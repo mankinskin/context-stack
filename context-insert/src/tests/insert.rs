@@ -44,7 +44,7 @@ fn index_pattern1() {
     let byz_found = graph.find_ancestor(&query);
     assert_matches!(
         byz_found,
-        Ok(ref response) if response.is_complete() && response.root_token() == byz,
+        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == byz,
         "byz"
     );
     let query = vec![ab, y];
@@ -52,7 +52,7 @@ fn index_pattern1() {
     let aby_found = graph.find_parent(&query);
     assert_matches!(
         aby_found,
-        Ok(ref response) if response.is_complete() && response.root_token() == aby,
+        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
         "aby"
     );
 }
@@ -95,7 +95,7 @@ fn index_pattern2() {
     let aby_found = graph_ref.find_ancestor(&query);
     assert_matches!(
         aby_found,
-        Ok(ref response) if response.is_complete() && response.root_token() == aby,
+        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
         "aby"
     );
 }
@@ -135,7 +135,7 @@ fn index_infix1() {
     let aby_found = graph_ref.find_ancestor(&query);
     assert_matches!(
         aby_found,
-        Ok(ref response) if response.is_complete() && response.root_token() == aby,
+        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
         "aby"
     );
     let abyz = graph_ref
@@ -222,7 +222,7 @@ fn index_prefix1() {
     );
     let fold_res =
         Searchable::search::<InsertTraversal>(vec![h, e, l, l], graph.clone());
-    assert_matches!(fold_res, Ok(ref response) if !response.is_complete());
+    assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
     let state = fold_res.unwrap();
     let init = InitInterval::from(state);
 
@@ -276,7 +276,7 @@ fn index_postfix1() {
     let fold_res =
         Searchable::search::<InsertTraversal>(vec![b, c, d, d], graph.clone());
 
-    assert_matches!(fold_res, Ok(ref response) if !response.is_complete());
+    assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
     let state = fold_res.unwrap();
     let init = InitInterval::from(state);
     assert_eq!(

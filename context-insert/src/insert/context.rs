@@ -71,8 +71,8 @@ impl<R: InsertResult> InsertCtx<R> {
     ) -> Result<Result<R, R::Error>, ErrorState> {
         match searchable.search::<InsertTraversal>(self.graph.clone()) {
             Ok(result) => {
-                // Check if the result is complete
-                if result.is_complete() {
+                // Check if the query was exhausted and result is full token
+                if result.query_exhausted() && result.is_full_token() {
                     // Extract the query pattern from the cursor and the root token from the complete path
                     let query_path = result.query_pattern().clone();
                     let root_token = result.root_token();
@@ -81,7 +81,7 @@ impl<R: InsertResult> InsertCtx<R> {
                         path: query_path,
                     }))
                 } else {
-                    // Incomplete result - need to insert
+                    // Query not exhausted - need to insert
                     Ok(Ok(self.insert_init(
                         <R::Extract as ResultExtraction>::extract_from(&result),
                         InitInterval::from(result),

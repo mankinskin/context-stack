@@ -43,27 +43,28 @@ pub trait Searchable {
 ```rust
 pub struct Response {
     pub cache: TraceCache,      // Trace cache built during search
-    pub end: EndState,          // Terminal state (complete or incomplete)
+    pub end: MatchedEndState,   // Terminal state with path and cursor
 }
 ```
 
-**Why unified?** Whether a search fully matches or partially matches, you get back a `Response`. The distinction is:
-- **Complete**: `response.is_complete() == true` - full pattern match found
-- **Incomplete**: `response.is_complete() == false` - search stopped before completing
+**Why unified?** Whether a search fully matches or partially matches, you get back a `Response`. Two orthogonal properties:
+- **Query exhausted**: `response.query_exhausted() == true` - entire query was matched
+- **Full token**: `response.is_full_token() == true` - result is complete pre-existing token
 
 **Key accessor methods:**
 ```rust
-// Check completion
-response.is_complete() -> bool
-response.as_complete() -> Option<&IndexRangePath>
+// Check query and match status (two independent properties)
+response.query_exhausted() -> bool   // Has entire query been matched?
+response.is_full_token() -> bool     // Is result a complete token?
+response.as_complete() -> Option<&IndexRangePath>  // Some if both true
 
-// Get data (works for both complete and incomplete)
+// Get data (works for all result types)
 response.root_token() -> Token
 response.query_pattern() -> &PatternRangePath  
 response.query_cursor() -> &PatternCursor
 response.cursor_position() -> AtomPosition
 
-// Unwrap complete (panics if incomplete)
+// Unwrap complete (panics if not query_exhausted && is_full_token)
 response.expect_complete(msg) -> IndexRangePath
 response.unwrap_complete() -> IndexRangePath
 ```
@@ -109,11 +110,10 @@ The search engine:
 **Step 3: Result Construction**
 ```rust
 Response {
-    cache: TraceCache,     // What was learned during search
-    end: EndState {        // Where/how search terminated
-        path: PathEnum,    // Complete/Range/Postfix/Prefix
-        cursor: PatternCursor,  // Current position
-        reason: EndReason, // Why search stopped
+    cache: TraceCache,           // What was learned during search
+    end: MatchedEndState {       // Where/how search terminated
+        path: PathCoverage,      // EntireRoot/Range/Postfix/Prefix
+        cursor: PatternCursor,   // Current position in query
     }
 }
 ```
@@ -225,14 +225,19 @@ let query = vec![h, e, l, l, o];
 let result: Result<Response, ErrorState> = 
     Searchable::search::<InsertTraversal>(query, graph.clone())?;
 
-// Handle result
-if result.is_complete() {
-    println!("Found complete match!");
-    let path = result.expect_complete("should be complete");
-    let root = path.root_parent();
-    println!("Root token: {:?}", root);
+// Handle result - check both properties
+if result.query_exhausted() {
+    if result.is_full_token() {
+        println!("Found exact match!");
+        let path = result.expect_complete("query exhausted and full token");
+        let root = path.root_parent();
+        println!("Root token: {:?}", root);
+    } else {
+        println!("Query exhausted within token: {:?}", 
+                 result.root_token());
+    }
 } else {
-    println!("Incomplete match at position: {:?}", 
+    println!("Query not exhausted at position: {:?}", 
              result.cursor_position());
 }
 ```
@@ -246,27 +251,27 @@ use context_search::Find;
 let query = vec![a, b, c];
 let result = graph.find_ancestor(query)?;
 
-// Check if found
-match result.as_complete() {
-    Some(path) => {
-        println!("Found ancestor: {:?}", path.root_parent());
-    },
-    None => {
-        println!("No complete ancestor found");
-        // Can still use the incomplete result
-        let partial = result.query_pattern();
-        println!("Got up to: {:?}", partial);
-    }
+// Check if query was exhausted and result is full token
+if result.query_exhausted() && result.is_full_token() {
+    let path = result.as_complete().unwrap();
+    println!("Found exact ancestor: {:?}", path.root_parent());
+} else if result.query_exhausted() {
+    println!("Query exhausted within: {:?}", result.root_token());
+} else {
+    println!("Query not exhausted");
+    // Can still use the partial result
+    let partial = result.query_pattern();
+    println!("Got up to: {:?}", partial);
 }
 ```
 
-### Handle Incomplete Searches
+### Handle Partial Searches
 
 ```rust
-// Search that might not complete
+// Search that might not exhaust query
 let result = Searchable::search::<InsertTraversal>(query, graph)?;
 
-if !result.is_complete() {
+if !result.query_exhausted() {
     // Extract information about where search stopped
     let position = result.cursor_position();
     let pattern = result.query_pattern();
@@ -310,8 +315,8 @@ use context_insert::InitInterval;
 // Search first
 let result = graph.find_ancestor(query)?;
 
-// If incomplete, prepare for insertion
-if !result.is_complete() {
+// If query not exhausted, prepare for insertion
+if !result.query_exhausted() {
     // Convert response to insertion initialization
     let init = InitInterval::from(result);
     
@@ -327,15 +332,15 @@ if !result.is_complete() {
 ### Pattern: Check Before Unwrap
 
 ```rust
-// ✅ Safe pattern
-if response.is_complete() {
-    let path = response.expect_complete("checked above");
+// ✅ Safe pattern - check both properties
+if response.query_exhausted() && response.is_full_token() {
+    let path = response.expect_complete("checked both above");
     let token = path.root_parent();
     // Use token
 }
 
 // ❌ Unsafe - might panic
-let path = response.expect_complete("hope it's complete!");
+let path = response.expect_complete("hope it's exhausted and exact!");
 ```
 
 ### Pattern: Extract Data Without Consuming
@@ -353,14 +358,18 @@ let path = response.expect_complete("msg");  // Consumes response
 
 ```rust
 // ✅ Comprehensive handling
-match response.as_complete() {
-    Some(path) => {
-        // Handle complete match
-        println!("Complete: {:?}", path.root_parent());
+match (response.query_exhausted(), response.is_full_token()) {
+    (true, true) => {
+        // Perfect match: query exhausted and exact token
+        println!("Exact: {:?}", response.as_complete().unwrap().root_parent());
     },
-    None => {
-        // Handle incomplete match
-        println!("Incomplete at: {:?}", response.cursor_position());
+    (true, false) => {
+        // Query matched but within token (intersection path)
+        println!("Exhausted within: {:?}", response.root_token());
+    },
+    (false, _) => {
+        // Query not fully matched
+        println!("Not exhausted at: {:?}", response.cursor_position());
         // Can still use response for other operations
     }
 }
@@ -476,15 +485,23 @@ Input Tokens → Fold to Context → Traverse Graph
 
 ## Common Gotchas
 
-### 1. Forgetting to Check is_complete()
+### 1. Forgetting to Check query_exhausted() and is_full_token()
 
 ```rust
 // ❌ Wrong - might panic
 let path = response.expect_complete("found");
 
-// ✅ Correct - check first
-if response.is_complete() {
+// ✅ Correct - check both properties
+if response.query_exhausted() && response.is_full_token() {
     let path = response.expect_complete("checked");
+}
+// Or handle all cases
+if response.query_exhausted() {
+    if response.is_full_token() {
+        // Exact token match
+    } else {
+        // Query exhausted but intersection path
+    }
 }
 ```
 
@@ -561,16 +578,17 @@ fn test_pattern_search() {
     ).unwrap();
     
     // Assert expectations
-    assert!(result.is_complete());
+    assert!(result.query_exhausted());
+    assert!(result.is_full_token());
     assert_eq!(result.root_token(), abc);
 }
 ```
 
-### Testing Incomplete Searches
+### Testing Partial Searches
 
 ```rust
 #[test]
-fn test_incomplete_search() {
+fn test_partial_search() {
     let _tracing = context_trace::init_test_tracing!();
     
     let mut graph = Hypergraph::default();
@@ -584,8 +602,8 @@ fn test_incomplete_search() {
         graph.clone()
     ).unwrap();
     
-    // Should be incomplete
-    assert!(!result.is_complete());
+    // Query should not be exhausted
+    assert!(!result.query_exhausted());
     
     // Can still get useful information
     let position = result.cursor_position();
@@ -646,16 +664,21 @@ eprintln!("Cache: {}", pretty(&response.cache));
 
 ### Common Issues
 
-**Search returns incomplete when expected complete:**
+**Search returns not exhausted when expected:**
 - Check if all patterns exist in graph
 - Verify query tokens are correct
 - Inspect cache to see what was found
 - Check if pattern hierarchy is as expected
 
 **Search panics on expect_complete():**
-- Always check `is_complete()` first
+- Always check `query_exhausted() && is_full_token()` first
 - Use `as_complete()` for safe Option handling
-- Add logging to see why incomplete
+- Add logging to see why not exhausted or not full token
+
+**Query exhausted but not full token:**
+- Result is an intersection path within a token
+- Query matched but doesn't align with token boundaries
+- May need different search strategy or pattern structure
 
 **Search is slow:**
 - Check cache size (might be very large)

@@ -33,6 +33,12 @@ impl Response {
         self.end.query_exhausted()
     }
 
+    /// Check if the result is a complete pre-existing token in the graph
+    /// Returns true for PathCoverage::EntireRoot, false for Range/Prefix/Postfix
+    pub fn is_full_token(&self) -> bool {
+        self.end.is_full_token()
+    }
+
     /// Unwrap a complete response, panicking if incomplete
     pub fn unwrap_complete(self) -> IndexRangePath {
         self.expect_complete("Called unwrap_complete on incomplete Response")

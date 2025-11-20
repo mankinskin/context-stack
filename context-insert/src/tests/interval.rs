@@ -216,7 +216,7 @@ fn interval_graph1() {
     } = env;
     let query = vec![*a, *bc, *d, *e];
     let res = graph.find_ancestor(query).unwrap();
-    assert!(!res.is_complete());
+    assert!(!res.query_exhausted());
     let init = InitInterval::from(res);
     let interval = IntervalGraph::from((&mut *graph, init));
     assert_eq!(
@@ -255,7 +255,7 @@ fn interval_graph2() {
     );
     let query = vec![d, e, f, g, h];
     let res = graph.find_ancestor(query).unwrap();
-    assert!(!res.is_complete());
+    assert!(!res.query_exhausted());
     let init = InitInterval::from(res);
 
     assert_eq!(

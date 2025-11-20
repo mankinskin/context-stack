@@ -20,15 +20,15 @@ Think of it as the "write engine" - it knows how to safely modify the graph by i
 
 ### 1. When Do You Need Insertion?
 
-Insertion is needed when a search returns an incomplete result:
+Insertion is needed when a search doesn't exhaust the query:
 
 ```rust
 // Search for a sequence
 let query = vec![a, b, c, d];
 let result = graph.find_ancestor(query)?;
 
-if !result.is_complete() {
-    // Pattern doesn't exist - need to insert it
+if !result.query_exhausted() {
+    // Query not fully matched - need to insert remaining part
     let init = InitInterval::from(result);
     // Perform insertion...
 }
@@ -42,7 +42,7 @@ if !result.is_complete() {
 
 ### 2. The InitInterval Type
 
-When a search is incomplete, you can convert the `Response` to an `InitInterval`:
+When a search doesn't exhaust the query, you can convert the `Response` to an `InitInterval`:
 
 ```rust
 pub struct InitInterval {
@@ -461,11 +461,11 @@ Join result: abcd = [a, b, c, d]
 ### 1. Converting Response Before Checking
 
 ```rust
-// ❌ Wrong - converting complete response
-let init = InitInterval::from(response);  // Should check is_complete() first!
+// ❌ Wrong - converting query-exhausted response
+let init = InitInterval::from(response);  // Should check query_exhausted() first!
 
-// ✅ Correct - only convert if incomplete
-if !response.is_complete() {
+// ✅ Correct - only convert if query not exhausted
+if !response.query_exhausted() {
     let init = InitInterval::from(response);
     // Now insert
 }

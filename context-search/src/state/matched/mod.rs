@@ -48,6 +48,13 @@ impl MatchedEndState {
         checkpoint_pos >= query_length
     }
 
+    /// Check if the result is a complete pre-existing token in the graph
+    /// Returns true for PathCoverage::EntireRoot (full token match),
+    /// false for Range/Prefix/Postfix (intersection paths within tokens)
+    pub fn is_full_token(&self) -> bool {
+        matches!(self.path, PathCoverage::EntireRoot(_))
+    }
+
     ///// Extract IndexRangePath and cursor for parent state generation
     ///// Returns None for Prefix paths (complex path type)
     //fn to_parent_state(&self) -> Option<(IndexRangePath, PatternCursor)> {
