@@ -1,0 +1,51 @@
+pub mod block_iter;
+
+use context_trace::*;
+
+use std::{
+    fmt::Debug,
+    str::Chars,
+};
+
+pub trait ToNewAtomIndices: Debug {
+    fn to_new_Atom_indices<'a: 'g, 'g, G: HasGraphMut<Kind = BaseGraphKind>>(
+        self,
+        graph: &'a mut G,
+    ) -> NewAtomIndices;
+}
+
+impl ToNewAtomIndices for NewAtomIndices {
+    fn to_new_atom_indices<'a: 'g, 'g, G: HasGraphMut<Kind = BaseGraphKind>>(
+        self,
+        _graph: &'a mut G,
+    ) -> NewAtomIndices {
+        self
+    }
+}
+impl ToNewAtomIndices for Chars<'_> {
+    fn to_new_atom_indices<'a: 'g, 'g, G: HasGraphMut<Kind = BaseGraphKind>>(
+        self,
+        graph: &'a mut G,
+    ) -> NewAtomIndices {
+        graph.graph_mut().new_atom_indices(self)
+    }
+}
+//impl<T: Atomize> ToNewTokenIndices<T> for Vec<T> {
+//    fn to_new_atom_indices<'a: 'g, 'g, G: HasGraphMut>(
+//        self,
+//        graph: &'a mut G,
+//    ) -> NewTokenIndices {
+//        graph.graph_mut().new_atom_indices(self)
+//    }
+//}
+
+//impl<Iter: IntoIterator<Item = DefaultAtom> + Debug + Send + Sync> ToNewAtomIndices<DefaultAtom>
+//    for Iter
+//{
+//    fn to_new_atom_indices<'a: 'g, 'g, G: HasGraphMut<Kind = BaseGraphKind>>(
+//        self,
+//        graph: &'a mut G,
+//    ) -> NewTokenIndices {
+//        graph.graph_mut().new_atom_indices(self)
+//    }
+//}
