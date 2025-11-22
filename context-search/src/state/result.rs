@@ -92,6 +92,6 @@ impl Response {
 
 impl TargetKey for Response {
     fn target_key(&self) -> DirectedKey {
-        DirectedKey::up(self.end.root_parent(), self.end.root_parent().width())
+        DirectedKey::up(self.end.root_parent(), *self.end.root_parent().width())
     }
 }

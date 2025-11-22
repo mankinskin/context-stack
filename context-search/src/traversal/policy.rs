@@ -58,3 +58,6 @@ pub trait DirectedTraversalPolicy: Sized + Debug {
         }
     }
 }
+impl<'a, P: DirectedTraversalPolicy> DirectedTraversalPolicy for &'a P {
+    type Trav = &'a P::Trav;
+}

@@ -174,7 +174,7 @@ fn test_child_state_advance_success() {
     );
 
     let child_state = ChildState {
-        current_pos: AtomPosition::from(0),
+        entry_pos: AtomPosition::from(0),
         path,
     };
 
@@ -227,7 +227,7 @@ fn test_child_state_advance_at_end() {
     );
 
     let child_state = ChildState {
-        current_pos: AtomPosition::from(0),
+        entry_pos: AtomPosition::from(0),
         path,
     };
 

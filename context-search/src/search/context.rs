@@ -1,7 +1,7 @@
 use crate::{
     traversal::{
         policy::DirectedTraversalPolicy,
-        TraversalKind,
+        SearchKind,
     },
     BftQueue,
 };
@@ -41,10 +41,13 @@ impl<T: HasGraph> Default for AncestorSearchTraversal<T> {
     }
 }
 
-impl<T: HasGraph> TraversalKind for AncestorSearchTraversal<T> {
+impl<T: HasGraph> TraceKind for AncestorSearchTraversal<T> {
     type Trav = SearchCtx<T>;
+}
+impl<T: HasGraph> SearchKind for AncestorSearchTraversal<T> {
     type Container = BftQueue;
     type Policy = AncestorPolicy<Self::Trav>;
+    type EndNode = PositionAnnotated<ChildLocation>;
 }
 #[derive(Debug)]
 pub(crate) struct ParentSearchTraversal<T: HasGraph>(
@@ -56,10 +59,13 @@ impl<T: HasGraph> Default for ParentSearchTraversal<T> {
     }
 }
 
-impl<T: HasGraph> TraversalKind for ParentSearchTraversal<T> {
+impl<T: HasGraph> TraceKind for ParentSearchTraversal<T> {
     type Trav = SearchCtx<T>;
+}
+impl<T: HasGraph> SearchKind for ParentSearchTraversal<T> {
     type Container = BftQueue;
     type Policy = ParentPolicy<Self::Trav>;
+    type EndNode = PositionAnnotated<ChildLocation>;
 }
 impl<T: HasGraph> SearchCtx<T> {
     pub(crate) fn new(graph: T) -> Self {

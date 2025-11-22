@@ -1,5 +1,6 @@
 use crate::{
     Token,
+    TokenWidth,
     graph::vertex::{
         data::VertexData,
         pattern::{
@@ -14,77 +15,77 @@ use crate::{
 };
 
 pub trait Wide {
-    fn width(&self) -> usize;
+    fn width(&self) -> TokenWidth;
 }
 
 impl Wide for Pattern {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         pattern_width(self)
     }
 }
 
 impl Wide for [Token] {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         pattern_width(self)
     }
 }
 
 impl Wide for char {
-    fn width(&self) -> usize {
-        1
+    fn width(&self) -> TokenWidth {
+        1.into()
     }
 }
 //impl<R> Wide for RolePath<R> {
-//    fn width(&self) -> usize {
+//    fn width(&self) -> TokenWidth {
 //        self.width
 //    }
 //}
 
 impl<T: Wide> Wide for &'_ T {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         (**self).width()
     }
 }
 
 impl<T: Wide> Wide for &'_ mut T {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         (**self).width()
     }
 }
 
 //impl Wide for OverlapPrimer {
-//    fn width(&self) -> usize {
+//    fn width(&self) -> TokenWidth {
 //        self.width
 //    }
 //}
 impl Wide for VertexData {
-    fn width(&self) -> usize {
-        self.width
+    fn width(&self) -> TokenWidth {
+        self.width.into()
     }
 }
 
 impl Wide for UpKey {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         self.index.width()
     }
 }
 
 impl Wide for DownKey {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         self.index.width()
     }
 }
 
 pub(crate) trait WideMut: Wide {
-    fn width_mut(&mut self) -> &mut usize;
+    fn width_mut(&mut self) -> &mut TokenWidth;
 }
 //impl<P: WideMut> WideMut for OriginPath<P> {
-//    fn width_mut(&mut self) -> &mut usize {
+//    fn width_mut(&mut self) -> &mut TokenWidth {
 //        self.postfix.width_mut()
 //    }
 //}
 //impl WideMut for OverlapPrimer {
-//    fn width_mut(&mut self) -> &mut usize {
+//    fn width_mut(&mut self) -> &mut TokenWidth {
 //        &mut self.width
 //    }
 //}

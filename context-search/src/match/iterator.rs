@@ -9,7 +9,7 @@ use crate::{
         SearchQueue,
     },
     state::matched::MatchedEndState,
-    traversal::TraversalKind,
+    traversal::SearchKind,
 };
 use context_trace::{
     logging::format_utils::pretty,
@@ -23,14 +23,14 @@ use tracing::{
 };
 
 #[derive(Debug, new)]
-pub(crate) struct SearchIterator<K: TraversalKind> {
+pub(crate) struct SearchIterator<K: SearchKind> {
     pub(crate) trace_ctx: TraceCtx<K::Trav>,
     pub(crate) queue: SearchQueue,
     /// Best checkpoint found so far during hierarchical search
     /// Updated whenever a root matches successfully, even if it needs parent exploration
     pub(crate) best_checkpoint: Option<MatchedEndState>,
 }
-impl<K: TraversalKind> SearchIterator<K> {
+impl<K: SearchKind> SearchIterator<K> {
     //#[context_trace::instrument_sig(skip(trav), fields(start_index = %start_index))]
     //pub(crate) fn start_index(
     //    trav: K::Trav,
@@ -75,14 +75,20 @@ impl<K: TraversalKind> SearchIterator<K> {
     }
 }
 
-impl<K: TraversalKind> SearchIterator<K> {
+impl<K: SearchKind> SearchIterator<K>
+where
+    K::Trav: Clone,
+{
     pub(crate) fn find_next(&mut self) -> Option<MatchedEndState> {
         trace!("finding next match");
         self.find_map(Some)
     }
 }
 
-impl<K: TraversalKind> Iterator for SearchIterator<K> {
+impl<K: SearchKind> Iterator for SearchIterator<K>
+where
+    K::Trav: Clone,
+{
     type Item = MatchedEndState;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -169,9 +175,7 @@ impl<K: TraversalKind> Iterator for SearchIterator<K> {
                             );
                         }
 
-                        match root_cursor
-                            .next_parents::<K>(&self.trace_ctx.trav)
-                        {
+                        match root_cursor.next_parents(&&self.trace_ctx.trav) {
                             Err(_end_state) => {
                                 // No more parents available - exhausted search without match
                                 // Don't return anything, continue to next candidate

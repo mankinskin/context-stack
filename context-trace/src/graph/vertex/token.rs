@@ -7,7 +7,16 @@ use std::{
     },
 };
 
-use derive_more::From;
+use derive_more::{
+    Add,
+    AddAssign,
+    Deref,
+    Display,
+    From,
+    Sub,
+    SubAssign,
+    Sum,
+};
 use serde::{
     Deserialize,
     Serialize,
@@ -42,18 +51,111 @@ use crate::{
 };
 
 #[derive(
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
     Debug,
     Clone,
     Copy,
     From,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
     Serialize,
     Deserialize,
+    Add,
+    Sub,
+    AddAssign,
+    SubAssign,
+    Deref,
+    Sum,
+    Display,
 )]
 pub struct TokenWidth(pub usize);
+
+// Allow comparing TokenWidth with usize directly
+impl PartialEq<usize> for TokenWidth {
+    fn eq(
+        &self,
+        other: &usize,
+    ) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<TokenWidth> for usize {
+    fn eq(
+        &self,
+        other: &TokenWidth,
+    ) -> bool {
+        *self == other.0
+    }
+}
+
+impl PartialOrd<usize> for TokenWidth {
+    fn partial_cmp(
+        &self,
+        other: &usize,
+    ) -> Option<Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+
+impl PartialOrd<TokenWidth> for usize {
+    fn partial_cmp(
+        &self,
+        other: &TokenWidth,
+    ) -> Option<Ordering> {
+        self.partial_cmp(&other.0)
+    }
+}
+
+// Allow adding/subtracting usize to/from TokenWidth
+impl std::ops::Add<usize> for TokenWidth {
+    type Output = TokenWidth;
+    fn add(
+        self,
+        rhs: usize,
+    ) -> TokenWidth {
+        TokenWidth(self.0 + rhs)
+    }
+}
+
+impl std::ops::Add<TokenWidth> for usize {
+    type Output = TokenWidth;
+    fn add(
+        self,
+        rhs: TokenWidth,
+    ) -> TokenWidth {
+        TokenWidth(self + rhs.0)
+    }
+}
+
+impl std::ops::Sub<usize> for TokenWidth {
+    type Output = TokenWidth;
+    fn sub(
+        self,
+        rhs: usize,
+    ) -> TokenWidth {
+        TokenWidth(self.0 - rhs)
+    }
+}
+
+impl std::ops::AddAssign<usize> for TokenWidth {
+    fn add_assign(
+        &mut self,
+        rhs: usize,
+    ) {
+        self.0 += rhs;
+    }
+}
+
+impl std::ops::SubAssign<usize> for TokenWidth {
+    fn sub_assign(
+        &mut self,
+        rhs: usize,
+    ) {
+        self.0 -= rhs;
+    }
+}
 
 impl Borrow<TokenWidth> for Token {
     fn borrow(&self) -> &TokenWidth {
@@ -102,11 +204,11 @@ impl Debug for Token {
 impl Token {
     pub fn new(
         index: impl HasVertexIndex,
-        width: usize,
+        width: impl Into<TokenWidth>,
     ) -> Self {
         Self {
             index: index.vertex_index(),
-            width: TokenWidth(width),
+            width: width.into(),
         }
     }
 
@@ -250,14 +352,14 @@ impl IntoIterator for Token {
 //}
 
 impl Wide for Token {
-    fn width(&self) -> usize {
-        self.width.0
+    fn width(&self) -> TokenWidth {
+        self.width
     }
 }
 
 impl WideMut for Token {
-    fn width_mut(&mut self) -> &mut usize {
-        &mut self.width.0
+    fn width_mut(&mut self) -> &mut TokenWidth {
+        &mut self.width
     }
 }
 

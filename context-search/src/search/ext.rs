@@ -1,11 +1,11 @@
-//pub(crate) trait IntoFoldCtx<K: TraversalKind> {
+//pub(crate) trait IntoFoldCtx<K: SearchKind> {
 //    fn start_search(
 //        self,
 //        trav: K::Trav,
 //    ) -> SearchState<K>;
 //}
 
-//impl<K: TraversalKind, S: ToToken> IntoFoldCtx<K> for S {
+//impl<K: SearchKind, S: ToToken> IntoFoldCtx<K> for S {
 //    fn start_search(
 //        self,
 //        trav: K::Trav,

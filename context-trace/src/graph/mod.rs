@@ -5,6 +5,7 @@ use std::sync::{
 
 use crate::{
     HashMap,
+    TokenWidth,
     graph::{
         child_strings::TokenStrings,
         getters::vertex::VertexSet,
@@ -362,7 +363,7 @@ where
         let s = if let Some(atom) = self.get_atom_by_key(&data.key) {
             atom.to_string()
         } else {
-            assert!(data.width() > 1);
+            assert!(data.width() > TokenWidth(1));
             self.pattern_string(data.expect_any_child_pattern().1)
         };
 

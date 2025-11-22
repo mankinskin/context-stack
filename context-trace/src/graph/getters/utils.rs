@@ -88,7 +88,7 @@ impl<G: GraphKind> Hypergraph<G> {
         range: Range<usize>,
     ) -> Token {
         let mut data = vertex.vertex(&self);
-        let mut wrap = 0..data.width();
+        let mut wrap = 0..data.width().0;
         assert!(wrap.start <= range.start && wrap.end >= range.end);
 
         while range != wrap {
@@ -96,7 +96,7 @@ impl<G: GraphKind> Hypergraph<G> {
                 .top_down_containment_nodes()
                 .into_iter()
                 .map(|(pos, c)| (wrap.start + pos, c))
-                .map(|(pos, c)| (c.vertex_index(), pos..pos + c.width()))
+                .map(|(pos, c)| (c.vertex_index(), pos..pos + c.width().0))
                 .find_or_first(|(_, w)| {
                     w.start == range.start || w.end == range.end
                 })

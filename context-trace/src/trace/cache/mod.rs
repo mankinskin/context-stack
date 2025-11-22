@@ -47,6 +47,11 @@ impl TraceCache {
     ) -> (DirectedKey, bool) {
         let edit = edit.into();
         let key = edit.target_key();
+        tracing::debug!(
+            "add_state: index={}, pos={:?}",
+            key.index,
+            key.pos
+        );
         if let Some(ve) = self.entries.get_mut(&key.index.vertex_index()) {
             if ve.get_mut(&key.pos).is_some() {
                 (key, false)

@@ -1,6 +1,7 @@
 use std::ops::ControlFlow;
 
 use crate::{
+    TokenWidth,
     direction::{
         Left,
         Right,
@@ -77,6 +78,23 @@ impl std::fmt::Display for ChildLocation {
             &format!("{}", self.pattern_id)[..8],
             self.sub_index
         )
+    }
+}
+
+impl crate::logging::compact_format::CompactFormat for ChildLocation {
+    fn fmt_compact(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut std::fmt::Formatter,
+        _indent: usize,
+    ) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
     }
 }
 
@@ -222,7 +240,7 @@ impl HasVertexIndex for ChildLocation {
 }
 
 impl Wide for ChildLocation {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         self.parent.width()
     }
 }

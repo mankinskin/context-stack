@@ -184,6 +184,8 @@ pub use crate::{
         structs::{
             role_path::RolePath,
             rooted::{
+                IntoChildLocation,
+                PathNode,
                 RootedRangePath,
                 index_range::IndexRangePath,
                 pattern_range::{
@@ -212,7 +214,10 @@ pub use crate::{
                     RootedPath,
                 },
             },
-            sub_path::SubPath,
+            sub_path::{
+                PositionAnnotated,
+                SubPath,
+            },
         },
     },
     trace::{
@@ -245,6 +250,7 @@ pub use crate::{
             iterator::{
                 ChildIterator,
                 ChildQueue,
+                TraceKind,
             },
             state::{
                 ChildState,

@@ -7,7 +7,10 @@ use crate::{
     },
     state::start::StartFoldPath,
 };
-use context_trace::*;
+use context_trace::{
+    IntoChildLocation,
+    *,
+};
 
 pub(crate) trait MovablePath<D: Direction, R: PathRole>:
     MovePath<D, R> + RootChildIndex<R> + RootPattern
@@ -24,16 +27,24 @@ impl<D: Direction, R: PathRole, P: MovablePath<D, R>, S: CursorState>
     MovePath<D, R> for PathCursor<P, S>
 where
     Self: MoveKey<D>,
+    P: MovePath<D, R>,
 {
+    type Node = P::Node;
+
+    fn path_pop_node(&mut self) -> Option<Self::Node> {
+        self.path.path_pop_node()
+    }
+
     fn move_path_segment<G: HasGraph>(
         &mut self,
-        location: &mut ChildLocation,
+        node: &mut Self::Node,
         trav: &G::Guard<'_>,
     ) -> ControlFlow<()> {
-        let flow = self.path.move_path_segment::<G>(location, trav);
+        let flow = self.path.move_path_segment::<G>(node, trav);
         if let ControlFlow::Continue(()) = flow {
             let graph = trav.graph();
-            self.move_key(graph.expect_child_at(*location).width());
+            let location = node.as_child_location();
+            self.move_key(*graph.expect_child_at(location).width());
         }
         flow
     }
@@ -58,7 +69,7 @@ where
             // When matching is complete, child_index may equal pattern.len()
             if child_index < pattern.len() {
                 let child_width = pattern[child_index].width();
-                self.move_key(child_width);
+                self.move_key(*child_width);
             }
         }
         flow
@@ -89,10 +100,11 @@ impl<P: RootedPath, S: CursorState> HasRootedPath<P> for PathCursor<P, S> {
 impl<R: PathRole, P: StartFoldPath + HasPath<R>, S: CursorState> HasPath<R>
     for PathCursor<P, S>
 {
-    fn path(&self) -> &Vec<ChildLocation> {
+    type Node = <P as HasPath<R>>::Node;
+    fn path(&self) -> &Vec<Self::Node> {
         HasPath::<R>::path(&self.path)
     }
-    fn path_mut(&mut self) -> &mut Vec<ChildLocation> {
+    fn path_mut(&mut self) -> &mut Vec<Self::Node> {
         HasPath::<R>::path_mut(&mut self.path)
     }
 }

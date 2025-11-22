@@ -15,6 +15,7 @@ use derive_more::{
 use std::{
     fmt::Debug,
     marker::PhantomData,
+    process::Child,
 };
 use tracing::debug;
 
@@ -27,7 +28,8 @@ use context_trace::trace::cache::key::directed::down::{
 pub(crate) struct CompareRootState {
     #[deref]
     #[deref_mut]
-    pub(crate) token: CompareState<Candidate, Candidate>,
+    pub(crate) token:
+        CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>>,
     pub(crate) root_parent: ParentState,
 }
 
@@ -62,31 +64,34 @@ impl StateAdvance for ParentCompareState {
                 // Get the token that index_cursor points to
                 let index_token = next
                     .child_state
-                    .leaf_token(trav)
-                    .expect("child_state should point to a valid token");
+                    .role_leaf_token::<End, _>(trav)
+                    .expect("parent should have valid end token");
                 let cursor_position = self.cursor.atom_position;
 
-                // Clone and simplify the child state path for checkpoint_child
-                let mut simplified_child_state = next.child_state.clone();
-                simplified_child_state
-                    .path
-                    .child_path_mut::<Start>()
-                    .simplify(trav);
-                simplified_child_state
-                    .path
-                    .child_path_mut::<End>()
-                    .simplify(trav);
+                // Clone and simplify the path, then convert to position-annotated
+                let mut simplified_path = next.child_state.path.clone();
+                simplified_path.child_path_mut::<Start, _>().simplify(trav);
+                simplified_path.child_path_mut::<End, _>().simplify(trav);
+
+                // Convert to position-annotated path for both working cursor and checkpoint
+                let annotated_path = simplified_path
+                    .with_positions(next.child_state.entry_pos, trav);
+                let child_state = ChildState {
+                    entry_pos: next.child_state.entry_pos,
+                    start_pos: next.child_state.start_pos,
+                    path: annotated_path.clone(),
+                };
 
                 Ok(CompareRootState {
                     token: CompareState {
                         child_cursor: ChildCursor {
-                            child_state: next.child_state.clone(),
+                            child_state: child_state.clone(),
                             _state: PhantomData,
                         },
                         cursor,
                         checkpoint: self.cursor,
                         checkpoint_child: ChildCursor {
-                            child_state: simplified_child_state,
+                            child_state,
                             _state: PhantomData,
                         },
                         mode: GraphMajor,

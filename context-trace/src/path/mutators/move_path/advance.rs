@@ -1,6 +1,9 @@
 use std::ops::ControlFlow;
 
-use crate::path::mutators::move_path::path::MovePath;
+use crate::path::{
+    mutators::move_path::path::MovePath,
+    structs::rooted::PathNode,
+};
 
 use crate::{
     direction::Right,
@@ -28,4 +31,5 @@ pub trait Advance: MovePath<Right, End> {
     }
 }
 
-impl<T: MovePath<Right, End>> Advance for T {}
+// Blanket implementation for types that implement MovePath with any Node type
+impl<T> Advance for T where T: MovePath<Right, End> {}

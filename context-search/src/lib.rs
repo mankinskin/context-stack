@@ -37,5 +37,5 @@ pub use crate::{
         result::Response,
         start::Searchable,
     },
-    traversal::TraversalKind,
+    traversal::SearchKind,
 };

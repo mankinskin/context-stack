@@ -15,8 +15,8 @@ use context_search::{
     AncestorPolicy,
     BftQueue,
     ErrorState,
+    SearchKind,
     Searchable,
-    TraversalKind,
 };
 use context_trace::*;
 use std::sync::RwLockReadGuard;
@@ -26,7 +26,7 @@ use crate::insert::result::InsertResult;
 #[derive(Debug, Clone, Default)]
 pub struct InsertTraversal;
 
-impl TraversalKind for InsertTraversal {
+impl SearchKind for InsertTraversal {
     type Trav = HypergraphRef;
     type Container = BftQueue;
     type Policy = AncestorPolicy<Self::Trav>;

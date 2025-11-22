@@ -76,18 +76,25 @@ impl RootKey for PathCoverage {
 }
 impl PathCoverage {
     pub(crate) fn from_range_path<G: HasGraph>(
-        mut path: IndexRangePath,
+        mut path: IndexRangePath<
+            ChildLocation,
+            PositionAnnotated<ChildLocation>,
+        >,
         root_pos: AtomPosition,
         target: DownKey,
         trav: &G,
     ) -> Self {
-        path.child_path_mut::<Start>().simplify(trav);
-        path.child_path_mut::<End>().simplify(trav);
+        // Simplify both paths
+        path.start_path_mut().simplify(trav);
+        path.end_path_mut().simplify(trav);
+
+        // Convert to plain path (strip position annotations) after simplification
+        let path = path.into_plain();
 
         let start_at_border = path.is_at_border::<_, Start>(trav.graph());
-        let start_path_empty = path.raw_child_path::<Start>().is_empty();
+        let start_path_empty = path.start_path().is_empty();
         let end_at_border = path.is_at_border::<_, End>(trav.graph());
-        let end_path_empty = path.raw_child_path::<End>().is_empty();
+        let end_path_empty = path.end_path().is_empty();
 
         tracing::debug!("from_range_path: start_at_border={}, start_path_empty={}, end_at_border={}, end_path_empty={}", 
             start_at_border, start_path_empty, end_at_border, end_path_empty);

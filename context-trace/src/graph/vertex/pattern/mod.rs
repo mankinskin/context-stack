@@ -17,6 +17,7 @@ use serde::{
 
 use crate::{
     ToToken,
+    TokenWidth,
     graph::vertex::{
         pattern::pattern_range::PatternRangeIndex,
         wide::Wide,
@@ -133,10 +134,10 @@ impl std::iter::FromIterator<Token> for Pattern {
 //pub(crate) type Patterns = Vec<Pattern>;
 
 pub trait PatternWidth: IntoPattern {
-    fn pattern_width(&self) -> usize;
+    fn pattern_width(&self) -> TokenWidth;
 }
 impl PatternWidth for Pattern {
-    fn pattern_width(&self) -> usize {
+    fn pattern_width(&self) -> TokenWidth {
         pattern_width(self)
     }
 }
@@ -228,7 +229,7 @@ impl<T> AsPatternMut for T where T: BorrowMut<Vec<Token>> + Debug {}
 
 pub fn pattern_width<T: Borrow<Token>>(
     pat: impl IntoIterator<Item = T>
-) -> usize {
+) -> TokenWidth {
     pat.into_iter().map(|c| c.borrow().width()).sum()
 }
 

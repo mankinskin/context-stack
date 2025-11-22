@@ -243,16 +243,17 @@ fn test_compare_state_candidate_advance() {
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
-        (ab, _ab_id) => [a, b],
+        (ab, ab_id) => [a, b],
         (abc, abc_id) => [ab, c]
     );
 
     // Create a CompareState<Candidate, Candidate>
     let root = IndexRoot::from(
-        ChildLocation::new(abc, abc_id, 0).into_pattern_location(),
+        ChildLocation::new(ab, ab_id, 0).into_pattern_location(),
     );
     let child_state = context_trace::ChildState {
-        current_pos: AtomPosition::from(0),
+        entry_pos: AtomPosition::from(0),
+        start_pos: AtomPosition::from(0),
         path: rooted_path!(Range: root, start: 0, end: 0),
     };
 
@@ -334,7 +335,8 @@ fn test_compare_state_matched_advance() {
         ChildLocation::new(abc, abc_id, 0).into_pattern_location(),
     );
     let child_state = context_trace::ChildState {
-        current_pos: AtomPosition::from(0),
+        entry_pos: AtomPosition::from(0),
+        start_pos: AtomPosition::from(0),
         path: rooted_path!(Range: root, start: 0, end: 0),
     };
 

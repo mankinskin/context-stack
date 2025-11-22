@@ -80,7 +80,7 @@ fn find_sequence() {
     );
     let query = graph.graph().expect_atom_children("abc".chars());
     let abc_found = graph.find_ancestor(&query).unwrap();
-    assert!(abc_found.query_exhausted(), "Query should be complete");
+    assert!(abc_found.query_exhausted(), "Query should be exhausted");
     match &abc_found.end.path {
         PathCoverage::EntireRoot(ref path) => {
             assert_eq!(path.root_parent(), *abc, "Should match abc root");
@@ -93,7 +93,7 @@ fn find_sequence() {
     let ababababcdefghi_found = graph.find_ancestor(&query).unwrap();
     assert!(
         ababababcdefghi_found.query_exhausted(),
-        "Query should be complete"
+        "Query should be exhausted"
     );
     match &ababababcdefghi_found.end.path {
         PathCoverage::EntireRoot(ref path) => {

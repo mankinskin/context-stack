@@ -84,13 +84,13 @@ impl Traceable for PostfixCommand {
         );
         let initial_prev = UpKey {
             index: start_index,
-            pos: start_index.width().into(),
+            pos: start_index.width().0.into(),
         };
         tracing::debug!(
             "PostfixCommand: calling trace_sub_path with initial_prev.pos={}",
             initial_prev.pos.0
         );
-        let prev = TraceRole::<Start>::trace_sub_path(
+        let sub_path_prev = TraceRole::<Start>::trace_sub_path(
             ctx,
             &self.path,
             initial_prev,
@@ -98,10 +98,16 @@ impl Traceable for PostfixCommand {
         );
         tracing::debug!(
             "PostfixCommand: trace_sub_path returned prev.pos={}",
-            prev.pos.0
+            sub_path_prev.pos.0
         );
-        tracing::trace!(?prev, "PostfixCommand: trace_sub_path returned");
+        tracing::trace!(?sub_path_prev, "PostfixCommand: trace_sub_path returned");
         let location = self.path.role_root_child_location::<Start>();
+        // For cache consistency, use the root position (from root_up_key) for prev
+        // The prev points to the child token at the parent's position
+        let prev = UpKey {
+            index: sub_path_prev.index,
+            pos: self.root_up_key.pos,
+        };
         tracing::debug!(
             "Creating bottom-up edge with position={}",
             self.root_up_key.pos.0
@@ -170,23 +176,22 @@ impl Traceable for RangeCommand {
         );
         let first = self.path.role_leaf_token_location::<Start>().unwrap();
         let start_index = *ctx.trav.graph().expect_child_at(first);
-        let prev = TraceRole::<Start>::trace_sub_path(
+        let sub_path_prev = TraceRole::<Start>::trace_sub_path(
             ctx,
             &self.path,
             UpKey {
                 index: start_index,
-                pos: start_index.width().into(),
+                pos: start_index.width().0.into(),
             },
             self.add_edges,
         );
-        //let location = self.path.role_root_child_location::<Start>();
-        //let new = UpEdit {
-        //    target: self.root_up_key.clone(),
-        //    prev,
-        //    location,
-        //};
+        // For cache consistency, prev should use the parent's current position (root_pos)
+        // The prev points to the child token, but at the parent's position
         let root_entry = self.path.role_root_child_location::<Start>();
-        //let root_entry_index = *ctx.trav.graph().expect_child_at(&root_entry);
+        let prev = UpKey {
+            index: sub_path_prev.index,  // Use the child token from trace_sub_path
+            pos: self.root_pos,  // But with the parent's position
+        };
         let root_up_key = UpKey {
             index: root_entry.parent,
             pos: self.root_pos,

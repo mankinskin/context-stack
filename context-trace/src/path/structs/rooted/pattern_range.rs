@@ -13,11 +13,13 @@ use crate::{
     *,
 };
 
-pub type PatternRangePath = RootedRangePath<Pattern>;
-pub type PatternPostfixPath = RootedRolePath<Start, Pattern>;
-pub type PatternPrefixPath = RootedRolePath<End, Pattern>;
+pub type PatternRangePath<StartNode = ChildLocation, EndNode = ChildLocation> =
+    RootedRangePath<Pattern, StartNode, EndNode>;
+pub type PatternPostfixPath<N = ChildLocation> =
+    RootedRolePath<Start, Pattern, N>;
+pub type PatternPrefixPath<N = ChildLocation> = RootedRolePath<End, Pattern, N>;
 
-impl PatternRangePath {
+impl PatternRangePath<ChildLocation, ChildLocation> {
     /// Check if this range path has reached the end of its pattern
     /// and should be converted to a Postfix path
     pub fn is_at_pattern_end(&self) -> bool {
@@ -31,7 +33,7 @@ impl PatternRangePath {
     }
 }
 
-impl RangePath for PatternRangePath {
+impl RangePath for PatternRangePath<ChildLocation, ChildLocation> {
     //fn new_range(
     //    root: Self::Root,
     //    entry: usize,
@@ -44,13 +46,15 @@ impl RangePath for PatternRangePath {
     //    }
     //}
 }
-impl RootChildIndexMut<End> for PatternRangePath {
+impl RootChildIndexMut<End> for PatternRangePath<ChildLocation, ChildLocation> {
     fn root_child_index_mut(&mut self) -> &mut usize {
         &mut self.end.sub_path.root_entry
     }
 }
 
-impl<P: IntoPattern> From<P> for PatternRangePath {
+impl<P: IntoPattern> From<P>
+    for PatternRangePath<ChildLocation, ChildLocation>
+{
     fn from(p: P) -> Self {
         let p = p.into_pattern();
         let entry =
@@ -62,22 +66,24 @@ impl<P: IntoPattern> From<P> for PatternRangePath {
         }
     }
 }
-impl_root! { RootPattern for PatternRangePath, self, _trav => PatternRoot::pattern_root_pattern(self) }
-impl_root! { PatternRoot for PatternRangePath, self => self.root.borrow() }
+impl_root! { RootPattern for PatternRangePath<ChildLocation, ChildLocation>, self, _trav => PatternRoot::pattern_root_pattern(self) }
+impl_root! { PatternRoot for PatternRangePath<ChildLocation, ChildLocation>, self => self.root.borrow() }
 impl_root! { <Role: PathRole> PatternRoot for PatternRolePath<Role>, self => self.root.borrow() }
 
-impl RootChildIndex<Start> for PatternRangePath {
+impl RootChildIndex<Start> for PatternRangePath<ChildLocation, ChildLocation> {
     fn root_child_index(&self) -> usize {
         self.start.root_entry
     }
 }
-impl RootChildIndex<End> for PatternRangePath {
+impl RootChildIndex<End> for PatternRangePath<ChildLocation, ChildLocation> {
     fn root_child_index(&self) -> usize {
         self.end.root_entry
     }
 }
 
-impl MoveRootIndex<Right, End> for PatternRangePath {
+impl MoveRootIndex<Right, End>
+    for PatternRangePath<ChildLocation, ChildLocation>
+{
     fn move_root_index<G: HasGraph>(
         &mut self,
         _trav: &G,
@@ -111,18 +117,21 @@ impl MoveRootIndex<Right, End> for PatternRangePath {
 }
 
 impl<R: PathRole> LeafToken<R> for PatternRolePath<R> where
-    Self: HasPath<R> + PatternRootChild<R>
+    Self: HasPath<R, Node = ChildLocation> + PatternRootChild<R>
 {
 }
-impl<R: PathRole> LeafToken<R> for PatternRangePath where
-    Self: HasPath<R> + PatternRootChild<R>
+impl<R: PathRole> LeafToken<R>
+    for PatternRangePath<ChildLocation, ChildLocation>
+where
+    Self: HasPath<R, Node = ChildLocation> + PatternRootChild<R>,
 {
 }
 
 impl<R: PathRole> HasPath<R> for PatternRangePath
 where
-    Self: HasRolePath<R>,
+    Self: HasRolePath<R, Node = ChildLocation>,
 {
+    type Node = ChildLocation;
     fn path(&self) -> &Vec<ChildLocation> {
         HasRolePath::<R>::role_path(self).path()
     }
@@ -140,12 +149,12 @@ where
         self.into_role_path().into_rooted(root)
     }
 }
-impl IntoRolePath<Start> for PatternRangePath {
+impl IntoRolePath<Start> for PatternRangePath<ChildLocation, ChildLocation> {
     fn into_role_path(self) -> RolePath<Start> {
         self.start
     }
 }
-impl IntoRolePath<End> for PatternRangePath {
+impl IntoRolePath<End> for PatternRangePath<ChildLocation, ChildLocation> {
     fn into_role_path(self) -> RolePath<End> {
         self.end
     }
@@ -155,19 +164,21 @@ impl<R: PathRole> PatternRootChild<R> for PatternRolePath<R> where
     Self: RootChildIndex<R>
 {
 }
-impl<R: PathRole> PatternRootChild<R> for PatternRangePath where
-    Self: RootChildIndex<R>
+impl<R: PathRole> PatternRootChild<R>
+    for PatternRangePath<ChildLocation, ChildLocation>
+where
+    Self: RootChildIndex<R>,
 {
 }
 
-impl_root_child_token! { RootChildToken for PatternRangePath, self, _trav =>
+impl_root_child_token! { RootChildToken for PatternRangePath<ChildLocation, ChildLocation>, self, _trav =>
        *self.root.get(self.role_root_child_index::<R>()).unwrap()
 }
 impl<Root: PathRoot> CalcOffset for RootedRangePath<Root> {
     fn calc_offset<G: HasGraph>(
         &self,
         trav: G,
-    ) -> usize {
+    ) -> TokenWidth {
         let outer_offsets =
             self.start.calc_offset(&trav) + self.end.calc_offset(&trav);
         let graph = trav.graph();
@@ -177,7 +188,7 @@ impl<Root: PathRoot> CalcOffset for RootedRangePath<Root> {
         let inner_offset = if entry < exit {
             pattern_width(&pattern[entry + 1..exit])
         } else {
-            0
+            TokenWidth(0)
         };
         inner_offset + outer_offsets
     }

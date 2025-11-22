@@ -10,6 +10,8 @@ use accessors::{
 };
 
 use crate::{
+    PathNode,
+    TokenWidth,
     direction::pattern::PatternDirection,
     graph::vertex::{
         location::child::ChildLocation,
@@ -111,7 +113,7 @@ pub trait RolePathUtils {
     fn role_outer_width<G: HasGraph, R: PathRole>(
         &self,
         trav: &G,
-    ) -> usize
+    ) -> TokenWidth
     where
         Self: GraphRootChild<R>,
     {
@@ -120,7 +122,7 @@ pub trait RolePathUtils {
     fn role_inner_width<G: HasGraph, R: PathRole>(
         &self,
         trav: &G,
-    ) -> usize
+    ) -> TokenWidth
     where
         Self: GraphRootChild<R>,
     {
@@ -142,9 +144,11 @@ pub trait RolePathUtils {
         )
         .is_none()
     }
-    fn child_path_mut<R: PathRole>(&mut self) -> &mut RolePath<R>
+    fn child_path_mut<R: PathRole, Node: PathNode>(
+        &mut self
+    ) -> &mut RolePath<R, Node>
     where
-        Self: HasRolePath<R>,
+        Self: HasRolePath<R, Node = Node>,
     {
         HasRolePath::<R>::role_path_mut(self)
     }
@@ -156,13 +160,13 @@ pub trait RolePathUtils {
     }
     fn raw_child_path<R: PathRole>(&self) -> &Vec<ChildLocation>
     where
-        Self: HasRolePath<R>,
+        Self: HasRolePath<R, Node = ChildLocation>,
     {
         HasRolePath::<R>::role_path(self).path()
     }
     fn raw_child_path_mut<R: PathRole>(&mut self) -> &mut Vec<ChildLocation>
     where
-        Self: HasRolePath<R>,
+        Self: HasRolePath<R, Node = ChildLocation>,
     {
         HasRolePath::<R>::role_path_mut(self).path_mut()
     }

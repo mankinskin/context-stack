@@ -9,6 +9,7 @@ use derive_more::Deref;
 use derive_new::new;
 
 use crate::{
+    TokenWidth,
     HashMap,
     graph::{
         getters::vertex::VertexSet,
@@ -98,7 +99,7 @@ impl GraphBuilder {
     ) {
         self.graph.insert_vertex_data(VertexData::new(
             node.index.vertex_index(),
-            node.range.clone().count(),
+            TokenWidth(node.range.clone().count()),
         ));
         self.queue.push_back(node);
     }
@@ -108,8 +109,8 @@ impl GraphBuilder {
         node: BuilderNode,
     ) {
         for rule in match node.index.width() {
-            1 => vec![],
-            2 => vec![node.prefix_rule()],
+            TokenWidth(1) => vec![],
+            TokenWidth(2) => vec![node.prefix_rule()],
             _ => vec![node.prefix_rule(), node.postfix_rule()],
         } {
             let pid = PatternId::default();

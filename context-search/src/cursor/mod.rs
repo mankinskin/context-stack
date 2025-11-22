@@ -55,8 +55,11 @@ pub(crate) type PatternPrefixCursor = PathCursor<PatternPrefixPath>;
 /// This allows tracking the state (Matched/Candidate/Mismatched) of the index path
 /// without duplicating the path information that ChildState already contains.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ChildCursor<State = Matched> {
-    pub(crate) child_state: ChildState,
+pub(crate) struct ChildCursor<
+    State = Matched,
+    EndNode: PathNode = ChildLocation,
+> {
+    pub(crate) child_state: ChildState<EndNode>,
     pub(crate) _state: PhantomData<State>,
 }
 
@@ -189,9 +192,9 @@ impl<P> MarkMatchState for PathCursor<P, Candidate> {
 //}
 
 // ChildCursor state transitions
-impl ChildCursor<Matched> {
+impl<EndNode: PathNode> ChildCursor<Matched, EndNode> {
     /// Convert a Matched cursor to a Candidate by creating a copy
-    pub(crate) fn as_candidate(&self) -> ChildCursor<Candidate> {
+    pub(crate) fn as_candidate(&self) -> ChildCursor<Candidate, EndNode> {
         ChildCursor {
             child_state: self.child_state.clone(),
             _state: PhantomData,
@@ -199,9 +202,9 @@ impl ChildCursor<Matched> {
     }
 }
 
-impl MarkMatchState for ChildCursor<Candidate> {
-    type Matched = ChildCursor<Matched>;
-    type Mismatched = ChildCursor<Mismatched>;
+impl<EndNode: PathNode> MarkMatchState for ChildCursor<Candidate, EndNode> {
+    type Matched = ChildCursor<Matched, EndNode>;
+    type Mismatched = ChildCursor<Mismatched, EndNode>;
 
     fn mark_match(self) -> Self::Matched {
         ChildCursor {

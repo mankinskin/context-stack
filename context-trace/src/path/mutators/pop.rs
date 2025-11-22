@@ -7,23 +7,24 @@ use crate::{
             rooted::{
                 role_path::RootedRolePath,
                 root::PathRoot,
+                PathNode,
             },
         },
     },
 };
 
 // pop path segments
-pub trait PathPop {
-    fn path_pop(&mut self) -> Option<ChildLocation>;
+pub trait PathPop<Node = ChildLocation> {
+    fn path_pop(&mut self) -> Option<Node>;
 }
 
-impl<Role: PathRole, Root: PathRoot> PathPop for RootedRolePath<Role, Root> {
+impl<Role: PathRole, Root: PathRoot> PathPop<ChildLocation> for RootedRolePath<Role, Root> {
     fn path_pop(&mut self) -> Option<ChildLocation> {
         self.role_path.path_pop()
     }
 }
 
-impl<R: PathRole> PathPop for RolePath<R> {
+impl<R: PathRole> PathPop<ChildLocation> for RolePath<R> {
     fn path_pop(&mut self) -> Option<ChildLocation> {
         self.sub_path.path.pop()
     }

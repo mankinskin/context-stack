@@ -19,18 +19,19 @@ use auto_impl::auto_impl;
 /// access to a rooted path pointing to a descendant
 #[auto_impl(& mut)]
 pub trait HasPath<R> {
-    fn path(&self) -> &Vec<ChildLocation>;
-    fn path_mut(&mut self) -> &mut Vec<ChildLocation>;
+    type Node;
+    fn path(&self) -> &Vec<Self::Node>;
+    fn path_mut(&mut self) -> &mut Vec<Self::Node>;
 }
 
 /// access to a rooted path pointing to a descendant
 pub trait IntoRootedRolePath<R: PathRole>:
     IntoRolePath<R> + RootedPath
 {
-    fn into_rooted_role_path(self) -> RootedRolePath<R, Self::Root>;
-    fn get_rooted_role_path(&self) -> RootedRolePath<R, Self::Root>
+    fn into_rooted_role_path(self) -> RootedRolePath<R, Self::Root, ChildLocation>;
+    fn get_rooted_role_path(&self) -> RootedRolePath<R, Self::Root, ChildLocation>
     where
-        Self: HasRolePath<R>,
+        Self: HasRolePath<R, Node = ChildLocation>,
     {
         let root = self.path_root();
         self.role_path().clone().into_rooted(root)
@@ -41,8 +42,8 @@ pub trait IntoRootedPath<P: RootedPath> {
     fn into_rooted_path(self) -> P;
 }
 pub trait HasRootedRolePath<Root: PathRoot, R: PathRole> {
-    fn rooted_role_path(&self) -> &RootedRolePath<R, Root>;
-    fn rooted_role_path_mut(&mut self) -> &mut RootedRolePath<R, Root>;
+    fn rooted_role_path(&self) -> &RootedRolePath<R, Root, ChildLocation>;
+    fn rooted_role_path_mut(&mut self) -> &mut RootedRolePath<R, Root, ChildLocation>;
 }
 pub trait HasRootedPath<P: RootedPath> {
     fn rooted_path(&self) -> &P;
@@ -50,8 +51,9 @@ pub trait HasRootedPath<P: RootedPath> {
 }
 /// access to a rooted path pointing to a descendant
 pub trait HasRolePath<R: PathRole> {
-    fn role_path(&self) -> &RolePath<R>;
-    fn role_path_mut(&mut self) -> &mut RolePath<R>;
+    type Node;
+    fn role_path(&self) -> &RolePath<R, Self::Node>;
+    fn role_path_mut(&mut self) -> &mut RolePath<R, Self::Node>;
 }
 pub trait IntoRolePath<R: PathRole> {
     fn into_role_path(self) -> RolePath<R>;

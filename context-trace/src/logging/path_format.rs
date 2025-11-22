@@ -1,6 +1,7 @@
 //! Compact formatting implementations for path types
 
 use crate::{
+    ChildLocation,
     graph::vertex::{
         location::pattern::PatternLocation,
         pattern::Pattern,
@@ -13,6 +14,7 @@ use crate::{
     path::structs::{
         role_path::RolePath,
         rooted::{
+            PathNode,
             RootedRangePath,
             role_path::{
                 PatternEndPath,
@@ -72,16 +74,18 @@ impl CompactFormat for RootedRangePath<Pattern> {
     }
 }
 
-// CompactFormat for RootedRangePath<IndexRoot>
-impl CompactFormat for RootedRangePath<IndexRoot> {
+// CompactFormat for generic RootedRangePath<IndexRoot, ChildLocation, EndNode>
+impl<EndNode> CompactFormat
+    for RootedRangePath<IndexRoot, ChildLocation, EndNode>
+where
+    EndNode: PathNode,
+{
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
         let start_entry = self.start.sub_path.root_entry;
-        let end_entry = self.end.sub_path.root_entry;
-
-        write!(f, "Index({})[{}..{}]", self.root, start_entry, end_entry)?;
+        write!(f, "Index({})[{}..]", self.root, start_entry)?;
         Ok(())
     }
 
@@ -102,7 +106,7 @@ impl CompactFormat for RootedRangePath<IndexRoot> {
 
         // End position
         write_indent(f, indent + 1)?;
-        write!(f, "end: {}", self.end)?;
+        write!(f, "end: {:?}", self.end)?;
         writeln!(f)?;
 
         write_indent(f, indent)?;
@@ -185,13 +189,20 @@ impl CompactFormat for PatternEndPath {
 }
 
 // CompactFormat for ChildState
-impl CompactFormat for crate::trace::child::state::ChildState {
+impl<EndNode> CompactFormat for crate::trace::child::state::ChildState<EndNode>
+where
+    EndNode: PathNode,
+    crate::path::structs::rooted::index_range::IndexRangePath<
+        crate::graph::vertex::location::child::ChildLocation,
+        EndNode,
+    >: CompactFormat,
+{
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
-        let current_pos: usize = self.current_pos.into();
-        write!(f, "ChildState(target:{}, path:...)", current_pos)
+        let entry_pos: usize = self.entry_pos.into();
+        write!(f, "ChildState(entry:{}, path:...)", entry_pos)
     }
 
     fn fmt_indented(
@@ -201,7 +212,7 @@ impl CompactFormat for crate::trace::child::state::ChildState {
     ) -> fmt::Result {
         writeln!(f, "ChildState {{")?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "current_pos: {},", usize::from(self.current_pos))?;
+        writeln!(f, "entry_pos: {},", usize::from(self.entry_pos))?;
         write_indent(f, indent + 1)?;
         write!(f, "path: ")?;
         self.path.fmt_indented(f, indent + 1)?;
@@ -348,5 +359,5 @@ where
 impl_display_via_compact!(PatternEndPath);
 impl_display_via_compact!(RootedRolePath<R, Root> where R: crate::PathRole, Root: PathRoot + CompactFormat);
 impl_display_via_compact!(crate::trace::state::BaseState<P> where P: RootedPath + CompactFormat);
-impl_display_via_compact!(crate::trace::child::state::ChildState);
+impl_display_via_compact!(crate::trace::child::state::ChildState<EndNode> where EndNode: PathNode);
 impl_display_via_compact!(crate::trace::state::parent::ParentState);

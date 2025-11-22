@@ -59,12 +59,12 @@ pub struct TopDown;
 //      - Start paths: bottom up
 // - keys are relative to the start index
 pub trait TraceRolePath<Role: PathRole>:
-    RolePathUtils + HasRolePath<Role> + GraphRootChild<Role>
+    RolePathUtils + HasRolePath<Role, Node = ChildLocation> + GraphRootChild<Role>
 {
 }
 impl<
     Role: PathRole,
-    P: RolePathUtils + HasRolePath<Role> + GraphRootChild<Role>,
+    P: RolePathUtils + HasRolePath<Role, Node = ChildLocation> + GraphRootChild<Role>,
 > TraceRolePath<Role> for P
 {
 }

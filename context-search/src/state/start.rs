@@ -14,7 +14,7 @@ use crate::{
     },
     traversal::{
         policy::DirectedTraversalPolicy,
-        TraversalKind,
+        SearchKind,
     },
     Response,
 };
@@ -46,7 +46,7 @@ impl<P: StartFoldPath> ToCursor for P {
         trav: &G,
     ) -> PathCursor<Self> {
         PathCursor {
-            atom_position: self.calc_width(trav).into(),
+            atom_position: (*self.calc_width(trav)).into(),
             path: self,
             _state: std::marker::PhantomData,
         }
@@ -232,7 +232,7 @@ impl StartCtx {
     //    }
     //}
     //
-    pub(crate) fn get_parent_batch<K: TraversalKind>(
+    pub(crate) fn get_parent_batch<K: SearchKind>(
         &self,
         trav: &K::Trav,
     ) -> Result<CompareParentBatch, ErrorState> {
@@ -258,16 +258,19 @@ impl StartCtx {
 }
 
 pub trait Searchable: Sized {
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState>;
 
     #[context_trace::instrument_sig(skip(self, trav))]
-    fn search<K: TraversalKind>(
+    fn search<K: SearchKind>(
         self,
         trav: K::Trav,
-    ) -> Result<Response, ErrorState> {
+    ) -> Result<Response, ErrorState>
+    where
+        K::Trav: Clone,
+    {
         debug!("starting search");
         match self.start_search::<K>(trav) {
             Ok(ctx) => {
@@ -284,7 +287,7 @@ pub trait Searchable: Sized {
 
 impl Searchable for PatternCursor {
     #[context_trace::instrument_sig(skip(self, trav))]
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -325,7 +328,7 @@ impl Searchable for PatternCursor {
 }
 
 impl<T: Searchable + Clone> Searchable for &T {
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -335,7 +338,7 @@ impl<T: Searchable + Clone> Searchable for &T {
 
 impl<const N: usize> Searchable for &'_ [Token; N] {
     #[context_trace::instrument_sig(skip(self, trav), fields(token_count = N))]
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -348,7 +351,7 @@ impl<const N: usize> Searchable for &'_ [Token; N] {
 }
 impl Searchable for &'_ [Token] {
     #[context_trace::instrument_sig(skip(self, trav), fields(token_count = self.len()))]
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -361,7 +364,7 @@ impl Searchable for &'_ [Token] {
     }
 }
 impl Searchable for Pattern {
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -370,7 +373,7 @@ impl Searchable for Pattern {
 }
 
 impl Searchable for Vec<Token> {
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -379,7 +382,7 @@ impl Searchable for Vec<Token> {
 }
 
 impl Searchable for PatternEndPath {
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -390,7 +393,7 @@ impl Searchable for PatternEndPath {
 }
 impl Searchable for PatternRangePath {
     #[context_trace::instrument_sig(skip(self, trav), fields(path = ?self))]
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
@@ -407,7 +410,7 @@ impl Searchable for PatternRangePath {
     }
 }
 impl Searchable for PatternPrefixCursor {
-    fn start_search<K: TraversalKind>(
+    fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {

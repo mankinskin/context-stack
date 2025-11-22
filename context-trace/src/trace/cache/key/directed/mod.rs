@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    TokenWidth,
     direction::Right,
     graph::vertex::{
         VertexIndex,
@@ -107,7 +108,7 @@ pub struct DirectedKey {
     pub pos: DirectedPosition,
 }
 impl Wide for DirectedKey {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         self.index.width()
     }
 }
@@ -169,7 +170,7 @@ impl DirectedKey {
 impl From<Token> for DirectedKey {
     fn from(index: Token) -> Self {
         Self {
-            pos: DirectedPosition::BottomUp(index.width().into()),
+            pos: DirectedPosition::BottomUp(index.width().0.into()),
             index,
         }
     }

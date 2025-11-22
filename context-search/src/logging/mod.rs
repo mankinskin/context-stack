@@ -17,7 +17,7 @@ use crate::{
         SearchNode,
         SearchQueue,
     },
-    traversal::TraversalKind,
+    traversal::SearchKind,
 };
 use context_trace::{
     impl_display_via_compact,
@@ -27,6 +27,7 @@ use context_trace::{
     },
     GraphRoot,
     HasTargetPos,
+    PathNode,
 };
 use std::fmt;
 
@@ -95,10 +96,11 @@ impl CompactFormat for SearchNode {
     }
 }
 
-impl<Q, I> CompactFormat for CompareState<Q, I>
+impl<Q, I, EndNode> CompactFormat for CompareState<Q, I, EndNode>
 where
     Q: CursorState,
     I: CursorState,
+    EndNode: PathNode,
 {
     fn fmt_compact(
         &self,
@@ -157,7 +159,7 @@ where
     }
 }
 
-impl CompactFormat for CompareResult {
+impl<EndNode: PathNode + CompactFormat> CompactFormat for CompareResult<EndNode> {
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
@@ -209,7 +211,7 @@ impl CompactFormat for CompareResult {
     }
 }
 
-impl<K: TraversalKind> CompactFormat for SearchIterator<K> {
+impl<K: SearchKind> CompactFormat for SearchIterator<K> {
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
@@ -309,9 +311,9 @@ impl CompactFormat for SearchQueue {
 }
 
 // Implement Display for types to enable % formatting in tracing without Compact wrapper
-impl_display_via_compact!(CompareResult);
-impl_display_via_compact!(CompareState<Q, I> where Q: CursorState, I: CursorState);
-impl_display_via_compact!(SearchIterator<K> where K: TraversalKind);
+impl_display_via_compact!(CompareResult<EndNode> where EndNode: PathNode + CompactFormat);
+impl_display_via_compact!(CompareState<Q, I, EndNode> where Q: CursorState, I: CursorState, EndNode: PathNode);
+impl_display_via_compact!(SearchIterator<K> where K: SearchKind);
 impl_display_via_compact!(SearchQueue);
 impl_display_via_compact!(ParentCompareState);
 impl_display_via_compact!(SearchNode);

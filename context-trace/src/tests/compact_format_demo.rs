@@ -79,7 +79,7 @@ fn test_compact_with_token_display() {
     );
 
     // Show how these appear in paths
-    let path = IndexRangePath::new_empty(root);
+    let path = IndexRangePath::new_empty(root) as IndexRangePath;
     tracing::info!(
         path = %Compact(&path),
         "Path containing formatted root"

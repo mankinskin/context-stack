@@ -14,7 +14,10 @@ use serde::{
     Serialize,
 };
 
-use crate::graph::vertex::wide::Wide;
+use crate::graph::vertex::{
+    token::TokenWidth,
+    wide::Wide,
+};
 
 pub fn atomizing_iter<T: Atomize, C: AsAtom<T>>(
     seq: impl Iterator<Item = C>
@@ -73,8 +76,8 @@ impl<T: Debug + PartialEq + Clone + Wide> AtomData for T {}
 pub(crate) struct NoAtom;
 
 impl Wide for NoAtom {
-    fn width(&self) -> usize {
-        0
+    fn width(&self) -> TokenWidth {
+        TokenWidth(0)
     }
 }
 
@@ -94,8 +97,8 @@ impl NewAtomIndex {
 }
 
 impl Wide for NewAtomIndex {
-    fn width(&self) -> usize {
-        1
+    fn width(&self) -> TokenWidth {
+        TokenWidth(1)
     }
 }
 
@@ -267,11 +270,11 @@ impl<T: Atomize + Display> Display for Atom<T> {
 }
 
 impl<T: Atomize> Wide for Atom<T> {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         match self {
             Atom::Element(t) => t.width(),
-            Atom::Start => 0,
-            Atom::End => 0,
+            Atom::Start => TokenWidth(0),
+            Atom::End => TokenWidth(0),
         }
     }
 }

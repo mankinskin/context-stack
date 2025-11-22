@@ -14,10 +14,15 @@ use context_trace::{
 use policy::DirectedTraversalPolicy;
 use std::fmt::Debug;
 
-pub trait TraversalKind: Debug + Default {
-    type Trav: HasGraph;
+pub trait SearchKind: TraceKind {
     type Container: StateContainer;
     type Policy: DirectedTraversalPolicy<Trav = Self::Trav>;
+    type EndNode: PathNode;
+}
+impl<'a, K: SearchKind> SearchKind for &'a K {
+    type Container = K::Container;
+    type Policy = &'a K::Policy;
+    type EndNode = K::EndNode;
 }
 //#[derive(Debug, Clone, Copy)]
 //pub(crate) enum OptGen<Y> {
@@ -50,7 +55,7 @@ impl Traceable for TraceStart<'_> {
     }
 }
 
-//impl<K: TraversalKind> HasGraph for &'_ TraversalCtx<K> {
+//impl<K: SearchKind> HasGraph for &'_ TraversalCtx<K> {
 //    type Kind = TravKind<K::Trav>;
 //    type Guard<'g>
 //        = <K::Trav as HasGraph>::Guard<'g>
@@ -61,7 +66,7 @@ impl Traceable for TraceStart<'_> {
 //    }
 //}
 //
-//impl<K: TraversalKind> HasGraph for &mut TraversalCtx<K> {
+//impl<K: SearchKind> HasGraph for &mut TraversalCtx<K> {
 //    type Kind = TravKind<K::Trav>;
 //    type Guard<'g>
 //        = <K::Trav as HasGraph>::Guard<'g>

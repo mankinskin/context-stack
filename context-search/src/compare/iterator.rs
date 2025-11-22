@@ -4,6 +4,7 @@ use crate::{
         CompareState,
     },
     cursor::Candidate,
+    SearchKind,
 };
 use context_trace::*;
 
@@ -12,17 +13,35 @@ use std::fmt::Debug;
 use crate::compare::state::CompareResult::*;
 
 #[derive(Debug)]
-pub(crate) struct CompareIterator<G: HasGraph> {
-    pub(crate) children: ChildIterator<G, CompareState<Candidate, Candidate>>,
+pub(crate) struct CompareIterator<K: SearchKind> {
+    pub(crate) children: ChildIterator<
+        K,
+        CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>>,
+    >,
 }
 
-impl<G: HasGraph> CompareIterator<G> {
+impl<K: SearchKind> CompareIterator<K> {
     pub(crate) fn new(
-        trav: G,
-        queue: impl Into<ChildQueue<CompareState<Candidate, Candidate>>>,
+        trav: K::Trav,
+        queue: impl Into<
+            ChildQueue<
+                CompareState<
+                    Candidate,
+                    Candidate,
+                    PositionAnnotated<ChildLocation>,
+                >,
+            >,
+        >,
     ) -> Self {
         Self {
-            children: ChildIterator::new(trav, queue),
+            children: ChildIterator::<
+                K,
+                CompareState<
+                    Candidate,
+                    Candidate,
+                    PositionAnnotated<ChildLocation>,
+                >,
+            >::new(trav, queue),
         }
     }
     //pub(crate) fn find_match(self) -> Option<CompareState<Matched, Matched>> {
@@ -37,7 +56,7 @@ impl<G: HasGraph> CompareIterator<G> {
         self.find_map(|flow| flow).unwrap()
     }
 }
-impl<G: HasGraph> Iterator for CompareIterator<G> {
+impl<T: SearchKind> Iterator for CompareIterator<T> {
     type Item = Option<CompareResult>;
     fn next(&mut self) -> Option<Self::Item> {
         tracing::debug!(

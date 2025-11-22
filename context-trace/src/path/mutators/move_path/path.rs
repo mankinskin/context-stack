@@ -8,34 +8,44 @@ use crate::{
             move_path::root::MoveRootIndex,
             pop::PathPop,
         },
+        structs::rooted::{PathNode, IntoChildLocation},
     },
     trace::has_graph::HasGraph,
 };
 use std::ops::ControlFlow;
 
 pub trait MovePath<D: Direction, R: PathRole>:
-    PathPop + PathAppend + MoveRootIndex<D, R>
+    PathAppend + MoveRootIndex<D, R>
 {
+    type Node: PathNode;
+    
+    fn path_pop_node(&mut self) -> Option<Self::Node>;
+    
     fn move_path_segment<G: HasGraph>(
         &mut self,
-        location: &mut ChildLocation,
+        node: &mut Self::Node,
         trav: &G::Guard<'_>,
     ) -> ControlFlow<()>;
 
     fn move_path<G: HasGraph>(
         &mut self,
         trav: &G,
-    ) -> ControlFlow<()> {
+    ) -> ControlFlow<()> 
+    where
+        Self::Node: PathNode,
+    {
         let graph = trav.graph();
-        if let Some(location) = std::iter::from_fn(|| {
-            self.path_pop().map(|mut location| {
-                self.move_path_segment::<G>(&mut location, &graph)
+        if let Some(node) = std::iter::from_fn(|| {
+            self.path_pop_node().map(|mut node| {
+                self.move_path_segment::<G>(&mut node, &graph)
                     .is_continue()
-                    .then_some(location)
+                    .then_some(node)
             })
         })
-        .find_map(|location| location)
+        .find_map(|node| node)
         {
+            // Convert node to ChildLocation for PathAppend
+            let location = node.into_child_location();
             self.path_append(location);
             ControlFlow::Continue(())
         } else {

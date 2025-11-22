@@ -114,6 +114,6 @@ impl<G: GraphKind> Hypergraph<G> {
         location: impl IntoPatternLocation,
         range: impl PatternRangeIndex,
     ) -> usize {
-        pattern_width(self.expect_pattern_range(location, range))
+        pattern_width(self.expect_pattern_range(location, range)).0
     }
 }

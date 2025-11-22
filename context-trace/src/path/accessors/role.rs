@@ -139,7 +139,7 @@ impl PathRole for Start {
         pattern_width(pattern_pre_ctx(
             pattern.iter().map(Borrow::borrow),
             index,
-        ))
+        )).0
     }
     fn inner_ctx_width<T: Borrow<Token>>(
         pattern: &'_ [T],
@@ -148,19 +148,19 @@ impl PathRole for Start {
         pattern_width(pattern_post_ctx(
             pattern.iter().map(Borrow::borrow),
             index,
-        ))
+        )).0
     }
     fn inner_width<T: Borrow<Token>>(
         pattern: &'_ [T],
         index: usize,
     ) -> usize {
-        pattern_width(pattern_post(pattern.iter().map(Borrow::borrow), index))
+        pattern_width(pattern_post(pattern.iter().map(Borrow::borrow), index)).0
     }
     fn outer_width<T: Borrow<Token>>(
         pattern: &'_ [T],
         index: usize,
     ) -> usize {
-        pattern_width(pattern_pre(pattern.iter().map(Borrow::borrow), index))
+        pattern_width(pattern_pre(pattern.iter().map(Borrow::borrow), index)).0
     }
 }
 

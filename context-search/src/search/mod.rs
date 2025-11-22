@@ -8,7 +8,7 @@ use crate::{
     },
     traversal::TraceStart,
     Response,
-    TraversalKind,
+    SearchKind,
 };
 use context::{
     AncestorSearchTraversal,
@@ -37,7 +37,10 @@ pub trait Find: HasGraph {
     fn find_sequence(
         &self,
         pattern: impl IntoIterator<Item = impl AsAtom<AtomOf<TravKind<Self>>>>,
-    ) -> SearchResult {
+    ) -> SearchResult
+    where
+        Self: Clone,
+    {
         let iter = atomizing_iter(pattern.into_iter());
         let atoms: Vec<_> = iter.collect();
         tracing::Span::current().record("pattern_len", atoms.len());
@@ -55,8 +58,10 @@ pub trait Find: HasGraph {
     fn find_parent(
         &self,
         searchable: impl Searchable,
-    ) -> SearchResult {
-        debug!("starting parent search");
+    ) -> SearchResult
+    where
+        Self: Clone,
+    {        debug!("starting parent search");
         let result = searchable
             .search::<ParentSearchTraversal<Self>>(self.ctx())
             .map_err(|err| err.reason);
@@ -74,8 +79,10 @@ pub trait Find: HasGraph {
     fn find_ancestor(
         &self,
         searchable: impl Searchable,
-    ) -> SearchResult {
-        debug!("starting ancestor search");
+    ) -> SearchResult
+    where
+        Self: Clone,
+    {        debug!("starting ancestor search");
         let result = searchable
             .search::<AncestorSearchTraversal<Self>>(self.ctx())
             .map_err(|err| err.reason);
@@ -103,13 +110,13 @@ impl Find for HypergraphRef {
 
 /// context for running fold traversal
 #[derive(Debug)]
-pub struct SearchState<K: TraversalKind> {
+pub struct SearchState<K: SearchKind> {
     pub(crate) matches: SearchIterator<K>,
     /// The query pattern we're searching for
     pub(crate) query: PatternRangePath,
 }
 
-//impl<K: TraversalKind> SearchState<K> {
+//impl<K: SearchKind> SearchState<K> {
 //    /// Extract parent batch from a matched state for queue repopulation
 //    /// Converts matched root to parent nodes for continued exploration
 //    fn extract_parent_batch(
@@ -163,7 +170,10 @@ pub struct SearchState<K: TraversalKind> {
 //    }
 //}
 
-impl<K: TraversalKind> Iterator for SearchState<K> {
+impl<K: SearchKind> Iterator for SearchState<K>
+where
+    K::Trav: Clone,
+{
     type Item = MatchedEndState;
     fn next(&mut self) -> Option<Self::Item> {
         trace!("searching for next match");
@@ -256,7 +266,10 @@ impl<K: TraversalKind> Iterator for SearchState<K> {
     }
 }
 
-impl<K: TraversalKind> SearchState<K> {
+impl<K: SearchKind> SearchState<K>
+where
+    K::Trav: Clone,
+{
     #[context_trace::instrument_sig(skip(self))]
     pub(crate) fn search(mut self) -> Response {
         debug!("starting fold search");

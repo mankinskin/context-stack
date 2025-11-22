@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     HashSet,
+    TokenWidth,
     graph::{
         getters::{
             ErrorReason,
@@ -112,7 +113,7 @@ where
         &mut self,
         atom: Atom<G::Atom>,
     ) -> Token {
-        let data = VertexData::new(self.next_vertex_index(), 1);
+        let data = VertexData::new(self.next_vertex_index(), TokenWidth(1));
         self.insert_atom_data(atom, data)
     }
     /// insert multiple atom nodes
@@ -135,8 +136,8 @@ where
             .into_iter()
             .map(|index| {
                 let index = index.vertex_index();
-                let w = self.expect_vertex(index.vertex_index()).get_width();
-                width += w;
+                let w = self.expect_vertex(index.vertex_index()).width;
+                width += w.0;
                 (index, Token::new(index, w))
             })
             .unzip();
@@ -229,7 +230,7 @@ where
         let indices = pattern.into_pattern();
         let (width, indices, tokens) = self.to_width_indices_children(indices);
         let index = self.next_vertex_index();
-        let mut new_data = VertexData::new(index, width);
+        let mut new_data = VertexData::new(index, width.into());
         let pattern_id = PatternId::default();
         new_data.add_pattern_no_update(pattern_id, Pattern::from(tokens));
         let index = self.insert_vertex_data(new_data);

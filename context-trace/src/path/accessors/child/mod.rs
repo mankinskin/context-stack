@@ -19,7 +19,9 @@ use crate::{
     trace::has_graph::HasGraph,
 };
 
-pub trait LeafToken<R: PathRole>: RootChildIndex<R> + HasPath<R> {
+pub trait LeafToken<R: PathRole>:
+    RootChildIndex<R> + HasPath<R, Node = ChildLocation>
+{
     fn leaf_token_location_mut(&mut self) -> Option<&mut ChildLocation> {
         R::bottom_up_iter(self.path_mut().iter_mut()).next()
     }

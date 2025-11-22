@@ -24,7 +24,7 @@ use crate::{
     },
     traversal::{
         policy::DirectedTraversalPolicy,
-        TraversalKind,
+        SearchKind,
     },
 };
 use context_trace::{
@@ -53,22 +53,25 @@ use std::{
 /// Result of advancing both cursors:
 /// - Ok: Both cursors advanced successfully
 /// - Err: Contains EndReason and optionally a cursor needing parent exploration
-pub(crate) type AdvanceCursorsResult<G> = Result<
-    RootCursor<G, Candidate, Candidate>,
-    (EndReason, Option<RootCursor<G, Candidate, Matched>>),
+pub(crate) type AdvanceCursorsResult<K> = Result<
+    RootCursor<K, Candidate, Candidate>,
+    (EndReason, Option<RootCursor<K, Candidate, Matched>>),
 >;
 
 #[derive(Debug)]
 pub(crate) struct RootCursor<
-    G: HasGraph + Clone,
+    K: SearchKind,
     Q: CursorState = Matched,
     I: CursorState = Matched,
 > {
     pub(crate) state: Box<CompareState<Q, I>>,
-    pub(crate) trav: G,
+    pub(crate) trav: K::Trav,
 }
 
-impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
+impl<K: SearchKind> RootCursor<K, Matched, Matched>
+where
+    K::Trav: Clone,
+{
     /// Advance through matches until we reach an end state
     /// Returns Ok(MatchedEndState) if we reach QueryExhausted or Mismatch with progress
     /// Returns Err((checkpoint_state, root_cursor)) if we need parent exploration
@@ -76,7 +79,7 @@ impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
         self
     ) -> Result<
         MatchedEndState,
-        (MatchedEndState, RootCursor<G, Candidate, Matched>),
+        (MatchedEndState, RootCursor<K, Candidate, Matched>),
     > {
         let root_parent =
             self.state.child_cursor.child_state.path.root_parent();
@@ -145,8 +148,8 @@ impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
     fn advance_to_next_match(
         self
     ) -> Result<
-        RootCursor<G, Candidate, Candidate>,
-        Result<MatchedEndState, RootCursor<G, Candidate, Matched>>,
+        RootCursor<K, Candidate, Candidate>,
+        Result<MatchedEndState, RootCursor<K, Candidate, Matched>>,
     > {
         debug!("  → advance_to_next_match: Step 1 - calling advance_query");
         // Step 1: Advance query cursor
@@ -208,7 +211,7 @@ impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
     /// Returns Err(MatchedEndState) if query ended (QueryExhausted)
     fn advance_query(
         self
-    ) -> Result<RootCursor<G, Candidate, Matched>, MatchedEndState> {
+    ) -> Result<RootCursor<K, Candidate, Matched>, MatchedEndState> {
         let root_parent =
             self.state.child_cursor.child_state.path.root_parent();
         let query_pos_before = *self.state.cursor.atom_position.as_ref();
@@ -245,15 +248,17 @@ impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
                     "    → advance_query: QUERY ENDED - creating QueryExhausted state"
                 );
                 // Query ended - create complete match state
-                let root_pos =
-                    *matched_state.child_cursor.child_state.target_pos();
+                // Use query position for root_pos (not child position)
+                let root_pos = matched_state.cursor.atom_position;
                 let path = matched_state.child_cursor.child_state.path.clone();
+                let start_pos =
+                    matched_state.child_cursor.child_state.start_pos;
                 let root_parent = path.root_parent();
                 let target_index = path.role_rooted_leaf_token::<End, _>(&trav);
                 let last_token_width_value = target_index.width();
                 let end_pos = AtomPosition::from(
                     *matched_state.cursor.atom_position
-                        - last_token_width_value,
+                        - *last_token_width_value,
                 );
                 tracing::debug!(
                     "root_cursor advance_query: root_parent={}, root_pos={}, cursor.atom_position={}, last_token_width={}, end_pos={}",
@@ -273,15 +278,15 @@ impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
     }
 }
 
-impl<G: HasGraph + Clone> RootCursor<G, Candidate, Matched> {
+impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
     /// Step 2: Advance the child path (index cursor)
     /// Returns Ok(<Candidate, Candidate>) if child advanced
     /// Returns Err(<Candidate, Matched>) if child ended but query continues (need parent exploration)
     fn advance_child(
         self
     ) -> Result<
-        RootCursor<G, Candidate, Candidate>,
-        RootCursor<G, Candidate, Matched>,
+        RootCursor<K, Candidate, Candidate>,
+        RootCursor<K, Candidate, Matched>,
     > {
         let root_parent =
             self.state.child_cursor.child_state.path.root_parent();
@@ -339,7 +344,7 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Matched> {
     }
 }
 
-impl<G: HasGraph + Clone> RootCursor<G, Candidate, Matched> {
+impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
     /// Create a QueryExhausted state from this root cursor's checkpoint
     /// Used when the root matched successfully but needs parent exploration
     pub(crate) fn create_checkpoint_state(&self) -> MatchedEndState {
@@ -349,11 +354,13 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Matched> {
 
         // Use checkpoint_child path as it represents the matched state
         let mut path = checkpoint_child.child_state.path.clone();
-        let root_pos = *checkpoint_child.child_state.target_pos();
+        let start_pos = checkpoint_child.child_state.start_pos;
+        // Use query checkpoint position for root_pos (not child position)
+        let root_pos = checkpoint.atom_position;
 
         // Simplify path to remove redundant segments
-        path.child_path_mut::<Start>().simplify(&self.trav);
-        path.child_path_mut::<End>().simplify(&self.trav);
+        path.child_path_mut::<Start, _>().simplify(&self.trav);
+        path.child_path_mut::<End, _>().simplify(&self.trav);
 
         let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
         //let last_token_width_value = target_index.width();
@@ -371,11 +378,11 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Matched> {
         }
     }
 }
-impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
+impl<K: SearchKind> RootCursor<K, Matched, Matched> {
     ///// Process a matched cursor: advance and convert to either iterable candidate cursor or immediate end
     //pub(crate) fn process_match(
     //    self
-    //) -> Result<RootCursor<G, Candidate, Candidate>, EndReason> {
+    //) -> Result<RootCursor<K, Candidate, Candidate>, EndReason> {
     //    match self.advance_cursors() {
     //        Ok(candidate_cursor) => {
     //            // Both cursors advanced - can continue iterating
@@ -390,7 +397,7 @@ impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
 
     /// Advance cursors after a match and transition to Candidate state
     /// Returns Ok with both-advanced state, or Err with reason for failure
-    pub(crate) fn advance_cursors(self) -> AdvanceCursorsResult<G> {
+    pub(crate) fn advance_cursors(self) -> AdvanceCursorsResult<K> {
         let matched_state = *self.state;
 
         // Step 1: Try to advance QUERY cursor
@@ -442,7 +449,10 @@ impl<G: HasGraph + Clone> RootCursor<G, Matched, Matched> {
     }
 }
 
-impl<G: HasGraph + Clone> Iterator for RootCursor<G, Candidate, Candidate> {
+impl<K: SearchKind> Iterator for RootCursor<K, Candidate, Candidate>
+where
+    K::Trav: Clone,
+{
     type Item = ControlFlow<EndReason>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -450,7 +460,9 @@ impl<G: HasGraph + Clone> Iterator for RootCursor<G, Candidate, Candidate> {
 
         tracing::debug!("comparing current candidate");
         // Compare the current candidate state
-        match CompareIterator::new(&self.trav, *self.state.clone()).compare() {
+        match CompareIterator::<K>::new(self.trav.clone(), *self.state.clone())
+            .compare()
+        {
             FoundMatch(matched_state) => {
                 tracing::debug!(
                     "got Match, creating Matched RootCursor to advance"
@@ -508,7 +520,10 @@ impl<G: HasGraph + Clone> Iterator for RootCursor<G, Candidate, Candidate> {
     }
 }
 
-impl<G: HasGraph + Clone> RootCursor<G, Candidate, Candidate> {
+impl<K: SearchKind> RootCursor<K, Candidate, Candidate>
+where
+    K::Trav: Clone,
+{
     /// Iterate through candidate comparisons until we reach an end state or need parent exploration
     /// Returns Ok(MatchedEndState) if we reach QueryExhausted or Mismatch with progress
     /// Returns Err((checkpoint_state, root_cursor)) if iterator completed without conclusion - need parent exploration
@@ -516,7 +531,7 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Candidate> {
         mut self
     ) -> Result<
         MatchedEndState,
-        (MatchedEndState, RootCursor<G, Candidate, Matched>),
+        (MatchedEndState, RootCursor<K, Candidate, Matched>),
     > {
         // Iterate until we get a match or need to stop
         loop {
@@ -579,47 +594,43 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Candidate> {
             ..
         } = *self.state;
 
+        // Choose the path based on end reason
         // For Mismatch, use checkpoint_child path (state at last match)
         // For QueryExhausted, use current child_cursor path
-        let (mut path, root_pos) = match reason {
-            EndReason::QueryExhausted => {
-                let root_pos = *child_cursor.child_state.target_pos();
-                (child_cursor.child_state.path.clone(), root_pos)
-            },
-            EndReason::Mismatch => {
-                let root_pos = *checkpoint_child.child_state.target_pos();
-                (checkpoint_child.child_state.path.clone(), root_pos)
-            },
+        let mut path = match reason {
+            EndReason::QueryExhausted => child_cursor.child_state.path.clone(),
+            EndReason::Mismatch => checkpoint_child.child_state.path.clone(),
         };
 
         // Simplify path to remove redundant segments at token borders
-        path.child_path_mut::<Start>().simplify(&self.trav);
-        path.child_path_mut::<End>().simplify(&self.trav);
+        path.child_path_mut::<Start, _>().simplify(&self.trav);
+        path.child_path_mut::<End, _>().simplify(&self.trav);
 
-        let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
-        let last_token_width_value = target_index.width();
+        // Get the target token from the path
+        let target_token = path.role_rooted_leaf_token::<End, _>(&self.trav);
 
-        let (end_cursor, end_pos) = match reason {
-            EndReason::QueryExhausted => (
-                checkpoint.clone(),
-                AtomPosition::from(
-                    *cursor.atom_position - last_token_width_value,
-                ),
-            ),
-            EndReason::Mismatch => {
-                // For Mismatch, checkpoint already points to position AFTER last match
-                (checkpoint.clone(), checkpoint.atom_position)
-            },
+        // Use entry_pos from the ChildState - it already tracks the correct position
+        // For QueryExhausted: use current child cursor position
+        // For Mismatch: use checkpoint_child position (last confirmed match)
+        let child_state = match reason {
+            EndReason::QueryExhausted => &child_cursor.child_state,
+            EndReason::Mismatch => &checkpoint_child.child_state,
         };
 
-        let target = DownKey::new(target_index, end_pos.into());
+        let start_pos = child_state.start_pos;
+        let root_pos = child_state.entry_pos;
+        let end_pos = root_pos; // The end position is the same as root for the matched segment
+
+        let target = DownKey::new(target_token, end_pos.into());
+
+        // Use the non-annotated path for PathCoverage
         let path_enum =
             PathCoverage::from_range_path(path, root_pos, target, &self.trav);
 
         // Create matched state - no need to distinguish QueryExhausted vs Mismatch in data structure
         // The cursor's atom_position indicates how far we matched
         MatchedEndState {
-            cursor: end_cursor,
+            cursor: checkpoint.clone(),
             path: path_enum,
         }
     }
@@ -632,15 +643,21 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Candidate> {
         let checkpoint_child = &self.state.checkpoint_child;
 
         let mut path = checkpoint_child.child_state.path.clone();
-        let root_pos = *checkpoint_child.child_state.target_pos();
 
-        // Simplify path
-        path.child_path_mut::<Start>().simplify(&self.trav);
-        path.child_path_mut::<End>().simplify(&self.trav);
+        // Simplify paths
+        path.start_path_mut().simplify(&self.trav);
+        path.end_path_mut().simplify(&self.trav);
 
-        let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
-        let end_pos = checkpoint.atom_position;
-        let target = DownKey::new(target_index, end_pos.into());
+        // Get the target token from the path
+        let target_token = path.role_rooted_leaf_token::<End, _>(&self.trav);
+
+        // Use entry_pos from checkpoint_child - it already has the correct position
+        let start_pos = checkpoint_child.child_state.start_pos;
+        let root_pos = checkpoint_child.child_state.entry_pos;
+        let end_pos = root_pos; // The end position is the same as root for the matched segment
+
+        let target = DownKey::new(target_token, end_pos.into());
+
         let path_enum =
             PathCoverage::from_range_path(path, root_pos, target, &self.trav);
 
@@ -654,7 +671,7 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Candidate> {
     }
 
     /// Convert <Candidate, Candidate> to <Candidate, Matched> for parent exploration
-    fn into_candidate_matched(self) -> RootCursor<G, Candidate, Matched> {
+    fn into_candidate_matched(self) -> RootCursor<K, Candidate, Matched> {
         RootCursor {
             state: Box::new(CompareState {
                 child_cursor: ChildCursor {
@@ -672,9 +689,9 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Candidate> {
     }
 }
 
-impl<G: HasGraph + Clone> RootCursor<G, Candidate, Matched> {
+impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
     /// Convert to Candidate state for both cursors to enable parent exploration
-    pub(crate) fn into_candidate(self) -> RootCursor<G, Candidate, Candidate> {
+    pub(crate) fn into_candidate(self) -> RootCursor<K, Candidate, Candidate> {
         let state = *self.state;
         RootCursor {
             state: Box::new(CompareState {
@@ -689,17 +706,17 @@ impl<G: HasGraph + Clone> RootCursor<G, Candidate, Matched> {
         }
     }
 
-    pub(crate) fn next_parents<K: TraversalKind>(
+    pub(crate) fn next_parents(
         self,
         trav: &K::Trav,
     ) -> Result<(ParentCompareState, CompareParentBatch), Box<EndState>> {
         // Convert to Candidate first, then call next_parents
-        self.into_candidate().next_parents::<K>(trav)
+        self.into_candidate().next_parents(trav)
     }
 }
 
-impl<G: HasGraph + Clone> RootCursor<G, Candidate, Candidate> {
-    pub(crate) fn next_parents<K: TraversalKind>(
+impl<K: SearchKind> RootCursor<K, Candidate, Candidate> {
+    pub(crate) fn next_parents(
         self,
         trav: &K::Trav,
     ) -> Result<(ParentCompareState, CompareParentBatch), Box<EndState>> {

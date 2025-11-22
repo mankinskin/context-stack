@@ -1,4 +1,5 @@
 use crate::{
+    PositionAnnotated,
     graph::vertex::{
         location::{
             child::ChildLocation,
@@ -28,6 +29,11 @@ impl GraphRootPattern for PatternLocation {
         *self
     }
 }
+impl<T: GraphRootPattern> GraphRootPattern for PositionAnnotated<T> {
+    fn root_pattern_location(&self) -> PatternLocation {
+        self.node.root_pattern_location()
+    }
+}
 impl GraphRootPattern for ChildLocation {
     fn root_pattern_location(&self) -> PatternLocation {
         self.into_pattern_location()
@@ -46,49 +52,16 @@ impl GraphRoot for ChildLocation {
         self.parent
     }
 }
+impl<T: GraphRoot> GraphRoot for PositionAnnotated<T> {
+    fn root_parent(&self) -> Token {
+        self.node.root_parent()
+    }
+}
 
 pub trait PatternRoot {
     fn pattern_root_pattern(&self) -> &Pattern;
 }
 
-pub trait RootPattern {
-    fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
-        &'b self,
-        trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern;
-}
-impl RootPattern for ChildLocation {
-    fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
-        &'b self,
-        trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern {
-        GraphRootPattern::graph_root_pattern::<G>(self, trav)
-    }
-}
-impl RootPattern for PatternLocation {
-    fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
-        &'b self,
-        trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern {
-        GraphRootPattern::graph_root_pattern::<G>(self, trav)
-    }
-}
-impl RootPattern for IndexRoot {
-    fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
-        &'b self,
-        trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern {
-        self.location.root_pattern::<G>(trav)
-    }
-}
-impl RootPattern for Pattern {
-    fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
-        &'b self,
-        _trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern {
-        self
-    }
-}
 #[macro_export]
 macro_rules! impl_root {
     {
@@ -133,3 +106,15 @@ macro_rules! impl_root {
         }
     }
 }
+
+pub trait RootPattern {
+    fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
+        &'b self,
+        trav: &'g G::Guard<'a>,
+    ) -> &'g Pattern;
+}
+impl_root! { RootPattern for ChildLocation, self, trav => GraphRootPattern::graph_root_pattern::<G>(self, trav) }
+impl_root! { RootPattern for PatternLocation, self, trav => GraphRootPattern::graph_root_pattern::<G>(self, trav) }
+impl_root! { RootPattern for IndexRoot, self, trav => self.location.root_pattern::<G>(trav) }
+impl_root! { RootPattern for Pattern, self, _trav => self }
+impl_root! { <T: RootPattern> RootPattern for PositionAnnotated<T>, self, trav => self.node.root_pattern::<G>(trav) }

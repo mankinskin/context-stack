@@ -8,17 +8,26 @@ use derive_more::{
 
 use crate::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deref, DerefMut)]
-pub struct RootedRolePath<R: PathRole, Root: PathRoot> {
+#[derive(Debug, Clone, PartialEq, Eq, Deref, DerefMut)]
+pub struct RootedRolePath<R: PathRole, Root: PathRoot, N = ChildLocation> {
     pub(crate) root: Root,
     #[deref]
     #[deref_mut]
-    pub(crate) role_path: RolePath<R>,
+    pub(crate) role_path: RolePath<R, N>,
 }
-impl<Root: PathRoot, R: PathRole> RootedRolePath<R, Root> {
+
+impl<Root: PathRoot + Default, R: PathRole, N> Default for RootedRolePath<R, Root, N> {
+    fn default() -> Self {
+        Self {
+            root: Root::default(),
+            role_path: RolePath::default(),
+        }
+    }
+}
+impl<Root: PathRoot, R: PathRole, N> RootedRolePath<R, Root, N> {
     pub fn new(
         root: impl Into<Root>,
-        role_path: RolePath<R>,
+        role_path: RolePath<R, N>,
     ) -> Self {
         Self {
             root: root.into(),
@@ -26,7 +35,7 @@ impl<Root: PathRoot, R: PathRole> RootedRolePath<R, Root> {
         }
     }
 }
-impl<Root: PathRoot, R: PathRole> From<Root> for RootedRolePath<R, Root> {
+impl<Root: PathRoot, R: PathRole, N> From<Root> for RootedRolePath<R, Root, N> {
     fn from(root: Root) -> Self {
         Self {
             root,
@@ -35,10 +44,11 @@ impl<Root: PathRoot, R: PathRole> From<Root> for RootedRolePath<R, Root> {
     }
 }
 
-impl<R: PathRole, Root: PathRoot> HasPath<R> for RootedRolePath<R, Root>
+impl<R: PathRole, Root: PathRoot> HasPath<R> for RootedRolePath<R, Root, ChildLocation>
 where
-    Self: HasRolePath<R>,
+    Self: HasRolePath<R, Node = ChildLocation>,
 {
+    type Node = ChildLocation;
     fn path(&self) -> &Vec<ChildLocation> {
         HasRolePath::<R>::role_path(self).path()
     }
@@ -65,10 +75,11 @@ impl<Root: PathRoot> HasEndPath for RootedEndPath<Root> {
 }
 
 impl<R: PathRole, Root: PathRoot> HasRolePath<R> for RootedRolePath<R, Root> {
-    fn role_path(&self) -> &RolePath<R> {
+    type Node = ChildLocation;
+    fn role_path(&self) -> &RolePath<R, ChildLocation> {
         &self.role_path
     }
-    fn role_path_mut(&mut self) -> &mut RolePath<R> {
+    fn role_path_mut(&mut self) -> &mut RolePath<R, ChildLocation> {
         &mut self.role_path
     }
 }
@@ -77,12 +88,12 @@ impl<R: PathRole, Root: PathRoot> IntoRolePath<R> for RootedRolePath<R, Root> {
         self.role_path
     }
 }
-pub(crate) type IndexRolePath<R> = RootedRolePath<R, IndexRoot>;
+pub(crate) type IndexRolePath<R, N = ChildLocation> = RootedRolePath<R, IndexRoot, N>;
 
-pub(crate) type PatternRolePath<R> = RootedRolePath<R, Pattern>;
+pub(crate) type PatternRolePath<R, N = ChildLocation> = RootedRolePath<R, Pattern, N>;
 
-pub(crate) type RootedStartPath<R> = RootedRolePath<Start, R>;
-pub(crate) type RootedEndPath<R> = RootedRolePath<End, R>;
+pub(crate) type RootedStartPath<R, N = ChildLocation> = RootedRolePath<Start, R, N>;
+pub(crate) type RootedEndPath<R, N = ChildLocation> = RootedRolePath<End, R, N>;
 pub type IndexStartPath = IndexRolePath<Start>;
 pub type IndexEndPath = IndexRolePath<End>;
 pub type PatternStartPath = PatternRolePath<Start>;
@@ -95,7 +106,7 @@ impl<R: PathRole> IndexRolePath<R> {
 }
 impl<R: PathRole> LeafToken<R> for IndexRolePath<R>
 where
-    Self: HasRolePath<R>,
+    Self: HasRolePath<R, Node = ChildLocation> + HasPath<R, Node = ChildLocation>,
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         Some(

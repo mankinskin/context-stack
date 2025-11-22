@@ -5,6 +5,7 @@ pub(crate) mod root;
 //pub(crate) mod split_path;
 
 use crate::{
+    ChildLocation,
     EndPath,
     HasEndPath,
     HasPath,
@@ -12,6 +13,11 @@ use crate::{
     IntoRootedRolePath,
     RootChildIndex,
     StartPath,
+    graph::vertex::{
+        location::pattern::PatternLocation,
+        pattern::Pattern,
+        token::Token,
+    },
     path::{
         accessors::{
             child::RootedLeafToken,
@@ -20,17 +26,26 @@ use crate::{
                 End,
                 Start,
             },
+            root::{
+                GraphRoot,
+                GraphRootPattern,
+                RootPattern,
+            },
         },
+        mutators::move_path::key::AtomPosition,
         structs::{
             role_path::RolePath,
             rooted::role_path::{
                 RootedEndPath,
                 RootedStartPath,
             },
+            sub_path::PositionAnnotated,
         },
     },
+    trace::has_graph::HasGraph,
 };
 use root::{
+    IndexRoot,
     PathRoot,
     RootedPath,
 };
@@ -50,17 +65,57 @@ pub(crate) trait RangePath:
     //    exit: usize,
     //) -> Self;
 }
-#[derive(Clone, PartialEq, Eq)]
-pub struct RootedRangePath<Root: PathRoot> {
-    pub(crate) root: Root,
-    pub(crate) start: RolePath<Start>,
-    pub(crate) end: RolePath<End>,
+
+/// Trait for extracting ChildLocation from path nodes
+pub trait IntoChildLocation {
+    fn into_child_location(self) -> ChildLocation;
+    fn as_child_location(&self) -> ChildLocation;
 }
-impl<Root: PathRoot> RootedRangePath<Root> {
+
+impl IntoChildLocation for ChildLocation {
+    fn into_child_location(self) -> ChildLocation {
+        self
+    }
+    fn as_child_location(&self) -> ChildLocation {
+        *self
+    }
+}
+
+impl IntoChildLocation for PositionAnnotated<ChildLocation> {
+    fn into_child_location(self) -> ChildLocation {
+        self.node
+    }
+    fn as_child_location(&self) -> ChildLocation {
+        self.node
+    }
+}
+
+pub trait PathNode:
+    std::fmt::Debug + Clone + PartialEq + Eq + IntoChildLocation
+{
+}
+impl<T: std::fmt::Debug + Clone + PartialEq + Eq + IntoChildLocation> PathNode
+    for T
+{
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct RootedRangePath<
+    Root: PathRoot,
+    StartNode = ChildLocation,
+    EndNode = ChildLocation,
+> {
+    pub(crate) root: Root,
+    pub(crate) start: RolePath<Start, StartNode>,
+    pub(crate) end: RolePath<End, EndNode>,
+}
+impl<Root: PathRoot, StartNode, EndNode>
+    RootedRangePath<Root, StartNode, EndNode>
+{
     pub fn new(
         root: impl Into<Root>,
-        start: RolePath<Start>,
-        end: RolePath<End>,
+        start: RolePath<Start, StartNode>,
+        end: RolePath<End, EndNode>,
     ) -> Self {
         Self {
             root: root.into(),
@@ -68,24 +123,53 @@ impl<Root: PathRoot> RootedRangePath<Root> {
             end,
         }
     }
+    pub fn end_path(&self) -> &RolePath<End, EndNode> {
+        &self.end
+    }
+    pub fn start_path(&self) -> &RolePath<Start, StartNode> {
+        &self.start
+    }
+    pub fn start_path_mut(&mut self) -> &mut RolePath<Start, StartNode> {
+        &mut self.start
+    }
+    pub fn end_path_mut(&mut self) -> &mut RolePath<End, EndNode> {
+        &mut self.end
+    }
     pub fn new_path<O: PathRoot>(
         root: impl Into<Root>,
-        path: impl Into<RootedRangePath<O>>,
+        path: impl Into<RootedRangePath<O, StartNode, EndNode>>,
     ) -> Self {
         let path = path.into();
         Self::new(root, path.start, path.end)
     }
-    pub fn new_empty(root: Root) -> Self {
+    pub fn new_empty(root: Root) -> Self
+    where
+        RolePath<Start, StartNode>: Default,
+        RolePath<End, EndNode>: Default,
+    {
         Self::new(root, Default::default(), Default::default())
     }
 }
-impl<R: PathRoot> RootedPath for RootedRangePath<R> {
+
+impl<Root: PathRoot, StartNode>
+    RootedRangePath<Root, StartNode, PositionAnnotated<ChildLocation>>
+{
+    /// Get the entry position from the end path (position when entering this range)
+    pub fn end_entry_position(&self) -> Option<AtomPosition> {
+        self.end.entry_position()
+    }
+}
+impl<R: PathRoot, StartNode, EndNode> RootedPath
+    for RootedRangePath<R, StartNode, EndNode>
+{
     type Root = R;
     fn path_root(&self) -> Self::Root {
         self.root.clone()
     }
 }
-impl<R: PathRoot> From<RootedEndPath<R>> for RootedRangePath<R> {
+impl<R: PathRoot> From<RootedEndPath<R>>
+    for RootedRangePath<R, ChildLocation, ChildLocation>
+{
     fn from(value: RootedEndPath<R>) -> Self {
         Self {
             root: value.root,
@@ -94,7 +178,9 @@ impl<R: PathRoot> From<RootedEndPath<R>> for RootedRangePath<R> {
         }
     }
 }
-impl<R: PathRoot> From<RootedStartPath<R>> for RootedRangePath<R> {
+impl<R: PathRoot, EndNode> From<RootedStartPath<R>>
+    for RootedRangePath<R, ChildLocation, EndNode>
+{
     fn from(value: RootedStartPath<R>) -> Self {
         Self {
             end: RolePath::new_empty(value.role_path.root_child_index()),
@@ -103,9 +189,10 @@ impl<R: PathRoot> From<RootedStartPath<R>> for RootedRangePath<R> {
         }
     }
 }
-impl<Root: PathRoot> HasStartPath for RootedRangePath<Root>
+impl<Root: PathRoot, EndNode> HasStartPath
+    for RootedRangePath<Root, ChildLocation, EndNode>
 where
-    RootedRangePath<Root>: HasPath<Start>,
+    RootedRangePath<Root, ChildLocation, EndNode>: HasPath<Start>,
 {
     fn start_path(&self) -> &StartPath {
         &self.start
@@ -114,9 +201,10 @@ where
         &mut self.start
     }
 }
-impl<Root: PathRoot> HasEndPath for RootedRangePath<Root>
+impl<Root: PathRoot, StartNode> HasEndPath
+    for RootedRangePath<Root, StartNode, ChildLocation>
 where
-    RootedRangePath<Root>: HasPath<End>,
+    RootedRangePath<Root, StartNode, ChildLocation>: HasPath<End>,
 {
     fn end_path(&self) -> &EndPath {
         &self.end
@@ -140,25 +228,60 @@ where
 //    }
 //}
 
-impl<R: PathRoot> HasRolePath<Start> for RootedRangePath<R> {
-    fn role_path(&self) -> &RolePath<Start> {
+impl<R: PathRoot, EndNode> HasRolePath<Start>
+    for RootedRangePath<R, ChildLocation, EndNode>
+{
+    type Node = ChildLocation;
+    fn role_path(&self) -> &RolePath<Start, ChildLocation> {
         &self.start
     }
-    fn role_path_mut(&mut self) -> &mut RolePath<Start> {
+    fn role_path_mut(&mut self) -> &mut RolePath<Start, ChildLocation> {
         &mut self.start
     }
 }
-impl<R: PathRoot> HasRolePath<End> for RootedRangePath<R> {
-    fn role_path(&self) -> &RolePath<End> {
+
+// Generic implementation for all EndNode types
+impl<R: PathRoot, StartNode, EndNode> HasRolePath<End>
+    for RootedRangePath<R, StartNode, EndNode>
+{
+    type Node = EndNode;
+    fn role_path(&self) -> &RolePath<End, EndNode> {
         &self.end
     }
-    fn role_path_mut(&mut self) -> &mut RolePath<End> {
+    fn role_path_mut(&mut self) -> &mut RolePath<End, EndNode> {
         &mut self.end
     }
 }
 
+impl<EndNode> GraphRoot for RootedRangePath<IndexRoot, ChildLocation, EndNode> {
+    fn root_parent(&self) -> Token {
+        self.root.location.parent
+    }
+}
+
+impl<EndNode> GraphRootPattern
+    for RootedRangePath<IndexRoot, ChildLocation, EndNode>
+{
+    fn root_pattern_location(&self) -> PatternLocation {
+        self.root.location
+    }
+}
+
+impl<EndNode> RootPattern
+    for RootedRangePath<IndexRoot, ChildLocation, EndNode>
+{
+    fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
+        &'b self,
+        trav: &'g G::Guard<'a>,
+    ) -> &'g Pattern {
+        self.root.root_pattern::<G>(trav)
+    }
+}
+
 // Display implementation using compact format with Display trait for nested types
-impl<R: PathRoot + fmt::Display> fmt::Display for RootedRangePath<R> {
+impl<R: PathRoot + fmt::Display> fmt::Display
+    for RootedRangePath<R, ChildLocation, ChildLocation>
+{
     fn fmt(
         &self,
         f: &mut fmt::Formatter<'_>,
@@ -182,16 +305,24 @@ impl<R: PathRoot + fmt::Display> fmt::Display for RootedRangePath<R> {
     }
 }
 
-impl<R: PathRoot + fmt::Display> fmt::Debug for RootedRangePath<R>
+// Generic Debug implementation for all RootedRangePath types
+impl<R, StartNode, EndNode> fmt::Debug
+    for RootedRangePath<R, StartNode, EndNode>
 where
-    Self: crate::logging::compact_format::CompactFormat,
+    R: PathRoot + fmt::Debug,
+    StartNode: fmt::Debug,
+    EndNode: fmt::Debug,
+    RolePath<Start, StartNode>: fmt::Debug,
+    RolePath<End, EndNode>: fmt::Debug,
 {
     fn fmt(
         &self,
         f: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
-        // Use CompactFormat's indented format for Debug
-        use crate::logging::compact_format::CompactFormat;
-        self.fmt_indented(f, 1)
+        f.debug_struct("RootedRangePath")
+            .field("root", &self.root)
+            .field("start", &self.start)
+            .field("end", &self.end)
+            .finish()
     }
 }

@@ -1,5 +1,6 @@
 use crate::{
     HashSet,
+    TokenWidth,
     direction::{
         Direction,
         pattern::PatternDirection,
@@ -85,7 +86,7 @@ pub(crate) fn localized_children_iter_for_index(
 #[derive(Debug, Builder, Serialize, Deserialize)]
 #[cfg_attr(not(any(test, feature = "test-api")), derive(PartialEq, Eq, Clone))]
 pub struct VertexData {
-    pub(crate) width: usize,
+    pub(crate) width: TokenWidth,
     pub(crate) index: VertexIndex,
 
     #[builder(default)]
@@ -138,7 +139,7 @@ impl Clone for VertexData {
 impl VertexData {
     pub(crate) fn new(
         index: VertexIndex,
-        width: usize,
+        width: TokenWidth,
     ) -> Self {
         Self {
             width,
@@ -149,9 +150,6 @@ impl VertexData {
             #[cfg(any(test, feature = "test-api"))]
             cached_string: std::sync::RwLock::new(None),
         }
-    }
-    pub(crate) fn get_width(&self) -> usize {
-        self.width
     }
     pub(crate) fn get_parent(
         &self,
@@ -282,7 +280,7 @@ impl VertexData {
     pub fn expect_child_offset(
         &self,
         loc: &SubLocation,
-    ) -> usize {
+    ) -> TokenWidth {
         pattern_width(
             &self.expect_child_pattern(&loc.pattern_id)[0..loc.sub_index],
         )
@@ -394,7 +392,7 @@ impl VertexData {
                 let pattern_width = pattern_width(p);
                 assert_eq!(pattern_width, self.width, "Pattern width mismatch in index {:#?} token pattern:\n {:#?}", self.index, (pid, self.children.get(pid)));
                 let mut p = p.iter().fold(Vec::new(), |mut pa, c| {
-                    offset += c.width();
+                    offset += c.width().0;
                     assert!(
                         !acc.iter().any(|pr| pr.contains(&offset)),
                         "Duplicate border in index {:#?} token patterns:\n {:#?}",
@@ -458,7 +456,7 @@ impl VertexData {
     }
     pub(crate) fn get_parents_below_width(
         &self,
-        width_ceiling: Option<usize>,
+        width_ceiling: Option<TokenWidth>,
     ) -> impl Iterator<Item = (&VertexIndex, &Parent)> + Clone {
         let parents = self.parents();
         // optionally filter parents by width
@@ -614,7 +612,7 @@ impl VertexData {
             .flat_map(|(_, pat)| {
                 pat.iter()
                     .enumerate()
-                    .filter(|(_, c)| c.width() + 1 == self.width())
+                    .filter(|(_, c)| c.width() + TokenWidth(1) == self.width())
                     .map(|(off, c)| (off, *c))
             })
             .sorted_by_key(|&(off, _)| off)

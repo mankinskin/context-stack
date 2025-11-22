@@ -1,4 +1,6 @@
 use crate::{
+    PositionAnnotated,
+    TokenWidth,
     graph::vertex::{
         location::child::ChildLocation,
         token::Token,
@@ -50,25 +52,30 @@ pub trait GraphRootChild<R: PathRole>: RootedPath + GraphRootPattern {
     fn get_outer_width<G: HasGraph>(
         &self,
         trav: &G,
-    ) -> usize {
+    ) -> TokenWidth {
         let i = self.graph_root_child_location().sub_index;
         let g = trav.graph();
         let p = self.graph_root_pattern::<G>(&g);
-        R::outer_ctx_width(p, i)
+        TokenWidth(R::outer_ctx_width(p, i))
     }
     fn get_inner_width<G: HasGraph>(
         &self,
         trav: &G,
-    ) -> usize {
+    ) -> TokenWidth {
         let i = self.graph_root_child_location().sub_index;
         let g = trav.graph();
         let p = self.graph_root_pattern::<G>(&g);
-        R::inner_width(p, i)
+        TokenWidth(R::inner_width(p, i))
     }
 }
 impl<R: PathRole> GraphRootChild<R> for ChildLocation {
     fn graph_root_child_location(&self) -> ChildLocation {
         *self
+    }
+}
+impl<R: PathRole, T: GraphRootChild<R>> GraphRootChild<R> for PositionAnnotated<T> {
+    fn graph_root_child_location(&self) -> ChildLocation {
+        self.node.graph_root_child_location()
     }
 }
 // used to get a direct token of a pattern

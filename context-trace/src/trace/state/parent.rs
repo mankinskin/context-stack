@@ -20,9 +20,12 @@ use crate::{
             move_path::key::AdvanceKey,
             raise::PathRaise,
         },
-        structs::rooted::{
-            role_path::IndexStartPath,
-            root::RootedPath,
+        structs::{
+            rooted::{
+                role_path::IndexStartPath,
+                root::RootedPath,
+            },
+            sub_path::PositionAnnotated,
         },
     },
     trace::{
@@ -93,10 +96,11 @@ impl StateAdvance for ParentState {
         {
             tracing::debug!(next_i = next_i, "Found next child in pattern");
             let root_parent = self.clone();
-            let ParentState { path, root_pos, .. } = self;
+            let ParentState { path, root_pos, prev_pos } = self;
             Ok(RootChildState {
                 child_state: ChildState {
-                    current_pos: root_pos,
+                    entry_pos: root_pos,
+                    start_pos: prev_pos, // Use prev_pos for start path tracing
                     path: path.into_range(next_i),
                 },
                 root_parent,
@@ -125,7 +129,7 @@ impl PathRaise for ParentState {
 
         self.prev_pos = self.root_pos;
         self.root_pos
-            .advance_key(pattern_width(&prev_pattern[path.root_entry + 1..]));
+            .advance_key(pattern_width(&prev_pattern[path.root_entry + 1..]).0);
 
         let prev = self.path.root.location.to_child_location(path.root_entry);
         path.root_entry = parent_entry.sub_index;

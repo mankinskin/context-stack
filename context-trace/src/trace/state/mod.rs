@@ -116,7 +116,7 @@ impl IntoParentState for Token {
         _trav: &G,
         parent_entry: ChildLocation,
     ) -> ParentState {
-        let width = self.width().into();
+        let width = self.width().0.into();
         ParentState {
             prev_pos: width,
             root_pos: width,

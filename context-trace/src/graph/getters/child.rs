@@ -70,7 +70,7 @@ impl<G: GraphKind> Hypergraph<G> {
         loc: &ChildLocation,
     ) -> usize {
         self.expect_vertex(loc.vertex_index())
-            .expect_child_offset(&loc.to_sub_location())
+            .expect_child_offset(&loc.to_sub_location()).0
     }
     pub(crate) fn expect_child(
         &self,

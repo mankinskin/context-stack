@@ -66,3 +66,9 @@ impl RootedPath for ChildLocation {
         IndexRoot::from(self.into_pattern_location())
     }
 }
+impl<T: RootedPath> RootedPath for crate::PositionAnnotated<T> {
+    type Root = T::Root;
+    fn path_root(&self) -> Self::Root {
+        self.node.path_root()
+    }
+}

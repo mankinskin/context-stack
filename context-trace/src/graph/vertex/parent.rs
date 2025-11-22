@@ -48,26 +48,26 @@ impl PatternIndex {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Parent {
     /// width of the parent
-    pub(crate) width: usize,
+    pub(crate) width: TokenWidth,
     /// positions of token in parent patterns
     pub(crate) pattern_indices: HashSet<PatternIndex>,
 }
 impl Wide for Parent {
-    fn width(&self) -> usize {
+    fn width(&self) -> TokenWidth {
         self.width
     }
 }
 impl Parent {
-    pub(crate) fn new(width: usize) -> Self {
+    pub(crate) fn new(width: impl Into<TokenWidth>) -> Self {
         Self {
-            width,
+            width: width.into(),
             pattern_indices: Default::default(),
         }
     }
     pub fn pattern_indices(&self) -> &HashSet<PatternIndex> {
         &self.pattern_indices
     }
-    pub(crate) fn get_width(&self) -> usize {
+    pub(crate) fn get_width(&self) -> TokenWidth {
         self.width
     }
     pub(crate) fn any_pattern_index(&self) -> PatternIndex {

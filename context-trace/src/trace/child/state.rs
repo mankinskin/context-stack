@@ -5,6 +5,7 @@ use crate::{
     GraphRootPattern,
     HasPath,
     PathRole,
+    PositionAnnotated,
     RootChildIndex,
     RootPattern,
     RootedPath,
@@ -18,8 +19,14 @@ use crate::{
         RolePathUtils,
         accessors::{
             child::LeafToken,
-            has_path::IntoRootedRolePath,
-            role::End,
+            has_path::{
+                HasRolePath,
+                IntoRootedRolePath,
+            },
+            role::{
+                End,
+                Start,
+            },
             root::GraphRoot,
         },
         mutators::{
@@ -28,7 +35,11 @@ use crate::{
         },
         structs::rooted::{
             index_range::IndexRangePath,
-            role_path::RootChildToken,
+            role_path::{
+                RootChildToken,
+                RootedRolePath,
+            },
+            root::IndexRoot,
         },
     },
     trace::{
@@ -63,33 +74,48 @@ use std::{
 //}
 
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub struct RootChildState {
+pub struct RootChildState<
+    EndNode: Debug + Clone + PartialEq + Eq = ChildLocation,
+> {
     #[deref]
     #[deref_mut]
-    pub child_state: ChildState,
+    pub child_state: ChildState<EndNode>,
     pub root_parent: ParentState,
 }
 
-/// State representing a child position (range path with current target position).
-/// The `current_pos` represents the target position being traversed.
+/// State representing a child position (range path with entry position).
+/// The `entry_pos` represents the position where we entered the root token of this traversal.
+/// The `start_pos` represents the position to use for tracing the start path (for bottom-up edges).
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub struct ChildState {
-    pub current_pos: AtomPosition,
+pub struct ChildState<EndNode: Debug + Clone + PartialEq + Eq = ChildLocation> {
+    pub entry_pos: AtomPosition,
+    pub start_pos: AtomPosition,
     #[deref]
     #[deref_mut]
-    pub path: IndexRangePath,
+    pub path: IndexRangePath<ChildLocation, EndNode>,
 }
 
-impl ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> ChildState<EndNode>
+where
+    IndexRangePath<ChildLocation, EndNode>:
+        HasRolePath<Start, Node = ChildLocation> + RootedPath<Root = IndexRoot>,
+{
     pub fn parent_state(&self) -> ParentState {
         ParentState {
-            path: self.path.get_rooted_role_path(),
-            prev_pos: self.current_pos,
-            root_pos: self.current_pos,
+            path: RootedRolePath::new(
+                self.path.path_root(),
+                self.path.role_path().clone(),
+            ),
+            prev_pos: self.entry_pos,
+            root_pos: self.entry_pos,
         }
     }
 }
-impl PathAppend for ChildState {
+
+impl<EndNode: Debug + Clone + PartialEq + Eq> PathAppend for ChildState<EndNode>
+where
+    IndexRangePath<ChildLocation, EndNode>: PathAppend,
+{
     fn path_append(
         &mut self,
         parent_entry: ChildLocation,
@@ -97,12 +123,20 @@ impl PathAppend for ChildState {
         self.path.path_append(parent_entry);
     }
 }
-impl RootChildIndex<End> for ChildState {
+
+impl<EndNode: Debug + Clone + PartialEq + Eq> RootChildIndex<End>
+    for ChildState<EndNode>
+{
     fn root_child_index(&self) -> usize {
         self.path.role_root_child_index::<End>()
     }
 }
-impl RootChildToken<End> for ChildState {
+
+impl<EndNode: Debug + Clone + PartialEq + Eq> RootChildToken<End>
+    for ChildState<EndNode>
+where
+    IndexRangePath<ChildLocation, EndNode>: RootChildToken<End>,
+{
     fn root_child_token<G: HasGraph>(
         &self,
         trav: &G,
@@ -110,12 +144,17 @@ impl RootChildToken<End> for ChildState {
         RootChildToken::<End>::root_child_token(&self.path, trav)
     }
 }
-impl GraphRoot for ChildState {
+
+impl<EndNode: Debug + Clone + PartialEq + Eq> GraphRoot
+    for ChildState<EndNode>
+{
     fn root_parent(&self) -> Token {
         self.path.root_parent()
     }
 }
-impl RootPattern for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> RootPattern
+    for ChildState<EndNode>
+{
     fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
         &'b self,
         trav: &'g G::Guard<'a>,
@@ -123,40 +162,61 @@ impl RootPattern for ChildState {
         self.path.root_pattern::<G>(trav)
     }
 }
-impl GraphRootPattern for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> GraphRootPattern
+    for ChildState<EndNode>
+{
     fn root_pattern_location(&self) -> crate::PatternLocation {
         self.path.root_pattern_location()
     }
 }
-impl RootedPath for ChildState {
-    type Root = <IndexRangePath as RootedPath>::Root;
+impl<EndNode: Debug + Clone + PartialEq + Eq> RootedPath
+    for ChildState<EndNode>
+{
+    type Root = <IndexRangePath<ChildLocation, EndNode> as RootedPath>::Root;
     fn path_root(&self) -> Self::Root {
         self.path.path_root()
     }
 }
-impl GraphRootChild<End> for ChildState {
+impl GraphRootChild<End> for ChildState<ChildLocation> {
     fn graph_root_child_location(&self) -> ChildLocation {
         self.path.role_root_child_location::<End>()
     }
 }
-impl LeafToken<End> for ChildState {
+// LeafToken only for non-position-annotated ChildState
+impl LeafToken<End> for ChildState<ChildLocation>
+where
+    IndexRangePath<ChildLocation, ChildLocation>:
+        RootChildIndex<End> + HasPath<End, Node = ChildLocation>,
+{
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         self.path.role_leaf_token_location::<End>()
     }
 }
-impl<R: PathRole> HasPath<R> for ChildState
+
+// Note: Cannot implement LeafToken<End> for ChildState<PositionAnnotated<ChildLocation>>
+// because LeafToken requires HasPath<End, Node = ChildLocation>, but PositionAnnotated paths
+// have HasPath<End, Node = PositionAnnotated<ChildLocation>>.
+// Instead, PrefixStates is implemented directly for this type in context-search.
+
+impl<R: PathRole, EndNode: Debug + Clone + PartialEq + Eq> HasPath<R>
+    for ChildState<EndNode>
 where
-    IndexRangePath: HasPath<R>,
+    IndexRangePath<ChildLocation, EndNode>: HasPath<R>,
 {
-    fn path(&self) -> &Vec<ChildLocation> {
+    type Node = <IndexRangePath<ChildLocation, EndNode> as HasPath<R>>::Node;
+    fn path(&self) -> &Vec<Self::Node> {
         HasPath::<R>::path(&self.path)
     }
-    fn path_mut(&mut self) -> &mut Vec<ChildLocation> {
+    fn path_mut(&mut self) -> &mut Vec<Self::Node> {
         HasPath::<R>::path_mut(&mut self.path)
     }
 }
 
-impl StateAdvance for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> StateAdvance
+    for ChildState<EndNode>
+where
+    IndexRangePath<ChildLocation, EndNode>: Advance,
+{
     type Next = Self;
     fn advance_state<G: HasGraph>(
         mut self,
@@ -170,7 +230,7 @@ impl StateAdvance for ChildState {
     }
 }
 
-impl Ord for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> Ord for ChildState<EndNode> {
     fn cmp(
         &self,
         other: &Self,
@@ -179,7 +239,9 @@ impl Ord for ChildState {
     }
 }
 
-impl PartialOrd for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> PartialOrd
+    for ChildState<EndNode>
+{
     fn partial_cmp(
         &self,
         other: &Self,
@@ -187,28 +249,32 @@ impl PartialOrd for ChildState {
         Some(self.cmp(other))
     }
 }
-impl RootKey for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> RootKey for ChildState<EndNode> {
     fn root_key(&self) -> UpKey {
-        UpKey::new(self.path.root_parent(), self.current_pos.into())
+        UpKey::new(self.path.root_parent(), self.entry_pos.into())
     }
 }
 
-impl TargetKey for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> TargetKey
+    for ChildState<EndNode>
+{
     fn target_key(&self) -> DirectedKey {
         self.root_key().into()
     }
 }
 
-impl HasTargetPos for ChildState {
+impl<EndNode: Debug + Clone + PartialEq + Eq> HasTargetPos
+    for ChildState<EndNode>
+{
     fn target_pos(&self) -> &AtomPosition {
-        &self.current_pos
+        &self.entry_pos
     }
     fn target_pos_mut(&mut self) -> &mut AtomPosition {
-        &mut self.current_pos
+        &mut self.entry_pos
     }
 }
 
-impl LeafKey for ChildState {
+impl LeafKey for ChildState<ChildLocation> {
     fn leaf_location(&self) -> ChildLocation {
         self.path.leaf_location()
     }

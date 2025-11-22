@@ -20,7 +20,7 @@ use crate::{
     r#match::root_cursor::RootCursor,
     traversal::{
         policy::DirectedTraversalPolicy,
-        TraversalKind,
+        SearchKind,
     },
 };
 use context_trace::*;
@@ -38,11 +38,15 @@ pub(crate) struct SearchQueue {
 // Display implementation moved to logging/mod.rs via impl_display_via_compact macro
 
 #[derive(Debug)]
-pub(crate) struct RootFinder<'a, K: TraversalKind> {
+pub(crate) struct RootFinder<'a, K: SearchKind + 'a> {
     pub(crate) ctx: &'a mut SearchQueue,
     pub(crate) trav: &'a K::Trav,
 }
-impl<'a, K: TraversalKind> RootFinder<'a, K> {
+impl<'a, K: SearchKind + 'a> RootFinder<'a, K>
+where
+    &'a K: SearchKind<Trav = &'a K::Trav>,
+    K::Trav: Clone,
+{
     pub(crate) fn new(
         trav: &'a K::Trav,
         ctx: &'a mut SearchQueue,
@@ -52,18 +56,25 @@ impl<'a, K: TraversalKind> RootFinder<'a, K> {
 
     pub(crate) fn find_root_cursor(
         mut self
-    ) -> Option<RootCursor<&'a K::Trav, Matched, Matched>> {
+    ) -> Option<RootCursor<&'a K, Matched, Matched>> {
+        // Save trav before iterating
+        let trav_copy = self.trav;
+
         self.find_map(|root| root).map(|matched_state| {
-            // Return a Matched RootCursor - caller will advance cursors
+            // Use the saved trav copy
+            // This works because &'a K::Trav implements Copy (it's just a reference)
             RootCursor {
-                trav: self.trav,
+                trav: trav_copy,
                 state: Box::new(matched_state),
             }
         })
     }
 }
 
-impl<K: TraversalKind> Iterator for RootFinder<'_, K> {
+impl<K: SearchKind> Iterator for RootFinder<'_, K>
+where
+    K::Trav: Clone,
+{
     type Item = Option<MatchedCompareState>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -187,14 +198,17 @@ impl Ord for SearchNode {
 }
 
 #[derive(Debug, new)]
-struct NodeConsumer<'a, K: TraversalKind>(SearchNode, &'a K::Trav);
+struct NodeConsumer<'a, K: SearchKind>(SearchNode, &'a K::Trav);
 
-impl<K: TraversalKind> NodeConsumer<'_, K> {
+impl<K: SearchKind> NodeConsumer<'_, K>
+where
+    K::Trav: Clone,
+{
     fn compare_next(
         trav: &K::Trav,
         queue: ChildQueue<CompareState<Candidate, Candidate>>,
     ) -> Option<NodeResult> {
-        let mut compare_iter = CompareIterator::<&K::Trav>::new(trav, queue);
+        let mut compare_iter = CompareIterator::<K>::new(trav.clone(), queue);
         match compare_iter.next() {
             Some(Some(CompareResult::FoundMatch(matched_state))) => {
                 // Return the matched state directly without conversion
