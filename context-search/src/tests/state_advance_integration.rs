@@ -297,7 +297,7 @@ fn test_advancement_fails_at_boundaries() {
         "Original state should be returned on failure"
     );
     assert_eq!(
-        usize::from(returned.cursor.atom_position),
+        usize::from(returned.query.current().atom_position),
         usize::from(cursor.atom_position),
         "Cursor should be unchanged on failure"
     );
@@ -421,8 +421,8 @@ fn test_compare_state_advancement_consistency() {
 
     // Verify checkpoint is preserved (it's not advanced by CompareState)
     assert_eq!(
-        usize::from(advanced_compare.checkpoint.atom_position),
-        usize::from(compare_state.checkpoint.atom_position),
+        usize::from(advanced_compare.query.checkpoint().atom_position),
+        usize::from(compare_state.query.checkpoint().atom_position),
         "Checkpoint should remain unchanged"
     );
 }
@@ -488,8 +488,8 @@ fn test_state_advance_idempotency_on_error() {
         "root_pos should be unchanged"
     );
     assert_eq!(
-        usize::from(returned_state.cursor.atom_position),
-        usize::from(original_state.cursor.atom_position),
+        usize::from(returned_state.query.current().atom_position),
+        usize::from(original_state.query.current().atom_position),
         "Cursor position should be unchanged"
     );
 

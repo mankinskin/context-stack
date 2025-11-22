@@ -2,6 +2,7 @@ use crate::{
     compare::parent::ParentCompareState,
     cursor::{
         Candidate,
+        Checkpointed,
         ChildCursor,
         CursorState,
         MarkMatchState,
@@ -85,37 +86,31 @@ impl std::fmt::Display for PathPairMode {
 /// - `CompareState<Matched, Matched>` - Both cursors matched successfully
 /// - `CompareState<Mismatched, Mismatched>` - Both cursors failed to match
 ///
-/// # Cursor State Semantics
+/// # Checkpointed Cursor Architecture
 ///
-/// This struct maintains THREE cursors that track different states:
+/// Each cursor is wrapped in a `Checkpointed<C>` type that encapsulates:
+/// - **current**: The position being evaluated (state controlled by generic Q or I)
+/// - **checkpoint**: Last confirmed match (always Matched state)
 ///
-/// - **`cursor`** (state controlled by generic `Q`): The query position being evaluated.
-///   - In `CompareState<Candidate, _>`: exploring ahead to test if tokens match
-///   - In `CompareState<Matched, _>`: confirmed as matching
-///   - In `CompareState<Mismatched, _>`: confirmed as mismatched
-///   - `atom_position` tracks how many atoms have been scanned (including this candidate)
-///   - Uses PatternPrefixPath (only End role) for efficient comparison
+/// This ensures cursor and checkpoint are always managed together, preventing
+/// desynchronization bugs.
 ///
-/// - **`child_cursor`** (state controlled by generic `I`): The index/graph position being evaluated.
-///   - Wraps ChildState (which contains the IndexRangePath) with cursor state semantics
-///   - Tracks position in the graph path independently from query cursor
-///   - State transitions separately, enabling independent query and index advancement
-///   - Position tracked via `child_cursor.child_state.root_pos()`
+/// ## Query Cursor (`query`)
+/// - Tracks position in the query pattern being searched for
+/// - Uses `PathCursor<PatternRangePath, Q>` to track start/end positions
+/// - `atom_position` represents atoms consumed from the pattern
 ///
-/// - **`checkpoint`** (always Matched state): The last confirmed matching position.
-///   - Marks where we were BEFORE advancing into the current token
-///   - Always in Matched state (represents confirmed progress)
-///   - `atom_position` reflects confirmed consumed atoms
-///   - Updated by RootCursor after confirming a match is part of the largest contiguous sequence
-///   - Uses PatternRangePath (Start and End) to track the matched range
+/// ## Child Cursor (`child`)
+/// - Tracks position in the graph/index path being searched
+/// - Uses `ChildCursor<I, EndNode>` wrapping ChildState with IndexRangePath
+/// - Position tracked via `child.current().child_state`
 ///
 /// # atom_position Tracking
 ///
 /// The `atom_position` field represents the number of atoms consumed:
 /// - Starts at 0 at the beginning of a pattern
 /// - Increments by token width when advancing
-/// - For prefix decomposition: accumulates widths across sub-tokens
-/// - checkpoint.atom_position ≤ cursor.atom_position (cursor explores ahead)
+/// - checkpoint.atom_position ≤ current.atom_position (current explores ahead)
 ///
 /// Example: Matching pattern [a,b,c] where b,c form a composite token "bc":
 /// ```text
@@ -124,12 +119,12 @@ impl std::fmt::Display for PathPairMode {
 /// Tokens:    a   [bc]
 ///
 /// After matching 'a':
-///   checkpoint.atom_position = 1 (consumed 'a')
-///   cursor.atom_position = 1 (about to test 'bc')
+///   query.checkpoint().atom_position = 1 (consumed 'a')
+///   query.current().atom_position = 1 (about to test 'bc')
 ///
 /// While testing 'bc':
-///   checkpoint.atom_position = 1 (still at 'a')
-///   cursor.atom_position = 3 (would consume through 'c')
+///   query.checkpoint().atom_position = 1 (still at 'a')
+///   query.current().atom_position = 3 (would consume through 'c')
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CompareState<
@@ -137,20 +132,13 @@ pub(crate) struct CompareState<
     I: CursorState = Candidate,
     EndNode: PathNode = PositionAnnotated<ChildLocation>,
 > {
-    /// Query cursor: state controlled by generic parameter Q
+    /// Query cursor with checkpoint (state controlled by generic parameter Q)
     /// Uses PatternRangePath to properly track start/end positions during matching
-    pub(crate) cursor: PathCursor<PatternRangePath, Q>,
+    pub(crate) query: Checkpointed<PathCursor<PatternRangePath, Q>>,
 
-    /// Index cursor: wraps ChildState with state marker I
+    /// Index cursor with checkpoint (state controlled by generic parameter I)
     /// The ChildState contains the IndexRangePath being traversed with position-annotated end nodes
-    pub(crate) child_cursor: ChildCursor<I, EndNode>,
-
-    /// Checkpoint: last confirmed match (always Matched state)
-    pub(crate) checkpoint: PathCursor<PatternRangePath, Matched>,
-
-    /// Checkpoint for child cursor: index path state at last confirmed match
-    /// Uses position-annotated paths to track entry positions for cache lookups
-    pub(crate) checkpoint_child: ChildCursor<Matched, EndNode>,
+    pub(crate) child: Checkpointed<ChildCursor<I, EndNode>>,
 
     pub(crate) target: DownKey,
     pub(crate) mode: PathPairMode,
@@ -163,7 +151,7 @@ impl<Q: CursorState, I: CursorState, EndNode: PathNode>
     pub(crate) fn rooted_path(
         &self
     ) -> &IndexRangePath<ChildLocation, EndNode> {
-        &self.child_cursor.child_state.path
+        &self.child.current().child_state.path
     }
 
     ///// Get the leaf ChildLocation from the path, extracting from PositionAnnotated if needed
@@ -194,20 +182,20 @@ impl<Q: CursorState + Clone, I: CursorState + Clone, EndNode: PathNode>
     CompareState<Q, I, EndNode>
 {
     pub(crate) fn parent_state(&self) -> ParentCompareState {
-        // IMPORTANT: Use cursor (not checkpoint) to create parent state
+        // IMPORTANT: Use current cursor (not checkpoint) to create parent state
         // The cursor.path is a PatternRangePath that tracks the current query position
         // This is passed to ParentCompareState.cursor and used as the starting point
         // for matching in parent roots, allowing incremental start path tracing:
         // - Each parent match builds on the previous match's cursor position
         // - Start paths can be traced incrementally from last match to new match
         let cursor = PathCursor {
-            path: self.cursor.path.clone(),
-            atom_position: self.cursor.atom_position,
+            path: self.query.current().path.clone(),
+            atom_position: self.query.current().atom_position,
             _state: PhantomData,
         };
 
         ParentCompareState {
-            parent_state: self.child_cursor.child_state.parent_state(),
+            parent_state: self.child.current().child_state.parent_state(),
             cursor,
         }
     }
@@ -220,38 +208,39 @@ impl<EndNode: PathNode> MarkMatchState
     type Mismatched = CompareState<Mismatched, Mismatched, EndNode>;
 
     fn mark_match(self) -> Self::Matched {
-        let cursor_pos = self.cursor.atom_position;
-        let old_checkpoint_pos = self.checkpoint.atom_position;
+        let cursor_pos = self.query.current().atom_position;
+        let old_checkpoint_pos = self.query.checkpoint().atom_position;
         let cursor_end_index =
-            RootChildIndex::<End>::root_child_index(&self.cursor.path);
-        let matched_cursor = self.cursor.mark_match();
-        let matched_child = self.child_cursor.mark_match();
-        let matched_end_index =
-            RootChildIndex::<End>::root_child_index(&matched_cursor.path);
+            RootChildIndex::<End>::root_child_index(&self.query.current().path);
+
+        // Mark both cursors as matched, which updates their checkpoints
+        let query_matched = self.query.mark_match();
+        let child_matched = self.child.mark_match();
+
+        let matched_end_index = RootChildIndex::<End>::root_child_index(
+            &query_matched.current().path,
+        );
         tracing::trace!(
             cursor_pos = %cursor_pos,
             cursor_end_index = cursor_end_index,
             old_checkpoint_pos = %old_checkpoint_pos,
-            new_checkpoint_pos = %matched_cursor.atom_position,
+            new_checkpoint_pos = %query_matched.current().atom_position,
             matched_end_index = matched_end_index,
-            "mark_match: converting to Matched state and updating checkpoint"
+            "mark_match: converting to Matched state and updating checkpoints"
         );
         CompareState {
-            child_cursor: matched_child.clone(),
-            cursor: matched_cursor.clone(),
-            checkpoint: matched_cursor,
-            checkpoint_child: matched_child,
+            query: query_matched,
+            child: child_matched,
             target: self.target,
             mode: self.mode,
         }
     }
 
     fn mark_mismatch(self) -> Self::Mismatched {
+        // Mark both cursors as mismatched, checkpoints remain unchanged
         CompareState {
-            child_cursor: self.child_cursor.mark_mismatch(),
-            cursor: self.cursor.mark_mismatch(),
-            checkpoint: self.checkpoint,
-            checkpoint_child: self.checkpoint_child,
+            query: self.query.mark_mismatch(),
+            child: self.child.mark_mismatch(),
             target: self.target,
             mode: self.mode,
         }
@@ -268,22 +257,20 @@ impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
         trav: &G,
     ) -> QueryAdvanceResult<EndNode> {
         debug!(
-            cursor = %self.cursor,
+            cursor = %self.query.current(),
             "advancing query cursor only"
         );
 
-        // Try to advance the query cursor
-        match self.cursor.advance(trav) {
+        // Try to advance the query cursor's current position
+        match self.query.current_mut().advance(trav) {
             Continue(_) => {
                 trace!("query cursor advance succeeded");
-                // Convert to candidate state
-                let candidate_cursor = self.cursor.as_candidate();
+                // Convert query to candidate state (checkpoint remains unchanged)
+                let query_candidate = self.query.as_candidate();
 
                 Ok(CompareState {
-                    child_cursor: self.child_cursor,
-                    cursor: candidate_cursor,
-                    checkpoint: self.checkpoint,
-                    checkpoint_child: self.checkpoint_child,
+                    query: query_candidate,
+                    child: self.child,
                     target: self.target,
                     mode: self.mode,
                 })
@@ -581,18 +568,19 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
         use Ordering::*;
         let path_leaf =
             self.rooted_path().role_rooted_leaf_token::<End, _>(trav);
-        let query_leaf = self.cursor.role_rooted_leaf_token::<End, _>(trav);
+        let query_leaf =
+            self.query.current().role_rooted_leaf_token::<End, _>(trav);
 
         let cursor_end_index =
-            RootChildIndex::<End>::root_child_index(&self.cursor.path);
+            RootChildIndex::<End>::root_child_index(&self.query.current().path);
         debug!(
             path_leaf = %path_leaf,
             query_leaf = %query_leaf,
             path_width = *path_leaf.width(),
             query_width = *query_leaf.width(),
-            cursor_pos = %self.cursor.atom_position,
+            cursor_pos = %self.query.current().atom_position,
             cursor_end_index = cursor_end_index,
-            checkpoint_pos = %self.checkpoint.atom_position,
+            checkpoint_pos = %self.query.checkpoint().atom_position,
             mode = %self.mode,
             "comparing candidate tokens (position-annotated)"
         );
@@ -660,17 +648,17 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
     > {
         debug!(
             mode = %self.mode,
-            child_state = %self.child_cursor.child_state,
-            cursor = %self.cursor,
+            child_state = %self.child.current().child_state,
+            cursor = %self.query.current(),
             "entering prefix_states (position-annotated)"
         );
 
         match self.mode {
             GraphMajor => {
-                let checkpoint_pos = *self.checkpoint.cursor_pos();
+                let checkpoint_pos = *self.query.checkpoint().cursor_pos();
                 debug!("calling child_state.prefix_states");
                 let prefixes =
-                    self.child_cursor.child_state.prefix_states(trav);
+                    self.child.current().child_state.prefix_states(trav);
 
                 trace!(
                     mode = "GraphMajor",
@@ -698,14 +686,15 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                         );
                         CompareState {
                             target: DownKey::new(token, target_pos),
-                            child_cursor: ChildCursor {
-                                child_state,
-                                _state: PhantomData,
+                            child: Checkpointed {
+                                current: ChildCursor {
+                                    child_state,
+                                    _state: PhantomData,
+                                },
+                                checkpoint: self.child.checkpoint().clone(),
                             },
                             mode: self.mode,
-                            cursor: self.cursor.clone(),
-                            checkpoint: self.checkpoint.clone(),
-                            checkpoint_child: self.checkpoint_child.clone(),
+                            query: self.query.clone(),
                         }
                     })
                     .collect();
@@ -716,14 +705,16 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                 result
             },
             QueryMajor => {
-                let base_position = self.checkpoint.atom_position;
+                let base_position = self.query.checkpoint().atom_position;
                 debug!("calling cursor.prefix_states_from");
-                let cursor_prefixes =
-                    self.cursor.prefix_states_from(trav, base_position);
+                let cursor_prefixes = self
+                    .query
+                    .current()
+                    .prefix_states_from(trav, base_position);
 
                 trace!(
                     mode = "QueryMajor",
-                    cursor_pos = %self.cursor.atom_position,
+                    cursor_pos = %self.query.current().atom_position,
                     base_pos = %base_position,
                     num_prefixes = cursor_prefixes.len(),
                     "decomposing query cursor token into prefixes (position-annotated)"
@@ -748,13 +739,14 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                         CompareState {
                             target: DownKey::new(
                                 sub.token(),
-                                (*self.checkpoint.cursor_pos()).into(),
+                                (*self.query.checkpoint().cursor_pos()).into(),
                             ),
-                            child_cursor: self.child_cursor.clone(),
+                            child: self.child.clone(),
                             mode: self.mode,
-                            cursor,
-                            checkpoint: self.checkpoint.clone(),
-                            checkpoint_child: self.checkpoint_child.clone(),
+                            query: Checkpointed {
+                                current: cursor,
+                                checkpoint: self.query.checkpoint().clone(),
+                            },
                         }
                     })
                     .collect();
@@ -815,30 +807,32 @@ impl CompareState<Candidate, Matched, PositionAnnotated<ChildLocation>> {
         self,
         trav: &G,
     ) -> IndexAdvanceResult<PositionAnnotated<ChildLocation>> {
-        let candidate_child_cursor = self.child_cursor.as_candidate();
+        let candidate_child_cursor = self.child.current().as_candidate();
         match candidate_child_cursor.child_state.advance_state(trav) {
             Ok(advanced_child_state) => {
                 // TODO: Update positions in the advanced state
                 Ok(CompareState {
-                    child_cursor: ChildCursor {
-                        child_state: advanced_child_state,
-                        _state: PhantomData,
+                    child: Checkpointed {
+                        current: ChildCursor {
+                            child_state: advanced_child_state,
+                            _state: PhantomData,
+                        },
+                        checkpoint: self.child.checkpoint().clone(),
                     },
-                    cursor: self.cursor,
-                    checkpoint: self.checkpoint,
-                    checkpoint_child: self.checkpoint_child,
+                    query: self.query,
                     target: self.target,
                     mode: self.mode,
                 })
             },
             Err(failed_child_state) => Err(CompareState {
-                child_cursor: ChildCursor {
-                    child_state: failed_child_state,
-                    _state: PhantomData,
+                child: Checkpointed {
+                    current: ChildCursor {
+                        child_state: failed_child_state,
+                        _state: PhantomData,
+                    },
+                    checkpoint: self.child.checkpoint().clone(),
                 },
-                cursor: self.cursor,
-                checkpoint: self.checkpoint,
-                checkpoint_child: self.checkpoint_child,
+                query: self.query,
                 target: self.target,
                 mode: self.mode,
             }),
@@ -896,18 +890,25 @@ impl StateAdvance for CompareState<Candidate, Candidate, ChildLocation> {
         self,
         trav: &G,
     ) -> Result<Self, Self> {
-        match self.child_cursor.child_state.advance_state(trav) {
+        let child_state_clone = self.child.current().child_state.clone();
+        match child_state_clone.advance_state(trav) {
             Ok(child_state) => Ok(CompareState {
-                child_cursor: ChildCursor {
-                    child_state,
-                    _state: PhantomData,
+                child: Checkpointed {
+                    current: ChildCursor {
+                        child_state,
+                        _state: PhantomData,
+                    },
+                    checkpoint: self.child.checkpoint().clone(),
                 },
                 ..self
             }),
             Err(child_state) => Ok(CompareState {
-                child_cursor: ChildCursor {
-                    child_state,
-                    _state: PhantomData,
+                child: Checkpointed {
+                    current: ChildCursor {
+                        child_state,
+                        _state: PhantomData,
+                    },
+                    checkpoint: self.child.checkpoint().clone(),
                 },
                 ..self
             }),
@@ -921,26 +922,29 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
         self,
         trav: &G,
     ) -> Result<Self, Self> {
-        match self.child_cursor.child_state.advance_state(trav) {
+        let child_state_clone = self.child.current().child_state.clone();
+        match child_state_clone.advance_state(trav) {
             Ok(child_state) => Ok(CompareState {
-                child_cursor: ChildCursor {
-                    child_state,
-                    _state: PhantomData,
+                child: Checkpointed {
+                    current: ChildCursor {
+                        child_state,
+                        _state: PhantomData,
+                    },
+                    checkpoint: self.child.checkpoint().clone(),
                 },
-                cursor: self.cursor,
-                checkpoint: self.checkpoint,
-                checkpoint_child: self.checkpoint_child,
+                query: self.query,
                 target: self.target,
                 mode: self.mode,
             }),
             Err(child_state) => Ok(CompareState {
-                child_cursor: ChildCursor {
-                    child_state,
-                    _state: PhantomData,
+                child: Checkpointed {
+                    current: ChildCursor {
+                        child_state,
+                        _state: PhantomData,
+                    },
+                    checkpoint: self.child.checkpoint().clone(),
                 },
-                cursor: self.cursor,
-                checkpoint: self.checkpoint,
-                checkpoint_child: self.checkpoint_child,
+                query: self.query,
                 target: self.target,
                 mode: self.mode,
             }),

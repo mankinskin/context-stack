@@ -146,7 +146,8 @@ where
 
         let root_parent = root_cursor
             .state
-            .child_cursor
+            .child
+            .current()
             .child_state
             .path
             .root_parent();
@@ -182,12 +183,17 @@ where
                 // checkpoint_state contains the best match found in this root
                 let current_root = root_cursor
                     .state
-                    .child_cursor
+                    .child
+                    .current()
                     .child_state
                     .path
                     .root_parent();
-                let checkpoint_pos =
-                    *root_cursor.state.checkpoint.atom_position.as_ref();
+                let checkpoint_pos = *root_cursor
+                    .state
+                    .query
+                    .checkpoint()
+                    .atom_position
+                    .as_ref();
 
                 debug!(
                     current_root = %current_root,

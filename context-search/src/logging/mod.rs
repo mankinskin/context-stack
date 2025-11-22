@@ -111,10 +111,10 @@ where
             PathPairMode::QueryMajor => "Q",
         };
 
-        let query_pos: usize = self.cursor.atom_position.into();
+        let query_pos: usize = self.query.current().atom_position.into();
         let index_pos: usize =
-            (*self.child_cursor.child_state.target_pos()).into();
-        let checkpoint_pos: usize = self.checkpoint.atom_position.into();
+            (*self.child.current().child_state.target_pos()).into();
+        let checkpoint_pos: usize = self.query.checkpoint().atom_position.into();
 
         write!(
             f,
@@ -140,18 +140,18 @@ where
         writeln!(f, "mode: {:?},", self.mode)?;
 
         write_indent(f, indent + 1)?;
-        write!(f, "child_cursor: ")?;
-        self.child_cursor.child_state.fmt_indented(f, indent + 1)?;
+        write!(f, "child: ")?;
+        self.child.current().child_state.fmt_indented(f, indent + 1)?;
         writeln!(f, ",")?;
 
         write_indent(f, indent + 1)?;
         write!(f, "query: ")?;
-        self.cursor.fmt_indented(f, indent + 1)?;
+        self.query.current().fmt_indented(f, indent + 1)?;
         writeln!(f, ",")?;
 
         write_indent(f, indent + 1)?;
-        write!(f, "checkpoint: ")?;
-        self.checkpoint.fmt_indented(f, indent + 1)?;
+        write!(f, "query_checkpoint: ")?;
+        self.query.checkpoint().fmt_indented(f, indent + 1)?;
         writeln!(f, ",")?;
 
         write_indent(f, indent)?;

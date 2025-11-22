@@ -91,13 +91,14 @@ fn test_parent_compare_state_advance_success() {
 
     // Verify cursors are created properly
     assert_eq!(
-        compare_root_state.token.cursor.atom_position,
+        compare_root_state.token.query.current().atom_position,
         parent_compare_state.cursor.atom_position
     );
     assert_eq!(
         *compare_root_state
             .token
-            .child_cursor
+            .child
+            .current()
             .child_state
             .target_pos(),
         parent_compare_state.cursor.atom_position
@@ -105,7 +106,7 @@ fn test_parent_compare_state_advance_success() {
 
     // Verify checkpoint is preserved
     assert_eq!(
-        compare_root_state.token.checkpoint.atom_position,
+        compare_root_state.token.query.checkpoint().atom_position,
         parent_compare_state.cursor.atom_position
     );
 }
@@ -227,7 +228,8 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
     assert_eq!(
         compare_root_state
             .token
-            .child_cursor
+            .child
+            .current()
             .child_state
             .path
             .path_root(),
@@ -275,15 +277,19 @@ fn test_compare_state_candidate_advance() {
     };
 
     let compare_state = CompareState {
-        child_cursor: crate::cursor::ChildCursor {
-            child_state: child_state.clone(),
-            _state: PhantomData,
+        child: crate::cursor::Checkpointed {
+            current: crate::cursor::ChildCursor {
+                child_state: child_state.clone(),
+                _state: PhantomData,
+            },
+            checkpoint: crate::cursor::ChildCursor {
+                child_state,
+                _state: PhantomData,
+            },
         },
-        cursor,
-        checkpoint,
-        checkpoint_child: crate::cursor::ChildCursor {
-            child_state,
-            _state: PhantomData,
+        query: crate::cursor::Checkpointed {
+            current: cursor,
+            checkpoint,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
         target: context_trace::trace::cache::key::directed::down::DownKey::new(
@@ -313,8 +319,8 @@ fn test_compare_state_candidate_advance() {
 
     // Verify cursors and checkpoint are preserved
     assert_eq!(
-        advanced_state.checkpoint.atom_position,
-        compare_state.checkpoint.atom_position
+        advanced_state.query.checkpoint().atom_position,
+        compare_state.query.checkpoint().atom_position
     );
 }
 
@@ -358,15 +364,19 @@ fn test_compare_state_matched_advance() {
     };
 
     let compare_state = CompareState {
-        child_cursor: crate::cursor::ChildCursor {
-            child_state: child_state.clone(),
-            _state: PhantomData,
+        child: crate::cursor::Checkpointed {
+            current: crate::cursor::ChildCursor {
+                child_state: child_state.clone(),
+                _state: PhantomData,
+            },
+            checkpoint: crate::cursor::ChildCursor {
+                child_state,
+                _state: PhantomData,
+            },
         },
-        cursor,
-        checkpoint,
-        checkpoint_child: crate::cursor::ChildCursor {
-            child_state,
-            _state: PhantomData,
+        query: crate::cursor::Checkpointed {
+            current: cursor,
+            checkpoint,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
         target: context_trace::trace::cache::key::directed::down::DownKey::new(
@@ -393,16 +403,16 @@ fn test_compare_state_matched_advance() {
 
     // Verify all fields are preserved correctly
     assert_eq!(
-        advanced_state.cursor.atom_position,
-        compare_state.cursor.atom_position
+        advanced_state.query.current().atom_position,
+        compare_state.query.current().atom_position
     );
     assert_eq!(
-        *advanced_state.child_cursor.child_state.target_pos(),
-        *compare_state.child_cursor.child_state.target_pos()
+        *advanced_state.child.current().child_state.target_pos(),
+        *compare_state.child.current().child_state.target_pos()
     );
     assert_eq!(
-        advanced_state.checkpoint.atom_position,
-        compare_state.checkpoint.atom_position
+        advanced_state.query.checkpoint().atom_position,
+        compare_state.query.checkpoint().atom_position
     );
     assert_eq!(advanced_state.mode, compare_state.mode);
 }
@@ -452,23 +462,23 @@ fn test_parent_compare_state_cursor_conversion() {
 
     // Verify PatternRangePath was converted to PatternPrefixPath
     tracing::info!(
-        cursor_path = ?compare_root_state.token.cursor.path,
+        cursor_path = ?compare_root_state.token.query.current().path,
         "Cursor path after conversion"
     );
 
     // Verify atom_position was preserved
     assert_eq!(
-        compare_root_state.token.cursor.atom_position,
+        compare_root_state.token.query.current().atom_position,
         AtomPosition::from(5),
         "Cursor atom_position should be preserved"
     );
     assert_eq!(
-        *compare_root_state.token.child_cursor.child_state.target_pos(),
+        *compare_root_state.token.child.current().child_state.target_pos(),
         AtomPosition::from(0),
         "Child cursor target_pos should match parent_state root_pos (not query cursor position)"
     );
     assert_eq!(
-        compare_root_state.token.checkpoint.atom_position,
+        compare_root_state.token.query.checkpoint().atom_position,
         AtomPosition::from(5),
         "Checkpoint atom_position should be preserved"
     );

@@ -1,8 +1,12 @@
 use context_trace::*;
 use std::marker::PhantomData;
 
+pub(crate) mod checkpointed;
 pub(crate) mod path;
 pub(crate) mod position;
+
+pub(crate) use checkpointed::Checkpointed;
+
 //pub trait CursorPath: GraphRoot {}
 //impl<T: GraphRoot> CursorPath for T {}
 
@@ -140,6 +144,20 @@ impl<P> MarkMatchState for PathCursor<P, Candidate> {
     }
 }
 
+impl<P> PathCursor<P, Mismatched> {
+    /// Convert a Mismatched cursor to a Candidate (for retry)
+    pub(crate) fn as_candidate(&self) -> PathCursor<P, Candidate>
+    where
+        P: Clone,
+    {
+        PathCursor {
+            path: self.path.clone(),
+            atom_position: self.atom_position,
+            _state: PhantomData,
+        }
+    }
+}
+
 //impl<P> PathCursor<P, Candidate> {
 //    /// Confirm a candidate cursor as matched
 //    pub(crate) fn confirm_match(self) -> PathCursor<P, Matched> {
@@ -216,6 +234,16 @@ impl<EndNode: PathNode> MarkMatchState for ChildCursor<Candidate, EndNode> {
     fn mark_mismatch(self) -> Self::Mismatched {
         ChildCursor {
             child_state: self.child_state,
+            _state: PhantomData,
+        }
+    }
+}
+
+impl<EndNode: PathNode> ChildCursor<Mismatched, EndNode> {
+    /// Convert a Mismatched cursor to a Candidate (for retry)
+    pub(crate) fn as_candidate(&self) -> ChildCursor<Candidate, EndNode> {
+        ChildCursor {
+            child_state: self.child_state.clone(),
             _state: PhantomData,
         }
     }

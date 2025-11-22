@@ -2,6 +2,7 @@ use crate::{
     compare::state::CompareState,
     cursor::{
         Candidate,
+        Checkpointed,
         ChildCursor,
         PathCursor,
         PatternCursor,
@@ -83,15 +84,19 @@ impl StateAdvance for ParentCompareState {
 
                 Ok(CompareRootState {
                     token: CompareState {
-                        child_cursor: ChildCursor {
-                            child_state: child_state.clone(),
-                            _state: PhantomData,
+                        child: Checkpointed {
+                            checkpoint: ChildCursor {
+                                child_state: child_state.clone(),
+                                _state: PhantomData,
+                            },
+                            current: ChildCursor {
+                                child_state,
+                                _state: PhantomData,
+                            },
                         },
-                        cursor,
-                        checkpoint: self.cursor,
-                        checkpoint_child: ChildCursor {
-                            child_state,
-                            _state: PhantomData,
+                        query: Checkpointed {
+                            current: cursor.clone(),
+                            checkpoint: self.cursor,
                         },
                         mode: GraphMajor,
                         target: DownKey::new(

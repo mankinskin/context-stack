@@ -12,6 +12,7 @@ use crate::{
         CursorState,
         MarkMatchState,
         Matched,
+        PathCursor,
         PatternCursor,
     },
     state::{
@@ -88,11 +89,11 @@ where
         (MatchedEndState, RootCursor<K, Candidate, Matched>),
     > {
         let root_parent =
-            self.state.child_cursor.child_state.path.root_parent();
+            self.state.child.current().child_state.path.root_parent();
         debug!(
             root = %root_parent,
             width = root_parent.width.0,
-            checkpoint_pos = *self.state.checkpoint.atom_position.as_ref(),
+            checkpoint_pos = *self.state.query.checkpoint().atom_position.as_ref(),
             "→ advance_to_end: starting advancement for root"
         );
 
@@ -101,7 +102,8 @@ where
             Ok(candidate_cursor) => {
                 let root = candidate_cursor
                     .state
-                    .child_cursor
+                    .child
+                    .current()
                     .child_state
                     .path
                     .root_parent();
@@ -123,12 +125,17 @@ where
             Err(Err(need_parent)) => {
                 let root = need_parent
                     .state
-                    .child_cursor
+                    .child
+                    .current()
                     .child_state
                     .path
                     .root_parent();
-                let checkpoint_pos =
-                    *need_parent.state.checkpoint.atom_position.as_ref();
+                let checkpoint_pos = *need_parent
+                    .state
+                    .query
+                    .checkpoint()
+                    .atom_position
+                    .as_ref();
                 debug!(
                     root = %root,
                     checkpoint_pos = checkpoint_pos,
@@ -163,10 +170,10 @@ where
         let query_advanced = match self.advance_query() {
             Ok(cursor) => {
                 let root =
-                    cursor.state.child_cursor.child_state.path.root_parent();
+                    cursor.state.child.current().child_state.path.root_parent();
                 trace!(
                     root = %root,
-                    query_pos = *cursor.state.cursor.atom_position.as_ref(),
+                    query_pos = *cursor.state.query.current().atom_position.as_ref(),
                     "  → advance_to_next_match: Step 1 complete - query advanced successfully"
                 );
                 cursor
@@ -186,13 +193,14 @@ where
             Ok(both_advanced) => {
                 let root = both_advanced
                     .state
-                    .child_cursor
+                    .child
+                    .current()
                     .child_state
                     .path
                     .root_parent();
                 trace!(
                     root = %root,
-                    child_pos = *both_advanced.state.child_cursor.child_state.target_pos().as_ref(),
+                    child_pos = *both_advanced.state.child.current().child_state.target_pos().as_ref(),
                     "  → advance_to_next_match: Step 2 complete - child advanced successfully, got <Candidate, Candidate>"
                 );
                 Ok(both_advanced)
@@ -200,7 +208,8 @@ where
             Err(need_parent) => {
                 let root = need_parent
                     .state
-                    .child_cursor
+                    .child
+                    .current()
                     .child_state
                     .path
                     .root_parent();
@@ -221,8 +230,9 @@ where
         self
     ) -> Result<RootCursor<K, Candidate, Matched>, MatchedEndState> {
         let root_parent =
-            self.state.child_cursor.child_state.path.root_parent();
-        let query_pos_before = *self.state.cursor.atom_position.as_ref();
+            self.state.child.current().child_state.path.root_parent();
+        let query_pos_before =
+            *self.state.query.current().atom_position.as_ref();
         trace!(
             root = %root_parent,
             query_pos = query_pos_before,
@@ -236,7 +246,7 @@ where
         match matched_state.advance_query_cursor(&trav) {
             Ok(query_advanced) => {
                 let query_pos_after =
-                    *query_advanced.cursor.atom_position.as_ref();
+                    *query_advanced.query.current().atom_position.as_ref();
                 debug!(
                     root = %root_parent,
                     query_pos_before = query_pos_before,
@@ -257,25 +267,28 @@ where
                 );
                 // Query ended - create complete match state
                 // Use entry_pos (where we entered the root) for root_pos
-                let root_pos = matched_state.child_cursor.child_state.entry_pos;
-                let path = matched_state.child_cursor.child_state.path.clone();
+                let root_pos =
+                    matched_state.child.current().child_state.entry_pos;
+                let path =
+                    matched_state.child.current().child_state.path.clone();
                 let _start_pos =
-                    matched_state.child_cursor.child_state.start_pos;
+                    matched_state.child.current().child_state.start_pos;
                 let root_parent = path.root_parent();
                 let target_index = path.role_rooted_leaf_token::<End, _>(&trav);
                 let last_token_width_value = target_index.width();
                 // end_pos is where matching ended (checkpoint position)
-                let end_pos = matched_state.checkpoint.atom_position;
+                let end_pos = matched_state.query.checkpoint().atom_position;
                 tracing::trace!(
                     "root_cursor advance_query: root_parent={}, root_pos={}, checkpoint.atom_position={}, last_token_width={}, end_pos={}",
-                    root_parent, usize::from(root_pos), *matched_state.checkpoint.atom_position,
+                    root_parent, usize::from(root_pos), *matched_state.query.checkpoint().atom_position,
                     last_token_width_value, usize::from(end_pos)
                 );
 
                 // For exhausted queries, the checkpoint points at the last matched token
                 // but its atom_position doesn't include that token's width yet
                 // We need to add the width to get the total consumed tokens
-                let mut checkpoint_cursor = matched_state.checkpoint.clone();
+                let mut checkpoint_cursor =
+                    matched_state.query.checkpoint().clone();
                 let new_position = usize::from(checkpoint_cursor.atom_position)
                     + last_token_width_value.0;
                 checkpoint_cursor.atom_position = new_position.into();
@@ -315,9 +328,9 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         RootCursor<K, Candidate, Matched>,
     > {
         let root_parent =
-            self.state.child_cursor.child_state.path.root_parent();
+            self.state.child.current().child_state.path.root_parent();
         let child_pos_before =
-            *self.state.child_cursor.child_state.target_pos().as_ref();
+            *self.state.child.current().child_state.target_pos().as_ref();
         trace!(
             root = %root_parent,
             child_pos = child_pos_before,
@@ -331,7 +344,8 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         match state.advance_index_cursor(&trav) {
             Ok(both_advanced) => {
                 let child_pos_after = *both_advanced
-                    .child_cursor
+                    .child
+                    .current()
                     .child_state
                     .target_pos()
                     .as_ref();
@@ -355,14 +369,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
                 );
                 // Index ended but query continues - need parent exploration
                 Err(RootCursor {
-                    state: Box::new(CompareState {
-                        child_cursor: query_only_advanced.child_cursor,
-                        cursor: query_only_advanced.cursor,
-                        checkpoint: query_only_advanced.checkpoint,
-                        checkpoint_child: query_only_advanced.checkpoint_child,
-                        target: query_only_advanced.target,
-                        mode: query_only_advanced.mode,
-                    }),
+                    state: Box::new(query_only_advanced),
                     trav,
                 })
             },
@@ -375,26 +382,8 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
     /// Used when the root matched successfully but needs parent exploration
     #[context_trace::instrument_sig(level = "trace", skip(self))]
     pub(crate) fn create_checkpoint_state(&self) -> MatchedEndState {
-        // For consecutive searches, use the checkpoint cursor (last successful match)
-        // and advance its path by one to point to the next position to search
-        let cursor = &self.state.cursor; // Candidate cursor (advanced too far)
-        let checkpoint = &self.state.checkpoint; // Last successful match
-        let checkpoint_child = &self.state.checkpoint_child;
-
-        let cursor_pos = cursor.atom_position;
-        let cursor_end_index =
-            RootChildIndex::<End>::root_child_index(&cursor.path);
-        let checkpoint_pos = checkpoint.atom_position;
-        let checkpoint_end_index =
-            RootChildIndex::<End>::root_child_index(&checkpoint.path);
-
-        tracing::trace!(
-            %cursor_pos,
-            cursor_end_index,
-            %checkpoint_pos,
-            checkpoint_end_index,
-            "create_checkpoint_state: cursor state before creating end cursor"
-        );
+        let checkpoint = self.state.query.checkpoint();
+        let checkpoint_child = self.state.child.checkpoint();
 
         // Use checkpoint_child path as it represents the matched state
         let mut path = checkpoint_child.child_state.path.clone();
@@ -407,28 +396,14 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         path.child_path_mut::<End, _>().simplify(&self.trav);
 
         let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
-        //let last_token_width_value = target_index.width();
 
-        // For consecutive searches, advance the checkpoint path one step past the last matched token
-        // This makes end_index point to the next position to search
-        // checkpoint.atom_position already represents the count of consumed tokens (correct as-is)
-        let mut checkpoint_path = checkpoint.path.clone();
-        checkpoint_path.move_root_index(&self.trav);
-
-        let final_end_index =
-            RootChildIndex::<End>::root_child_index(&checkpoint_path);
-        tracing::trace!(
-            %checkpoint_pos,
-            checkpoint_end_index,
-            final_end_index,
-            "create_checkpoint_state: advanced checkpoint path for consecutive search"
-        );
-
-        // Return checkpoint cursor with advanced path (ready for next search)
-        let end_cursor = PatternCursor {
-            path: checkpoint_path,
+        // Use current query cursor's PATH (advanced beyond checkpoint when child cannot advance)
+        // This ensures end_index points to next token to match, not last matched
+        // But keep checkpoint's atom_position (number of tokens successfully matched)
+        let end_cursor = PathCursor {
+            path: self.state.query.current().path.clone(),
             atom_position: checkpoint.atom_position,
-            _state: PhantomData,
+            _state: std::marker::PhantomData::<Matched>,
         };
         let end_pos = checkpoint.atom_position;
 
@@ -487,16 +462,7 @@ impl<K: SearchKind> RootCursor<K, Matched, Matched> {
                         Err((
                             EndReason::Mismatch,
                             Some(RootCursor {
-                                state: Box::new(CompareState {
-                                    child_cursor: _query_only_advanced
-                                        .child_cursor,
-                                    cursor: _query_only_advanced.cursor,
-                                    checkpoint: _query_only_advanced.checkpoint,
-                                    checkpoint_child: _query_only_advanced
-                                        .checkpoint_child,
-                                    target: _query_only_advanced.target,
-                                    mode: _query_only_advanced.mode,
-                                }),
+                                state: Box::new(_query_only_advanced),
                                 trav: self.trav,
                             }),
                         ))
@@ -567,7 +533,8 @@ where
                 // Mismatch found - check if this is after some matches (partial match)
                 // or immediate mismatch (no match)
                 // The checkpoint atom_position tells us if we've made progress
-                if self.state.checkpoint.atom_position != AtomPosition::from(0)
+                if self.state.query.checkpoint().atom_position
+                    != AtomPosition::from(0)
                 {
                     // We had matches before this mismatch
                     // This is a PARTIAL MATCH - the success case!
@@ -609,9 +576,14 @@ where
                 Some(Break(reason)) => {
                     // Hit an end condition (QueryExhausted or Mismatch)
                     let checkpoint_pos =
-                        *self.state.checkpoint.atom_position.as_ref();
-                    let root_parent =
-                        self.state.child_cursor.child_state.path.root_parent();
+                        *self.state.query.checkpoint().atom_position.as_ref();
+                    let root_parent = self
+                        .state
+                        .child
+                        .current()
+                        .child_state
+                        .path
+                        .root_parent();
 
                     // Check if this is a valid match before destructuring
                     if reason == EndReason::Mismatch && checkpoint_pos == 0 {
@@ -651,20 +623,16 @@ where
         self,
         reason: EndReason,
     ) -> MatchedEndState {
-        let CompareState {
-            child_cursor,
-            cursor,
-            checkpoint,
-            checkpoint_child,
-            ..
-        } = *self.state;
+        let state = *self.state;
 
         // Choose the path based on end reason
-        // For Mismatch, use checkpoint_child path (state at last match)
-        // For QueryExhausted, use current child_cursor path
+        // For Mismatch, use checkpoint path (state at last match)
+        // For QueryExhausted, use current child path
         let mut path = match reason {
-            EndReason::QueryExhausted => child_cursor.child_state.path.clone(),
-            EndReason::Mismatch => checkpoint_child.child_state.path.clone(),
+            EndReason::QueryExhausted =>
+                state.child.current().child_state.path.clone(),
+            EndReason::Mismatch =>
+                state.child.checkpoint().child_state.path.clone(),
         };
 
         // Simplify path to remove redundant segments at token borders
@@ -676,33 +644,31 @@ where
 
         // Use entry_pos from the ChildState - it already tracks the correct position
         // For QueryExhausted: use current child cursor position
-        // For Mismatch: use checkpoint_child position (last confirmed match)
+        // For Mismatch: use checkpoint position (last confirmed match)
         let child_state = match reason {
-            EndReason::QueryExhausted => &child_cursor.child_state,
-            EndReason::Mismatch => &checkpoint_child.child_state,
+            EndReason::QueryExhausted => &state.child.current().child_state,
+            EndReason::Mismatch => &state.child.checkpoint().child_state,
         };
 
         let _start_pos = child_state.start_pos;
+
+        // root_pos is where we entered the root (beginning of the match)
         let root_pos = child_state.entry_pos;
 
         // target should use root_pos (where the target token starts)
         let target = DownKey::new(target_token, root_pos.into());
 
         // end_pos is where matching ended (checkpoint cursor's position)
-        let end_pos = checkpoint.atom_position;
+        let end_pos = state.query.checkpoint().atom_position;
 
         // Use the non-annotated path for PathCoverage
         let path_enum = PathCoverage::from_range_path(
             path, root_pos, target, end_pos, &self.trav,
         );
 
-        // Choose cursor based on end reason:
-        // - Mismatch: use checkpoint (last confirmed match)
-        // - QueryExhausted: use current cursor (advanced to end of query)
-        let result_cursor = match reason {
-            EndReason::QueryExhausted => cursor.mark_match(),
-            EndReason::Mismatch => checkpoint.clone(),
-        };
+        // Use current query cursor (which may be advanced beyond checkpoint)
+        // This ensures end_index points to next token to match (not last matched)
+        let result_cursor = state.query.current().clone().mark_match();
 
         MatchedEndState {
             cursor: result_cursor,
@@ -714,8 +680,8 @@ where
     /// Used when iterator completes without definitive match/mismatch - needs parent exploration
     /// Always returns Mismatch since the root ended without completing the query
     fn create_checkpoint_from_state(&self) -> MatchedEndState {
-        let checkpoint = &self.state.checkpoint;
-        let checkpoint_child = &self.state.checkpoint_child;
+        let checkpoint = self.state.query.checkpoint();
+        let checkpoint_child = self.state.child.checkpoint();
 
         let mut path = checkpoint_child.child_state.path.clone();
 
@@ -737,25 +703,23 @@ where
             path, root_pos, target, end_pos, &self.trav,
         );
 
-        // Create checkpoint - no need to determine if query is complete here
-        // The cursor's atom_position indicates how far we matched
-        // Completeness can be determined later by comparing position to query length
+        // Use current query cursor (advanced beyond checkpoint when child cannot advance)
+        // This ensures end_index points to next token to match, not last matched
         MatchedEndState {
-            cursor: checkpoint.clone(),
+            cursor: self.state.query.current().clone().mark_match(),
             path: path_enum,
         }
     }
 
     /// Convert <Candidate, Candidate> to <Candidate, Matched> for parent exploration
     fn into_candidate_matched(self) -> RootCursor<K, Candidate, Matched> {
+        let state = *self.state;
         RootCursor {
             state: Box::new(CompareState {
-                child_cursor: self.state.child_cursor.mark_match(),
-                cursor: self.state.cursor.clone(),
-                checkpoint: self.state.checkpoint.clone(),
-                checkpoint_child: self.state.checkpoint_child.clone(),
-                target: self.state.target,
-                mode: self.state.mode,
+                child: state.child.mark_match(),
+                query: state.query,
+                target: state.target,
+                mode: state.mode,
             }),
             trav: self.trav,
         }
@@ -768,10 +732,8 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         let state = *self.state;
         RootCursor {
             state: Box::new(CompareState {
-                child_cursor: state.child_cursor.as_candidate(),
-                cursor: state.cursor,
-                checkpoint: state.checkpoint,
-                checkpoint_child: state.checkpoint_child,
+                child: state.child.as_candidate(),
+                query: state.query,
                 target: state.target,
                 mode: state.mode,
             }),
