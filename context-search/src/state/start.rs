@@ -265,7 +265,7 @@ pub trait Searchable: Sized {
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState>;
 
-    #[context_trace::instrument_sig(skip(self, trav))]
+    #[context_trace::instrument_sig(level = "debug", skip(self, trav))]
     fn search<K: SearchKind>(
         self,
         trav: K::Trav,
@@ -288,7 +288,7 @@ pub trait Searchable: Sized {
 }
 
 impl Searchable for PatternCursor {
-    #[context_trace::instrument_sig(skip(self, trav))]
+    #[context_trace::instrument_sig(level = "debug", skip(self, trav))]
     fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
@@ -339,7 +339,7 @@ impl<T: Searchable + Clone> Searchable for &T {
 }
 
 impl<const N: usize> Searchable for &'_ [Token; N] {
-    #[context_trace::instrument_sig(skip(self, trav), fields(token_count = N))]
+    #[context_trace::instrument_sig(level = "trace", skip(self, trav), fields(token_count = N))]
     fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
@@ -352,7 +352,7 @@ impl<const N: usize> Searchable for &'_ [Token; N] {
     }
 }
 impl Searchable for &'_ [Token] {
-    #[context_trace::instrument_sig(skip(self, trav), fields(token_count = self.len()))]
+    #[context_trace::instrument_sig(level = "trace", skip(self, trav), fields(token_count = self.len()))]
     fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
@@ -394,7 +394,7 @@ impl Searchable for PatternEndPath {
     }
 }
 impl Searchable for PatternRangePath {
-    #[context_trace::instrument_sig(skip(self, trav), fields(path = ?self))]
+    #[context_trace::instrument_sig(level = "trace", skip(self, trav), fields(path = ?self))]
     fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,

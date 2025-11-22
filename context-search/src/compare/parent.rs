@@ -43,7 +43,7 @@ pub(crate) struct ParentCompareState {
 #[context_trace::instrument_trait_impl]
 impl StateAdvance for ParentCompareState {
     type Next = CompareRootState;
-    #[context_trace::instrument_sig(skip(self, trav), fields(parent_state=%self.parent_state, cursor=%self.cursor))]
+    #[context_trace::instrument_sig(level = "debug", skip(self, trav), fields(parent_state=%self.parent_state, cursor=%self.cursor))]
     fn advance_state<G: HasGraph>(
         self,
         trav: &G,

@@ -86,14 +86,14 @@ impl PathCoverage {
         trav: &G,
     ) -> Self {
         // Simplify both paths
-        tracing::debug!(
+        tracing::trace!(
             "from_range_path BEFORE simplify: start_path.len={}, end_path.len={}",
             path.start_path().len(),
             path.end_path().len()
         );
         path.start_path_mut().simplify(trav);
         path.end_path_mut().simplify(trav);
-        tracing::debug!(
+        tracing::trace!(
             "from_range_path AFTER simplify: start_path.len={}, end_path.len={}",
             path.start_path().len(),
             path.end_path().len()
@@ -107,7 +107,7 @@ impl PathCoverage {
         let end_at_border = path.is_at_border::<_, End>(trav.graph());
         let end_path_empty = path.end_path().is_empty();
 
-        tracing::debug!("from_range_path: start_at_border={}, start_path_empty={}, end_at_border={}, end_path_empty={}", 
+        tracing::trace!("from_range_path: start_at_border={}, start_path_empty={}, end_at_border={}, end_path_empty={}", 
             start_at_border, start_path_empty, end_at_border, end_path_empty);
 
         match (
@@ -125,14 +125,14 @@ impl PathCoverage {
                 }),
             (false, _, true, true) | (true, false, true, true) => {
                 let path: IndexStartPath = path.into();
-                tracing::debug!(
+                tracing::trace!(
                     "Creating PostfixEnd with root_pos={}",
                     usize::from(root_pos)
                 );
                 PathCoverage::Postfix(PostfixEnd { path, root_pos })
             },
             _ => {
-                tracing::debug!(
+                tracing::trace!(
                     "Creating RangeEnd: root_pos={}, end_pos={}",
                     usize::from(root_pos),
                     usize::from(end_pos)

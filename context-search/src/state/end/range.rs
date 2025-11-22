@@ -31,7 +31,7 @@ impl Traceable for &RangeEnd {
 
 impl From<&RangeEnd> for RangeCommand {
     fn from(value: &RangeEnd) -> Self {
-        tracing::debug!(
+        tracing::trace!(
             "Creating RangeCommand from RangeEnd: root_pos={}, end_pos={}",
             usize::from(value.root_pos),
             usize::from(value.end_pos)

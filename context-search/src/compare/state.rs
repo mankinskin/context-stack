@@ -228,7 +228,7 @@ impl<EndNode: PathNode> MarkMatchState
         let matched_child = self.child_cursor.mark_match();
         let matched_end_index =
             RootChildIndex::<End>::root_child_index(&matched_cursor.path);
-        tracing::debug!(
+        tracing::trace!(
             cursor_pos = %cursor_pos,
             cursor_end_index = cursor_end_index,
             old_checkpoint_pos = %old_checkpoint_pos,
@@ -275,7 +275,7 @@ impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
         // Try to advance the query cursor
         match self.cursor.advance(trav) {
             Continue(_) => {
-                debug!("query cursor advance succeeded");
+                trace!("query cursor advance succeeded");
                 // Convert to candidate state
                 let candidate_cursor = self.cursor.as_candidate();
 
@@ -607,23 +607,23 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
         } else {
             match path_leaf.width().cmp(&query_leaf.width()) {
                 Equal if path_leaf.width() == TokenWidth(1) => {
-                    debug!("atom mismatch: different atoms");
+                    trace!("atom mismatch: different atoms");
                     CompareResult::Mismatch(self.mark_mismatch())
                 },
                 Equal => {
-                    debug!("equal width but not matching: need decomposition (both sides)");
+                    trace!("equal width but not matching: need decomposition (both sides)");
                     CompareResult::Prefixes(
                         self.mode_prefixes(trav, GraphMajor),
                     )
                 },
                 Greater => {
-                    debug!("GraphMajor: path_width > query_width");
+                    trace!("GraphMajor: path_width > query_width");
                     CompareResult::Prefixes(
                         self.mode_prefixes(trav, GraphMajor),
                     )
                 },
                 Less => {
-                    debug!("QueryMajor: path_width < query_width");
+                    trace!("QueryMajor: path_width < query_width");
                     CompareResult::Prefixes(
                         self.mode_prefixes(trav, QueryMajor),
                     )

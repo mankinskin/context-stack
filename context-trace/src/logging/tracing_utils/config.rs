@@ -464,22 +464,23 @@ impl Default for TracingConfig {
         // Check environment variable to enable stdout logging
         // Usage: LOG_STDOUT=1 cargo test
         // or:    LOG_STDOUT=true cargo test
-        // Config file value takes precedence over env var
-        let log_to_stdout = format.log_to_stdout.unwrap_or_else(|| {
-            env::var("LOG_STDOUT")
-                .map(|v| {
+        // Env var takes precedence over config file value
+        let log_to_stdout = env::var("LOG_STDOUT")
+            .ok()
+            .and_then(|v| {
+                Some(
                     v == "1"
                         || v.eq_ignore_ascii_case("true")
-                        || v.eq_ignore_ascii_case("yes")
-                })
-                .unwrap_or(false)
-        });
+                        || v.eq_ignore_ascii_case("yes"),
+                )
+            })
+            .or(format.log_to_stdout)
+            .unwrap_or(false);
 
-        // Check for log filter in config file, then env var
-        let filter_directives = format
-            .log_filter
-            .clone()
-            .or_else(|| env::var("LOG_FILTER").ok());
+        // Check for log filter: env var takes precedence over config file
+        let filter_directives = env::var("LOG_FILTER")
+            .ok()
+            .or_else(|| format.log_filter.clone());
 
         Self {
             log_dir: get_target_dir().join("test-logs"),

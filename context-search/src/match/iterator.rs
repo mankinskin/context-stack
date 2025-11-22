@@ -52,7 +52,7 @@ impl<K: SearchKind> SearchIterator<K> {
     //    }
     //}
 
-    #[context_trace::instrument_sig(skip(trav, p), fields(start_index = %start_index, parent_count = p.len()))]
+    #[context_trace::instrument_sig(level = "debug", skip(trav, p), fields(start_index = %start_index, parent_count = p.len()))]
     pub(crate) fn start_parent(
         trav: K::Trav,
         start_index: Token,

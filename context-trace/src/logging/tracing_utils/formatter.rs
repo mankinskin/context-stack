@@ -136,7 +136,16 @@ where
         }
 
         // Write level
-        let level = *event.metadata().level();
+        // For span events, use the span's level instead of the event's level
+        let level = if is_span_event {
+            ctx.event_scope()
+                .and_then(|scope| scope.from_root().last())
+                .map(|span| *span.metadata().level())
+                .unwrap_or(*event.metadata().level())
+        } else {
+            *event.metadata().level()
+        };
+        
         if self.config.enable_ansi {
             let level_str = match level {
                 Level::ERROR => "\x1b[31mERROR\x1b[0m",

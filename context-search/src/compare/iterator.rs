@@ -59,7 +59,7 @@ impl<K: SearchKind> CompareIterator<K> {
 impl<T: SearchKind> Iterator for CompareIterator<T> {
     type Item = Option<CompareResult>;
     fn next(&mut self) -> Option<Self::Item> {
-        tracing::debug!(
+        tracing::trace!(
             queue_len = self.children.queue.len(),
             "processing next state"
         );
@@ -74,8 +74,8 @@ impl<T: SearchKind> Iterator for CompareIterator<T> {
                     None
                 },
                 result => {
-                    tracing::debug!(
-                        result = %result,
+                    tracing::trace!(
+                        result = ?result,
                         "got result (Match/Mismatch)"
                     );
                     Some(result)

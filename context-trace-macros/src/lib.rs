@@ -16,9 +16,10 @@ pub fn instrument_sig(
 ) -> TokenStream {
     let input_fn = parse_macro_input!(input as ItemFn);
 
-    // Convert args to string to check for fields
+    // Convert args to string to check for fields and level
     let args_str = args.to_string();
     let has_fields = args_str.contains("fields");
+    let has_level = args_str.contains("level");
 
     // Extract the function signature as a string
     let fn_sig = extract_function_signature(&input_fn);
@@ -61,9 +62,16 @@ pub fn instrument_sig(
         }
     };
 
+    // Add default level = "debug" if no level was specified
+    let final_args = if has_level {
+        new_args
+    } else {
+        quote! { level = "debug", #new_args }
+    };
+
     // Generate the output with #[instrument] attribute
     let output = quote! {
-        #[tracing::instrument(#new_args)]
+        #[tracing::instrument(#final_args)]
         #input_fn
     };
 

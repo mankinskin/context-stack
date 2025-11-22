@@ -21,6 +21,7 @@ use context_trace::{
 };
 use tracing::{
     debug,
+    info,
     trace,
 };
 pub(crate) mod context;
@@ -33,7 +34,11 @@ pub(crate) type SearchResult = Result<Response, ErrorReason>;
 pub trait Find: HasGraph {
     fn ctx(&self) -> SearchCtx<Self>;
 
-    #[context_trace::instrument_sig(skip(self, pattern), fields(pattern_len))]
+    #[context_trace::instrument_sig(
+        level = "info",
+        skip(self, pattern),
+        fields(pattern_len)
+    )]
     fn find_sequence(
         &self,
         pattern: impl IntoIterator<Item = impl AsAtom<AtomOf<TravKind<Self>>>>,
@@ -54,14 +59,15 @@ pub trait Find: HasGraph {
     }
 
     /// find largest matching parent for pattern
-    #[context_trace::instrument_sig(skip(self, searchable))]
+    #[context_trace::instrument_sig(level = "info", skip(self, searchable))]
     fn find_parent(
         &self,
         searchable: impl Searchable,
     ) -> SearchResult
     where
         Self: Clone,
-    {        debug!("starting parent search");
+    {
+        debug!("starting parent search");
         let result = searchable
             .search::<ParentSearchTraversal<Self>>(self.ctx())
             .map_err(|err| err.reason);
@@ -75,14 +81,15 @@ pub trait Find: HasGraph {
     }
 
     /// find largest matching ancestor for pattern
-    #[context_trace::instrument_sig(skip(self, searchable))]
+    #[context_trace::instrument_sig(level = "info", skip(self, searchable))]
     fn find_ancestor(
         &self,
         searchable: impl Searchable,
     ) -> SearchResult
     where
         Self: Clone,
-    {        debug!("starting ancestor search");
+    {
+        debug!("starting ancestor search");
         let result = searchable
             .search::<AncestorSearchTraversal<Self>>(self.ctx())
             .map_err(|err| err.reason);
@@ -270,9 +277,9 @@ impl<K: SearchKind> SearchState<K>
 where
     K::Trav: Clone,
 {
-    #[context_trace::instrument_sig(skip(self))]
+    #[context_trace::instrument_sig(level = "info", skip(self))]
     pub(crate) fn search(mut self) -> Response {
-        debug!("starting fold search");
+        info!("starting fold search");
         debug!(queue = %&self.matches.queue, "initial state");
 
         let mut iteration = 0;
@@ -332,7 +339,7 @@ where
             end,
         };
 
-        debug!("search complete");
+        info!("search complete");
         response
     }
 }

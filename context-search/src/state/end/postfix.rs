@@ -65,7 +65,7 @@ impl Traceable for &'_ PostfixEnd {
 
 impl From<&'_ PostfixEnd> for PostfixCommand {
     fn from(value: &'_ PostfixEnd) -> Self {
-        tracing::debug!(
+        tracing::trace!(
             "Creating PostfixCommand from PostfixEnd: root_pos={}",
             usize::from(value.root_pos)
         );
