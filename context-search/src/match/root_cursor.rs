@@ -11,6 +11,7 @@ use crate::{
         Candidate,
         ChildCursor,
         CursorState,
+        MarkMatchState,
         Matched,
         PatternCursor,
     },
@@ -41,7 +42,6 @@ use derive_more::{
 use std::{
     collections::VecDeque,
     fmt::Debug,
-    marker::PhantomData,
     ops::ControlFlow::{
         self,
         Break,
@@ -266,11 +266,11 @@ where
                     last_token_width_value, usize::from(end_pos)
                 );
 
-                let target = DownKey::new(target_index, end_pos.into());
+                let target = DownKey::new(target_index, root_pos.into());
                 Err(MatchedEndState {
                     cursor: matched_state.checkpoint,
                     path: PathCoverage::from_range_path(
-                        path, root_pos, target, &trav,
+                        path, root_pos, target, end_pos, &trav,
                     ),
                 })
             },
@@ -368,9 +368,10 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         let end_cursor = checkpoint.clone();
         let end_pos = checkpoint.atom_position;
 
-        let target = DownKey::new(target_index, end_pos.into());
-        let path_enum =
-            PathCoverage::from_range_path(path, root_pos, target, &self.trav);
+        let target = DownKey::new(target_index, root_pos.into());
+        let path_enum = PathCoverage::from_range_path(
+            path, root_pos, target, end_pos, &self.trav,
+        );
 
         MatchedEndState {
             cursor: end_cursor,
@@ -619,18 +620,28 @@ where
 
         let start_pos = child_state.start_pos;
         let root_pos = child_state.entry_pos;
-        let end_pos = root_pos; // The end position is the same as root for the matched segment
 
-        let target = DownKey::new(target_token, end_pos.into());
+        // target should use root_pos (where the target token starts)
+        let target = DownKey::new(target_token, root_pos.into());
+
+        // end_pos is where matching ended (checkpoint cursor's position)
+        let end_pos = checkpoint.atom_position;
 
         // Use the non-annotated path for PathCoverage
-        let path_enum =
-            PathCoverage::from_range_path(path, root_pos, target, &self.trav);
+        let path_enum = PathCoverage::from_range_path(
+            path, root_pos, target, end_pos, &self.trav,
+        );
 
-        // Create matched state - no need to distinguish QueryExhausted vs Mismatch in data structure
-        // The cursor's atom_position indicates how far we matched
+        // Choose cursor based on end reason:
+        // - Mismatch: use checkpoint (last confirmed match)
+        // - QueryExhausted: use current cursor (advanced to end of query)
+        let result_cursor = match reason {
+            EndReason::QueryExhausted => cursor.mark_match(),
+            EndReason::Mismatch => checkpoint.clone(),
+        };
+
         MatchedEndState {
-            cursor: checkpoint.clone(),
+            cursor: result_cursor,
             path: path_enum,
         }
     }
@@ -658,8 +669,9 @@ where
 
         let target = DownKey::new(target_token, end_pos.into());
 
-        let path_enum =
-            PathCoverage::from_range_path(path, root_pos, target, &self.trav);
+        let path_enum = PathCoverage::from_range_path(
+            path, root_pos, target, end_pos, &self.trav,
+        );
 
         // Create checkpoint - no need to determine if query is complete here
         // The cursor's atom_position indicates how far we matched
@@ -674,10 +686,7 @@ where
     fn into_candidate_matched(self) -> RootCursor<K, Candidate, Matched> {
         RootCursor {
             state: Box::new(CompareState {
-                child_cursor: ChildCursor {
-                    child_state: self.state.child_cursor.child_state.clone(),
-                    _state: PhantomData,
-                },
+                child_cursor: self.state.child_cursor.mark_match(),
                 cursor: self.state.cursor.clone(),
                 checkpoint: self.state.checkpoint.clone(),
                 checkpoint_child: self.state.checkpoint_child.clone(),

@@ -100,7 +100,10 @@ impl Traceable for PostfixCommand {
             "PostfixCommand: trace_sub_path returned prev.pos={}",
             sub_path_prev.pos.0
         );
-        tracing::trace!(?sub_path_prev, "PostfixCommand: trace_sub_path returned");
+        tracing::trace!(
+            ?sub_path_prev,
+            "PostfixCommand: trace_sub_path returned"
+        );
         let location = self.path.role_root_child_location::<Start>();
         // For cache consistency, use the root position (from root_up_key) for prev
         // The prev points to the child token at the parent's position
@@ -189,8 +192,8 @@ impl Traceable for RangeCommand {
         // The prev points to the child token, but at the parent's position
         let root_entry = self.path.role_root_child_location::<Start>();
         let prev = UpKey {
-            index: sub_path_prev.index,  // Use the child token from trace_sub_path
-            pos: self.root_pos,  // But with the parent's position
+            index: sub_path_prev.index, // Use the child token from trace_sub_path
+            pos: self.root_pos,         // But with the parent's position
         };
         let root_up_key = UpKey {
             index: root_entry.parent,
@@ -210,12 +213,14 @@ impl Traceable for RangeCommand {
 
         let root_exit = self.path.role_root_child_location::<End>();
 
+        // Use root_pos for the exit_key to ensure TD cache entries are at the root position
+        // For TD cache consistency, target should also use root_pos (not end_pos)
         let exit_key = DownKey {
-            pos: self.end_pos.into(),
+            pos: self.root_pos.0.into(),
             index: root_exit.parent,
         };
         let target = DownKey {
-            pos: exit_key.pos,
+            pos: self.root_pos.0.into(),
             index: *ctx.trav.graph().expect_child_at(root_exit),
         };
         let new = NewTraceEdge::<TopDown> {

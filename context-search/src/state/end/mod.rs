@@ -82,6 +82,7 @@ impl PathCoverage {
         >,
         root_pos: AtomPosition,
         target: DownKey,
+        end_pos: AtomPosition,
         trav: &G,
     ) -> Self {
         // Simplify both paths
@@ -110,7 +111,7 @@ impl PathCoverage {
                 PathCoverage::Prefix(PrefixEnd {
                     path: path.into(),
                     target,
-                    end_pos: target.pos.0,
+                    end_pos,
                 }),
             (false, _, true, true) | (true, false, true, true) => {
                 let path: IndexStartPath = path.into();
@@ -124,13 +125,13 @@ impl PathCoverage {
                 tracing::debug!(
                     "Creating RangeEnd: root_pos={}, end_pos={}",
                     usize::from(root_pos),
-                    usize::from(target.pos.0)
+                    usize::from(end_pos)
                 );
                 PathCoverage::Range(RangeEnd {
                     path,
                     root_pos,
                     target,
-                    end_pos: target.pos.0,
+                    end_pos,
                 })
             },
         }

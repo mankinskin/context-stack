@@ -158,7 +158,7 @@ fn find_pattern1() {
         MatchedEndState {
             path: PathCoverage::Range(RangeEnd {
                 root_pos: 2.into(),
-                target: DownKey::new(y, 3.into()),
+                target: DownKey::new(y, 2.into()),
                 end_pos: 3.into(),
                 path: RootedRangePath::new(
                     PatternLocation::new(xabyz, xab_yz_id),
@@ -172,8 +172,8 @@ fn find_pattern1() {
             cursor: PatternCursor {
                 path: RootedRangePath::new(
                     query.clone(),
-                    RolePath::new(2, vec![]),
-                    RolePath::new_empty(query.len()),
+                    RolePath::new(0, vec![]),
+                    RolePath::new_empty(2),
                 ),
                 atom_position: 3.into(),
                 _state: std::marker::PhantomData,
