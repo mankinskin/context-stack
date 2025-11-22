@@ -98,6 +98,22 @@ impl<R: PathRole> HasRolePath<R> for RolePath<R, ChildLocation> {
     }
 }
 
+// New PathAccessor trait implementation
+impl<R: PathRole> crate::path::accessors::path_accessor::PathAccessor
+    for RolePath<R, ChildLocation>
+{
+    type Role = R;
+    type Node = ChildLocation;
+
+    fn path(&self) -> &Vec<ChildLocation> {
+        &self.sub_path.path
+    }
+
+    fn path_mut(&mut self) -> &mut Vec<ChildLocation> {
+        &mut self.sub_path.path
+    }
+}
+
 impl<R: PathRole> PathSimplify for RolePath<R, ChildLocation> {
     fn into_simplified<G: HasGraph>(
         mut self,
@@ -114,7 +130,9 @@ impl<R: PathRole> PathSimplify for RolePath<R, ChildLocation> {
     }
 }
 
-impl<R: PathRole> PathSimplify for RolePath<R, PositionAnnotated<ChildLocation>> {
+impl<R: PathRole> PathSimplify
+    for RolePath<R, PositionAnnotated<ChildLocation>>
+{
     fn into_simplified<G: HasGraph>(
         mut self,
         trav: &G,

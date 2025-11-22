@@ -4,8 +4,10 @@ use std::marker::PhantomData;
 pub(crate) mod checkpointed;
 pub(crate) mod path;
 pub(crate) mod position;
+pub(crate) mod state_machine;
 
 pub(crate) use checkpointed::Checkpointed;
+pub(crate) use state_machine::CursorStateMachine;
 
 //pub trait CursorPath: GraphRoot {}
 //impl<T: GraphRoot> CursorPath for T {}
@@ -246,6 +248,142 @@ impl<EndNode: PathNode> ChildCursor<Mismatched, EndNode> {
             child_state: self.child_state.clone(),
             _state: PhantomData,
         }
+    }
+}
+
+// ============================================================================
+// CursorStateMachine implementations
+// ============================================================================
+
+// Implementation for PathCursor<P, Matched>
+impl<P: Clone> CursorStateMachine for PathCursor<P, Matched> {
+    type AsCandidate = PathCursor<P, Candidate>;
+    type AsMatched = Self;
+    type AsMismatched = PathCursor<P, Mismatched>;
+
+    fn to_candidate(&self) -> Self::AsCandidate {
+        self.as_candidate()
+    }
+
+    fn to_matched(self) -> Self::AsMatched {
+        self // Already matched
+    }
+
+    fn to_mismatched(self) -> Self::AsMismatched {
+        PathCursor {
+            path: self.path,
+            atom_position: self.atom_position,
+            _state: PhantomData,
+        }
+    }
+}
+
+// Implementation for PathCursor<P, Candidate>
+impl<P: Clone> CursorStateMachine for PathCursor<P, Candidate> {
+    type AsCandidate = Self;
+    type AsMatched = PathCursor<P, Matched>;
+    type AsMismatched = PathCursor<P, Mismatched>;
+
+    fn to_candidate(&self) -> Self::AsCandidate {
+        self.clone() // Already candidate
+    }
+
+    fn to_matched(self) -> Self::AsMatched {
+        self.mark_match()
+    }
+
+    fn to_mismatched(self) -> Self::AsMismatched {
+        self.mark_mismatch()
+    }
+}
+
+// Implementation for PathCursor<P, Mismatched>
+impl<P: Clone> CursorStateMachine for PathCursor<P, Mismatched> {
+    type AsCandidate = PathCursor<P, Candidate>;
+    type AsMatched = PathCursor<P, Matched>;
+    type AsMismatched = Self;
+
+    fn to_candidate(&self) -> Self::AsCandidate {
+        self.as_candidate()
+    }
+
+    fn to_matched(self) -> Self::AsMatched {
+        PathCursor {
+            path: self.path,
+            atom_position: self.atom_position,
+            _state: PhantomData,
+        }
+    }
+
+    fn to_mismatched(self) -> Self::AsMismatched {
+        self // Already mismatched
+    }
+}
+
+// Implementation for ChildCursor<Matched, EndNode>
+impl<EndNode: PathNode> CursorStateMachine for ChildCursor<Matched, EndNode> {
+    type AsCandidate = ChildCursor<Candidate, EndNode>;
+    type AsMatched = Self;
+    type AsMismatched = ChildCursor<Mismatched, EndNode>;
+
+    fn to_candidate(&self) -> Self::AsCandidate {
+        self.as_candidate()
+    }
+
+    fn to_matched(self) -> Self::AsMatched {
+        self // Already matched
+    }
+
+    fn to_mismatched(self) -> Self::AsMismatched {
+        ChildCursor {
+            child_state: self.child_state,
+            _state: PhantomData,
+        }
+    }
+}
+
+// Implementation for ChildCursor<Candidate, EndNode>
+impl<EndNode: PathNode + Clone> CursorStateMachine
+    for ChildCursor<Candidate, EndNode>
+{
+    type AsCandidate = Self;
+    type AsMatched = ChildCursor<Matched, EndNode>;
+    type AsMismatched = ChildCursor<Mismatched, EndNode>;
+
+    fn to_candidate(&self) -> Self::AsCandidate {
+        self.clone() // Already candidate
+    }
+
+    fn to_matched(self) -> Self::AsMatched {
+        self.mark_match()
+    }
+
+    fn to_mismatched(self) -> Self::AsMismatched {
+        self.mark_mismatch()
+    }
+}
+
+// Implementation for ChildCursor<Mismatched, EndNode>
+impl<EndNode: PathNode> CursorStateMachine
+    for ChildCursor<Mismatched, EndNode>
+{
+    type AsCandidate = ChildCursor<Candidate, EndNode>;
+    type AsMatched = ChildCursor<Matched, EndNode>;
+    type AsMismatched = Self;
+
+    fn to_candidate(&self) -> Self::AsCandidate {
+        self.as_candidate()
+    }
+
+    fn to_matched(self) -> Self::AsMatched {
+        ChildCursor {
+            child_state: self.child_state,
+            _state: PhantomData,
+        }
+    }
+
+    fn to_mismatched(self) -> Self::AsMismatched {
+        self // Already mismatched
     }
 }
 

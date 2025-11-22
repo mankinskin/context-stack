@@ -169,10 +169,8 @@ impl IndexRangePath<ChildLocation, PositionAnnotated<ChildLocation>> {
             + RootChildIndex<R>
             + RootChildToken<R>,
     {
-        use crate::path::structs::rooted::HasRolePath;
-
         // Extract leaf location from position-annotated node
-        let role_path = HasRolePath::<R>::role_path(self);
+        let role_path = self.role_path();
         let leaf_loc = role_path
             .path()
             .last()
@@ -219,10 +217,10 @@ where
 {
     type Node = <Self as HasRolePath<R>>::Node;
     fn path(&self) -> &Vec<Self::Node> {
-        HasRolePath::<R>::role_path(self).path()
+        self.role_path().path()
     }
     fn path_mut(&mut self) -> &mut Vec<Self::Node> {
-        HasRolePath::<R>::role_path_mut(self).path_mut()
+        self.role_path_mut().path_mut()
     }
 }
 

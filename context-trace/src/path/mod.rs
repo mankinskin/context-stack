@@ -150,25 +150,25 @@ pub trait RolePathUtils {
     where
         Self: HasRolePath<R, Node = Node>,
     {
-        HasRolePath::<R>::role_path_mut(self)
+        self.role_path_mut()
     }
     fn child_pos<R: PathRole>(&self) -> usize
     where
         Self: HasRolePath<R>,
     {
-        HasRolePath::<R>::role_path(self).root_child_index()
+        self.role_path().root_child_index()
     }
     fn raw_child_path<R: PathRole>(&self) -> &Vec<ChildLocation>
     where
         Self: HasRolePath<R, Node = ChildLocation>,
     {
-        HasRolePath::<R>::role_path(self).path()
+        self.role_path().path()
     }
     fn raw_child_path_mut<R: PathRole>(&mut self) -> &mut Vec<ChildLocation>
     where
         Self: HasRolePath<R, Node = ChildLocation>,
     {
-        HasRolePath::<R>::role_path_mut(self).path_mut()
+        self.role_path_mut().path_mut()
     }
 }
 

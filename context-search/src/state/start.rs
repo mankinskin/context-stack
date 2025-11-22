@@ -34,14 +34,14 @@ use tracing::{
     warn,
 };
 
-pub(crate) trait ToCursor: StartFoldPath {
-    fn to_cursor<G: HasGraph>(
+pub(crate) trait IntoCursor: StartFoldPath {
+    fn into_cursor<G: HasGraph>(
         self,
         trav: &G,
     ) -> PathCursor<Self>;
 }
-impl<P: StartFoldPath> ToCursor for P {
-    fn to_cursor<G: HasGraph>(
+impl<P: StartFoldPath> IntoCursor for P {
+    fn into_cursor<G: HasGraph>(
         self,
         trav: &G,
     ) -> PathCursor<Self> {
@@ -389,7 +389,7 @@ impl Searchable for PatternEndPath {
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
         self.to_range_path()
-            .to_cursor(&trav)
+            .into_cursor(&trav)
             .start_search::<K>(trav)
     }
 }
@@ -408,7 +408,7 @@ impl Searchable for PatternRangePath {
         let width = range_path.calc_width(&trav);
         debug!("calc_width returned: {}", width);
         
-        let cursor = range_path.to_cursor(&trav);
+        let cursor = range_path.into_cursor(&trav);
         debug!(cursor_atom_pos = *cursor.atom_position, cursor_path = %cursor.path, "created cursor");
         
         cursor.start_search::<K>(trav)

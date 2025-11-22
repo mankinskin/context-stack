@@ -23,6 +23,7 @@ use crate::{
                 HasRolePath,
                 IntoRootedRolePath,
             },
+            path_accessor::PathAccessor,
             role::{
                 End,
                 Start,
@@ -49,7 +50,6 @@ use crate::{
         },
         has_graph::HasGraph,
         state::{
-            HasTargetPos,
             StateAdvance,
             parent::ParentState,
         },
@@ -104,7 +104,7 @@ where
         ParentState {
             path: RootedRolePath::new(
                 self.path.path_root(),
-                self.path.role_path().clone(),
+                self.path.start_path().clone(),
             ),
             prev_pos: self.entry_pos,
             root_pos: self.entry_pos,
@@ -201,14 +201,15 @@ where
 impl<R: PathRole, EndNode: Debug + Clone + PartialEq + Eq> HasPath<R>
     for ChildState<EndNode>
 where
-    IndexRangePath<ChildLocation, EndNode>: HasPath<R>,
+    IndexRangePath<ChildLocation, EndNode>: HasRolePath<R>,
 {
-    type Node = <IndexRangePath<ChildLocation, EndNode> as HasPath<R>>::Node;
+    type Node =
+        <IndexRangePath<ChildLocation, EndNode> as HasRolePath<R>>::Node;
     fn path(&self) -> &Vec<Self::Node> {
-        HasPath::<R>::path(&self.path)
+        self.path.role_path().path()
     }
     fn path_mut(&mut self) -> &mut Vec<Self::Node> {
-        HasPath::<R>::path_mut(&mut self.path)
+        self.path.role_path_mut().path_mut()
     }
 }
 
@@ -263,14 +264,35 @@ impl<EndNode: Debug + Clone + PartialEq + Eq> TargetKey
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> HasTargetPos
+// HasTargetPos impl removed - use StatePosition instead
+
+// New StatePosition trait implementation
+impl<EndNode: Debug + Clone + PartialEq + Eq>
+    crate::path::accessors::path_accessor::StatePosition
     for ChildState<EndNode>
 {
-    fn target_pos(&self) -> &AtomPosition {
+    fn prev_pos(&self) -> &AtomPosition {
+        &self.start_pos
+    }
+
+    fn root_pos(&self) -> &AtomPosition {
         &self.entry_pos
     }
-    fn target_pos_mut(&mut self) -> &mut AtomPosition {
+
+    fn target_pos(&self) -> Option<&AtomPosition> {
+        Some(&self.entry_pos)
+    }
+
+    fn prev_pos_mut(&mut self) -> &mut AtomPosition {
+        &mut self.start_pos
+    }
+
+    fn root_pos_mut(&mut self) -> &mut AtomPosition {
         &mut self.entry_pos
+    }
+
+    fn target_pos_mut(&mut self) -> Option<&mut AtomPosition> {
+        Some(&mut self.entry_pos)
     }
 }
 

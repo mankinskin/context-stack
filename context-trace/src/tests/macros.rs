@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::*;
+use crate::{*, path::accessors::path_accessor::PathAccessor};
 
 #[macro_export]
 macro_rules! insert_patterns {
@@ -561,7 +561,7 @@ fn test_rooted_path_macro_single_role() {
     // Test IndexStartPath
     let start_path: IndexStartPath = rooted_path!(Start: root, 0);
     assert_eq!(start_path.root_entry, 0);
-    assert!(start_path.path().is_empty());
+    assert!(PathAccessor::path(&start_path).is_empty());
 
     // Test IndexEndPath
     let root2 = IndexRoot::from(
@@ -569,7 +569,7 @@ fn test_rooted_path_macro_single_role() {
     );
     let end_path: IndexEndPath = rooted_path!(End: root2, 2);
     assert_eq!(end_path.root_entry, 2);
-    assert!(end_path.path().is_empty());
+    assert!(PathAccessor::path(&end_path).is_empty());
 
     // Test PatternEndPath
     let pattern = Pattern::from(vec![a, b, c]);
@@ -588,25 +588,25 @@ fn test_rooted_path_macro_single_role() {
     let child_loc = ChildLocation::new(abc, abc_id, 1);
     let start_with_child: IndexStartPath =
         rooted_path!(Start: root3, (0, [child_loc]));
-    assert_eq!(start_with_child.path().len(), 1);
+    assert_eq!(PathAccessor::path(&start_with_child).len(), 1);
 
     // Test with children - IndexEndPath
     let root4 = IndexRoot::from(
         ChildLocation::new(abc, abc_id, 0).into_pattern_location(),
     );
     let end_with_child: IndexEndPath =
-        rooted_path!(End: root4, (2, [child_loc]));
-    assert_eq!(end_with_child.path().len(), 1);
+        rooted_path!(End: root4, (0, [child_loc2]));
+    assert_eq!(PathAccessor::path(&end_with_child).len(), 1);
 
     // Test with children - PatternEndPath
     let pattern3 = Pattern::from(vec![a, b, c]);
     let pattern_end_with_child: PatternEndPath =
-        rooted_path!(End: pattern3, (1, [child_loc]));
-    assert_eq!(pattern_end_with_child.path().len(), 1);
+        rooted_path!(End: pattern3, (0, [child_loc3]));
+    assert_eq!(PathAccessor::path(&pattern_end_with_child).len(), 1);
 
     // Test with children - PatternStartPath
     let pattern4 = Pattern::from(vec![a, b, c]);
     let pattern_start_with_child: PatternStartPath =
-        rooted_path!(Start: pattern4, (0, [child_loc]));
-    assert_eq!(pattern_start_with_child.path().len(), 1);
+        rooted_path!(Start: pattern4, (0, [child_loc4]));
+    assert_eq!(PathAccessor::path(&pattern_start_with_child).len(), 1);
 }

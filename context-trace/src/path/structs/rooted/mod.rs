@@ -258,6 +258,37 @@ impl<R: PathRoot, StartNode, EndNode> HasRolePath<End>
     }
 }
 
+// Tier 2 trait implementations: Concrete role accessors
+impl<R: PathRoot, EndNode> crate::path::accessors::range_accessor::StartPathAccessor
+    for RootedRangePath<R, ChildLocation, EndNode>
+{
+    type Node = ChildLocation;
+    
+    fn start_path(&self) -> &RolePath<Start, ChildLocation> {
+        &self.start
+    }
+    
+    fn start_path_mut(&mut self) -> &mut RolePath<Start, ChildLocation> {
+        &mut self.start
+    }
+}
+
+impl<R: PathRoot, StartNode> crate::path::accessors::range_accessor::EndPathAccessor
+    for RootedRangePath<R, StartNode, ChildLocation>
+{
+    type Node = ChildLocation;
+    
+    fn end_path(&self) -> &RolePath<End, ChildLocation> {
+        &self.end
+    }
+    
+    fn end_path_mut(&mut self) -> &mut RolePath<End, ChildLocation> {
+        &mut self.end
+    }
+}
+
+// RangePathAccessor automatically implemented via blanket impl
+
 impl<EndNode> GraphRoot for RootedRangePath<IndexRoot, ChildLocation, EndNode> {
     fn root_parent(&self) -> Token {
         self.root.location.parent

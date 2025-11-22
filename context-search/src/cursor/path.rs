@@ -8,6 +8,7 @@ use crate::{
     state::start::StartFoldPath,
 };
 use context_trace::{
+    path::accessors::has_path::HasRolePath,
     IntoChildLocation,
     *,
 };
@@ -94,16 +95,15 @@ impl<P: PathAppend, S: CursorState> PathAppend for PathCursor<P, S> {
         self.path.path_append(parent_entry);
     }
 }
-impl<P: RootedPath, S: CursorState> HasRootedPath<P> for PathCursor<P, S> {
-    fn rooted_path(&self) -> &P {
-        &self.path
-    }
-    fn rooted_path_mut(&mut self) -> &mut P {
-        &mut self.path
-    }
-}
-impl<R: PathRole, P: StartFoldPath + HasPath<R>, S: CursorState> HasPath<R>
-    for PathCursor<P, S>
+// PathCursor provides direct field access to the inner path via Deref
+// No need for HasRootedPath trait - use `.path` field or `&*cursor`
+impl<
+        R: PathRole,
+        P: StartFoldPath + HasRolePath<R> + HasPath<R>,
+        S: CursorState,
+    > HasPath<R> for PathCursor<P, S>
+where
+    <P as HasPath<R>>::Node: Clone,
 {
     type Node = <P as HasPath<R>>::Node;
     fn path(&self) -> &Vec<Self::Node> {
@@ -124,8 +124,11 @@ impl<R: PathRole, P: RootChildToken<R> + StartFoldPath, S: CursorState>
         RootChildToken::<R>::root_child_token(&self.path, trav)
     }
 }
-impl<R: PathRole, P: StartFoldPath + LeafToken<R>, S: CursorState> LeafToken<R>
-    for PathCursor<P, S>
+impl<
+        R: PathRole,
+        P: StartFoldPath + LeafToken<R> + HasRolePath<R>,
+        S: CursorState,
+    > LeafToken<R> for PathCursor<P, S>
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         LeafToken::<R>::leaf_token_location(&self.path)

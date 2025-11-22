@@ -7,9 +7,8 @@
 //! - Uniform handling across query and child cursors
 //! - Prevention of atom_position desynchronization bugs
 
-use super::{Candidate, ChildCursor, CursorState, MarkMatchState, Matched, Mismatched, PathCursor};
+use super::{Candidate, ChildCursor, CursorState, CursorStateMachine, Matched, Mismatched, PathCursor};
 use context_trace::PathNode;
-use std::marker::PhantomData;
 
 /// Trait for cursors that can have a checkpoint
 ///
@@ -88,7 +87,7 @@ where
         &self,
     ) -> Checkpointed<PathCursor<P, Candidate>> {
         Checkpointed {
-            current: self.current.as_candidate(),
+            current: CursorStateMachine::to_candidate(&self.current),
             checkpoint: self.checkpoint.clone(),
         }
     }
@@ -103,7 +102,7 @@ where
     /// This transitions the current cursor to Matched state and updates
     /// the checkpoint to match the new position.
     pub(crate) fn mark_match(self) -> Checkpointed<PathCursor<P, Matched>> {
-        let matched = self.current.mark_match();
+        let matched = CursorStateMachine::to_matched(self.current);
         Checkpointed {
             checkpoint: matched.clone(),
             current: matched,
@@ -118,7 +117,7 @@ where
         self,
     ) -> Checkpointed<PathCursor<P, Mismatched>> {
         Checkpointed {
-            current: self.current.mark_mismatch(),
+            current: CursorStateMachine::to_mismatched(self.current),
             checkpoint: self.checkpoint,
         }
     }
@@ -135,7 +134,7 @@ where
         &self,
     ) -> Checkpointed<PathCursor<P, Candidate>> {
         Checkpointed {
-            current: self.current.as_candidate(),
+            current: CursorStateMachine::to_candidate(&self.current),
             checkpoint: self.checkpoint.clone(),
         }
     }
@@ -163,7 +162,7 @@ where
         &self,
     ) -> Checkpointed<ChildCursor<Candidate, EndNode>> {
         Checkpointed {
-            current: self.current.as_candidate(),
+            current: CursorStateMachine::to_candidate(&self.current),
             checkpoint: self.checkpoint.clone(),
         }
     }
@@ -180,7 +179,7 @@ where
     pub(crate) fn mark_match(
         self,
     ) -> Checkpointed<ChildCursor<Matched, EndNode>> {
-        let matched = self.current.mark_match();
+        let matched = CursorStateMachine::to_matched(self.current);
         Checkpointed {
             checkpoint: matched.clone(),
             current: matched,
@@ -195,7 +194,7 @@ where
         self,
     ) -> Checkpointed<ChildCursor<Mismatched, EndNode>> {
         Checkpointed {
-            current: self.current.mark_mismatch(),
+            current: CursorStateMachine::to_mismatched(self.current),
             checkpoint: self.checkpoint,
         }
     }
@@ -212,7 +211,7 @@ where
         &self,
     ) -> Checkpointed<ChildCursor<Candidate, EndNode>> {
         Checkpointed {
-            current: self.current.as_candidate(),
+            current: CursorStateMachine::to_candidate(&self.current),
             checkpoint: self.checkpoint.clone(),
         }
     }

@@ -25,8 +25,8 @@ use context_trace::{
         write_indent,
         CompactFormat,
     },
+    path::accessors::path_accessor::StatePosition,
     GraphRoot,
-    HasTargetPos,
     PathNode,
 };
 use std::fmt;
@@ -113,7 +113,7 @@ where
 
         let query_pos: usize = self.query.current().atom_position.into();
         let index_pos: usize =
-            (*self.child.current().child_state.target_pos()).into();
+            (*self.child.current().child_state.target_pos().unwrap()).into();
         let checkpoint_pos: usize = self.query.checkpoint().atom_position.into();
 
         write!(

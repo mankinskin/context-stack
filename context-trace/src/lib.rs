@@ -148,7 +148,6 @@ pub use crate::{
             },
             has_path::{
                 HasPath,
-                HasRootedPath,
                 IntoRootedPath,
                 IntoRootedRolePath,
             },
@@ -269,9 +268,6 @@ pub use crate::{
         },
         state::{
             BaseState,
-            HasPrevPos,
-            HasRootPos,
-            HasTargetPos,
             IntoParentState,
             StateAdvance,
             parent::{
@@ -280,5 +276,22 @@ pub use crate::{
             },
         },
         traceable::Traceable,
+    },
+};
+
+// Re-export new consolidated accessor traits
+pub use path::accessors::{
+    path_accessor::{
+        PathAccessor,
+        RootedPathAccessor,
+        StatePosition,
+    },
+    range_accessor::{
+        EndPathAccessor,
+        RangePathAccessor,
+        RootedEndPathAccessor,
+        RootedRolePathAccessor,
+        RootedStartPathAccessor,
+        StartPathAccessor,
     },
 };

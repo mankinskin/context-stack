@@ -12,6 +12,9 @@ pub type EndPath = RolePath<End>;
 //        }
 //    }
 //}
+use crate::path::accessors::has_path::HasPath;
+use crate::path::accessors::role::{Start, End};
+
 pub trait HasStartPath: HasPath<Start> {
     fn start_path(&self) -> &StartPath;
     fn start_path_mut(&mut self) -> &mut StartPath;

@@ -4,10 +4,8 @@ use context_trace::{
         write_indent,
         CompactFormat,
     },
-    path::accessors::has_path::{
-        HasRootedRolePath,
-        IntoRolePath,
-    },
+    path::accessors::has_path::IntoRolePath,
+    RootedStartPathAccessor,
     *,
 };
 use derive_more::derive::{
@@ -22,14 +20,7 @@ pub struct PostfixEnd {
     pub(crate) path: IndexStartPath,
     pub(crate) root_pos: AtomPosition,
 }
-impl HasRootPos for PostfixEnd {
-    fn root_pos(&self) -> &AtomPosition {
-        &self.root_pos
-    }
-    fn root_pos_mut(&mut self) -> &mut AtomPosition {
-        &mut self.root_pos
-    }
-}
+// HasRootPos implementation removed - use StatePosition instead if needed
 impl RootedPath for PostfixEnd {
     type Root = IndexRoot;
     fn path_root(&self) -> IndexRoot {
@@ -46,14 +37,9 @@ impl IntoRootedRolePath<Start> for PostfixEnd {
         self.path
     }
 }
-impl HasRootedRolePath<IndexRoot, Start> for PostfixEnd {
-    fn rooted_role_path(&self) -> &IndexStartPath {
-        &self.path
-    }
-    fn rooted_role_path_mut(&mut self) -> &mut IndexStartPath {
-        &mut self.path
-    }
-}
+// PostfixEnd automatically implements RootedStartPathAccessor via blanket impl
+// (it implements RootedPath + HasRolePath<Start, Node = ChildLocation>)
+
 impl Traceable for &'_ PostfixEnd {
     fn trace<G: HasGraph>(
         self,

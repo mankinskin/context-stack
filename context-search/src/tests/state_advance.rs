@@ -95,12 +95,13 @@ fn test_parent_compare_state_advance_success() {
         parent_compare_state.cursor.atom_position
     );
     assert_eq!(
-        *compare_root_state
-            .token
-            .child
-            .current()
-            .child_state
-            .target_pos(),
+        *context_trace::path::accessors::path_accessor::StatePosition::target_pos(
+            &compare_root_state
+                .token
+                .child
+                .current()
+                .child_state
+        ).unwrap(),
         parent_compare_state.cursor.atom_position
     );
 
@@ -407,8 +408,8 @@ fn test_compare_state_matched_advance() {
         compare_state.query.current().atom_position
     );
     assert_eq!(
-        *advanced_state.child.current().child_state.target_pos(),
-        *compare_state.child.current().child_state.target_pos()
+        *context_trace::path::accessors::path_accessor::StatePosition::target_pos(&advanced_state.child.current().child_state).unwrap(),
+        *context_trace::path::accessors::path_accessor::StatePosition::target_pos(&compare_state.child.current().child_state).unwrap()
     );
     assert_eq!(
         advanced_state.query.checkpoint().atom_position,
@@ -473,7 +474,7 @@ fn test_parent_compare_state_cursor_conversion() {
         "Cursor atom_position should be preserved"
     );
     assert_eq!(
-        *compare_root_state.token.child.current().child_state.target_pos(),
+        *context_trace::path::accessors::path_accessor::StatePosition::target_pos(&compare_root_state.token.child.current().child_state).unwrap(),
         AtomPosition::from(0),
         "Child cursor target_pos should match parent_state root_pos (not query cursor position)"
     );

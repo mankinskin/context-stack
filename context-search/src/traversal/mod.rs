@@ -8,7 +8,8 @@ use crate::{
     },
 };
 use context_trace::{
-    path::accessors::has_path::HasRootedRolePath,
+    path::accessors::has_path::HasPath,
+    RootedStartPathAccessor,
     *,
 };
 use policy::DirectedTraversalPolicy;
@@ -49,7 +50,8 @@ impl Traceable for TraceStart<'_> {
             }),
             _ => None,
         } {
-            p.rooted_role_path_mut().drain(0..self.pos);
+            HasPath::<Start>::path_mut(p.start_role_path_mut())
+                .drain(0..self.pos);
             p.trace(ctx);
         }
     }

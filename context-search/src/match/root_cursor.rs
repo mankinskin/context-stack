@@ -199,7 +199,7 @@ where
                     .root_parent();
                 trace!(
                     root = %root,
-                    child_pos = *both_advanced.state.child.current().child_state.target_pos().as_ref(),
+                    child_pos = ?context_trace::path::accessors::path_accessor::StatePosition::target_pos(&both_advanced.state.child.current().child_state).unwrap(),
                     "  → advance_to_next_match: Step 2 complete - child advanced successfully, got <Candidate, Candidate>"
                 );
                 Ok(both_advanced)
@@ -326,32 +326,33 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         RootCursor<K, Candidate, Candidate>,
         RootCursor<K, Candidate, Matched>,
     > {
-        let root_parent =
-            self.state.child.current().child_state.path.root_parent();
-        let child_pos_before =
-            *self.state.child.current().child_state.target_pos().as_ref();
-        trace!(
-            root = %root_parent,
-            child_pos = child_pos_before,
-            "    → advance_child: attempting to advance child (index) cursor"
-        );
-
         let state = *self.state;
         let trav = self.trav;
+        
+        let root_parent =
+            state.child.current().child_state.path.root_parent();
+        let child_pos_before =
+            *context_trace::path::accessors::path_accessor::StatePosition::target_pos(&state.child.current().child_state).unwrap();
+        trace!(
+            root = %root_parent,
+            child_pos = ?child_pos_before,
+            "    → advance_child: attempting to advance child (index) cursor"
+        );
 
         // Try to advance index cursor
         match state.advance_index_cursor(&trav) {
             Ok(both_advanced) => {
-                let child_pos_after = *both_advanced
-                    .child
-                    .current()
-                    .child_state
-                    .target_pos()
-                    .as_ref();
+                let child_pos_after =
+                    context_trace::path::accessors::path_accessor::StatePosition::target_pos(
+                        &both_advanced
+                            .child
+                            .current()
+                            .child_state
+                    ).unwrap();
                 debug!(
                     root = %root_parent,
-                    child_pos_before = child_pos_before,
-                    child_pos_after = child_pos_after,
+                    child_pos_before = ?child_pos_before,
+                    child_pos_after = ?child_pos_after,
                     "    → advance_child: SUCCESS - child cursor advanced"
                 );
                 // Both cursors advanced - return Candidate cursor
@@ -363,7 +364,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
             Err(query_only_advanced) => {
                 debug!(
                     root = %root_parent,
-                    child_pos = child_pos_before,
+                    child_pos = ?child_pos_before,
                     "    → advance_child: CHILD ENDED - need parent exploration"
                 );
                 // Index ended but query continues - need parent exploration

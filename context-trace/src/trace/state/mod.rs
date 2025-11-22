@@ -26,52 +26,45 @@ use parent::ParentState;
 //
 // TraceState<K> is either {ChildState<K>, ParentState<K>}
 //
-pub trait HasPrevPos {
-    fn prev_pos(&self) -> &AtomPosition;
-    fn prev_pos_mut(&mut self) -> &mut AtomPosition;
-}
+// HasPrevPos, HasRootPos, HasTargetPos traits removed - use StatePosition instead
 
-pub trait HasRootPos {
-    fn root_pos(&self) -> &AtomPosition;
-    fn root_pos_mut(&mut self) -> &mut AtomPosition;
-}
-
-/// Trait for accessing the current/target position in a child state
-pub trait HasTargetPos {
-    fn target_pos(&self) -> &AtomPosition;
-    fn target_pos_mut(&mut self) -> &mut AtomPosition;
-}
-
-impl HasPrevPos for ParentState {
+// New StatePosition trait implementation
+impl crate::path::accessors::path_accessor::StatePosition for ParentState {
     fn prev_pos(&self) -> &AtomPosition {
         &self.prev_pos
     }
-    fn prev_pos_mut(&mut self) -> &mut AtomPosition {
-        &mut self.prev_pos
-    }
-}
 
-impl HasRootPos for ParentState {
     fn root_pos(&self) -> &AtomPosition {
         &self.root_pos
     }
+
+    fn prev_pos_mut(&mut self) -> &mut AtomPosition {
+        &mut self.prev_pos
+    }
+
     fn root_pos_mut(&mut self) -> &mut AtomPosition {
         &mut self.root_pos
     }
 }
 
-impl<P: RootedPath> HasPrevPos for BaseState<P> {
+// Deprecated HasPrevPos/HasRootPos impls removed - use StatePosition instead
+
+// New StatePosition trait implementation
+impl<P: RootedPath> crate::path::accessors::path_accessor::StatePosition
+    for BaseState<P>
+{
     fn prev_pos(&self) -> &AtomPosition {
         &self.prev_pos
     }
-    fn prev_pos_mut(&mut self) -> &mut AtomPosition {
-        &mut self.prev_pos
-    }
-}
-impl<P: RootedPath> HasRootPos for BaseState<P> {
+
     fn root_pos(&self) -> &AtomPosition {
         &self.root_pos
     }
+
+    fn prev_pos_mut(&mut self) -> &mut AtomPosition {
+        &mut self.prev_pos
+    }
+
     fn root_pos_mut(&mut self) -> &mut AtomPosition {
         &mut self.root_pos
     }
@@ -87,14 +80,7 @@ impl<P: RootedPath> IntoRootedPath<P> for BaseState<P> {
         self.path
     }
 }
-impl<P: RootedPath> HasRootedPath<P> for BaseState<P> {
-    fn rooted_path(&self) -> &P {
-        &self.path
-    }
-    fn rooted_path_mut(&mut self) -> &mut P {
-        &mut self.path
-    }
-}
+// HasRootedPath impl removed - use RootedPathAccessor instead
 
 pub trait StateAdvance: Sized + Clone {
     type Next;

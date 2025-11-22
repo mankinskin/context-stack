@@ -6,7 +6,10 @@ pub(crate) mod start;
 
 use std::cmp::Ordering;
 
-use context_trace::*;
+use context_trace::{
+    path::accessors::path_accessor::StatePosition,
+    *,
+};
 
 use inner_kind::InnerKind;
 
@@ -31,20 +34,7 @@ impl From<(DirectedKey, ChildState)> for TraversalState {
         }
     }
 }
-impl HasRootPos for TraversalState {
-    fn root_pos(&self) -> &AtomPosition {
-        match &self.kind {
-            InnerKind::ParentCandidate(state) => state.root_pos(),
-            InnerKind::ChildQueue(state) => state.target_pos(),
-        }
-    }
-    fn root_pos_mut(&mut self) -> &mut AtomPosition {
-        match &mut self.kind {
-            InnerKind::ParentCandidate(state) => state.root_pos_mut(),
-            InnerKind::ChildQueue(state) => state.target_pos_mut(),
-        }
-    }
-}
+// HasRootPos implementation removed - use StatePosition instead
 impl TargetKey for TraversalState {
     fn target_key(&self) -> DirectedKey {
         match &self.kind {

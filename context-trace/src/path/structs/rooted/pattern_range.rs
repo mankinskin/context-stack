@@ -139,10 +139,10 @@ where
 {
     type Node = ChildLocation;
     fn path(&self) -> &Vec<ChildLocation> {
-        HasRolePath::<R>::role_path(self).path()
+        self.role_path().path()
     }
     fn path_mut(&mut self) -> &mut Vec<ChildLocation> {
-        HasRolePath::<R>::role_path_mut(self).path_mut()
+        self.role_path_mut().path_mut()
     }
 }
 impl<Role: PathRole, Root: PathRoot + Clone> IntoRootedRolePath<Role>
