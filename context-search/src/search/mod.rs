@@ -3,7 +3,7 @@ use crate::{
     r#match::iterator::SearchIterator,
     state::{
         end::PathCoverage,
-        matched::MatchedEndState,
+        matched::MatchResult,
         start::Searchable,
     },
     traversal::TraceStart,
@@ -128,7 +128,7 @@ pub struct SearchState<K: SearchKind> {
 //    /// Converts matched root to parent nodes for continued exploration
 //    fn extract_parent_batch(
 //        &self,
-//        matched_state: &MatchedEndState,
+//        matched_state: &MatchResult,
 //    ) -> Option<Vec<crate::r#match::SearchNode>> {
 //        use crate::{
 //            compare::parent::ParentCompareState,
@@ -181,7 +181,7 @@ impl<K: SearchKind> Iterator for SearchState<K>
 where
     K::Trav: Clone,
 {
-    type Item = MatchedEndState;
+    type Item = MatchResult;
     fn next(&mut self) -> Option<Self::Item> {
         trace!("searching for next match");
         match self.matches.find_next() {
@@ -191,16 +191,16 @@ where
                     "found matched state"
                 );
 
-                // Update best_checkpoint if this match is better
+                // Update best_match if this match is better
                 let checkpoint_pos =
                     *matched_state.cursor().atom_position.as_ref();
 
-                let should_update = match &self.matches.best_checkpoint {
+                let should_update = match &self.matches.best_match {
                     None => {
                         debug!(
                             root = %matched_state.root_parent(),
                             checkpoint_pos = checkpoint_pos,
-                            "First match - setting as best_checkpoint"
+                            "First match - setting as best_match"
                         );
                         true
                     },
@@ -240,7 +240,7 @@ where
                     {
                         let prev_start_len = self
                             .matches
-                            .best_checkpoint
+                            .best_match
                             .as_ref()
                             .and_then(|p| p.path().try_start_path())
                             .map(|p| p.len())
@@ -260,7 +260,7 @@ where
                         }
                     }
 
-                    self.matches.best_checkpoint = Some(matched_state.clone());
+                    self.matches.best_match = Some(matched_state.clone());
                 }
 
                 Some(matched_state)
@@ -287,7 +287,7 @@ where
             iteration += 1;
             debug!(iteration, "tracing matched state");
             debug!(
-                "About to trace MatchedEndState: is_complete={}, path_variant={}",
+                "About to trace MatchResult: is_complete={}, path_variant={}",
                 matched_state.query_exhausted(),
                 match matched_state.path() {
                     PathCoverage::Range(_) => "Range",
@@ -297,18 +297,18 @@ where
                 }
             );
             matched_state.trace(&mut self.matches.trace_ctx);
-            debug!("Finished tracing MatchedEndState");
+            debug!("Finished tracing MatchResult");
         }
 
         debug!(iterations = iteration, "fold completed");
 
-        // Get the final matched state from best_checkpoint
-        let end = if let Some(checkpoint) = self.matches.best_checkpoint {
+        // Get the final matched state from best_match
+        let end = if let Some(checkpoint) = self.matches.best_match {
             debug!(
                 root = %checkpoint.root_parent(),
                 checkpoint_pos = *checkpoint.cursor().atom_position.as_ref(),
                 is_complete = checkpoint.query_exhausted(),
-                "Using best_checkpoint as final result"
+                "Using best_match as final result"
             );
             checkpoint
         } else {
@@ -326,7 +326,7 @@ where
                     PatternId::default(),
                 )),
             ));
-            MatchedEndState { path, cursor }
+            MatchResult { path, cursor }
         };
 
         trace!(end = %pretty(&end), "final matched state");

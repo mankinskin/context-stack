@@ -32,7 +32,7 @@ impl<'a, K: SearchKind> SearchKind for &'a K {
 
 #[derive(Clone, Debug)]
 pub(crate) struct TraceStart<'a> {
-    pub(crate) end: &'a crate::state::matched::MatchedEndState,
+    pub(crate) end: &'a crate::state::matched::MatchResult,
     pub(crate) pos: usize,
 }
 

@@ -2,13 +2,13 @@ use context_trace::*;
 
 use crate::state::{
     end::PathCoverage,
-    matched::MatchedEndState,
+    matched::MatchResult,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Response {
     pub cache: TraceCache,
-    pub end: MatchedEndState,
+    pub end: MatchResult,
 }
 //impl From<EndState> for Response {
 //    fn from(state: EndState) -> Self {
@@ -23,7 +23,7 @@ pub struct Response {
 impl Response {
     //pub(crate) fn new(
     //    cache: TraceCache,
-    //    end: MatchedEndState,
+    //    end: MatchResult,
     //) -> Self {
     //    Self { cache, end }
     //}

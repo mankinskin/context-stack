@@ -14,14 +14,14 @@ use context_trace::*;
 /// The cursor's atom_position indicates how far into the query pattern we matched.
 /// Use query_exhausted() to check if the entire query was matched.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MatchedEndState {
+pub struct MatchResult {
     /// The path in the graph where the match occurred
     pub path: PathCoverage,
     /// The cursor indicating position in the query pattern
     pub cursor: PatternCursor,
 }
 
-impl MatchedEndState {
+impl MatchResult {
     /// Get the path
     pub fn path(&self) -> &PathCoverage {
         &self.path
@@ -83,7 +83,7 @@ impl MatchedEndState {
     }
 }
 
-impl Traceable for &MatchedEndState {
+impl Traceable for &MatchResult {
     fn trace<G: HasGraph>(
         self,
         ctx: &mut TraceCtx<G>,
@@ -106,13 +106,13 @@ impl Traceable for &PathCoverage {
     }
 }
 
-impl RootKey for MatchedEndState {
+impl RootKey for MatchResult {
     fn root_key(&self) -> UpKey {
         self.path().root_key()
     }
 }
 
-impl GraphRoot for MatchedEndState {
+impl GraphRoot for MatchResult {
     fn root_parent(&self) -> Token {
         self.path().root_parent()
     }

@@ -11,7 +11,7 @@ use {
             range::RangeEnd,
             PathCoverage,
         },
-        state::matched::MatchedEndState,
+        state::matched::MatchResult,
     },
     context_trace::tests::env::Env1,
 
@@ -155,7 +155,7 @@ fn find_pattern1() {
     assert_eq!(aby_found.cache.entries.len(), 5);
     assert_eq!(
         aby_found.end,
-        MatchedEndState {
+        MatchResult {
             path: PathCoverage::Range(RangeEnd {
                 root_pos: 2.into(),
                 target: DownKey::new(y, 2.into()),

@@ -28,7 +28,7 @@ use range::RangeEnd;
 //    /// Initial state: searching for the query pattern, no graph location yet
 //    Query(PatternRangePath),
 //    /// Found state: matched something and located it in the graph
-//    Located(MatchedEndState),
+//    Located(MatchResult),
 //}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -184,6 +184,7 @@ impl PathCoverage {
 pub(crate) enum EndReason {
     QueryExhausted,
     Mismatch,
+    ChildExhausted,
 }
 
 impl std::fmt::Display for EndReason {
@@ -194,6 +195,7 @@ impl std::fmt::Display for EndReason {
         match self {
             EndReason::QueryExhausted => write!(f, "QueryExhausted"),
             EndReason::Mismatch => write!(f, "Mismatch"),
+            EndReason::ChildExhausted => write!(f, "ChildExhausted"),
         }
     }
 }

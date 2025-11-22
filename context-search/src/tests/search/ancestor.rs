@@ -7,7 +7,7 @@ use {
             postfix::PostfixEnd,
             PathCoverage,
         },
-        state::matched::MatchedEndState,
+        state::matched::MatchResult,
         state::result::Response,
     },
     context_trace::*,
@@ -246,7 +246,7 @@ fn find_ancestor2() {
     assert_eq!(
         byz_found,
         Response {
-            end: MatchedEndState {
+            end: MatchResult {
                 path: PathCoverage::Postfix(PostfixEnd {
                     root_pos: 2.into(),
                     path: RootedRolePath::new(
@@ -408,7 +408,7 @@ fn find_ancestor3() {
                     ),
                 ]),
             },
-            end: MatchedEndState {
+            end: MatchResult {
                 path: PathCoverage::Postfix(PostfixEnd {
                     root_pos: 2.into(),
                     path: RootedRolePath::new(

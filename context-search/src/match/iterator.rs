@@ -13,7 +13,7 @@ use crate::{
         },
         SearchQueue,
     },
-    state::matched::MatchedEndState,
+    state::matched::MatchResult,
     traversal::SearchKind,
 };
 use context_trace::{
@@ -31,9 +31,9 @@ use tracing::{
 pub(crate) struct SearchIterator<K: SearchKind> {
     pub(crate) trace_ctx: TraceCtx<K::Trav>,
     pub(crate) queue: SearchQueue,
-    /// Best checkpoint found so far during hierarchical search
+    /// Best match found so far during hierarchical search
     /// Updated whenever a root matches successfully, even if it needs parent exploration
-    pub(crate) best_checkpoint: Option<MatchedEndState>,
+    pub(crate) best_match: Option<MatchResult>,
 }
 impl<K: SearchKind> SearchIterator<K> {
     //#[context_trace::instrument_sig(skip(trav), fields(start_index = %start_index))]
@@ -75,7 +75,7 @@ impl<K: SearchKind> SearchIterator<K> {
                         .map(SearchNode::ParentCandidate),
                 ),
             },
-            best_checkpoint: None,
+            best_match: None,
         }
     }
 }
@@ -84,7 +84,7 @@ impl<K: SearchKind> SearchIterator<K>
 where
     K::Trav: Clone,
 {
-    pub(crate) fn find_next(&mut self) -> Option<MatchedEndState> {
+    pub(crate) fn find_next(&mut self) -> Option<MatchResult> {
         trace!("finding next match");
         self.find_map(Some)
     }
@@ -94,7 +94,7 @@ impl<K: SearchKind> Iterator for SearchIterator<K>
 where
     K::Trav: Clone,
 {
-    type Item = MatchedEndState;
+    type Item = MatchResult;
 
     fn next(&mut self) -> Option<Self::Item> {
         trace!("searching for root cursor");
@@ -204,8 +204,8 @@ where
                     "root cursor completed without conclusion - need parent exploration"
                 );
 
-                // Update best_checkpoint if this is better (smaller width)
-                let should_update = match &self.best_checkpoint {
+                // Update best_match if this is better (smaller width)
+                let should_update = match &self.best_match {
                     None => true,
                     Some(prev) => {
                         let prev_checkpoint_pos =
@@ -220,14 +220,14 @@ where
                         root = %checkpoint_state.root_parent(),
                         width = checkpoint_state.root_parent().width.0,
                         checkpoint_pos = checkpoint_pos,
-                        "Updating best_checkpoint from root needing parent exploration"
+                        "Updating best_match from root needing parent exploration"
                     );
-                    self.best_checkpoint = Some(checkpoint_state);
+                    self.best_match = Some(checkpoint_state);
                 } else {
                     debug!(
                         root = %checkpoint_state.root_parent(),
                         width = checkpoint_state.root_parent().width.0,
-                        "Not updating best_checkpoint - current is better"
+                        "Not updating best_match - current is better"
                     );
                 }
 

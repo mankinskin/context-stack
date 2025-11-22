@@ -21,7 +21,7 @@ use crate::{
             EndState,
             PathCoverage,
         },
-        matched::MatchedEndState,
+        matched::MatchResult,
     },
     traversal::{
         policy::DirectedTraversalPolicy,
@@ -79,15 +79,13 @@ where
     K::Trav: Clone,
 {
     /// Advance through matches until we reach an end state
-    /// Returns Ok(MatchedEndState) if we reach QueryExhausted or Mismatch with progress
+    /// Returns Ok(MatchResult) if we reach QueryExhausted or Mismatch with progress
     /// Returns Err((checkpoint_state, root_cursor)) if we need parent exploration
     #[context_trace::instrument_sig(level = "debug", skip(self))]
     pub(crate) fn advance_to_end(
         self
-    ) -> Result<
-        MatchedEndState,
-        (MatchedEndState, RootCursor<K, Candidate, Matched>),
-    > {
+    ) -> Result<MatchResult, (MatchResult, RootCursor<K, Candidate, Matched>)>
+    {
         let root_parent =
             self.state.child.current().child_state.path.root_parent();
         debug!(
@@ -143,7 +141,8 @@ where
                 );
                 // Need parent exploration immediately (index ended before query)
                 // Create checkpoint state for this root
-                let checkpoint_state = need_parent.create_checkpoint_state();
+                let checkpoint_state =
+                    need_parent.create_parent_exploration_state();
                 debug!(
                     checkpoint_root = %checkpoint_state.root_parent(),
                     checkpoint_width = checkpoint_state.root_parent().width.0,
@@ -156,14 +155,14 @@ where
 
     /// Advance to the next match by: 1. advancing query cursor, 2. advancing child path
     /// Returns Ok(<Candidate, Candidate>) if both advanced successfully
-    /// Returns Err(Ok(MatchedEndState)) if query ended (complete match)
+    /// Returns Err(Ok(MatchResult)) if query ended (complete match)
     /// Returns Err(Err(<Candidate, Matched>)) if child path ended but query continues (need parent exploration)
     #[context_trace::instrument_sig(level = "trace", skip(self))]
     fn advance_to_next_match(
         self
     ) -> Result<
         RootCursor<K, Candidate, Candidate>,
-        Result<MatchedEndState, RootCursor<K, Candidate, Matched>>,
+        Result<MatchResult, RootCursor<K, Candidate, Matched>>,
     > {
         trace!("  → advance_to_next_match: Step 1 - calling advance_query");
         // Step 1: Advance query cursor
@@ -224,11 +223,11 @@ where
 
     /// Step 1: Advance the query cursor
     /// Returns Ok(<Candidate, Matched>) if query advanced
-    /// Returns Err(MatchedEndState) if query ended (QueryExhausted)
+    /// Returns Err(MatchResult) if query ended (QueryExhausted)
     #[context_trace::instrument_sig(level = "trace", skip(self))]
     fn advance_query(
         self
-    ) -> Result<RootCursor<K, Candidate, Matched>, MatchedEndState> {
+    ) -> Result<RootCursor<K, Candidate, Matched>, MatchResult> {
         let root_parent =
             self.state.child.current().child_state.path.root_parent();
         let query_pos_before =
@@ -305,7 +304,7 @@ where
                 );
 
                 let target = DownKey::new(target_index, root_pos.into());
-                Err(MatchedEndState {
+                Err(MatchResult {
                     cursor: checkpoint_cursor,
                     path: PathCoverage::from_range_path(
                         path, root_pos, target, end_pos, &trav,
@@ -381,7 +380,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
     /// Create a QueryExhausted state from this root cursor's checkpoint
     /// Used when the root matched successfully but needs parent exploration
     #[context_trace::instrument_sig(level = "trace", skip(self))]
-    pub(crate) fn create_checkpoint_state(&self) -> MatchedEndState {
+    pub(crate) fn create_parent_exploration_state(&self) -> MatchResult {
         let checkpoint = self.state.query.checkpoint();
         let checkpoint_child = self.state.child.checkpoint();
 
@@ -412,7 +411,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
             path, root_pos, target, end_pos, &self.trav,
         );
 
-        MatchedEndState {
+        MatchResult {
             cursor: end_cursor,
             path: path_enum,
         }
@@ -460,7 +459,7 @@ impl<K: SearchKind> RootCursor<K, Matched, Matched> {
                         // INDEX ENDED, QUERY CONTINUES
                         // Return cursor in <Candidate, Matched> state for parent exploration
                         Err((
-                            EndReason::Mismatch,
+                            EndReason::ChildExhausted,
                             Some(RootCursor {
                                 state: Box::new(_query_only_advanced),
                                 trav: self.trav,
@@ -519,7 +518,7 @@ where
                                 tracing::trace!("query pattern ended - QueryExhausted match found");
                                 Some(Break(EndReason::QueryExhausted))
                             },
-                            (EndReason::Mismatch, Some(_)) => {
+                            (EndReason::ChildExhausted, Some(_)) => {
                                 // Index ended but query continues - need parent exploration
                                 tracing::trace!("index ended, query continues - returning None for parent exploration");
                                 None
@@ -557,14 +556,12 @@ where
     K::Trav: Clone,
 {
     /// Iterate through candidate comparisons until we reach an end state or need parent exploration
-    /// Returns Ok(MatchedEndState) if we reach QueryExhausted or Mismatch with progress
+    /// Returns Ok(MatchResult) if we reach QueryExhausted or Mismatch with progress
     /// Returns Err((checkpoint_state, root_cursor)) if iterator completed without conclusion - need parent exploration
     pub(crate) fn advance_to_matched(
         mut self
-    ) -> Result<
-        MatchedEndState,
-        (MatchedEndState, RootCursor<K, Candidate, Matched>),
-    > {
+    ) -> Result<MatchResult, (MatchResult, RootCursor<K, Candidate, Matched>)>
+    {
         // Iterate until we get a match or need to stop
         loop {
             match self.next() {
@@ -586,12 +583,16 @@ where
                         .root_parent();
 
                     // Check if this is a valid match before destructuring
-                    if reason == EndReason::Mismatch && checkpoint_pos == 0 {
+                    if matches!(
+                        reason,
+                        EndReason::Mismatch | EndReason::ChildExhausted
+                    ) && checkpoint_pos == 0
+                    {
                         // No progress - not a valid match, continue iteration
                         debug!(
                             root = %root_parent,
-                            reason = "Mismatch with checkpoint=0 (no progress)",
-                            "Discarding invalid match - continuing iteration"
+                            reason = ?reason,
+                            "Discarding invalid match - no progress made, continuing iteration"
                         );
                         continue;
                     }
@@ -601,7 +602,7 @@ where
                         root_width = root_parent.width.0,
                         checkpoint_pos = checkpoint_pos,
                         reason = ?reason,
-                        "Valid match found - creating MatchedEndState"
+                        "Valid match found - creating MatchResult"
                     );
 
                     // Create matched end state from current state
@@ -618,20 +619,20 @@ where
         }
     }
 
-    /// Create a MatchedEndState from the current candidate state based on the end reason
+    /// Create a MatchResult from the current candidate state based on the end reason
     fn create_end_state(
         self,
         reason: EndReason,
-    ) -> MatchedEndState {
+    ) -> MatchResult {
         let state = *self.state;
 
         // Choose the path based on end reason
-        // For Mismatch, use checkpoint path (state at last match)
+        // For Mismatch or ChildExhausted, use checkpoint path (state at last match)
         // For QueryExhausted, use current child path
         let mut path = match reason {
             EndReason::QueryExhausted =>
                 state.child.current().child_state.path.clone(),
-            EndReason::Mismatch =>
+            EndReason::Mismatch | EndReason::ChildExhausted =>
                 state.child.checkpoint().child_state.path.clone(),
         };
 
@@ -644,10 +645,11 @@ where
 
         // Use entry_pos from the ChildState - it already tracks the correct position
         // For QueryExhausted: use current child cursor position
-        // For Mismatch: use checkpoint position (last confirmed match)
+        // For Mismatch or ChildExhausted: use checkpoint position (last confirmed match)
         let child_state = match reason {
             EndReason::QueryExhausted => &state.child.current().child_state,
-            EndReason::Mismatch => &state.child.checkpoint().child_state,
+            EndReason::Mismatch | EndReason::ChildExhausted =>
+                &state.child.checkpoint().child_state,
         };
 
         let _start_pos = child_state.start_pos;
@@ -670,7 +672,7 @@ where
         // This ensures end_index points to next token to match (not last matched)
         let result_cursor = state.query.current().clone().mark_match();
 
-        MatchedEndState {
+        MatchResult {
             cursor: result_cursor,
             path: path_enum,
         }
@@ -679,7 +681,7 @@ where
     /// Create a checkpoint Mismatch state from the current candidate state
     /// Used when iterator completes without definitive match/mismatch - needs parent exploration
     /// Always returns Mismatch since the root ended without completing the query
-    fn create_checkpoint_from_state(&self) -> MatchedEndState {
+    fn create_checkpoint_from_state(&self) -> MatchResult {
         let checkpoint = self.state.query.checkpoint();
         let checkpoint_child = self.state.child.checkpoint();
 
@@ -705,7 +707,7 @@ where
 
         // Use current query cursor (advanced beyond checkpoint when child cannot advance)
         // This ensures end_index points to next token to match, not last matched
-        MatchedEndState {
+        MatchResult {
             cursor: self.state.query.current().clone().mark_match(),
             path: path_enum,
         }
