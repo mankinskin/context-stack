@@ -13,10 +13,9 @@ pub(super) fn install_panic_hook(config: PanicConfig) {
             // Log panic before unwinding closes spans (if enabled)
             if config.show {
                 if config.show_message {
-                    tracing::error!(
-                        panic_message = %panic_info,
-                        "PANIC occurred!"
-                    );
+                    // Format panic info to string and include in message
+                    let panic_msg = format!("{}", panic_info);
+                    tracing::error!("PANIC: {}", panic_msg);
                 } else {
                     tracing::error!("PANIC occurred!");
                 }
@@ -27,8 +26,10 @@ pub(super) fn install_panic_hook(config: PanicConfig) {
                 eprintln!("\n🔥 PANIC: {}", panic_info);
             }
 
-            // Call the default hook (which prints to stderr)
-            default_hook(panic_info);
+            // Call the default hook (which prints to stderr) if enabled
+            if config.show_default_hook {
+                default_hook(panic_info);
+            }
         }));
     });
 }

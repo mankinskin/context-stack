@@ -27,7 +27,7 @@ fn test_pattern_cursor_at_end_cannot_advance() {
     let root = IndexRoot::from(
         ChildLocation::new(abc, abc_id, 0).into_pattern_location(),
     );
-    let mut path = IndexRangePath::new_empty(root);
+    let mut path: IndexRangePath = IndexRangePath::new_empty(root);
 
     tracing::info!(%path, "Initial path");
     tracing::info!(
@@ -97,7 +97,7 @@ fn test_can_advance_advance_consistency() {
     let root = IndexRoot::from(
         ChildLocation::new(abcd, abcd_id, 0).into_pattern_location(),
     );
-    let mut path = IndexRangePath::new_empty(root);
+    let mut path: IndexRangePath = IndexRangePath::new_empty(root);
 
     for step in 0..10 {
         let can_advance = path.can_advance(&graph);

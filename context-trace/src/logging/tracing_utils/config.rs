@@ -112,6 +112,10 @@ pub struct PanicConfig {
     /// Show stderr output (🔥 PANIC: ...)
     #[serde(default = "default_true")]
     pub show_stderr: bool,
+    /// Call the default panic hook (which prints to stderr)
+    /// Set to false to suppress stderr output and only log to file
+    #[serde(default = "default_true")]
+    pub show_default_hook: bool,
 }
 
 impl Default for PanicConfig {
@@ -120,6 +124,7 @@ impl Default for PanicConfig {
             show: true,
             show_message: true,
             show_stderr: true,
+            show_default_hook: true,
         }
     }
 }
@@ -347,6 +352,7 @@ impl FormatConfig {
     /// - TRACING_PANIC_SHOW=0
     /// - TRACING_PANIC_SHOW_MESSAGE=0
     /// - TRACING_PANIC_SHOW_STDERR=0
+    /// - TRACING_PANIC_SHOW_DEFAULT_HOOK=0
     /// - TRACING_ENABLE_INDENTATION=0
     /// - TRACING_SHOW_FILE_LOCATION=0
     /// - TRACING_ENABLE_ANSI=0
@@ -404,6 +410,10 @@ impl FormatConfig {
         }
         if let Ok(val) = env::var("TRACING_PANIC_SHOW_STDERR") {
             config.panic.show_stderr =
+                val == "1" || val.eq_ignore_ascii_case("true");
+        }
+        if let Ok(val) = env::var("TRACING_PANIC_SHOW_DEFAULT_HOOK") {
+            config.panic.show_default_hook =
                 val == "1" || val.eq_ignore_ascii_case("true");
         }
 
