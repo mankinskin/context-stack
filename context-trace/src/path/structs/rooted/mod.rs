@@ -171,10 +171,15 @@ impl<R: PathRoot> From<RootedEndPath<R>>
     for RootedRangePath<R, ChildLocation, ChildLocation>
 {
     fn from(value: RootedEndPath<R>) -> Self {
+        // The EndPath points to the token we want to start from
+        // In RangePath, end points to the token after what's been consumed
+        // So if EndPath.root_entry = 0 (start from first token),
+        // RangePath.end should = 1 (first token consumed, now at second)
+        let end_index = value.role_path.root_child_index() + 1;
         Self {
             root: value.root,
             start: Default::default(),
-            end: value.role_path,
+            end: RolePath::new_empty(end_index),
         }
     }
 }

@@ -100,12 +100,18 @@ impl MoveRootIndex<Right, End>
         if let Some(next) =
             TravDir::<G>::pattern_index_next(&self.root, current_index)
         {
+            let old_end = *self.root_child_index_mut();
             tracing::debug!(
-                "PatternRangePath::move_root_index - advancing from {} to {}",
+                "PatternRangePath::move_root_index - advancing from {} to {}, old end.root_entry={}",
                 current_index,
-                next
+                next,
+                old_end
             );
             *self.root_child_index_mut() = next;
+            tracing::debug!(
+                "PatternRangePath::move_root_index - AFTER UPDATE: end.root_entry={}",
+                *self.root_child_index_mut()
+            );
             ControlFlow::Continue(())
         } else {
             tracing::debug!(

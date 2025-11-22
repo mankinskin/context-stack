@@ -244,7 +244,7 @@ fn test_compare_state_candidate_advance() {
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],
-        (abc, abc_id) => [ab, c]
+        (_abc, _abc_id) => [ab, c]
     );
 
     // Create a CompareState<Candidate, Candidate>

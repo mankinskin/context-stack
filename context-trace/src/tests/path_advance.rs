@@ -4,9 +4,12 @@
 //! can_advance() returned true but advance() returned Break.
 
 use crate::{
-    path::mutators::move_path::advance::{
-        Advance,
-        CanAdvance,
+    path::{
+        accessors::role::End,
+        mutators::move_path::advance::{
+            Advance,
+            CanAdvance,
+        },
     },
     *,
 };
@@ -31,7 +34,7 @@ fn test_pattern_cursor_at_end_cannot_advance() {
 
     tracing::info!(%path, "Initial path");
     tracing::info!(
-        end_index = %path.role_root_child_index::<crate::path::accessors::role::End>(),
+        end_index = %path.role_root_child_index::<End>(),
         "End index"
     );
 
@@ -39,7 +42,7 @@ fn test_pattern_cursor_at_end_cannot_advance() {
     let result1 = path.advance(&graph);
     tracing::info!(
         ?result1,
-        end_index = %path.role_root_child_index::<crate::path::accessors::role::End>(),
+        end_index = %path.role_root_child_index::<End>(),
         "First advance result"
     );
     assert!(result1.is_continue(), "First advance should succeed");
@@ -48,14 +51,13 @@ fn test_pattern_cursor_at_end_cannot_advance() {
     let result2 = path.advance(&graph);
     tracing::info!(
         ?result2,
-        end_index = %path.role_root_child_index::<crate::path::accessors::role::End>(),
+        end_index = %path.role_root_child_index::<End>(),
         "Second advance result"
     );
     assert!(result2.is_continue(), "Second advance should succeed");
 
     // Now we're at the end (index 2 of a 3-element pattern)
-    let end_index =
-        path.role_root_child_index::<crate::path::accessors::role::End>();
+    let end_index = path.role_root_child_index::<End>();
     tracing::info!(%end_index, "After two advances");
 
     // Check can_advance
@@ -109,7 +111,7 @@ fn test_can_advance_advance_consistency() {
             step,
             can_advance,
             advance_result,
-            path.role_root_child_index::<crate::path::accessors::role::End>()
+            path.role_root_child_index::<End>()
         );
 
         // CRITICAL INVARIANT: can_advance should guarantee advance succeeds

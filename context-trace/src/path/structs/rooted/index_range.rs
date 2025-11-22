@@ -269,10 +269,15 @@ impl<EndNode: PathNode> MoveRootIndex<Right, End>
     ) -> ControlFlow<()> {
         let graph = trav.graph();
         let pattern = self.root_pattern::<G>(&graph);
-        if let Some(next) = TravDir::<G>::pattern_index_next(
-            pattern,
-            RootChildIndex::<End>::root_child_index(self),
-        ) {
+        let current_index = RootChildIndex::<End>::root_child_index(self);
+        if let Some(next) =
+            TravDir::<G>::pattern_index_next(pattern, current_index)
+        {
+            tracing::debug!(
+                "IndexRangePath::move_root_index - advancing end.root_entry from {} to {}",
+                current_index,
+                next
+            );
             *self.root_child_index_mut() = next;
             ControlFlow::Continue(())
         } else {

@@ -69,6 +69,11 @@ where
             // When matching is complete, child_index may equal pattern.len()
             if child_index < pattern.len() {
                 let child_width = pattern[child_index].width();
+                let old_pos = *self.atom_position.as_ref();
+                tracing::debug!(
+                    "PathCursor::move_root_index: child_index={}, child_width={}, old_atom_pos={}, will advance to {}",
+                    child_index, child_width, old_pos, old_pos + child_width
+                );
                 self.move_key(*child_width);
             }
         }

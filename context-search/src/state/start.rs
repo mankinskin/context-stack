@@ -45,6 +45,8 @@ impl<P: StartFoldPath> ToCursor for P {
         self,
         trav: &G,
     ) -> PathCursor<Self> {
+        // Initialize with first token consumed (to get its parents)
+        // Both atom_position and path indices should reflect this
         PathCursor {
             atom_position: (*self.calc_width(trav)).into(),
             path: self,
@@ -403,8 +405,11 @@ impl Searchable for PatternRangePath {
         let range_path = self.to_range_path();
         debug!(range_path = %range_path, "converted to range_path");
         
+        let width = range_path.calc_width(&trav);
+        debug!("calc_width returned: {}", width);
+        
         let cursor = range_path.to_cursor(&trav);
-        debug!(cursor = %cursor, "created cursor");
+        debug!(cursor_atom_pos = *cursor.atom_position, cursor_path = %cursor.path, "created cursor");
         
         cursor.start_search::<K>(trav)
     }

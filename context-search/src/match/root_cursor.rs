@@ -9,7 +9,6 @@ use crate::{
     },
     cursor::{
         Candidate,
-        ChildCursor,
         CursorState,
         MarkMatchState,
         Matched,
@@ -31,8 +30,11 @@ use crate::{
 use context_trace::{
     path::RolePathUtils,
     End,
+    MoveRootIndex,
+    RootChildIndex,
     *,
 };
+use std::marker::PhantomData;
 use tracing::debug;
 
 use derive_more::{
@@ -248,27 +250,44 @@ where
                     "    → advance_query: QUERY ENDED - creating QueryExhausted state"
                 );
                 // Query ended - create complete match state
-                // Use query position for root_pos (not child position)
-                let root_pos = matched_state.cursor.atom_position;
+                // Use entry_pos (where we entered the root) for root_pos
+                let root_pos = matched_state.child_cursor.child_state.entry_pos;
                 let path = matched_state.child_cursor.child_state.path.clone();
-                let start_pos =
+                let _start_pos =
                     matched_state.child_cursor.child_state.start_pos;
                 let root_parent = path.root_parent();
                 let target_index = path.role_rooted_leaf_token::<End, _>(&trav);
                 let last_token_width_value = target_index.width();
-                let end_pos = AtomPosition::from(
-                    *matched_state.cursor.atom_position
-                        - *last_token_width_value,
-                );
+                // end_pos is where matching ended (checkpoint position)
+                let end_pos = matched_state.checkpoint.atom_position;
                 tracing::debug!(
-                    "root_cursor advance_query: root_parent={}, root_pos={}, cursor.atom_position={}, last_token_width={}, end_pos={}",
-                    root_parent, usize::from(root_pos), *matched_state.cursor.atom_position,
+                    "root_cursor advance_query: root_parent={}, root_pos={}, checkpoint.atom_position={}, last_token_width={}, end_pos={}",
+                    root_parent, usize::from(root_pos), *matched_state.checkpoint.atom_position,
                     last_token_width_value, usize::from(end_pos)
+                );
+
+                // For exhausted queries, the checkpoint points at the last matched token
+                // but its atom_position doesn't include that token's width yet
+                // We need to add the width to get the total consumed tokens
+                let mut checkpoint_cursor = matched_state.checkpoint.clone();
+                let new_position = usize::from(checkpoint_cursor.atom_position)
+                    + last_token_width_value.0;
+                checkpoint_cursor.atom_position = new_position.into();
+
+                let final_end_index = RootChildIndex::<End>::root_child_index(
+                    &checkpoint_cursor.path,
+                );
+
+                tracing::debug!(
+                    checkpoint_pos=%checkpoint_cursor.atom_position,
+                    final_end_index,
+                    last_token_width=%last_token_width_value,
+                    "advance_query: returning checkpoint cursor for exhausted query (includes last token width)"
                 );
 
                 let target = DownKey::new(target_index, root_pos.into());
                 Err(MatchedEndState {
-                    cursor: matched_state.checkpoint,
+                    cursor: checkpoint_cursor,
                     path: PathCoverage::from_range_path(
                         path, root_pos, target, end_pos, &trav,
                     ),
@@ -348,13 +367,30 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
     /// Create a QueryExhausted state from this root cursor's checkpoint
     /// Used when the root matched successfully but needs parent exploration
     pub(crate) fn create_checkpoint_state(&self) -> MatchedEndState {
-        // Extract checkpoint information
-        let checkpoint = &self.state.checkpoint;
+        // For consecutive searches, use the checkpoint cursor (last successful match)
+        // and advance its path by one to point to the next position to search
+        let cursor = &self.state.cursor; // Candidate cursor (advanced too far)
+        let checkpoint = &self.state.checkpoint; // Last successful match
         let checkpoint_child = &self.state.checkpoint_child;
+
+        let cursor_pos = cursor.atom_position;
+        let cursor_end_index =
+            RootChildIndex::<End>::root_child_index(&cursor.path);
+        let checkpoint_pos = checkpoint.atom_position;
+        let checkpoint_end_index =
+            RootChildIndex::<End>::root_child_index(&checkpoint.path);
+
+        tracing::debug!(
+            %cursor_pos,
+            cursor_end_index,
+            %checkpoint_pos,
+            checkpoint_end_index,
+            "create_checkpoint_state: cursor state before creating end cursor"
+        );
 
         // Use checkpoint_child path as it represents the matched state
         let mut path = checkpoint_child.child_state.path.clone();
-        let start_pos = checkpoint_child.child_state.start_pos;
+        let _start_pos = checkpoint_child.child_state.start_pos;
         // Use query checkpoint position for root_pos (not child position)
         let root_pos = checkpoint.atom_position;
 
@@ -365,7 +401,27 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
         //let last_token_width_value = target_index.width();
 
-        let end_cursor = checkpoint.clone();
+        // For consecutive searches, advance the checkpoint path one step past the last matched token
+        // This makes end_index point to the next position to search
+        // checkpoint.atom_position already represents the count of consumed tokens (correct as-is)
+        let mut checkpoint_path = checkpoint.path.clone();
+        checkpoint_path.move_root_index(&self.trav);
+
+        let final_end_index =
+            RootChildIndex::<End>::root_child_index(&checkpoint_path);
+        tracing::debug!(
+            %checkpoint_pos,
+            checkpoint_end_index,
+            final_end_index,
+            "create_checkpoint_state: advanced checkpoint path for consecutive search"
+        );
+
+        // Return checkpoint cursor with advanced path (ready for next search)
+        let end_cursor = PatternCursor {
+            path: checkpoint_path,
+            atom_position: checkpoint.atom_position,
+            _state: PhantomData,
+        };
         let end_pos = checkpoint.atom_position;
 
         let target = DownKey::new(target_index, root_pos.into());
@@ -618,7 +674,7 @@ where
             EndReason::Mismatch => &checkpoint_child.child_state,
         };
 
-        let start_pos = child_state.start_pos;
+        let _start_pos = child_state.start_pos;
         let root_pos = child_state.entry_pos;
 
         // target should use root_pos (where the target token starts)
@@ -663,7 +719,7 @@ where
         let target_token = path.role_rooted_leaf_token::<End, _>(&self.trav);
 
         // Use entry_pos from checkpoint_child - it already has the correct position
-        let start_pos = checkpoint_child.child_state.start_pos;
+        let _start_pos = checkpoint_child.child_state.start_pos;
         let root_pos = checkpoint_child.child_state.entry_pos;
         let end_pos = root_pos; // The end position is the same as root for the matched segment
 

@@ -86,8 +86,18 @@ impl PathCoverage {
         trav: &G,
     ) -> Self {
         // Simplify both paths
+        tracing::debug!(
+            "from_range_path BEFORE simplify: start_path.len={}, end_path.len={}",
+            path.start_path().len(),
+            path.end_path().len()
+        );
         path.start_path_mut().simplify(trav);
         path.end_path_mut().simplify(trav);
+        tracing::debug!(
+            "from_range_path AFTER simplify: start_path.len={}, end_path.len={}",
+            path.start_path().len(),
+            path.end_path().len()
+        );
 
         // Convert to plain path (strip position annotations) after simplification
         let path = path.into_plain();

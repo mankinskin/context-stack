@@ -13,10 +13,7 @@ use crate::{
             MatchedCompareState,
         },
     },
-    cursor::{
-        Candidate,
-        Matched,
-    },
+    cursor::Candidate,
     r#match::root_cursor::RootCursor,
     traversal::{
         policy::DirectedTraversalPolicy,
@@ -36,86 +33,6 @@ pub(crate) struct SearchQueue {
 }
 
 // Display implementation moved to logging/mod.rs via impl_display_via_compact macro
-
-#[derive(Debug)]
-pub(crate) struct RootFinder<'a, K: SearchKind + 'a> {
-    pub(crate) ctx: &'a mut SearchQueue,
-    pub(crate) trav: &'a K::Trav,
-}
-impl<'a, K: SearchKind + 'a> RootFinder<'a, K>
-where
-    &'a K: SearchKind<Trav = &'a K::Trav>,
-    K::Trav: Clone,
-{
-    pub(crate) fn new(
-        trav: &'a K::Trav,
-        ctx: &'a mut SearchQueue,
-    ) -> Self {
-        Self { ctx, trav }
-    }
-
-    pub(crate) fn find_root_cursor(
-        mut self
-    ) -> Option<RootCursor<&'a K, Matched, Matched>> {
-        // Save trav before iterating
-        let trav_copy = self.trav;
-
-        self.find_map(|root| root).map(|matched_state| {
-            // Use the saved trav copy
-            // This works because &'a K::Trav implements Copy (it's just a reference)
-            RootCursor {
-                trav: trav_copy,
-                state: Box::new(matched_state),
-            }
-        })
-    }
-}
-
-impl<K: SearchKind> Iterator for RootFinder<'_, K>
-where
-    K::Trav: Clone,
-{
-    type Item = Option<MatchedCompareState>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let popped_node = self.ctx.nodes.pop();
-
-        // Debug: log what was popped from the queue
-        if let Some(ref node) = popped_node {
-            use tracing::debug;
-            match node {
-                SearchNode::ParentCandidate(state) => {
-                    let token = state.parent_state.path.root_parent();
-                    debug!(
-                        popped_token = %token,
-                        popped_width = token.width.0,
-                        queue_remaining = self.ctx.nodes.len(),
-                        "Popped SearchNode from priority queue"
-                    );
-                },
-                SearchNode::PrefixQueue(_) => {
-                    debug!("Popped PrefixQueue node from priority queue");
-                },
-            }
-        }
-
-        match popped_node.and_then(|node| {
-            NodeConsumer::<'_, K>::new(node, self.trav).consume()
-        }) {
-            Some(QueueMore(next)) => {
-                self.ctx.nodes.extend(next);
-                Some(None)
-            },
-            Some(NodeResult::FoundMatch(matched_state)) => {
-                // Found a root match - return it for RootCursor creation
-                // RootCursor will handle cursor advancement and determine when to add cache entries
-                Some(Some(*matched_state))
-            },
-            Some(Skip) => Some(None),
-            None => None,
-        }
-    }
-}
 
 #[derive(Debug)]
 pub(crate) enum NodeResult {

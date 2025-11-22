@@ -57,6 +57,9 @@ pub struct Env1 {
     pub ef: Token,
     pub e_f_id: PatternId,
 
+    pub gh: Token,
+    pub efgh: Token,
+
     pub ghi: Token,
 
     pub cdef: Token,
@@ -64,8 +67,12 @@ pub struct Env1 {
     pub cd_ef_id: PatternId,
 
     pub efghi: Token,
+    pub aba: Token,
     pub abab: Token,
     pub ababab: Token,
+    pub ababcd: Token,
+    pub ababababcd: Token,
+    pub ababcdefghi: Token,
 
     pub abcdef: Token,
     pub abcd_ef_id: PatternId,
@@ -203,6 +210,8 @@ impl TestEnv for Env1 {
             a_bcd_id: abcd_ids[1],
             ef,
             e_f_id: e_f_id.unwrap(),
+            gh,
+            efgh,
             def,
             d_ef_id: d_ef_id.unwrap(),
             ghi,
@@ -217,8 +226,12 @@ impl TestEnv for Env1 {
             c_def_id: cdef_ids[0],
             cd_ef_id: cdef_ids[1],
             efghi,
+            aba,
             abab,
             ababab,
+            ababcd,
+            ababababcd,
+            ababcdefghi,
             ababababcdefghi,
         }
     }

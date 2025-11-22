@@ -11,12 +11,15 @@ use {
 
         tests::env::TestEnv,
     },
+    context_trace::{
+        End,
+        RootChildIndex,
+        Start,
+    },
 };
 
 #[test]
 fn find_consecutive1() {
-    let _tracing = context_trace::init_test_tracing!();
-
     let Env1 {
         graph,
         a,
@@ -29,6 +32,8 @@ fn find_consecutive1() {
         ghi,
         ..
     } = &*Env1::get_expected();
+    let _tracing = context_trace::init_test_tracing!(graph);
+
     //let a_bc_pattern = [Token::new(a, 1), Token::new(bc, 2)];
     //let ab_c_pattern = [Token::new(ab, 2), Token::new(c, 1)];
     let g_h_i_a_b_c_pattern = vec![
@@ -41,9 +46,33 @@ fn find_consecutive1() {
     ];
 
     let query = PatternPrefixPath::from(Pattern::from(g_h_i_a_b_c_pattern));
-    let fin = graph.find_ancestor(&query).unwrap();
-    assert!(fin.query_exhausted(), "Query should be complete");
-    match &fin.end.path {
+    let fin1 = graph.find_ancestor(&query).unwrap();
+
+    // Verify cursor state after first search
+    let cursor = fin1.end.cursor();
+    let checkpoint_pos = *cursor.atom_position.as_ref();
+
+    // Verify cursor path range
+    let start_index = RootChildIndex::<Start>::root_child_index(&cursor.path);
+    let end_index = RootChildIndex::<End>::root_child_index(&cursor.path);
+
+    tracing::debug!(%checkpoint_pos, %start_index, %end_index, "After first search");
+    tracing::debug!(%cursor.path, "Cursor path");
+
+    assert_eq!(
+        checkpoint_pos, 3,
+        "Checkpoint position should be 3 after matching ghi"
+    );
+    assert_eq!(start_index, 0, "Start index should be 0");
+    assert_eq!(
+        end_index, 3,
+        "End index should be 3 (pointing to first unmatched token 'a')"
+    );
+    assert!(
+        !fin1.query_exhausted(),
+        "Query should not be exhausted after matching only ghi"
+    );
+    match &fin1.end.path {
         PathCoverage::EntireRoot(ref path) => {
             assert_eq!(path.root_parent(), *ghi, "Should match ghi root");
         },
@@ -51,10 +80,34 @@ fn find_consecutive1() {
     }
 
     // Extract the cursor from the response and use it for the next search
-    let query = fin.end.cursor().clone();
-    let response = graph.find_ancestor(&query).unwrap();
-    assert!(response.query_exhausted(), "Query should be complete");
-    match &response.end.path {
+    let query = fin1.end.cursor().clone();
+    // second search
+    let fin2 = graph.find_ancestor(&query).unwrap();
+    // Verify cursor state after second search
+    let cursor = fin2.end.cursor();
+    let checkpoint_pos = *cursor.atom_position.as_ref();
+
+    // Verify cursor path range
+    let start_index = RootChildIndex::<Start>::root_child_index(&cursor.path);
+    let end_index = RootChildIndex::<End>::root_child_index(&cursor.path);
+
+    tracing::debug!(%checkpoint_pos, %start_index, %end_index, "After second search");
+    tracing::debug!(%cursor.path, "Cursor path");
+
+    assert_eq!(
+        checkpoint_pos, 6,
+        "Checkpoint position should be 6 after matching ghi and abc"
+    );
+    assert_eq!(start_index, 0, "Start index should be 0");
+    assert_eq!(
+        end_index, 5,
+        "End index should be 5 (pointing at last matched token 'c', query exhausted)"
+    );
+    assert!(
+        fin2.query_exhausted(),
+        "Query should be exhausted after matching abc"
+    );
+    match &fin2.end.path {
         PathCoverage::EntireRoot(ref path) => {
             assert_eq!(path.root_parent(), *abc, "Should match abc root");
         },
