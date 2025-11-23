@@ -161,7 +161,7 @@ impl VertexData {
     pub(crate) fn get_parents_at_prefix(&self) -> HashMap<VertexIndex, PatternId> {
         self.get_parents_with_index_at(0)
     }
-    
+
     pub(crate) fn get_parents_at_postfix(
         &self,
         graph: &crate::graph::Hypergraph,
@@ -175,7 +175,7 @@ impl VertexData {
             })
             .collect()
     }
-    
+
     pub(crate) fn get_parents_with_index_at(
         &self,
         offset: usize,
@@ -189,7 +189,7 @@ impl VertexData {
             })
             .collect()
     }
-    
+
     pub(crate) fn filter_parent_to(
         &self,
         parent: impl HasVertexIndex,
@@ -201,7 +201,7 @@ impl VertexData {
             .filter(cond)
             .ok_or(ErrorReason::ErrorReasoningParent(index))
     }
-    
+
     pub(crate) fn get_parent_to_ending_at(
         &self,
         parent_key: impl HasVertexKey,

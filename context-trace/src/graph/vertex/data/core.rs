@@ -19,14 +19,17 @@ use crate::{
         pattern::{
             self,
             Pattern,
+            id::PatternId,
             pattern_width,
         },
         token::Token,
     },
 };
-use crate::graph::vertex::pattern::id::PatternId;
 use derive_builder::Builder;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 /// Central vertex data structure for hypergraph.
 ///
@@ -37,22 +40,22 @@ use serde::{Deserialize, Serialize};
 pub struct VertexData {
     /// Total token width of this vertex
     pub(crate) width: TokenWidth,
-    
+
     /// Unique identifier for this vertex
     pub(crate) index: VertexIndex,
-    
+
     /// Vertex key (optional metadata)
     #[builder(default)]
     pub(crate) key: VertexKey,
-    
+
     /// Parent vertices and their pattern indices
     #[builder(default)]
     pub(crate) parents: VertexParents,
-    
+
     /// Child token patterns by PatternId
     #[builder(default)]
     pub(crate) children: ChildPatterns,
-    
+
     /// Cached string representation (test-only)
     #[cfg(any(test, feature = "test-api"))]
     #[serde(skip)]
@@ -63,7 +66,10 @@ pub struct VertexData {
 // Custom PartialEq for test builds that ignores cached_string
 #[cfg(any(test, feature = "test-api"))]
 impl PartialEq for VertexData {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
         self.width == other.width
             && self.index == other.index
             && self.key == other.key
@@ -170,7 +176,7 @@ impl VertexData {
     #[track_caller]
     pub(crate) fn validate_patterns(&self) {
         use crate::graph::vertex::pattern::pattern_width;
-        
+
         self.children.iter().fold(
             Vec::new(),
             |mut acc: Vec<Vec<usize>>, (pid, p)| {

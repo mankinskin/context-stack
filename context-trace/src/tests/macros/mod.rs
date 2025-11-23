@@ -12,8 +12,8 @@ use crate::{
 
 // Re-export all macros from submodules
 pub mod atoms;
-pub mod patterns;
 pub mod paths;
+pub mod patterns;
 pub mod test_utils;
 pub mod trace_cache;
 
