@@ -69,6 +69,7 @@ fn test_split_cache1() {
         e_f_id,
         ..
     } = &*Env1::get_expected_mut();
+    let _tracing = context_trace::init_test_tracing!(&env.graph);
     assert_eq!(
         build_split_cache1(env),
         SplitCache {
@@ -204,6 +205,7 @@ fn test_split_cache1() {
 #[test]
 fn interval_graph1() {
     let env = &mut *Env1::get_expected_mut();
+    let _tracing = context_trace::init_test_tracing!(&env.graph);
     let graph = &mut env.graph;
     let Env1 {
         a,
@@ -234,7 +236,6 @@ fn interval_graph1() {
 
 #[test]
 fn interval_graph2() {
-    let _tracing = context_trace::init_test_tracing!();
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d, e, f, g, h, i, j, k});
     insert_patterns!(graph,
@@ -253,6 +254,7 @@ fn interval_graph2() {
     insert_patterns!(graph,
         (_abcdefghijk, _abcdefghijk_id) => [a, b, cdefghi, j, k],
     );
+    let _tracing = context_trace::init_test_tracing!(&graph);
     let query = vec![d, e, f, g, h];
     let res = graph.find_ancestor(query).unwrap();
     assert!(!res.query_exhausted());

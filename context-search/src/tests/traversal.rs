@@ -236,7 +236,6 @@ fn postfix1() {
 
 #[test]
 fn range1() {
-    let _tracing = init_test_tracing!();
     let Env1 {
         graph,
         a,
@@ -265,6 +264,7 @@ fn range1() {
         abcdef_ghi_id,
         ..
     } = &*Env1::get_expected();
+    let _tracing = init_test_tracing!(graph);
 
     let query = vec![*bc, *d, *e];
     let res: Response = graph.find_ancestor(query).unwrap();

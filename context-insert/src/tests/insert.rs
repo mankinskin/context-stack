@@ -17,7 +17,7 @@ use tracing::debug;
 
 #[test]
 fn index_pattern1() {
-    let mut graph = Hypergraph::default();
+    let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
         ab => [[a, b]],
@@ -28,6 +28,7 @@ fn index_pattern1() {
         xaby => [[xab, y], [xa, by]],
         xabyz => [[xaby, z], [xab, yz]]
     );
+    let _tracing = context_trace::init_test_tracing!(&graph);
     print!("{:#?}", xabyz);
     // todo: split sub patterns not caught by query search
     let graph = HypergraphRef::from(graph);
@@ -59,7 +60,8 @@ fn index_pattern1() {
 
 #[test]
 fn index_pattern2() {
-    let mut graph = Hypergraph::default();
+    let mut graph = HypergraphRef::default();
+    let _tracing = context_trace::init_test_tracing!(&graph);
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
         yz => [[y, z]],
@@ -102,12 +104,13 @@ fn index_pattern2() {
 
 #[test]
 fn index_infix1() {
-    let mut graph = Hypergraph::default();
+    let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, w, x, y, z});
     insert_patterns!(graph,
         yz => [[y, z]],
         xxabyzw => [[x, x, a, b, yz, w]],
     );
+    let _tracing = context_trace::init_test_tracing!(&graph);
 
     let graph_ref = HypergraphRef::from(graph);
 
@@ -166,7 +169,7 @@ fn index_infix1() {
 
 #[test]
 fn index_infix2() {
-    let mut graph = Hypergraph::default();
+    let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d, x, y});
     insert_patterns!(graph,
         yy => [y, y],
@@ -180,6 +183,7 @@ fn index_infix2() {
         xxy => [[xx, y], [x, xy]],
         _xxyyabcdxxyy => [[xx, yy, abcdxx, yy], [xxy, yabcdx, xy, y]],
     );
+    let _tracing = context_trace::init_test_tracing!(&graph);
 
     let graph_ref = HypergraphRef::from(graph);
 
@@ -213,13 +217,13 @@ fn index_infix2() {
 
 #[test]
 fn index_prefix1() {
-    let _tracing = context_trace::init_test_tracing!();
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {h, e, l, d});
     insert_patterns!(graph,
         (ld, ld_id) => [l, d],
         (heldld, heldld_id) => [h, e, ld, ld]
     );
+    let _tracing = context_trace::init_test_tracing!(&graph);
     let fold_res =
         Searchable::search::<InsertTraversal>(vec![h, e, l, l], graph.clone());
     assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
@@ -273,6 +277,7 @@ fn index_postfix1() {
         (ab, ab_id) => [a, b],
         (ababcd, ababcd_id) => [ab, ab, c, d]
     );
+    let _tracing = context_trace::init_test_tracing!(&graph);
     let fold_res =
         Searchable::search::<InsertTraversal>(vec![b, c, d, d], graph.clone());
 

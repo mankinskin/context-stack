@@ -54,9 +54,8 @@ impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
         G: Send + Sync + 'static,
         G::Atom: std::fmt::Display,
     {
-        // HypergraphRef derefs to Arc<RwLock<Hypergraph>>
-        let graph = self.read().unwrap();
-        crate::graph::test_graph::register_test_graph(&*graph);
+        // Use the new register_test_graph_ref to avoid cloning
+        crate::graph::test_graph::register_test_graph_ref(self);
     }
 }
 
@@ -80,8 +79,8 @@ impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
         G: Send + Sync + 'static,
         G::Atom: std::fmt::Display,
     {
-        let graph = self.read().unwrap();
-        crate::graph::test_graph::register_test_graph(&*graph);
+        // Use the new register_test_graph_ref to avoid cloning
+        crate::graph::test_graph::register_test_graph_ref(&self);
     }
 }
 

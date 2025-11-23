@@ -23,6 +23,8 @@ pub(crate) fn pattern_from_widths(
 
 #[test]
 fn atom_pos_split() {
+    // No graph available in this test - uses pattern_from_widths helper
+    let _tracing = context_trace::init_test_tracing!();
     let pattern = pattern_from_widths([1, 1, 3, 1, 1]);
     let width = pattern_width(&pattern);
     assert_eq!(

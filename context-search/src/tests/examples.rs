@@ -21,9 +21,6 @@ use {
 
 #[test]
 fn example_basic_sequence_search() {
-    // Initialize tracing for this test - log file will be cleaned up on success
-    let _tracing = init_test_tracing!();
-
     // Create graph and insert atoms
     let mut graph = Hypergraph::<BaseGraphKind>::default();
     debug!("Created empty hypergraph");
@@ -44,6 +41,8 @@ fn example_basic_sequence_search() {
 
     // Search for [b, c] in the graph
     let graph = HypergraphRef::from(graph);
+    // Initialize tracing for this test - log file will be cleaned up on success
+    let _tracing = init_test_tracing!(&graph);
     let query = [b, c];
     debug!(query = %pretty(&query), "Searching for [b, c]");
     let result = graph.find_ancestor(&query[..]);
@@ -188,9 +187,6 @@ fn example_hierarchical_ancestor_search() {
     // - Root parent should be abcd
     // - Result should be QueryExhausted with a Postfix path
     //
-    // Initialize tracing for this test
-    let _tracing = init_test_tracing!();
-
     let mut graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
@@ -210,6 +206,8 @@ fn example_hierarchical_ancestor_search() {
     );
 
     let graph = HypergraphRef::from(graph);
+    // Initialize tracing for this test
+    let _tracing = init_test_tracing!(&graph);
 
     // Search for [b, c, d] - this should find a hierarchical postfix match
     // In abcd with patterns [ab, cd] and [a, bc, d],

@@ -14,8 +14,6 @@ use std::marker::PhantomData;
 
 #[test]
 fn test_compare_state_candidate_advance() {
-    let _tracing = init_test_tracing!();
-
     // Create a graph with pattern: [a, b, c]
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
@@ -23,6 +21,7 @@ fn test_compare_state_candidate_advance() {
         (ab, ab_id) => [a, b],
         (_abc, _abc_id) => [ab, c]
     );
+    let _tracing = init_test_tracing!(&graph);
 
     // Create a CompareState<Candidate, Candidate>
     let root = IndexRoot::from(
@@ -101,8 +100,6 @@ fn test_compare_state_candidate_advance() {
 
 #[test]
 fn test_compare_state_matched_advance() {
-    let _tracing = init_test_tracing!();
-
     // Create a graph
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
@@ -110,6 +107,7 @@ fn test_compare_state_matched_advance() {
         (ab, _ab_id) => [a, b],
         (abc, abc_id) => [ab, c]
     );
+    let _tracing = init_test_tracing!(&graph);
 
     // Create a CompareState<Matched, Matched>
     let root = IndexRoot::from(

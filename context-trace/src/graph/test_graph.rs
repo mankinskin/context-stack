@@ -35,23 +35,30 @@
 
 use crate::{
     Hypergraph,
+    HypergraphRef,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
         vertex::VertexIndex,
     },
 };
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
 
 /// Type-erased graph accessor for getting string representations
-trait GraphStringGetter {
+trait GraphStringGetter: Send + Sync {
     fn get_token_string(
         &self,
         index: usize,
     ) -> Option<String>;
 }
 
-impl<G: GraphKind> GraphStringGetter for Hypergraph<G>
+impl<G: GraphKind> GraphStringGetter for Arc<RwLock<Hypergraph<G>>>
 where
     G::Atom: std::fmt::Display,
 {
@@ -59,8 +66,11 @@ where
         &self,
         index: usize,
     ) -> Option<String> {
-        self.get_vertex(VertexIndex::from(index)).ok().map(|_| {
-            <Hypergraph<G>>::index_string(self, VertexIndex::from(index))
+        // Use try_read to avoid deadlocks when the graph is locked for writing
+        // (e.g., during insert operations in parallel tests)
+        let graph = self.try_read().ok()?;
+        graph.get_vertex(VertexIndex::from(index)).ok().map(|_| {
+            <Hypergraph<G>>::index_string(&*graph, VertexIndex::from(index))
         })
     }
 }
@@ -68,36 +78,58 @@ where
 thread_local! {
     /// Thread-local test graph registry
     /// Each test thread maintains its own graph reference, allowing parallel test execution
+    /// Stores Arc<RwLock<Hypergraph>> so dynamic updates to the graph are visible
     static TEST_GRAPH: RefCell<Option<Box<dyn GraphStringGetter>>> = RefCell::new(None);
 }
 
-/// Register a graph for use in tests
+/// Register a HypergraphRef for use in tests
 ///
 /// This allows tokens to look up their string representation when formatting.
-/// The graph is stored as a type-erased reference, so it works with any GraphKind.
+/// The Arc<RwLock<Hypergraph>> is stored, so any new tokens added to the graph
+/// after registration will automatically be visible in formatting.
 /// Each test thread has its own graph registry, allowing parallel test execution.
 ///
 /// # Example
 /// ```ignore
-/// let mut graph = Hypergraph::default();
+/// let mut graph = HypergraphRef::default();
 /// insert_atoms!(graph, {a, b, c});
 ///
-/// register_test_graph(&graph);
+/// register_test_graph_ref(&graph);
 ///
 /// // Now tokens will show their string representation in logs
-/// println!("{}", a); // T1w1("a")
+/// println!("{}", a); // "a"(0)
+///
+/// // Add more atoms - they'll automatically be visible too
+/// insert_atoms!(graph, {d, e});
+/// println!("{}", d); // "d"(3)
 ///
 /// clear_test_graph();
 /// ```
+pub fn register_test_graph_ref<G: GraphKind + 'static>(graph: &HypergraphRef<G>)
+where
+    G::Atom: std::fmt::Display,
+{
+    // Clone the Arc (cheap - just increments ref count), not the graph
+    let graph_arc = graph.0.clone();
+    TEST_GRAPH.with(|tg| {
+        *tg.borrow_mut() = Some(Box::new(graph_arc));
+    });
+}
+
+/// Register a Hypergraph for use in tests (legacy compatibility)
+///
+/// **Note:** This wraps the graph in an Arc<RwLock<>> to support the same
+/// interface as HypergraphRef. However, since you only have a reference,
+/// the graph is cloned. For dynamic updates, use `register_test_graph_ref` instead.
 pub fn register_test_graph<G: GraphKind + 'static>(graph: &Hypergraph<G>)
 where
     G::Atom: std::fmt::Display,
 {
-    // We need to clone the graph to store it safely
-    // In tests this is acceptable overhead
+    // Clone the graph and wrap it - needed because we only have a reference
     let graph_clone = graph.clone();
+    let graph_arc = Arc::new(RwLock::new(graph_clone));
     TEST_GRAPH.with(|tg| {
-        *tg.borrow_mut() = Some(Box::new(graph_clone));
+        *tg.borrow_mut() = Some(Box::new(graph_arc));
     });
 }
 
