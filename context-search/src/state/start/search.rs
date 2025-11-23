@@ -112,11 +112,7 @@ impl Searchable for PatternCursor {
 
                 Ok(SearchState {
                     query: self.path.clone(),
-                    matches: SearchIterator::start_parent(
-                        trav,
-                        start_token,
-                        p,
-                    ),
+                    matches: SearchIterator::start_parent(trav, start_token, p),
                 })
             },
             Err(err) => {
@@ -144,7 +140,7 @@ impl<const N: usize> Searchable for &'_ [Token; N] {
     ) -> Result<SearchState<K>, ErrorState> {
         debug!(token_count = N, "creating pattern range path from array");
         trace!(tokens = ?self, "token array");
-        
+
         // Delegate to slice implementation which handles atom special case
         self.as_slice().start_search::<K>(trav)
     }
@@ -156,9 +152,12 @@ impl Searchable for &'_ [Token] {
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
-        debug!(token_count = self.len(), "creating pattern range path from slice");
+        debug!(
+            token_count = self.len(),
+            "creating pattern range path from slice"
+        );
         trace!(tokens = ?self, "token slice");
-        
+
         // Convert the token slice to a PatternRangePath and start the search
         // This works for both atoms and composite patterns now thanks to MatchState::Query
         PatternRangePath::from(self).start_search::<K>(trav)
@@ -202,16 +201,16 @@ impl Searchable for PatternRangePath {
     ) -> Result<SearchState<K>, ErrorState> {
         debug!("converting pattern range path to cursor");
         trace!(range_path_details = %self, "pattern range path details");
-        
+
         let range_path = self.to_range_path();
         debug!(range_path = %range_path, "converted to range_path");
-        
+
         let width = range_path.calc_width(&trav);
         debug!("calc_width returned: {}", width);
-        
+
         let cursor = range_path.into_cursor(&trav);
         debug!(cursor_atom_pos = *cursor.atom_position, cursor_path = %cursor.path, "created cursor");
-        
+
         cursor.start_search::<K>(trav)
     }
 }
