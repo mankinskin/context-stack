@@ -13,8 +13,8 @@ use crate::{
         },
         structs::rooted::{
             role_path::{
-                RootChildIndex,
-                RootChildIndexMut,
+                HasRootChildIndex,
+                HasRootChildIndexMut,
                 RootedRolePath,
             },
             root::PathRoot,
@@ -41,7 +41,7 @@ impl<Root: PathRoot, Role: PathRole, D: PatternDirection> MoveRootIndex<D, Role>
         let pattern = self.root_pattern::<G>(&graph);
         if let Some(next) = D::pattern_index_next(
             pattern,
-            RootChildIndex::<Role>::root_child_index(self),
+            HasRootChildIndex::<Role>::root_child_index(self),
         ) {
             assert!(next < pattern.len());
             *self.root_child_index_mut() = next;

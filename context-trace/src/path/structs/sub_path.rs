@@ -10,7 +10,9 @@ use crate::{
     path::{
         accessors::role::PathRole,
         mutators::move_path::key::AtomPosition,
-        structs::rooted::role_path::RootChildIndex,
+        structs::rooted::role_path::{
+            HasRootChildIndex,
+        },
     },
 };
 
@@ -108,7 +110,7 @@ impl<N> SubPath<N> {
     //    }
     //}
 }
-impl<R: PathRole, N> RootChildIndex<R> for SubPath<N> {
+impl<R: PathRole, N> HasRootChildIndex<R> for SubPath<N> {
     fn root_child_index(&self) -> usize {
         self.root_entry
     }

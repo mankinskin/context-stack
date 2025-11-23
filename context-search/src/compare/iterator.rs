@@ -44,14 +44,6 @@ impl<K: SearchKind> CompareIterator<K> {
             >::new(trav, queue),
         }
     }
-    //pub(crate) fn find_match(self) -> Option<CompareState<Matched, Matched>> {
-    //    match self.compare() {
-    //        Mismatch(_) => None,
-    //        FoundMatch(state) => Some(state),
-    //        Prefixes(_) =>
-    //            unreachable!("compare() always returns Match or Mismatch"),
-    //    }
-    //}
     pub(crate) fn compare(mut self) -> CompareResult {
         self.find_map(|flow| flow).unwrap()
     }

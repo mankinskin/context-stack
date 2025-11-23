@@ -1,5 +1,8 @@
 #[cfg(test)]
-use crate::{*, path::accessors::path_accessor::PathAccessor};
+use crate::{
+    path::accessors::path_accessor::PathAccessor,
+    *,
+};
 
 #[macro_export]
 macro_rules! insert_patterns {
@@ -594,19 +597,22 @@ fn test_rooted_path_macro_single_role() {
     let root4 = IndexRoot::from(
         ChildLocation::new(abc, abc_id, 0).into_pattern_location(),
     );
+    let child_loc2 = ChildLocation::new(abc, abc_id, 1);
     let end_with_child: IndexEndPath =
         rooted_path!(End: root4, (0, [child_loc2]));
     assert_eq!(PathAccessor::path(&end_with_child).len(), 1);
 
     // Test with children - PatternEndPath
     let pattern3 = Pattern::from(vec![a, b, c]);
+    let child_loc3 = ChildLocation::new(abc, abc_id, 1);
     let pattern_end_with_child: PatternEndPath =
         rooted_path!(End: pattern3, (0, [child_loc3]));
     assert_eq!(PathAccessor::path(&pattern_end_with_child).len(), 1);
-
     // Test with children - PatternStartPath
     let pattern4 = Pattern::from(vec![a, b, c]);
+    let child_loc4 = ChildLocation::new(abc, abc_id, 1);
     let pattern_start_with_child: PatternStartPath =
         rooted_path!(Start: pattern4, (0, [child_loc4]));
+    assert_eq!(PathAccessor::path(&pattern_start_with_child).len(), 1);
     assert_eq!(PathAccessor::path(&pattern_start_with_child).len(), 1);
 }

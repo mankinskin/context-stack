@@ -11,7 +11,6 @@ use crate::{
     HasPath,
     HasStartPath,
     IntoRootedRolePath,
-    RootChildIndex,
     StartPath,
     graph::vertex::{
         location::pattern::PatternLocation,
@@ -20,7 +19,9 @@ use crate::{
     },
     path::{
         accessors::{
-            child::RootedLeafToken,
+            child::{
+                HasRootedLeafToken,
+            },
             has_path::HasRolePath,
             role::{
                 End,
@@ -36,6 +37,7 @@ use crate::{
         structs::{
             role_path::RolePath,
             rooted::role_path::{
+                HasRootChildIndex,
                 RootedEndPath,
                 RootedStartPath,
             },
@@ -54,10 +56,10 @@ pub(crate) trait RangePath:
     RootedPath
     + IntoRootedRolePath<Start>
     + IntoRootedRolePath<End>
-    + RootChildIndex<Start>
-    + RootChildIndex<End>
-    + RootedLeafToken<Start>
-    + RootedLeafToken<End>
+    + HasRootChildIndex<Start>
+    + HasRootChildIndex<End>
+    + HasRootedLeafToken<Start>
+    + HasRootedLeafToken<End>
 {
     //fn new_range(
     //    root: Self::Root,

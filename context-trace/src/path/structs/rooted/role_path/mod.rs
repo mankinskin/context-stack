@@ -143,7 +143,7 @@ impl<R: PathRole> IndexRolePath<R> {
         Self::from(first)
     }
 }
-impl<R: PathRole> LeafToken<R> for IndexRolePath<R>
+impl<R: PathRole> HasLeafToken<R> for IndexRolePath<R>
 where
     Self:
         HasRolePath<R, Node = ChildLocation> + HasPath<R, Node = ChildLocation>,
@@ -219,26 +219,28 @@ impl<R: PathRoot> RootedEndPath<R> {
         }
     }
 }
-/// access to the position of a token
+
+/// Access to a token at the root child position of a path
 #[auto_impl(&, & mut)]
-pub trait RootChildToken<R> {
+pub trait HasRootChildToken<R> {
     fn root_child_token<G: HasGraph>(
         &self,
         trav: &G,
     ) -> Token;
 }
 
-/// access to the position of a token
+/// Access to the index position of a root child in a path
 #[auto_impl(&, & mut)]
-pub trait RootChildIndex<R> {
+pub trait HasRootChildIndex<R> {
     fn root_child_index(&self) -> usize;
 }
 
-pub trait RootChildIndexMut<R>: RootChildIndex<R> {
+/// Mutable access to the index position of a root child in a path  
+pub trait HasRootChildIndexMut<R>: HasRootChildIndex<R> {
     fn root_child_index_mut(&mut self) -> &mut usize;
 }
 
-impl<R: PathRole, Root: PathRoot> RootChildIndexMut<R>
+impl<R: PathRole, Root: PathRoot> HasRootChildIndexMut<R>
     for RootedRolePath<R, Root>
 {
     fn root_child_index_mut(&mut self) -> &mut usize {
@@ -270,13 +272,13 @@ impl<R: PathRole, Root: PathRoot> RootedPath for RootedRolePath<R, Root> {
     }
 }
 
-impl<R: PathRole> LeafToken<R> for RolePath<R> {}
+impl<R: PathRole> HasLeafToken<R> for RolePath<R> {}
 
 impl_root_child_token! {
     RootChildToken for IndexRolePath<R>, self,
     trav => *trav.graph().expect_child_at(
             self.path_root().location.to_child_location(
-                RootChildIndex::<R>::root_child_index(&self.role_path)
+                HasRootChildIndex::<R>::root_child_index(&self.role_path)
             )
         )
 }
@@ -287,11 +289,11 @@ impl<R: PathRole> GraphRootChild<R> for RootedRolePath<R, IndexRoot> {
             .to_child_location(self.role_path.sub_path.root_entry)
     }
 }
-impl<R: PathRole, Root: PathRoot> RootChildIndex<R>
+impl<R: PathRole, Root: PathRoot> HasRootChildIndex<R>
     for RootedRolePath<R, Root>
 {
     fn root_child_index(&self) -> usize {
-        RootChildIndex::<R>::root_child_index(&self.role_path)
+        HasRootChildIndex::<R>::root_child_index(&self.role_path)
     }
 }
 

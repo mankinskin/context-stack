@@ -13,7 +13,6 @@
 /// - `Matched` → `to_candidate()` → `Candidate` (non-consuming, creates copy)
 /// - `Candidate` → `to_matched()` → `Matched` (consuming, confirms match)
 /// - `Candidate` → `to_mismatched()` → `Mismatched` (consuming, marks failure)
-/// - `Mismatched` → `to_candidate()` → `Candidate` (non-consuming, for retry)
 ///
 /// # Type Parameters
 /// The Self type determines which cursor type is being transitioned.

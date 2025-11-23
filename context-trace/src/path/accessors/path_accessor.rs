@@ -77,3 +77,164 @@ pub trait StatePosition {
         None
     }
 }
+
+/// Macro to implement StatePosition for types with prev_pos and root_pos fields
+///
+/// This macro reduces boilerplate for types that store position state.
+///
+/// # Basic usage (no target_pos)
+/// ```ignore
+/// impl_state_position! {
+///     for MyState => {
+///         prev_pos: prev_pos,
+///         root_pos: root_pos,
+///     }
+/// }
+/// ```
+///
+/// # With target_pos
+/// ```ignore
+/// impl_state_position! {
+///     for MyState => {
+///         prev_pos: start_pos,
+///         root_pos: entry_pos,
+///         target_pos: Some(entry_pos),
+///     }
+/// }
+/// ```
+///
+/// # With generic parameters
+/// ```ignore
+/// impl_state_position! {
+///     for BaseState<P> where [P: RootedPath] => {
+///         prev_pos: prev_pos,
+///         root_pos: root_pos,
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! impl_state_position {
+    // Pattern without generics: for Type => { ... }
+    (
+        for $ty:ty => {
+            prev_pos: $prev_field:ident,
+            root_pos: $root_field:ident,
+        }
+    ) => {
+        impl $crate::path::accessors::path_accessor::StatePosition for $ty {
+            fn prev_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$prev_field
+            }
+
+            fn root_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$root_field
+            }
+
+            fn prev_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$prev_field
+            }
+
+            fn root_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$root_field
+            }
+        }
+    };
+
+    // Pattern with generics: for Type<G> where [bounds] => { ... }
+    (
+        for $ty:ty where [$($bounds:tt)*] => {
+            prev_pos: $prev_field:ident,
+            root_pos: $root_field:ident,
+        }
+    ) => {
+        impl<$($bounds)*> $crate::path::accessors::path_accessor::StatePosition for $ty {
+            fn prev_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$prev_field
+            }
+
+            fn root_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$root_field
+            }
+
+            fn prev_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$prev_field
+            }
+
+            fn root_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$root_field
+            }
+        }
+    };
+
+    // Pattern without generics with target_pos: for Type => { ...with target... }
+    (
+        for $ty:ty => {
+            prev_pos: $prev_field:ident,
+            root_pos: $root_field:ident,
+            target_pos: Some($target_field:ident),
+        }
+    ) => {
+        impl $crate::path::accessors::path_accessor::StatePosition for $ty {
+            fn prev_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$prev_field
+            }
+
+            fn root_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$root_field
+            }
+
+            fn target_pos(&self) -> Option<&$crate::path::mutators::move_path::key::AtomPosition> {
+                Some(&self.$target_field)
+            }
+
+            fn prev_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$prev_field
+            }
+
+            fn root_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$root_field
+            }
+
+            fn target_pos_mut(&mut self) -> Option<&mut $crate::path::mutators::move_path::key::AtomPosition> {
+                Some(&mut self.$target_field)
+            }
+        }
+    };
+
+    // Pattern with generics and target_pos: for Type<G> where [bounds] => { ...with target... }
+    (
+        for $ty:ty where [$($bounds:tt)*] => {
+            prev_pos: $prev_field:ident,
+            root_pos: $root_field:ident,
+            target_pos: Some($target_field:ident),
+        }
+    ) => {
+        impl<$($bounds)*> $crate::path::accessors::path_accessor::StatePosition for $ty {
+            fn prev_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$prev_field
+            }
+
+            fn root_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
+                &self.$root_field
+            }
+
+            fn target_pos(&self) -> Option<&$crate::path::mutators::move_path::key::AtomPosition> {
+                Some(&self.$target_field)
+            }
+
+            fn prev_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$prev_field
+            }
+
+            fn root_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
+                &mut self.$root_field
+            }
+
+            fn target_pos_mut(&mut self) -> Option<&mut $crate::path::mutators::move_path::key::AtomPosition> {
+                Some(&mut self.$target_field)
+            }
+        }
+    };
+}
+
+pub use impl_state_position;

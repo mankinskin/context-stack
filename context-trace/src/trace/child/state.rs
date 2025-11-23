@@ -6,7 +6,6 @@ use crate::{
     HasPath,
     PathRole,
     PositionAnnotated,
-    RootChildIndex,
     RootPattern,
     RootedPath,
     TargetKey,
@@ -18,7 +17,7 @@ use crate::{
     path::{
         RolePathUtils,
         accessors::{
-            child::LeafToken,
+            child::HasLeafToken,
             has_path::{
                 HasRolePath,
                 IntoRootedRolePath,
@@ -37,7 +36,8 @@ use crate::{
         structs::rooted::{
             index_range::IndexRangePath,
             role_path::{
-                RootChildToken,
+                HasRootChildIndex,
+                HasRootChildToken,
                 RootedRolePath,
             },
             root::IndexRoot,
@@ -124,7 +124,7 @@ where
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> RootChildIndex<End>
+impl<EndNode: Debug + Clone + PartialEq + Eq> HasRootChildIndex<End>
     for ChildState<EndNode>
 {
     fn root_child_index(&self) -> usize {
@@ -132,16 +132,16 @@ impl<EndNode: Debug + Clone + PartialEq + Eq> RootChildIndex<End>
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> RootChildToken<End>
+impl<EndNode: Debug + Clone + PartialEq + Eq> HasRootChildToken<End>
     for ChildState<EndNode>
 where
-    IndexRangePath<ChildLocation, EndNode>: RootChildToken<End>,
+    IndexRangePath<ChildLocation, EndNode>: HasRootChildToken<End>,
 {
     fn root_child_token<G: HasGraph>(
         &self,
         trav: &G,
     ) -> Token {
-        RootChildToken::<End>::root_child_token(&self.path, trav)
+        HasRootChildToken::<End>::root_child_token(&self.path, trav)
     }
 }
 
@@ -182,11 +182,11 @@ impl GraphRootChild<End> for ChildState<ChildLocation> {
         self.path.role_root_child_location::<End>()
     }
 }
-// LeafToken only for non-position-annotated ChildState
-impl LeafToken<End> for ChildState<ChildLocation>
+// HasLeafToken only for non-position-annotated ChildState
+impl HasLeafToken<End> for ChildState<ChildLocation>
 where
     IndexRangePath<ChildLocation, ChildLocation>:
-        RootChildIndex<End> + HasPath<End, Node = ChildLocation>,
+        HasRootChildIndex<End> + HasPath<End, Node = ChildLocation>,
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         self.path.role_leaf_token_location::<End>()
@@ -266,33 +266,12 @@ impl<EndNode: Debug + Clone + PartialEq + Eq> TargetKey
 
 // HasTargetPos impl removed - use StatePosition instead
 
-// New StatePosition trait implementation
-impl<EndNode: Debug + Clone + PartialEq + Eq>
-    crate::path::accessors::path_accessor::StatePosition
-    for ChildState<EndNode>
-{
-    fn prev_pos(&self) -> &AtomPosition {
-        &self.start_pos
-    }
-
-    fn root_pos(&self) -> &AtomPosition {
-        &self.entry_pos
-    }
-
-    fn target_pos(&self) -> Option<&AtomPosition> {
-        Some(&self.entry_pos)
-    }
-
-    fn prev_pos_mut(&mut self) -> &mut AtomPosition {
-        &mut self.start_pos
-    }
-
-    fn root_pos_mut(&mut self) -> &mut AtomPosition {
-        &mut self.entry_pos
-    }
-
-    fn target_pos_mut(&mut self) -> Option<&mut AtomPosition> {
-        Some(&mut self.entry_pos)
+// StatePosition implementation using macro (with target_pos)
+crate::impl_state_position! {
+    for ChildState<EndNode> where [EndNode: Debug + Clone + PartialEq + Eq] => {
+        prev_pos: start_pos,
+        root_pos: entry_pos,
+        target_pos: Some(entry_pos),
     }
 }
 

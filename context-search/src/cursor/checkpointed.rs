@@ -7,7 +7,15 @@
 //! - Uniform handling across query and child cursors
 //! - Prevention of atom_position desynchronization bugs
 
-use super::{Candidate, ChildCursor, CursorState, CursorStateMachine, Matched, Mismatched, PathCursor};
+use super::{
+    Candidate,
+    ChildCursor,
+    CursorState,
+    CursorStateMachine,
+    Matched,
+    Mismatched,
+    PathCursor,
+};
 use context_trace::PathNode;
 
 /// Trait for cursors that can have a checkpoint
@@ -21,7 +29,9 @@ impl<P, S: CursorState> HasCheckpoint for PathCursor<P, S> {
     type Checkpoint = PathCursor<P, Matched>;
 }
 
-impl<S: CursorState, EndNode: PathNode> HasCheckpoint for ChildCursor<S, EndNode> {
+impl<S: CursorState, EndNode: PathNode> HasCheckpoint
+    for ChildCursor<S, EndNode>
+{
     type Checkpoint = ChildCursor<Matched, EndNode>;
 }
 
@@ -84,7 +94,7 @@ where
     ///
     /// The checkpoint remains unchanged at the last matched position.
     pub(crate) fn as_candidate(
-        &self,
+        &self
     ) -> Checkpointed<PathCursor<P, Candidate>> {
         Checkpointed {
             current: CursorStateMachine::to_candidate(&self.current),
@@ -114,28 +124,11 @@ where
     /// This transitions the current cursor to Mismatched state without
     /// updating the checkpoint.
     pub(crate) fn mark_mismatch(
-        self,
+        self
     ) -> Checkpointed<PathCursor<P, Mismatched>> {
         Checkpointed {
             current: CursorStateMachine::to_mismatched(self.current),
             checkpoint: self.checkpoint,
-        }
-    }
-}
-
-impl<P> Checkpointed<PathCursor<P, Mismatched>>
-where
-    P: Clone,
-{
-    /// Convert current cursor to Candidate state (for retrying)
-    ///
-    /// The checkpoint remains unchanged at the last matched position.
-    pub(crate) fn as_candidate(
-        &self,
-    ) -> Checkpointed<PathCursor<P, Candidate>> {
-        Checkpointed {
-            current: CursorStateMachine::to_candidate(&self.current),
-            checkpoint: self.checkpoint.clone(),
         }
     }
 }
@@ -159,7 +152,7 @@ where
     ///
     /// The checkpoint remains unchanged at the last matched position.
     pub(crate) fn as_candidate(
-        &self,
+        &self
     ) -> Checkpointed<ChildCursor<Candidate, EndNode>> {
         Checkpointed {
             current: CursorStateMachine::to_candidate(&self.current),
@@ -177,7 +170,7 @@ where
     /// This transitions the current cursor to Matched state and updates
     /// the checkpoint to match the new position.
     pub(crate) fn mark_match(
-        self,
+        self
     ) -> Checkpointed<ChildCursor<Matched, EndNode>> {
         let matched = CursorStateMachine::to_matched(self.current);
         Checkpointed {
@@ -191,28 +184,11 @@ where
     /// This transitions the current cursor to Mismatched state without
     /// updating the checkpoint.
     pub(crate) fn mark_mismatch(
-        self,
+        self
     ) -> Checkpointed<ChildCursor<Mismatched, EndNode>> {
         Checkpointed {
             current: CursorStateMachine::to_mismatched(self.current),
             checkpoint: self.checkpoint,
-        }
-    }
-}
-
-impl<EndNode: PathNode> Checkpointed<ChildCursor<Mismatched, EndNode>>
-where
-    EndNode: Clone,
-{
-    /// Convert current cursor to Candidate state (for retrying)
-    ///
-    /// The checkpoint remains unchanged at the last matched position.
-    pub(crate) fn as_candidate(
-        &self,
-    ) -> Checkpointed<ChildCursor<Candidate, EndNode>> {
-        Checkpointed {
-            current: CursorStateMachine::to_candidate(&self.current),
-            checkpoint: self.checkpoint.clone(),
         }
     }
 }

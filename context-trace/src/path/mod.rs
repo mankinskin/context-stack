@@ -2,7 +2,9 @@ use std::fmt::Debug;
 
 use accessors::{
     child::{
-        LeafToken,
+        HasLeafToken,
+        HasRootedLeafToken,
+        HasRootedLeafTokenLocation,
         root::GraphRootChild,
     },
     has_path::HasRolePath,
@@ -18,15 +20,11 @@ use crate::{
         token::Token,
     },
     path::{
-        accessors::child::{
-            RootedLeafToken,
-            RootedLeafTokenLocation,
-        },
         structs::{
             role_path::RolePath,
             rooted::role_path::{
-                RootChildIndex,
-                RootChildToken,
+                HasRootChildIndex,
+                HasRootChildToken,
             },
         },
     },
@@ -60,48 +58,48 @@ impl<T: Debug + Sized + Clone + PartialEq + Eq + Send + Sync + Unpin + 'static>
 pub trait RolePathUtils {
     fn role_leaf_token_location<R: PathRole>(&self) -> Option<ChildLocation>
     where
-        Self: LeafToken<R>,
+        Self: HasLeafToken<R>,
     {
-        LeafToken::<R>::leaf_token_location(self)
+        HasLeafToken::<R>::leaf_token_location(self)
     }
     fn role_leaf_token<R: PathRole, G: HasGraph>(
         &self,
         trav: &G,
     ) -> Option<Token>
     where
-        Self: LeafToken<R>,
+        Self: HasLeafToken<R>,
     {
-        LeafToken::<R>::leaf_token(self, trav)
+        HasLeafToken::<R>::leaf_token(self, trav)
     }
     fn role_rooted_leaf_token<R: PathRole, G: HasGraph>(
         &self,
         trav: &G,
     ) -> Token
     where
-        Self: RootedLeafToken<R>,
+        Self: HasRootedLeafToken<R>,
     {
-        RootedLeafToken::<R>::rooted_leaf_token(self, trav)
+        HasRootedLeafToken::<R>::rooted_leaf_token(self, trav)
     }
     fn role_rooted_leaf_token_location<R: PathRole>(&self) -> ChildLocation
     where
-        Self: RootedLeafTokenLocation<R>,
+        Self: HasRootedLeafTokenLocation<R>,
     {
-        RootedLeafTokenLocation::<R>::rooted_leaf_token_location(self)
+        HasRootedLeafTokenLocation::<R>::rooted_leaf_token_location(self)
     }
     fn role_root_child_token<R: PathRole, G: HasGraph>(
         &self,
         trav: &G,
     ) -> Token
     where
-        Self: RootChildToken<R>,
+        Self: HasRootChildToken<R>,
     {
-        RootChildToken::<R>::root_child_token(self, trav)
+        HasRootChildToken::<R>::root_child_token(self, trav)
     }
     fn role_root_child_index<R: PathRole>(&self) -> usize
     where
-        Self: RootChildIndex<R>,
+        Self: HasRootChildIndex<R>,
     {
-        RootChildIndex::<R>::root_child_index(self)
+        HasRootChildIndex::<R>::root_child_index(self)
     }
     fn role_root_child_location<R: PathRole>(&self) -> ChildLocation
     where

@@ -13,7 +13,7 @@ use {
     },
     context_trace::{
         End,
-        RootChildIndex,
+        HasRootChildIndex,
         Start,
     },
 };
@@ -53,8 +53,8 @@ fn find_consecutive1() {
     let checkpoint_pos = *cursor.atom_position.as_ref();
 
     // Verify cursor path range
-    let start_index = RootChildIndex::<Start>::root_child_index(&cursor.path);
-    let end_index = RootChildIndex::<End>::root_child_index(&cursor.path);
+    let start_index = HasRootChildIndex::<Start>::root_child_index(&cursor.path);
+    let end_index = HasRootChildIndex::<End>::root_child_index(&cursor.path);
 
     tracing::debug!(%checkpoint_pos, %start_index, %end_index, "After first search");
     tracing::debug!(%cursor.path, "Cursor path");
@@ -88,8 +88,8 @@ fn find_consecutive1() {
     let checkpoint_pos = *cursor.atom_position.as_ref();
 
     // Verify cursor path range
-    let start_index = RootChildIndex::<Start>::root_child_index(&cursor.path);
-    let end_index = RootChildIndex::<End>::root_child_index(&cursor.path);
+    let start_index = HasRootChildIndex::<Start>::root_child_index(&cursor.path);
+    let end_index = HasRootChildIndex::<End>::root_child_index(&cursor.path);
 
     tracing::debug!(%checkpoint_pos, %start_index, %end_index, "After second search");
     tracing::debug!(%cursor.path, "Cursor path");

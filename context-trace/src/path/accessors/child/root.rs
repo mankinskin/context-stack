@@ -14,7 +14,9 @@ use crate::{
             },
         },
         structs::rooted::{
-            role_path::RootChildIndex,
+            role_path::{
+                HasRootChildIndex,
+            },
             root::RootedPath,
         },
     },
@@ -26,8 +28,8 @@ macro_rules! impl_root_child_token {
     {
         RootChildToken for $target:ty, $self_:ident, $trav:ident => $func:expr
     } => {
-        impl<R: PathRole> $crate::path::RootChildToken<R> for $target
-            where $target: RootChildIndex<R>
+        impl<R: PathRole> $crate::path::structs::rooted::role_path::HasRootChildToken<R> for $target
+            where $target: $crate::path::structs::rooted::role_path::HasRootChildIndex<R>
         {
             fn root_child_token<
                 G: HasGraph,
@@ -80,7 +82,7 @@ impl<R: PathRole, T: GraphRootChild<R>> GraphRootChild<R> for PositionAnnotated<
 }
 // used to get a direct token of a pattern
 pub(crate) trait PatternRootChild<R>:
-    RootChildIndex<R> + PatternRoot
+    HasRootChildIndex<R> + PatternRoot
 {
     fn pattern_root_child(&self) -> Token {
         PatternRoot::pattern_root_pattern(self)[self.root_child_index()]

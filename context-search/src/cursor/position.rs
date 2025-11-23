@@ -22,10 +22,10 @@ where
     }
 }
 
-impl<R: PathRole, P: RootChildIndex<R>, S: CursorState> RootChildIndex<R>
+impl<R: PathRole, P: HasRootChildIndex<R>, S: CursorState> HasRootChildIndex<R>
     for PathCursor<P, S>
 {
     fn root_child_index(&self) -> usize {
-        RootChildIndex::<R>::root_child_index(&self.path)
+        HasRootChildIndex::<R>::root_child_index(&self.path)
     }
 }

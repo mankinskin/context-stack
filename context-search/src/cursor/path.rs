@@ -14,13 +14,13 @@ use context_trace::{
 };
 
 pub(crate) trait MovablePath<D: Direction, R: PathRole>:
-    MovePath<D, R> + RootChildIndex<R> + RootPattern
+    MovePath<D, R> + HasRootChildIndex<R> + RootPattern
 {
 }
 impl<
         D: Direction,
         R: PathRole,
-        P: MovePath<D, R> + RootChildIndex<R> + RootPattern,
+        P: MovePath<D, R> + HasRootChildIndex<R> + RootPattern,
     > MovablePath<D, R> for P
 {
 }
@@ -54,7 +54,7 @@ where
 impl<D: Direction, R: PathRole, P: MovablePath<D, R>, S: CursorState>
     MoveRootIndex<D, R> for PathCursor<P, S>
 where
-    Self: MoveKey<D> + RootChildIndex<R>,
+    Self: MoveKey<D> + HasRootChildIndex<R>,
 {
     fn move_root_index<G: HasGraph>(
         &mut self,
@@ -114,29 +114,29 @@ where
     }
 }
 
-impl<R: PathRole, P: RootChildToken<R> + StartFoldPath, S: CursorState>
-    RootChildToken<R> for PathCursor<P, S>
+impl<R: PathRole, P: HasRootChildToken<R> + StartFoldPath, S: CursorState>
+    HasRootChildToken<R> for PathCursor<P, S>
 {
     fn root_child_token<G: HasGraph>(
         &self,
         trav: &G,
     ) -> Token {
-        RootChildToken::<R>::root_child_token(&self.path, trav)
+        HasRootChildToken::<R>::root_child_token(&self.path, trav)
     }
 }
 impl<
         R: PathRole,
-        P: StartFoldPath + LeafToken<R> + HasRolePath<R>,
+        P: StartFoldPath + HasLeafToken<R> + HasRolePath<R>,
         S: CursorState,
-    > LeafToken<R> for PathCursor<P, S>
+    > HasLeafToken<R> for PathCursor<P, S>
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
-        LeafToken::<R>::leaf_token_location(&self.path)
+        HasLeafToken::<R>::leaf_token_location(&self.path)
     }
     fn leaf_token<G: HasGraph>(
         &self,
         trav: &G,
     ) -> Option<Token> {
-        LeafToken::<R>::leaf_token(&self.path, trav)
+        HasLeafToken::<R>::leaf_token(&self.path, trav)
     }
 }

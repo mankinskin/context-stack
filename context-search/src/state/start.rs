@@ -23,7 +23,7 @@ use context_trace::{
         format_utils::pretty,
     },
     path::{
-        accessors::child::RootedLeafToken,
+        accessors::child::HasRootedLeafToken,
         BaseQuery,
     },
     *,
@@ -87,7 +87,7 @@ BaseQuery
 + PathAppend
 + PathPop
 + MoveRootIndex<Right, End>
-+ RootedLeafToken<End>
++ HasRootedLeafToken<End>
 + RootPattern
 + CalcWidth
 {

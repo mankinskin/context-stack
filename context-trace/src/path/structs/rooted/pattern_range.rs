@@ -46,7 +46,7 @@ impl RangePath for PatternRangePath<ChildLocation, ChildLocation> {
     //    }
     //}
 }
-impl RootChildIndexMut<End> for PatternRangePath<ChildLocation, ChildLocation> {
+impl HasRootChildIndexMut<End> for PatternRangePath<ChildLocation, ChildLocation> {
     fn root_child_index_mut(&mut self) -> &mut usize {
         &mut self.end.sub_path.root_entry
     }
@@ -70,12 +70,12 @@ impl_root! { RootPattern for PatternRangePath<ChildLocation, ChildLocation>, sel
 impl_root! { PatternRoot for PatternRangePath<ChildLocation, ChildLocation>, self => self.root.borrow() }
 impl_root! { <Role: PathRole> PatternRoot for PatternRolePath<Role>, self => self.root.borrow() }
 
-impl RootChildIndex<Start> for PatternRangePath<ChildLocation, ChildLocation> {
+impl HasRootChildIndex<Start> for PatternRangePath<ChildLocation, ChildLocation> {
     fn root_child_index(&self) -> usize {
         self.start.root_entry
     }
 }
-impl RootChildIndex<End> for PatternRangePath<ChildLocation, ChildLocation> {
+impl HasRootChildIndex<End> for PatternRangePath<ChildLocation, ChildLocation> {
     fn root_child_index(&self) -> usize {
         self.end.root_entry
     }
@@ -88,7 +88,7 @@ impl MoveRootIndex<Right, End>
         &mut self,
         _trav: &G,
     ) -> ControlFlow<()> {
-        let current_index = RootChildIndex::<End>::root_child_index(self);
+        let current_index = HasRootChildIndex::<End>::root_child_index(self);
 
         tracing::debug!(
             "PatternRangePath::move_root_index - current_index={}, pattern_len={}",
@@ -122,11 +122,11 @@ impl MoveRootIndex<Right, End>
     }
 }
 
-impl<R: PathRole> LeafToken<R> for PatternRolePath<R> where
+impl<R: PathRole> HasLeafToken<R> for PatternRolePath<R> where
     Self: HasPath<R, Node = ChildLocation> + PatternRootChild<R>
 {
 }
-impl<R: PathRole> LeafToken<R>
+impl<R: PathRole> HasLeafToken<R>
     for PatternRangePath<ChildLocation, ChildLocation>
 where
     Self: HasPath<R, Node = ChildLocation> + PatternRootChild<R>,
@@ -167,13 +167,13 @@ impl IntoRolePath<End> for PatternRangePath<ChildLocation, ChildLocation> {
 }
 
 impl<R: PathRole> PatternRootChild<R> for PatternRolePath<R> where
-    Self: RootChildIndex<R>
+    Self: HasRootChildIndex<R>
 {
 }
 impl<R: PathRole> PatternRootChild<R>
     for PatternRangePath<ChildLocation, ChildLocation>
 where
-    Self: RootChildIndex<R>,
+    Self: HasRootChildIndex<R>,
 {
 }
 

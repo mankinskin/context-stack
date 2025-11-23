@@ -9,7 +9,9 @@ use crate::{
         },
         structs::{
             rooted::{
-                role_path::RootChildIndex,
+                role_path::{
+                    HasRootChildIndex,
+                },
                 root::{
                     IndexRoot,
                     PathRoot,
@@ -74,9 +76,9 @@ impl_root! { GraphRootPattern for RootedSplitPath<IndexRoot>, self => self.root.
 impl_root! { GraphRoot for RootedSplitPath<IndexRoot>, self => self.root.location.parent }
 //impl_root! { GraphRoot for RootedSplitPathRef<'_, IndexRoot>, self => self.root.location.parent }
 
-impl<R: PathRole, Root: PathRoot> RootChildIndex<R> for RootedSplitPath<Root> {
+impl<R: PathRole, Root: PathRoot> HasRootChildIndex<R> for RootedSplitPath<Root> {
     fn root_child_index(&self) -> usize {
-        RootChildIndex::<R>::root_child_index(&self.sub_path)
+        HasRootChildIndex::<R>::root_child_index(&self.sub_path)
     }
 }
 

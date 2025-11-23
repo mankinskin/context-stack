@@ -61,12 +61,12 @@ impl<R: PathRole> RolePath<R, PositionAnnotated<ChildLocation>> {
     }
 }
 
-impl<R: PathRole, N> RootChildIndex<R> for RolePath<R, N> {
+impl<R: PathRole, N> HasRootChildIndex<R> for RolePath<R, N> {
     fn root_child_index(&self) -> usize {
         self.sub_path.root_entry
     }
 }
-impl<R: PathRole, N> RootChildIndexMut<R> for RolePath<R, N> {
+impl<R: PathRole, N> HasRootChildIndexMut<R> for RolePath<R, N> {
     fn root_child_index_mut(&mut self) -> &mut usize {
         &mut self.sub_path.root_entry
     }

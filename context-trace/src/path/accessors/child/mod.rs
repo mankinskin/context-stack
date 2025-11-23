@@ -1,5 +1,6 @@
 pub(crate) mod root;
 
+use auto_impl::auto_impl;
 use crate::{
     GraphRootChild,
     graph::vertex::{
@@ -12,15 +13,18 @@ use crate::{
             role::PathRole,
         },
         structs::rooted::role_path::{
-            RootChildIndex,
-            RootChildToken,
+            HasRootChildIndex,
+            HasRootChildToken,
         },
     },
     trace::has_graph::HasGraph,
 };
 
-pub trait LeafToken<R: PathRole>:
-    RootChildIndex<R> + HasPath<R, Node = ChildLocation>
+/// Access to the leaf token of a path (the token at the path's end point)
+/// 
+/// This trait provides methods to access the leaf token's location and value.
+pub trait HasLeafToken<R: PathRole>:
+    HasRootChildIndex<R> + HasPath<R, Node = ChildLocation>
 {
     fn leaf_token_location_mut(&mut self) -> Option<&mut ChildLocation> {
         R::bottom_up_iter(self.path_mut().iter_mut()).next()
@@ -36,43 +40,34 @@ pub trait LeafToken<R: PathRole>:
             .map(|loc| *trav.graph().expect_child_at(loc))
     }
 }
-pub trait RootedLeafTokenLocation<R: PathRole>:
-    LeafToken<R> + GraphRootChild<R>
+
+/// Access to the leaf token with a guaranteed root fallback
+pub trait HasRootedLeafTokenLocation<R: PathRole>:
+    HasLeafToken<R> + GraphRootChild<R>
 {
     fn rooted_leaf_token_location(&self) -> ChildLocation;
 }
-pub trait RootedLeafToken<R: PathRole>:
-    LeafToken<R> + RootChildToken<R>
+
+/// Access to the leaf token value with a guaranteed root fallback
+pub trait HasRootedLeafToken<R: PathRole>:
+    HasLeafToken<R> + HasRootChildToken<R>
 {
     fn rooted_leaf_token<G: HasGraph>(
         &self,
         trav: &G,
     ) -> Token;
 }
-//impl<R: PathRole, T: LeafToken<R> + GraphRootChild<R>> RootedLeafToken<R>
-//    for T
-//{
-//    fn rooted_leaf_token<G: HasGraph>(
-//        &self,
-//        trav: &G,
-//    ) -> Token {
-//        self.leaf_token(trav)
-//            .unwrap_or_else(|| self.graph_root_child(trav))
-//    }
-//    fn rooted_leaf_token_location(&self) -> ChildLocation {
-//        self.leaf_token_location()
-//            .unwrap_or_else(|| self.graph_root_child_location())
-//    }
-//}
-impl<R: PathRole, T: LeafToken<R> + GraphRootChild<R>>
-    RootedLeafTokenLocation<R> for T
+
+impl<R: PathRole, T: HasLeafToken<R> + GraphRootChild<R>>
+    HasRootedLeafTokenLocation<R> for T
 {
     fn rooted_leaf_token_location(&self) -> ChildLocation {
         self.leaf_token_location()
             .unwrap_or_else(|| self.graph_root_child_location())
     }
 }
-impl<R: PathRole, T: LeafToken<R> + RootChildToken<R>> RootedLeafToken<R>
+
+impl<R: PathRole, T: HasLeafToken<R> + HasRootChildToken<R>> HasRootedLeafToken<R>
     for T
 {
     fn rooted_leaf_token<G: HasGraph>(
@@ -84,6 +79,6 @@ impl<R: PathRole, T: LeafToken<R> + RootChildToken<R>> RootedLeafToken<R>
     }
 }
 
-//pub(crate) trait LeafTokenPosMut<R>: RootChildIndexMut<R> {
+//pub(crate) trait LeafTokenPosMut<R>: HasRootChildIndexMut<R> {
 //    fn leaf_token_pos_mut(&mut self) -> &mut usize;
 //}

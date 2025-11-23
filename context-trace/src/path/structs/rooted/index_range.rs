@@ -25,7 +25,7 @@ use crate::{
     path::{
         accessors::{
             child::{
-                LeafToken,
+                HasLeafToken,
                 root::GraphRootChild,
             },
             has_path::{
@@ -65,9 +65,9 @@ use crate::{
                 RangePath,
                 RootedRangePath,
                 role_path::{
-                    RootChildIndex,
-                    RootChildIndexMut,
-                    RootChildToken,
+                    HasRootChildIndex,
+                    HasRootChildIndexMut,
+                    HasRootChildToken,
                     RootedRolePath,
                 },
                 root::{
@@ -166,8 +166,8 @@ impl IndexRangePath<ChildLocation, PositionAnnotated<ChildLocation>> {
     ) -> Token
     where
         Self: HasRolePath<R, Node = PositionAnnotated<ChildLocation>>
-            + RootChildIndex<R>
-            + RootChildToken<R>,
+            + HasRootChildIndex<R>
+            + HasRootChildToken<R>,
     {
         // Extract leaf location from position-annotated node
         let role_path = self.role_path();
@@ -224,12 +224,12 @@ where
     }
 }
 
-// Generic LeafToken for IndexRangePath types with ChildLocation nodes
-impl<R: PathRole, StartNode, EndNode> LeafToken<R>
+// Generic HasLeafToken for IndexRangePath types with ChildLocation nodes
+impl<R: PathRole, StartNode, EndNode> HasLeafToken<R>
     for IndexRangePath<StartNode, EndNode>
 where
     IndexRangePath<StartNode, EndNode>: HasRolePath<R, Node = ChildLocation>
-        + RootChildIndex<R>
+        + HasRootChildIndex<R>
         + HasPath<R, Node = ChildLocation>,
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
@@ -267,7 +267,7 @@ impl<EndNode: PathNode> MoveRootIndex<Right, End>
     ) -> ControlFlow<()> {
         let graph = trav.graph();
         let pattern = self.root_pattern::<G>(&graph);
-        let current_index = RootChildIndex::<End>::root_child_index(self);
+        let current_index = HasRootChildIndex::<End>::root_child_index(self);
         if let Some(next) =
             TravDir::<G>::pattern_index_next(pattern, current_index)
         {
@@ -295,7 +295,7 @@ impl<EndNode: PathNode> MoveRootIndex<Left, End>
         let pattern = self.root_pattern::<G>(&graph);
         if let Some(prev) = TravDir::<G>::pattern_index_prev(
             pattern,
-            RootChildIndex::<End>::root_child_index(self),
+            HasRootChildIndex::<End>::root_child_index(self),
         ) {
             *self.root_child_index_mut() = prev;
             ControlFlow::Continue(())
@@ -378,7 +378,7 @@ where
         location.move_leaf(trav)
     }
 }
-impl RootChildToken<Start> for IndexRangePath {
+impl HasRootChildToken<Start> for IndexRangePath {
     fn root_child_token<G: HasGraph>(
         &self,
         trav: &G,
@@ -391,7 +391,7 @@ impl RootChildToken<Start> for IndexRangePath {
     }
 }
 
-impl RootChildToken<End> for IndexRangePath {
+impl HasRootChildToken<End> for IndexRangePath {
     fn root_child_token<G: HasGraph>(
         &self,
         trav: &G,
@@ -405,7 +405,7 @@ impl RootChildToken<End> for IndexRangePath {
 }
 
 // RootChildToken implementations for position-annotated paths
-impl RootChildToken<End>
+impl HasRootChildToken<End>
     for IndexRangePath<ChildLocation, PositionAnnotated<ChildLocation>>
 {
     fn root_child_token<G: HasGraph>(
@@ -420,7 +420,7 @@ impl RootChildToken<End>
     }
 }
 
-impl RootChildToken<Start>
+impl HasRootChildToken<Start>
     for IndexRangePath<ChildLocation, PositionAnnotated<ChildLocation>>
 {
     fn root_child_token<G: HasGraph>(
@@ -457,19 +457,19 @@ impl GraphRootChild<End> for IndexRangePath {
     }
 }
 
-impl RootChildIndex<Start> for IndexRangePath {
+impl HasRootChildIndex<Start> for IndexRangePath {
     fn root_child_index(&self) -> usize {
-        RootChildIndex::<Start>::root_child_index(&self.start)
+        HasRootChildIndex::<Start>::root_child_index(&self.start)
     }
 }
 
-impl<EndNode> RootChildIndex<End> for IndexRangePath<ChildLocation, EndNode> {
+impl<EndNode> HasRootChildIndex<End> for IndexRangePath<ChildLocation, EndNode> {
     fn root_child_index(&self) -> usize {
         self.end.root_entry
     }
 }
 
-impl<EndNode> RootChildIndexMut<End>
+impl<EndNode> HasRootChildIndexMut<End>
     for IndexRangePath<ChildLocation, EndNode>
 {
     fn root_child_index_mut(&mut self) -> &mut usize {

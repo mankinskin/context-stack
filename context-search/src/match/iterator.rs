@@ -1,6 +1,9 @@
 use crate::{
     r#match::{
-        root_cursor::CompareParentBatch,
+        root_cursor::{
+            AdvanceToEndResult,
+            CompareParentBatch,
+        },
         NodeConsumer,
         NodeResult::{
             self,
@@ -36,22 +39,6 @@ pub(crate) struct SearchIterator<K: SearchKind> {
     pub(crate) best_match: Option<MatchResult>,
 }
 impl<K: SearchKind> SearchIterator<K> {
-    //#[context_trace::instrument_sig(skip(trav), fields(start_index = %start_index))]
-    //pub(crate) fn start_index(
-    //    trav: K::Trav,
-    //    start_index: Token,
-    //) -> Self {
-    //    debug!("creating match iterator from start index");
-    //    SearchIterator {
-    //        trace_ctx: TraceCtx {
-    //            trav,
-    //            cache: TraceCache::new(start_index),
-    //        },
-    //        queue: SearchQueue::new(),
-    //        best_checkpoint: None,
-    //    }
-    //}
-
     #[context_trace::instrument_sig(level = "debug", skip(trav, p), fields(start_index = %start_index, parent_count = p.len()))]
     pub(crate) fn start_parent(
         trav: K::Trav,
@@ -164,8 +151,8 @@ where
         );
         self.queue.nodes.clear();
 
-        Some(match root_cursor.advance_to_end() {
-            Ok(matched_state) => {
+        Some(match root_cursor.advance_until_conclusion() {
+            AdvanceToEndResult::Completed(matched_state) => {
                 // RootCursor found a match - query matched at least partially
                 debug!(
                     is_complete = matched_state.query_exhausted(),
@@ -177,7 +164,10 @@ where
 
                 matched_state
             },
-            Err((checkpoint_state, root_cursor)) => {
+            AdvanceToEndResult::NeedsParentExploration {
+                checkpoint: checkpoint_state,
+                cursor: root_cursor,
+            } => {
                 // RootCursor reached end of root without conclusion
                 // Need to explore parent tokens to continue comparison
                 // checkpoint_state contains the best match found in this root
@@ -231,7 +221,7 @@ where
                     );
                 }
 
-                match root_cursor.next_parents(&self.trace_ctx.trav) {
+                match root_cursor.get_parent_batch(&self.trace_ctx.trav) {
                     Err(_end_state) => {
                         // No more parents available - exhausted search without match
                         // Don't return anything, continue to next candidate

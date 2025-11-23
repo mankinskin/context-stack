@@ -143,7 +143,9 @@ pub use crate::{
                 CalcWidth,
             },
             child::{
-                LeafToken,
+                HasLeafToken,
+                HasRootedLeafToken,
+                HasRootedLeafTokenLocation,
                 root::GraphRootChild,
             },
             has_path::{
@@ -193,13 +195,13 @@ pub use crate::{
                     PatternRangePath,
                 },
                 role_path::{
+                    HasRootChildIndex,
+                    HasRootChildIndexMut,
+                    HasRootChildToken,
                     IndexEndPath,
                     IndexStartPath,
                     PatternEndPath,
                     PatternStartPath,
-                    RootChildIndex,
-                    RootChildIndexMut,
-                    RootChildToken,
                     RootedRolePath,
                     range::{
                         EndPath,
