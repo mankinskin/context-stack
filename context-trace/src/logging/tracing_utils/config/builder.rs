@@ -1,7 +1,9 @@
 //! Builder methods and configuration helpers
 
-use super::loader::TracingConfig;
-use super::types::FormatConfig;
+use super::{
+    loader::TracingConfig,
+    types::FormatConfig,
+};
 use std::path::PathBuf;
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
