@@ -30,12 +30,12 @@ pub use crate::{
     container::bft::BftQueue,
     search::{
         context::AncestorPolicy,
-        searchable::ErrorState,
+        searchable::{
+            ErrorState,
+            Searchable,
+        },
         Find,
     },
-    state::{
-        result::Response,
-        start::Searchable,
-    },
+    state::result::Response,
     traversal::SearchKind,
 };

@@ -38,14 +38,12 @@ impl MatchResult {
     }
 
     /// Check if the query was fully matched
-    /// Returns true if cursor position equals the query length
+    /// Returns true if the cursor has reached the end of the query pattern
+    /// AND is not pointing inside the last token (no nested end path)
     pub fn query_exhausted(&self) -> bool {
-        use std::borrow::Borrow;
-        let query_pattern = self.cursor.path.pattern_root_pattern();
-        let query_tokens: &[Token] = query_pattern.borrow();
-        let query_length = query_tokens.len();
-        let checkpoint_pos = *self.cursor.atom_position.as_ref();
-        checkpoint_pos >= query_length
+        use context_trace::HasPath;
+        self.cursor.path.is_at_pattern_end()
+            && HasPath::path(self.cursor.path.end_path()).is_empty()
     }
 
     /// Check if the result is a complete pre-existing token in the graph

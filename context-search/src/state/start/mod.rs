@@ -7,4 +7,3 @@ pub(crate) use core::{
     StartCtx,
     StartFoldPath,
 };
-pub use search::Searchable;
