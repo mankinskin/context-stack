@@ -8,9 +8,7 @@ use crate::{
         },
         state::CompareState,
     },
-    cursor::{
-        PatternCursor,
-    },
+    cursor::PatternCursor,
 };
 use context_trace::*;
 use std::marker::PhantomData;
