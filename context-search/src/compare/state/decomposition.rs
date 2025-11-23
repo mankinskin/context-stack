@@ -270,27 +270,35 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                 > = prefixes
                     .into_iter()
                     .enumerate()
-                    .map(|(i, (sub, child_state)): (usize, (SubToken, ChildState<PositionAnnotated<ChildLocation>>))| {
-                        let token = sub.token();
-                        let target_pos = checkpoint_pos.into();
-                        debug!(
-                            prefix_idx = i,
-                            sub_width = *token.width(),
-                            "creating prefix state (position-annotated)"
-                        );
-                        CompareState {
-                            target: DownKey::new(token, target_pos),
-                            child: Checkpointed {
-                                current: ChildCursor {
-                                    child_state,
-                                    _state: PhantomData,
+                    .map(
+                        |(i, (sub, child_state)): (
+                            usize,
+                            (
+                                SubToken,
+                                ChildState<PositionAnnotated<ChildLocation>>,
+                            ),
+                        )| {
+                            let token = sub.token();
+                            let target_pos = checkpoint_pos.into();
+                            debug!(
+                                prefix_idx = i,
+                                sub_width = *token.width(),
+                                "creating prefix state (position-annotated)"
+                            );
+                            CompareState {
+                                target: DownKey::new(token, target_pos),
+                                child: Checkpointed {
+                                    current: ChildCursor {
+                                        child_state,
+                                        _state: PhantomData,
+                                    },
+                                    checkpoint: self.child.checkpoint().clone(),
                                 },
-                                checkpoint: self.child.checkpoint().clone(),
-                            },
-                            mode: self.mode,
-                            query: self.query.clone(),
-                        }
-                    })
+                                mode: self.mode,
+                                query: self.query.clone(),
+                            }
+                        },
+                    )
                     .collect();
                 debug!(
                     num_results = result.len(),
@@ -323,26 +331,32 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                 > = cursor_prefixes
                     .into_iter()
                     .enumerate()
-                    .map(|(i, (sub, cursor)): (usize, (SubToken, PathCursor<PatternRangePath, Candidate>))| {
-                        trace!(
-                            prefix_idx = i,
-                            sub_width = *sub.token().width(),
-                            cursor_pos = %cursor.atom_position,
-                            "created prefix state (position-annotated)"
-                        );
-                        CompareState {
-                            target: DownKey::new(
-                                sub.token(),
-                                (*self.query.checkpoint().cursor_pos()).into(),
-                            ),
-                            child: self.child.clone(),
-                            mode: self.mode,
-                            query: Checkpointed {
-                                current: cursor,
-                                checkpoint: self.query.checkpoint().clone(),
-                            },
-                        }
-                    })
+                    .map(
+                        |(i, (sub, cursor)): (
+                            usize,
+                            (SubToken, PathCursor<PatternRangePath, Candidate>),
+                        )| {
+                            trace!(
+                                prefix_idx = i,
+                                sub_width = *sub.token().width(),
+                                cursor_pos = %cursor.atom_position,
+                                "created prefix state (position-annotated)"
+                            );
+                            CompareState {
+                                target: DownKey::new(
+                                    sub.token(),
+                                    (*self.query.checkpoint().cursor_pos())
+                                        .into(),
+                                ),
+                                child: self.child.clone(),
+                                mode: self.mode,
+                                query: Checkpointed {
+                                    current: cursor,
+                                    checkpoint: self.query.checkpoint().clone(),
+                                },
+                            }
+                        },
+                    )
                     .collect();
                 debug!(
                     num_results = result.len(),

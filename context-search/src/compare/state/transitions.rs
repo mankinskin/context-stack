@@ -18,10 +18,12 @@ use context_trace::{
     HasRootChildIndex,
     *,
 };
-use std::marker::PhantomData;
-use std::ops::ControlFlow::{
-    Break,
-    Continue,
+use std::{
+    marker::PhantomData,
+    ops::ControlFlow::{
+        Break,
+        Continue,
+    },
 };
 use tracing::{
     debug,
