@@ -55,7 +55,10 @@ fn example_basic_sequence_search() {
     // Since [b, c] was never inserted as a complete pattern, we expect a Postfix
     // (it matches indices 1-2 of the parent pattern [a, b, c])
     // But the query should be fully matched (Complete variant)
-    assert!(response.end.query_exhausted(), "Query should be fully matched");
+    assert!(
+        response.end.query_exhausted(),
+        "Query should be fully matched"
+    );
     assert!(
         matches!(response.end.path(), crate::state::end::PathCoverage::Postfix(_)),
         "Path should be Postfix since [b, c] doesn't start at the beginning of [a, b, c]"
@@ -126,7 +129,10 @@ fn example_token_pattern_element() {
 
     // [e, l] matches at indices 1-2 within [h, e, l], so it's a Postfix match
     // but the query itself completed successfully (Complete variant)
-    assert!(response.end.query_exhausted(), "Query should be fully matched");
+    assert!(
+        response.end.query_exhausted(),
+        "Query should be fully matched"
+    );
 
     // The path is Postfix since [e, l] starts at position 1 in [h, e, l]
     assert!(
@@ -227,7 +233,7 @@ fn example_hierarchical_ancestor_search() {
         // But the path is Postfix, not Complete
         assert!(
             response.end.query_exhausted(),
-            "Query should be fully exhausted (Complete variant). Got is_complete={:?}",
+            "Query should be fully exhausted (Complete variant). Got query_exhausted={:?}",
             response.end.query_exhausted()
         );
 
@@ -276,7 +282,10 @@ fn example_incomplete_postfix() {
     let response = graph.find_ancestor(&query).unwrap();
 
     // Query is fully exhausted (Complete), but path is Postfix (doesn't start at beginning)
-    assert!(response.query_exhausted(), "Query should be fully exhausted");
+    assert!(
+        response.query_exhausted(),
+        "Query should be fully exhausted"
+    );
     match &response.end.path() {
         PathCoverage::Postfix(postfix) => {
             assert_eq!(postfix.root_pos, 1.into());
@@ -301,7 +310,10 @@ fn example_incomplete_prefix() {
     let response = graph.find_ancestor(&query).unwrap();
 
     // Query is fully exhausted (Complete), but path is Prefix (doesn't reach end of parent)
-    assert!(response.query_exhausted(), "Query should be fully exhausted");
+    assert!(
+        response.query_exhausted(),
+        "Query should be fully exhausted"
+    );
     match &response.end.path() {
         PathCoverage::Prefix(prefix) => {
             assert_eq!(prefix.path.root_pattern_location().parent, abc);

@@ -3,13 +3,11 @@
 use super::field_visitor::FieldVisitor;
 
 /// Filter span fields by removing special fields that are shown elsewhere
-pub(super) fn filter_span_fields(
-    fields: &str,
-    has_fn_sig: bool,
-) -> String {
+pub(super) fn filter_span_fields(fields: &str) -> String {
     let mut cleaned = fields.to_string();
 
     // Remove fn_sig if it was shown inline with span name
+    let has_fn_sig = fields.contains("fn_sig=");
     if has_fn_sig {
         cleaned = remove_field(&cleaned, "fn_sig");
     }
@@ -40,7 +38,10 @@ pub(super) fn filter_span_fields(
 }
 
 /// Remove a field from formatted fields string
-fn remove_field(fields: &str, field_name: &str) -> String {
+fn remove_field(
+    fields: &str,
+    field_name: &str,
+) -> String {
     let pattern = format!("{}=", field_name);
 
     if let Some(start) = fields.find(&pattern) {

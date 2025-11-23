@@ -247,12 +247,6 @@ impl EndState {
             cursor: parent.cursor,
         }
     }
-    //pub(crate) fn query_end<G: HasGraph>(
-    //    trav: G,
-    //    parent: ParentCompareState,
-    //) -> Self {
-    //    Self::with_reason(trav, EndReason::QueryExhausted, parent)
-    //}
 
     pub(crate) fn mismatch<G: HasGraph>(
         trav: G,
@@ -260,66 +254,7 @@ impl EndState {
     ) -> Self {
         Self::with_reason(trav, EndReason::Mismatch, parent)
     }
-
-    //pub(crate) fn start_len(&self) -> usize {
-    //    self.path
-    //        .try_start_path()
-    //        .map(|p| p.len())
-    //        .unwrap_or_default()
-    //}
-
-    //pub(crate) fn start_path(&self) -> Option<&'_ StartPath> {
-    //    self.path.try_start_path()
-    //}
-
-    //pub(crate) fn is_final(&self) -> bool {
-    //    self.reason == EndReason::QueryExhausted
-    //        && matches!(self.path, PathCoverage::EntireRoot(_))
-    //}
-    //pub(crate) fn entry_location(&self) -> Option<ChildLocation> {
-    //    match &self.path {
-    //        PathCoverage::Range(state) => Some(
-    //            GraphRootChild::<Start>::graph_root_child_location(&state.path),
-    //        ),
-    //        PathCoverage::Postfix(_) => None,
-    //        PathCoverage::Prefix(_) => None,
-    //        PathCoverage::EntireRoot(_) => None,
-    //    }
-    //}
-
-    //pub(crate) fn state_direction(&self) -> StateDirection {
-    //    match self.path {
-    //        PathCoverage::Range(_) => StateDirection::TopDown,
-    //        PathCoverage::Postfix(_) => StateDirection::BottomUp,
-    //        PathCoverage::Prefix(_) => StateDirection::TopDown,
-    //        PathCoverage::EntireRoot(_) => StateDirection::BottomUp,
-    //    }
-    //}
-
-    //pub(crate) fn end_path(&self) -> Option<&'_ EndPath> {
-    //    match &self.path {
-    //        PathCoverage::Range(e) => Some(e.path.end_path()),
-    //        PathCoverage::Postfix(_) => None,
-    //        PathCoverage::Prefix(e) => Some(e.path.end_path()),
-    //        PathCoverage::EntireRoot(_) => None,
-    //    }
-    //}
-
-    //pub(crate) fn is_complete(&self) -> bool {
-    //    matches!(self.path, PathCoverage::EntireRoot(_))
-    //}
 }
-
-//impl TargetKey for EndState {
-//    fn target_key(&self) -> DirectedKey {
-//        match &self.path {
-//            PathCoverage::Range(p) => p.target.into(),
-//            PathCoverage::Postfix(_) => self.root_key().into(),
-//            PathCoverage::Prefix(p) => p.target.into(),
-//            PathCoverage::EntireRoot(c) => c.target_key(),
-//        }
-//    }
-//}
 
 impl RootKey for EndState {
     fn root_key(&self) -> UpKey {

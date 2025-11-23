@@ -3,7 +3,6 @@ pub(crate) mod pattern_range;
 pub(crate) mod role_path;
 pub(crate) mod root;
 //pub(crate) mod split_path;
-
 use crate::{
     ChildLocation,
     EndPath,
@@ -19,9 +18,7 @@ use crate::{
     },
     path::{
         accessors::{
-            child::{
-                HasRootedLeafToken,
-            },
+            child::HasRootedLeafToken,
             has_path::HasRolePath,
             role::{
                 End,
@@ -51,7 +48,10 @@ use root::{
     PathRoot,
     RootedPath,
 };
-use std::fmt;
+use std::{
+    fmt,
+    fmt::Debug,
+};
 pub(crate) trait RangePath:
     RootedPath
     + IntoRootedRolePath<Start>
@@ -92,14 +92,8 @@ impl IntoChildLocation for PositionAnnotated<ChildLocation> {
     }
 }
 
-pub trait PathNode:
-    std::fmt::Debug + Clone + PartialEq + Eq + IntoChildLocation
-{
-}
-impl<T: std::fmt::Debug + Clone + PartialEq + Eq + IntoChildLocation> PathNode
-    for T
-{
-}
+pub trait PathNode: Debug + Clone + PartialEq + Eq + IntoChildLocation {}
+impl<T: Debug + Clone + PartialEq + Eq + IntoChildLocation> PathNode for T {}
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct RootedRangePath<
@@ -261,29 +255,31 @@ impl<R: PathRoot, StartNode, EndNode> HasRolePath<End>
 }
 
 // Tier 2 trait implementations: Concrete role accessors
-impl<R: PathRoot, EndNode> crate::path::accessors::range_accessor::StartPathAccessor
+impl<R: PathRoot, EndNode>
+    crate::path::accessors::range_accessor::StartPathAccessor
     for RootedRangePath<R, ChildLocation, EndNode>
 {
     type Node = ChildLocation;
-    
+
     fn start_path(&self) -> &RolePath<Start, ChildLocation> {
         &self.start
     }
-    
+
     fn start_path_mut(&mut self) -> &mut RolePath<Start, ChildLocation> {
         &mut self.start
     }
 }
 
-impl<R: PathRoot, StartNode> crate::path::accessors::range_accessor::EndPathAccessor
+impl<R: PathRoot, StartNode>
+    crate::path::accessors::range_accessor::EndPathAccessor
     for RootedRangePath<R, StartNode, ChildLocation>
 {
     type Node = ChildLocation;
-    
+
     fn end_path(&self) -> &RolePath<End, ChildLocation> {
         &self.end
     }
-    
+
     fn end_path_mut(&mut self) -> &mut RolePath<End, ChildLocation> {
         &mut self.end
     }

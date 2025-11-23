@@ -7,13 +7,11 @@ use crate::cursor::{
     Candidate,
     Checkpointed,
     ChildCursor,
-    CursorState,
     MarkMatchState,
     Matched,
     Mismatched,
 };
 use context_trace::{
-    graph::vertex::token::HasSubLocation,
     trace::state::StateAdvance,
     HasRootChildIndex,
     *,

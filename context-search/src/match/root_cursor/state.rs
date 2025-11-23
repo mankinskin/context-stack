@@ -70,20 +70,20 @@ where
                     trav: self.trav.clone(),
                 };
 
-                match matched_cursor.advance_both_from_match() {
-                    AdvanceCursorsResult::BothAdvanced(candidate_cursor) => {
+                match matched_cursor.advance_both_cursors() {
+                    Ok(candidate_cursor) => {
                         // Both cursors advanced - update to candidate state and continue
                         *self = candidate_cursor;
                         Some(Continue(()))
                     },
-                    AdvanceCursorsResult::QueryExhausted => {
+                    Err(Ok(_matched_result)) => {
                         // Query cursor ended - QueryExhausted match
                         tracing::trace!(
                             "query pattern ended - QueryExhausted match found"
                         );
                         Some(Break(EndReason::QueryExhausted))
                     },
-                    AdvanceCursorsResult::ChildExhausted(_) => {
+                    Err(Err(_)) => {
                         // Index ended but query continues - need parent exploration
                         tracing::trace!("index ended, query continues - returning None for parent exploration");
                         None

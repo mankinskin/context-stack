@@ -1,7 +1,12 @@
 //! Compact formatting implementations for path types
 
 use crate::{
+    BaseState,
     ChildLocation,
+    ChildState,
+    IndexRangePath,
+    ParentState,
+    PathRole,
     graph::vertex::{
         location::pattern::PatternLocation,
         pattern::Pattern,
@@ -189,13 +194,10 @@ impl CompactFormat for PatternEndPath {
 }
 
 // CompactFormat for ChildState
-impl<EndNode> CompactFormat for crate::trace::child::state::ChildState<EndNode>
+impl<EndNode> CompactFormat for ChildState<EndNode>
 where
     EndNode: PathNode,
-    crate::path::structs::rooted::index_range::IndexRangePath<
-        crate::graph::vertex::location::child::ChildLocation,
-        EndNode,
-    >: CompactFormat,
+    IndexRangePath<ChildLocation, EndNode>: CompactFormat,
 {
     fn fmt_compact(
         &self,
@@ -256,7 +258,7 @@ where
 }
 
 // CompactFormat for ParentState
-impl CompactFormat for crate::trace::state::parent::ParentState {
+impl CompactFormat for ParentState {
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
@@ -286,7 +288,7 @@ impl CompactFormat for crate::trace::state::parent::ParentState {
     }
 }
 
-impl<R: crate::PathRole> CompactFormat for RolePath<R> {
+impl<R: PathRole> CompactFormat for RolePath<R> {
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
@@ -314,8 +316,7 @@ impl<R: crate::PathRole> CompactFormat for RolePath<R> {
     }
 }
 
-impl<R: crate::PathRole, Root: PathRoot> CompactFormat
-    for RootedRolePath<R, Root>
+impl<R: PathRole, Root: PathRoot> CompactFormat for RootedRolePath<R, Root>
 where
     Root: CompactFormat,
 {
@@ -357,7 +358,7 @@ where
 // Note: Only implement for types that don't already have Display
 // (RootedRangePath and RolePath already have Display implemented directly)
 impl_display_via_compact!(PatternEndPath);
-impl_display_via_compact!(RootedRolePath<R, Root> where R: crate::PathRole, Root: PathRoot + CompactFormat);
-impl_display_via_compact!(crate::trace::state::BaseState<P> where P: RootedPath + CompactFormat);
-impl_display_via_compact!(crate::trace::child::state::ChildState<EndNode> where EndNode: PathNode);
-impl_display_via_compact!(crate::trace::state::parent::ParentState);
+impl_display_via_compact!(RootedRolePath<R, Root> where R: PathRole, Root: PathRoot + CompactFormat);
+impl_display_via_compact!(BaseState<P> where P: RootedPath + CompactFormat);
+impl_display_via_compact!(ChildState<EndNode> where EndNode: PathNode);
+impl_display_via_compact!(ParentState);

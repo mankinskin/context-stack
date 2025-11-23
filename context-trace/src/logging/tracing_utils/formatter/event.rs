@@ -1,18 +1,35 @@
 //! Main event formatting logic (FormatEvent trait implementation)
 
-use super::core::CompactFieldsFormatter;
-use super::fields::filter_span_fields;
-use super::field_visitor::FieldVisitor;
-use super::helpers::extract_trait_context;
-use super::string_utils::strip_ansi_codes;
-use super::syntax::{highlight_rust_signature, self};
-
-use std::fmt::{self, Write};
-use tracing::{Event, Level, Subscriber};
-use tracing_subscriber::fmt::{
-    format, FormatEvent, FormatFields, FmtContext,
+use super::{
+    core::CompactFieldsFormatter,
+    field_visitor::FieldVisitor,
+    fields::filter_span_fields,
+    helpers::extract_trait_context,
+    string_utils::strip_ansi_codes,
+    syntax::{
+        self,
+        highlight_rust_signature,
+    },
 };
-use tracing_subscriber::registry::LookupSpan;
+
+use std::fmt::{
+    self,
+    Write,
+};
+use tracing::{
+    Event,
+    Level,
+    Subscriber,
+};
+use tracing_subscriber::{
+    fmt::{
+        FmtContext,
+        FormatEvent,
+        FormatFields,
+        format,
+    },
+    registry::LookupSpan,
+};
 
 impl<S, N> FormatEvent<S, N> for CompactFieldsFormatter
 where
@@ -31,7 +48,8 @@ where
 
         // Check if this is a span lifecycle event
         let mut message_text = String::new();
-        event.record(&mut |field: &tracing::field::Field, value: &dyn fmt::Debug| {
+        event.record(&mut |field: &tracing::field::Field,
+                           value: &dyn fmt::Debug| {
             if field.name() == "message" {
                 message_text = format!("{:?}", value);
             }
@@ -146,12 +164,7 @@ where
 
         // For SPAN ENTERED events, display span's fields if enabled
         if self.config.span_enter.show_fields && is_span_enter {
-            format_span_fields(
-                &mut writer,
-                ctx,
-                &gutter_indent,
-                &self.config,
-            )?;
+            format_span_fields(&mut writer, ctx, &gutter_indent, &self.config)?;
         }
 
         // Write file location if enabled
@@ -230,59 +243,59 @@ where
             });
 
             // Extract and display trait context
-            if config.span_enter.trait_context.show_trait_name
+            if (config.span_enter.trait_context.show_trait_name
                 || config.span_enter.trait_context.show_self_type
-                || config.span_enter.trait_context.show_associated_types
+                || config.span_enter.trait_context.show_associated_types)
+                && let Some(trait_ctx) = fields_str_opt
+                    .as_ref()
+                    .and_then(|fs| extract_trait_context(fs))
             {
-                if let Some(trait_ctx) =
-                    fields_str_opt.as_ref().and_then(|fs| extract_trait_context(fs))
+                if config.span_enter.trait_context.show_trait_name
+                    && let Some(trait_name) = trait_ctx.trait_name
                 {
-                    if config.span_enter.trait_context.show_trait_name {
-                        if let Some(trait_name) = trait_ctx.trait_name {
-                            parts.push(format!("[trait: {}]", trait_name));
-                        }
-                    }
-                    if config.span_enter.trait_context.show_self_type {
-                        if let Some(self_type) = trait_ctx.self_type {
-                            let type_name =
-                                self_type.rsplit("::").next().unwrap_or(&self_type);
-                            parts.push(format!("<{}>", type_name));
-                        }
-                    }
-                    if config.span_enter.trait_context.show_associated_types
-                        && !trait_ctx.associated_types.is_empty()
-                    {
-                        let assoc_str = trait_ctx
-                            .associated_types
-                            .iter()
-                            .map(|(name, ty)| {
-                                let ty_short = ty.rsplit("::").next().unwrap_or(ty);
-                                format!("{}={}", name, ty_short)
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        parts.push(format!("[{}]", assoc_str));
-                    }
+                    parts.push(format!("[trait: {}]", trait_name));
+                }
+                if config.span_enter.trait_context.show_self_type
+                    && let Some(self_type) = trait_ctx.self_type
+                {
+                    let type_name =
+                        self_type.rsplit("::").next().unwrap_or(&self_type);
+                    parts.push(format!("<{}>", type_name));
+                }
+                if config.span_enter.trait_context.show_associated_types
+                    && !trait_ctx.associated_types.is_empty()
+                {
+                    let assoc_str = trait_ctx
+                        .associated_types
+                        .iter()
+                        .map(|(name, ty)| {
+                            let ty_short = ty.rsplit("::").next().unwrap_or(ty);
+                            format!("{}={}", name, ty_short)
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    parts.push(format!("[{}]", assoc_str));
                 }
             }
 
             // Extract and display function signature
-            if config.span_enter.show_fn_signature {
-                if let Some(fn_sig) = extract_fn_sig(fields_str_opt.as_ref()) {
-                    let highlighted = highlight_rust_signature(&fn_sig, config.enable_ansi);
-                    parts.push(format!("- {}", highlighted));
-                }
+            if config.span_enter.show_fn_signature
+                && let Some(fn_sig) = extract_fn_sig(fields_str_opt.as_ref())
+            {
+                let highlighted =
+                    highlight_rust_signature(&fn_sig, config.enable_ansi);
+                parts.push(format!("- {}", highlighted));
             }
 
             write!(writer, "{}", parts.join(" "))
-        }
+        },
         "\"close\"" => {
             write!(writer, "SPAN CLOSED: {}", span_name)?;
             if config.span_close.show_timing {
                 // Timing will be shown by field visitor
             }
             Ok(())
-        }
+        },
         _ => write!(writer, "{}", message_text.trim_matches('"')),
     }
 }
@@ -302,7 +315,9 @@ fn extract_fn_sig(fields_str_opt: Option<&String>) -> Option<String> {
         if let Some(idx) = fields_str.find("fn_sig=") {
             let start = idx + 7;
             let remaining = &fields_str[start..];
-            let end = remaining.find(char::is_whitespace).unwrap_or(remaining.len());
+            let end = remaining
+                .find(char::is_whitespace)
+                .unwrap_or(remaining.len());
             if end > 0 {
                 return Some(remaining[..end].trim_matches('"').to_string());
             }
@@ -322,34 +337,35 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
 {
-    if let Some(span) = ctx.event_scope().and_then(|scope| scope.from_root().last()) {
-        if let Some(fields) =
-            span.extensions().get::<tracing_subscriber::fmt::FormattedFields<N>>()
-        {
-            let fields_str = strip_ansi_codes(fields.as_str());
+    if let Some(span) =
+        ctx.event_scope().and_then(|scope| scope.from_root().last())
+        && let Some(fields) =
+            span.extensions()
+                .get::<tracing_subscriber::fmt::FormattedFields<N>>()
+    {
+        let fields_str = strip_ansi_codes(fields.as_str());
 
-            // Filter out special fields that are displayed elsewhere
-            let has_fn_sig = config.span_enter.show_fn_signature
-                && fields_str.contains("fn_sig=");
-            let cleaned = filter_span_fields(&fields_str, has_fn_sig);
+        // Filter out special fields that are displayed elsewhere
+        let cleaned = filter_span_fields(&fields_str);
 
-            // Also remove trait context fields if they were displayed
-            let mut final_cleaned = cleaned;
-            if config.span_enter.trait_context.show_self_type {
-                final_cleaned = remove_all_occurrences(&final_cleaned, "self_type=");
-            }
-            if config.span_enter.trait_context.show_trait_name {
-                final_cleaned = remove_all_occurrences(&final_cleaned, "trait_name=");
-            }
-            if config.span_enter.trait_context.show_associated_types {
-                final_cleaned = remove_associated_types(&final_cleaned);
-            }
+        // Also remove trait context fields if they were displayed
+        let mut final_cleaned = cleaned;
+        if config.span_enter.trait_context.show_self_type {
+            final_cleaned =
+                remove_all_occurrences(&final_cleaned, "self_type=");
+        }
+        if config.span_enter.trait_context.show_trait_name {
+            final_cleaned =
+                remove_all_occurrences(&final_cleaned, "trait_name=");
+        }
+        if config.span_enter.trait_context.show_associated_types {
+            final_cleaned = remove_associated_types(&final_cleaned);
+        }
 
-            let trimmed = final_cleaned.trim();
-            if !trimmed.is_empty() {
-                for line in trimmed.lines() {
-                    write!(writer, "\n{}    {}", gutter_indent, line)?;
-                }
+        let trimmed = final_cleaned.trim();
+        if !trimmed.is_empty() {
+            for line in trimmed.lines() {
+                write!(writer, "\n{}    {}", gutter_indent, line)?;
             }
         }
     }
@@ -357,7 +373,10 @@ where
 }
 
 /// Remove all occurrences of a field from formatted fields string
-fn remove_all_occurrences(fields: &str, field_prefix: &str) -> String {
+fn remove_all_occurrences(
+    fields: &str,
+    field_prefix: &str,
+) -> String {
     let mut result = fields.to_string();
     while let Some(start) = result.find(field_prefix) {
         let after_eq = start + field_prefix.len();
@@ -389,7 +408,9 @@ fn remove_associated_types(fields: &str) -> String {
             if field_name != "self" && field_name != "trait_name" {
                 let after_eq = abs_pos + 6;
                 let remaining = &result[after_eq..];
-                let field_end = if let Some(stripped) = remaining.strip_prefix('"') {
+                let field_end = if let Some(stripped) =
+                    remaining.strip_prefix('"')
+                {
                     stripped.find('"').map(|i| after_eq + i + 2)
                 } else {
                     remaining.find(char::is_whitespace).map(|i| after_eq + i)

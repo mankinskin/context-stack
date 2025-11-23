@@ -51,7 +51,11 @@ pub struct PathCursor<P, State = Matched> {
     pub(crate) atom_position: AtomPosition,
     pub(crate) _state: PhantomData<State>,
 }
-
+impl<P: GraphRoot, State: CursorState> GraphRoot for PathCursor<P, State> {
+    fn root_parent(&self) -> Token {
+        self.path.root_parent()
+    }
+}
 pub(crate) type PatternCursor = PathCursor<PatternRangePath>;
 //pub(crate) type IndexCursor = PathCursor<IndexRangePath>;
 

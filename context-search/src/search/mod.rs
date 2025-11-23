@@ -134,7 +134,7 @@ where
         match self.matches.find_next() {
             Some(matched_state) => {
                 debug!(
-                    is_complete = matched_state.query_exhausted(),
+                    query_exhausted = matched_state.query_exhausted(),
                     "found matched state"
                 );
 
@@ -234,7 +234,7 @@ where
             iteration += 1;
             debug!(iteration, "tracing matched state");
             debug!(
-                "About to trace MatchResult: is_complete={}, path_variant={}",
+                "About to trace MatchResult: query_exhausted={}, path_variant={}",
                 matched_state.query_exhausted(),
                 match matched_state.path() {
                     PathCoverage::Range(_) => "Range",
@@ -254,7 +254,7 @@ where
             debug!(
                 root = %checkpoint.root_parent(),
                 checkpoint_pos = *checkpoint.cursor().atom_position.as_ref(),
-                is_complete = checkpoint.query_exhausted(),
+                query_exhausted = checkpoint.query_exhausted(),
                 "Using best_match as final result"
             );
             checkpoint

@@ -4,6 +4,7 @@ use crate::{
     GraphRootChild,
     GraphRootPattern,
     HasPath,
+    PathNode,
     PathRole,
     PositionAnnotated,
     RootPattern,
@@ -74,9 +75,7 @@ use std::{
 //}
 
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub struct RootChildState<
-    EndNode: Debug + Clone + PartialEq + Eq = ChildLocation,
-> {
+pub struct RootChildState<EndNode: PathNode = ChildLocation> {
     #[deref]
     #[deref_mut]
     pub child_state: ChildState<EndNode>,
@@ -87,7 +86,7 @@ pub struct RootChildState<
 /// The `entry_pos` represents the position where we entered the root token of this traversal.
 /// The `start_pos` represents the position to use for tracing the start path (for bottom-up edges).
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub struct ChildState<EndNode: Debug + Clone + PartialEq + Eq = ChildLocation> {
+pub struct ChildState<EndNode: PathNode = ChildLocation> {
     pub entry_pos: AtomPosition,
     pub start_pos: AtomPosition,
     #[deref]
@@ -95,7 +94,7 @@ pub struct ChildState<EndNode: Debug + Clone + PartialEq + Eq = ChildLocation> {
     pub path: IndexRangePath<ChildLocation, EndNode>,
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> ChildState<EndNode>
+impl<EndNode: PathNode> ChildState<EndNode>
 where
     IndexRangePath<ChildLocation, EndNode>:
         HasRolePath<Start, Node = ChildLocation> + RootedPath<Root = IndexRoot>,
@@ -112,7 +111,7 @@ where
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> PathAppend for ChildState<EndNode>
+impl<EndNode: PathNode> PathAppend for ChildState<EndNode>
 where
     IndexRangePath<ChildLocation, EndNode>: PathAppend,
 {
@@ -124,16 +123,13 @@ where
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> HasRootChildIndex<End>
-    for ChildState<EndNode>
-{
+impl<EndNode: PathNode> HasRootChildIndex<End> for ChildState<EndNode> {
     fn root_child_index(&self) -> usize {
         self.path.role_root_child_index::<End>()
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> HasRootChildToken<End>
-    for ChildState<EndNode>
+impl<EndNode: PathNode> HasRootChildToken<End> for ChildState<EndNode>
 where
     IndexRangePath<ChildLocation, EndNode>: HasRootChildToken<End>,
 {
@@ -145,16 +141,12 @@ where
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> GraphRoot
-    for ChildState<EndNode>
-{
+impl<EndNode: PathNode> GraphRoot for ChildState<EndNode> {
     fn root_parent(&self) -> Token {
         self.path.root_parent()
     }
 }
-impl<EndNode: Debug + Clone + PartialEq + Eq> RootPattern
-    for ChildState<EndNode>
-{
+impl<EndNode: PathNode> RootPattern for ChildState<EndNode> {
     fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
         &'b self,
         trav: &'g G::Guard<'a>,
@@ -162,16 +154,12 @@ impl<EndNode: Debug + Clone + PartialEq + Eq> RootPattern
         self.path.root_pattern::<G>(trav)
     }
 }
-impl<EndNode: Debug + Clone + PartialEq + Eq> GraphRootPattern
-    for ChildState<EndNode>
-{
+impl<EndNode: PathNode> GraphRootPattern for ChildState<EndNode> {
     fn root_pattern_location(&self) -> crate::PatternLocation {
         self.path.root_pattern_location()
     }
 }
-impl<EndNode: Debug + Clone + PartialEq + Eq> RootedPath
-    for ChildState<EndNode>
-{
+impl<EndNode: PathNode> RootedPath for ChildState<EndNode> {
     type Root = <IndexRangePath<ChildLocation, EndNode> as RootedPath>::Root;
     fn path_root(&self) -> Self::Root {
         self.path.path_root()
@@ -198,8 +186,7 @@ where
 // have HasPath<End, Node = PositionAnnotated<ChildLocation>>.
 // Instead, PrefixStates is implemented directly for this type in context-search.
 
-impl<R: PathRole, EndNode: Debug + Clone + PartialEq + Eq> HasPath<R>
-    for ChildState<EndNode>
+impl<R: PathRole, EndNode: PathNode> HasPath<R> for ChildState<EndNode>
 where
     IndexRangePath<ChildLocation, EndNode>: HasRolePath<R>,
 {
@@ -213,8 +200,7 @@ where
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> StateAdvance
-    for ChildState<EndNode>
+impl<EndNode: PathNode> StateAdvance for ChildState<EndNode>
 where
     IndexRangePath<ChildLocation, EndNode>: Advance,
 {
@@ -231,7 +217,7 @@ where
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> Ord for ChildState<EndNode> {
+impl<EndNode: PathNode> Ord for ChildState<EndNode> {
     fn cmp(
         &self,
         other: &Self,
@@ -240,9 +226,7 @@ impl<EndNode: Debug + Clone + PartialEq + Eq> Ord for ChildState<EndNode> {
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> PartialOrd
-    for ChildState<EndNode>
-{
+impl<EndNode: PathNode> PartialOrd for ChildState<EndNode> {
     fn partial_cmp(
         &self,
         other: &Self,
@@ -250,15 +234,13 @@ impl<EndNode: Debug + Clone + PartialEq + Eq> PartialOrd
         Some(self.cmp(other))
     }
 }
-impl<EndNode: Debug + Clone + PartialEq + Eq> RootKey for ChildState<EndNode> {
+impl<EndNode: PathNode> RootKey for ChildState<EndNode> {
     fn root_key(&self) -> UpKey {
         UpKey::new(self.path.root_parent(), self.entry_pos.into())
     }
 }
 
-impl<EndNode: Debug + Clone + PartialEq + Eq> TargetKey
-    for ChildState<EndNode>
-{
+impl<EndNode: PathNode> TargetKey for ChildState<EndNode> {
     fn target_key(&self) -> DirectedKey {
         self.root_key().into()
     }
@@ -268,7 +250,7 @@ impl<EndNode: Debug + Clone + PartialEq + Eq> TargetKey
 
 // StatePosition implementation using macro (with target_pos)
 crate::impl_state_position! {
-    for ChildState<EndNode> where [EndNode: Debug + Clone + PartialEq + Eq] => {
+    for ChildState<EndNode> where [EndNode: PathNode] => {
         prev_pos: start_pos,
         root_pos: entry_pos,
         target_pos: Some(entry_pos),

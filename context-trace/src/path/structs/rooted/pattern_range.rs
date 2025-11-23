@@ -46,7 +46,9 @@ impl RangePath for PatternRangePath<ChildLocation, ChildLocation> {
     //    }
     //}
 }
-impl HasRootChildIndexMut<End> for PatternRangePath<ChildLocation, ChildLocation> {
+impl HasRootChildIndexMut<End>
+    for PatternRangePath<ChildLocation, ChildLocation>
+{
     fn root_child_index_mut(&mut self) -> &mut usize {
         &mut self.end.sub_path.root_entry
     }
@@ -70,7 +72,9 @@ impl_root! { RootPattern for PatternRangePath<ChildLocation, ChildLocation>, sel
 impl_root! { PatternRoot for PatternRangePath<ChildLocation, ChildLocation>, self => self.root.borrow() }
 impl_root! { <Role: PathRole> PatternRoot for PatternRolePath<Role>, self => self.root.borrow() }
 
-impl HasRootChildIndex<Start> for PatternRangePath<ChildLocation, ChildLocation> {
+impl HasRootChildIndex<Start>
+    for PatternRangePath<ChildLocation, ChildLocation>
+{
     fn root_child_index(&self) -> usize {
         self.start.root_entry
     }
@@ -90,12 +94,6 @@ impl MoveRootIndex<Right, End>
     ) -> ControlFlow<()> {
         let current_index = HasRootChildIndex::<End>::root_child_index(self);
 
-        tracing::debug!(
-            "PatternRangePath::move_root_index - current_index={}, pattern_len={}",
-            current_index,
-            self.root.len()
-        );
-
         // Use pattern_index_next to check bounds
         if let Some(next) =
             TravDir::<G>::pattern_index_next(&self.root, current_index)
@@ -108,10 +106,6 @@ impl MoveRootIndex<Right, End>
                 old_end
             );
             *self.root_child_index_mut() = next;
-            tracing::debug!(
-                "PatternRangePath::move_root_index - AFTER UPDATE: end.root_entry={}",
-                *self.root_child_index_mut()
-            );
             ControlFlow::Continue(())
         } else {
             tracing::debug!(

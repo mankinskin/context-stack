@@ -83,7 +83,6 @@ impl Searchable for PatternCursor {
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
         debug!("starting pattern cursor search");
-        debug!(path = %self.path, "pattern cursor path");
 
         // Get the starting token from the query pattern for the SearchIterator
         let start_token = self.path.role_root_child_token::<End, _>(&trav);
@@ -194,7 +193,6 @@ impl Searchable for PatternRangePath {
         trace!(range_path_details = %self, "pattern range path details");
 
         let range_path = self.to_range_path();
-        debug!(range_path = %range_path, "converted to range_path");
 
         let width = range_path.calc_width(&trav);
         debug!("calc_width returned: {}", width);

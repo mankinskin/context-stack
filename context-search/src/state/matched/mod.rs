@@ -20,7 +20,11 @@ pub struct MatchResult {
     /// The cursor indicating position in the query pattern
     pub cursor: PatternCursor,
 }
-
+impl GraphRoot for MatchResult {
+    fn root_parent(&self) -> Token {
+        self.path.root_parent()
+    }
+}
 impl MatchResult {
     /// Get the path
     pub fn path(&self) -> &PathCoverage {
@@ -32,18 +36,14 @@ impl MatchResult {
         &self.cursor
     }
 
-    /// Get the root parent token
-    pub fn root_parent(&self) -> Token {
-        self.path.root_parent()
-    }
-
     /// Check if the query was fully matched
-    /// Returns true if the cursor has reached the end of the query pattern
-    /// AND is not pointing inside the last token (no nested end path)
+    /// Returns true if the cursor's atom_position indicates all query tokens were matched
+    /// The atom_position represents the cumulative width of matched tokens
     pub fn query_exhausted(&self) -> bool {
-        use context_trace::HasPath;
-        self.cursor.path.is_at_pattern_end()
-            && HasPath::path(self.cursor.path.end_path()).is_empty()
+        use context_trace::PatternRoot;
+        let matched_tokens = usize::from(self.cursor.atom_position);
+        let query_length = self.cursor.path.pattern_root_pattern().len();
+        matched_tokens >= query_length
     }
 
     /// Check if the result is a complete pre-existing token in the graph
@@ -107,11 +107,5 @@ impl Traceable for &PathCoverage {
 impl RootKey for MatchResult {
     fn root_key(&self) -> UpKey {
         self.path().root_key()
-    }
-}
-
-impl GraphRoot for MatchResult {
-    fn root_parent(&self) -> Token {
-        self.path().root_parent()
     }
 }
