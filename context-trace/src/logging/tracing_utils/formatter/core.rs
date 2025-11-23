@@ -1,7 +1,9 @@
 //! Core formatter struct and constructor
 
-use super::config::FormatConfig;
-use super::timer::CompactTimer;
+use super::{
+    config::FormatConfig,
+    timer::CompactTimer,
+};
 
 /// Compact formatter that works with tracing_subscriber's FormatEvent trait
 /// and uses our custom CompactTimer for timing information.
