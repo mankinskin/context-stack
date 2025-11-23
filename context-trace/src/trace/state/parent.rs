@@ -96,7 +96,11 @@ impl StateAdvance for ParentState {
         {
             tracing::debug!(next_i = next_i, "Found next child in pattern");
             let root_parent = self.clone();
-            let ParentState { path, root_pos, prev_pos } = self;
+            let ParentState {
+                path,
+                root_pos,
+                prev_pos,
+            } = self;
             Ok(RootChildState {
                 child_state: ChildState {
                     entry_pos: root_pos,

@@ -46,6 +46,7 @@ mod field_visitor;
 mod formatter;
 mod panic;
 mod path;
+mod span_fields;
 mod string_utils;
 mod syntax;
 mod test_tracing;
@@ -53,6 +54,7 @@ mod timer;
 
 // Re-export public API
 pub use config::TracingConfig;
+pub use span_fields::SpanFieldFormatter;
 pub use test_tracing::TestTracing;
 
 /// Convenience macro to initialize tracing for a test

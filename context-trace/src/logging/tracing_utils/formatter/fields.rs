@@ -20,24 +20,26 @@ pub(super) fn filter_span_fields(fields: &str) -> String {
     cleaned = remove_field(&cleaned, "trait_name");
 
     // Remove associated type fields (ending with _type)
-    let words: Vec<&str> = cleaned.split_whitespace().collect();
-    cleaned = words
-        .into_iter()
-        .filter(|word| {
-            if let Some(eq_pos) = word.find('=') {
-                let field_name = &word[..eq_pos];
-                !field_name.ends_with("_type") || field_name == "self_type"
-            } else {
-                true
+    // We need to preserve newlines, so process line by line
+    let mut result_lines = Vec::new();
+    for line in cleaned.lines() {
+        let trimmed = line.trim();
+        // Skip lines that are just field names ending with _type
+        if let Some(eq_pos) = trimmed.find('=') {
+            let field_name = &trimmed[..eq_pos];
+            if field_name.ends_with("_type") && field_name != "self_type" {
+                continue; // Skip this line
             }
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
+        }
+        result_lines.push(line);
+    }
 
-    cleaned.trim().to_string()
+    let final_cleaned = result_lines.join("\n");
+    final_cleaned.trim().to_string()
 }
 
 /// Remove a field from formatted fields string
+/// Handles multi-line field values by finding the next field start
 fn remove_field(
     fields: &str,
     field_name: &str,
@@ -45,35 +47,34 @@ fn remove_field(
     let pattern = format!("{}=", field_name);
 
     if let Some(start) = fields.find(&pattern) {
-        // Find where the value ends (at next space or end of string)
+        // Find where this field ends - either at the next field or end of string
+        // A new field starts with "\n    <name>=" pattern
         let after_eq = start + pattern.len();
         let remaining = &fields[after_eq..];
 
-        let value_end = if remaining.starts_with('"') {
-            // Quoted value - find closing quote
-            remaining[1..]
-                .find('"')
-                .map(|pos| after_eq + pos + 2)
-                .unwrap_or(fields.len())
-        } else {
-            // Unquoted value - find next space
-            remaining
-                .find(char::is_whitespace)
-                .map(|pos| after_eq + pos)
-                .unwrap_or(fields.len())
-        };
+        // Find the next field by looking for newline followed by non-whitespace and '='
+        let value_end = remaining
+            .char_indices()
+            .skip(1) // Skip first char to allow for immediate newline
+            .find(|(i, c)| {
+                if *c == '\n' {
+                    // Check if next line starts a new field (has '=' before line break)
+                    let rest = &remaining[*i + 1..];
+                    rest.trim_start().contains('=')
+                        && rest[..rest.find('\n').unwrap_or(rest.len())]
+                            .contains('=')
+                } else {
+                    false
+                }
+            })
+            .map(|(i, _)| after_eq + i)
+            .unwrap_or(fields.len());
 
-        // Remove the field and normalize whitespace
-        let before = fields[..start].trim_end();
-        let after = fields[value_end..].trim_start();
+        // Remove the field preserving structure
+        let before = &fields[..start];
+        let after = &fields[value_end..];
 
-        if before.is_empty() {
-            after.to_string()
-        } else if after.is_empty() {
-            before.to_string()
-        } else {
-            format!("{} {}", before, after)
-        }
+        format!("{}{}", before, after)
     } else {
         fields.to_string()
     }

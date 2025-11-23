@@ -249,9 +249,7 @@ impl TestTracing {
                     .event_format(CompactFieldsFormatter::new(
                         format_config.clone(),
                     ))
-                    .fmt_fields(
-                        tracing_subscriber::fmt::format::DefaultFields::new(),
-                    )
+                    .fmt_fields(super::SpanFieldFormatter)
                     .with_filter(stdout_filter);
 
                 let file_layer = tracing_subscriber::fmt::layer()
@@ -268,6 +266,7 @@ impl TestTracing {
                     .event_format(CompactFieldsFormatter::new(
                         format_config_file.clone(),
                     ))
+                    .fmt_fields(super::SpanFieldFormatter)
                     .with_filter(file_filter);
 
                 Dispatch::new(registry.with(stdout_layer).with(file_layer))
@@ -284,9 +283,7 @@ impl TestTracing {
                     .with_ansi(format_config.enable_ansi)
                     .with_timer(CompactTimer::new())
                     .event_format(CompactFieldsFormatter::new(format_config))
-                    .fmt_fields(
-                        tracing_subscriber::fmt::format::DefaultFields::new(),
-                    )
+                    .fmt_fields(super::SpanFieldFormatter)
                     .with_filter(stdout_filter);
 
                 Dispatch::new(registry.with(stdout_layer))
@@ -310,9 +307,7 @@ impl TestTracing {
                     .event_format(CompactFieldsFormatter::new(
                         format_config_file,
                     ))
-                    .fmt_fields(
-                        tracing_subscriber::fmt::format::DefaultFields::new(),
-                    )
+                    .fmt_fields(super::SpanFieldFormatter)
                     .with_filter(file_filter);
 
                 Dispatch::new(registry.with(file_layer))

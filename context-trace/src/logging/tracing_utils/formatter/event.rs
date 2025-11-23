@@ -235,11 +235,11 @@ where
             let mut parts = Vec::new();
             parts.push(format!("SPAN ENTERED: {}::{}", target, span_name));
 
-            // Get formatted fields
+            // Get formatted fields (but don't display them inline - they'll be shown below)
             let fields_str_opt = span.as_ref().and_then(|s| {
                 s.extensions()
                     .get::<tracing_subscriber::fmt::FormattedFields<N>>()
-                    .map(|f| strip_ansi_codes(f.as_str()).replace('\n', " "))
+                    .map(|f| strip_ansi_codes(f.as_str()))
             });
 
             // Extract and display trait context
