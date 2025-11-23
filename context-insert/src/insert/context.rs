@@ -26,10 +26,14 @@ use crate::insert::result::InsertResult;
 #[derive(Debug, Clone, Default)]
 pub struct InsertTraversal;
 
-impl SearchKind for InsertTraversal {
+impl TraceKind for InsertTraversal {
     type Trav = HypergraphRef;
+}
+
+impl SearchKind for InsertTraversal {
     type Container = BftQueue;
     type Policy = AncestorPolicy<Self::Trav>;
+    type EndNode = PositionAnnotated<ChildLocation>;
 }
 
 #[derive(Debug)]

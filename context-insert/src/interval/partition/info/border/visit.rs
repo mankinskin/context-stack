@@ -54,7 +54,7 @@ impl<M: PostVisitMode> VisitBorders<Post<M>> for BorderInfo {
     ) -> Option<OffsetsOf<Post<M>>> {
         (self.inner_offset.is_some() && pattern.len() - self.sub_index > 1)
             .then(|| {
-                let w = pattern[self.sub_index].width();
+                let w = *pattern[self.sub_index].width();
                 self.start_offset.map(|o| o.get() + w).unwrap_or(w)
             })
             .and_then(NonZeroUsize::new)
@@ -114,7 +114,7 @@ impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
         let r = match (a, b) {
             (Some(lio), Some(rio)) => Some((lio, rio)),
             (Some(lio), None) => Some((lio, {
-                let w = pattern[self.1.sub_index].width();
+                let w = *pattern[self.1.sub_index].width();
                 let o = self.1.start_offset.unwrap().get() + w;
                 NonZeroUsize::new(o).unwrap()
             })),

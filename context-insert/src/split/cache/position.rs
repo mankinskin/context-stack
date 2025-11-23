@@ -36,7 +36,7 @@ impl From<Token> for PosKey {
     fn from(index: Token) -> Self {
         Self {
             index,
-            pos: NonZeroUsize::new(index.width()).unwrap(),
+            pos: NonZeroUsize::new(*index.width()).unwrap(),
         }
     }
 }

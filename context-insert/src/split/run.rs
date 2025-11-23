@@ -36,7 +36,7 @@ impl<G: HasGraph> Iterator for SplitRun<G> {
             self.incomplete.insert(state.index);
             let complete = self
                 .incomplete
-                .split_off(&TokenWidth(state.index.width() + 1));
+                .split_off(&TokenWidth(*state.index.width() + 1));
             self.ctx
                 .cache
                 .augment_nodes(&mut self.ctx.states_ctx, complete);

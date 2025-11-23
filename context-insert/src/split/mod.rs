@@ -73,9 +73,9 @@ impl TraceSide for TraceBack {
             .enumerate()
             .find_map(|(i, c)|
             // returns current index when remaining offset is smaller than current token
-            match c.width().cmp(&offset) {
+            match c.width().cmp(&TokenWidth(offset)) {
                 Ordering::Less => {
-                    offset -= c.width();
+                    offset -= *c.width();
                     None
                 }
                 Ordering::Equal => {
@@ -103,9 +103,9 @@ impl TraceSide for TraceFront {
             .enumerate()
             .find_map(|(i, c)|
             // returns current index when remaining offset does not exceed current token
-            match c.width().cmp(&offset) {
+            match c.width().cmp(&TokenWidth(offset)) {
                 Ordering::Less => {
-                    offset -= c.width();
+                    offset -= *c.width();
                     None
                 }
                 Ordering::Equal => {

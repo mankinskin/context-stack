@@ -161,8 +161,8 @@ impl NodeJoinCtx<'_> {
     pub fn join_partitions(&mut self) -> LinkedHashMap<PosKey, Split> {
         let partitions = self.index_partitions();
         assert_eq!(
-            self.index.width(),
-            partitions.iter().map(Token::width).sum::<usize>()
+            *self.index.width(),
+            partitions.iter().map(|t| *t.width()).sum::<usize>()
         );
         let pos_splits = self.vertex_cache();
         assert_eq!(partitions.len(), pos_splits.len() + 1,);
@@ -296,7 +296,7 @@ impl NodeJoinCtx<'_> {
                         self.index.to_child_location(SubLocation::new(rp, li)),
                     );
                     let outer_offset = NonZeroUsize::new(
-                        rp_brd.start_offset.unwrap().get() + lc.width(),
+                        rp_brd.start_offset.unwrap().get() + *lc.width(),
                     )
                     .unwrap();
                     (position_splits(self.patterns(), outer_offset), li)
@@ -352,7 +352,7 @@ impl NodeJoinCtx<'_> {
                         self.index.to_child_location(SubLocation::new(lp, ri)),
                     );
                     let outer_offset = NonZeroUsize::new(
-                        lp_brd.start_offset.unwrap().get() + rc.width(),
+                        lp_brd.start_offset.unwrap().get() + *rc.width(),
                     )
                     .unwrap();
                     (position_splits(self.patterns(), outer_offset), ri)

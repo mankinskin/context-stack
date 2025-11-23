@@ -144,8 +144,8 @@ impl VertexSplitCtx<'_> {
                 // pattern location
                 let token = node.expect_child_at(location);
 
-                let inner_offset = Offset::new(token.width() - **inner_width);
-                let outer_offset = node.expect_child_offset(location);
+                let inner_offset = Offset::new(*token.width() - **inner_width);
+                let outer_offset = *node.expect_child_offset(location);
                 if let Some(node_offset) = inner_offset
                     .and_then(|o| o.checked_add(outer_offset))
                     .or(NonZeroUsize::new(outer_offset))
@@ -179,18 +179,18 @@ impl VertexSplitCtx<'_> {
             for location in pos_cache.bottom().values() {
                 let token = node.expect_child_at(location);
                 let inner_offset =
-                    Offset::new(inner_offset.get() % token.width());
+                    Offset::new(inner_offset.get() % *token.width());
                 let location = SubLocation::new(
                     location.pattern_id(),
                     location.sub_index() + inner_offset.is_none() as usize,
                 );
 
-                let offset = node.expect_child_offset(&location);
+                let offset = *node.expect_child_offset(&location);
                 let parent_offset = inner_offset
                     .map(|o| o.checked_add(offset).unwrap())
                     .unwrap_or_else(|| NonZeroUsize::new(offset).unwrap());
 
-                if parent_offset.get() < node.width() {
+                if parent_offset.get() < *node.width() {
                     let bottom = SubSplitLocation::new(location, inner_offset);
                     if let Some(e) = output.splits_mut().get_mut(&parent_offset)
                     {

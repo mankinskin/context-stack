@@ -17,7 +17,7 @@ pub(crate) fn pattern_from_widths(
     widths
         .into_iter()
         .enumerate()
-        .map(|(i, w)| Token::new(i, w))
+        .map(|(i, w)| Token::new(VertexIndex(i), w))
         .collect()
 }
 
@@ -35,14 +35,14 @@ fn atom_pos_split() {
     assert_eq!(
         TraceFront::trace_child_pos(
             pattern.borrow() as &[Token],
-            NonZeroUsize::new(width - 2).unwrap(),
+            NonZeroUsize::new(*width - 2).unwrap(),
         ),
         Some((2, None).into()),
     );
     assert_eq!(
         TraceFront::trace_child_pos(
             pattern.borrow() as &[Token],
-            NonZeroUsize::new(width - 4).unwrap(),
+            NonZeroUsize::new(*width - 4).unwrap(),
         ),
         Some((2, NonZeroUsize::new(1)).into()),
     );

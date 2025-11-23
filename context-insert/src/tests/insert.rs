@@ -36,7 +36,7 @@ fn index_pattern1() {
     assert_eq!(
         byz,
         Token {
-            index: 13,
+            index: VertexIndex(13),
             width: 3.into(),
         },
         "byz"
