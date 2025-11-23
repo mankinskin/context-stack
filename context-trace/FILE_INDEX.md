@@ -1,11 +1,15 @@
 # context-trace File Index
 
 **Generated:** 2025-11-23  
-**Git Commit:** 6d74dcb (6d74dcbc4733fc3f0645eae86346b033fea9d24f)  
-**Commit Date:** 2025-11-23 15:20:32 +0100  
-**Commit Message:** Refactor path accessors and traits for improved clarity and consistency
+**Updated:** 2025-11-23 (Post-Phase 2 Complete)  
+**Git Commit:** f23260f  
+**Commit Date:** 2025-11-23  
+**Commit Message:** refactor: extract standalone tools and reorganize deps  
+**Status:** ✅ Phase 2 Complete - All Large Files Split!
 
-**Total:** 125 files, 18,488 lines
+**Total:** 153 files, 19,173 lines  
+**Largest File:** 408 lines (down from 728!)  
+**Files >500:** 0 (was 6) ✅
 
 ## Summary Statistics
 
@@ -21,21 +25,27 @@
 
 ## Files by Size Category
 
-### 🔴 Very Large (>500 lines) - Split Priority
-| Lines | File | Purpose |
-|-------|------|---------|
-| 728 | logging/tracing_utils/config.rs | Tracing configuration |
-| 699 | graph/vertex/data.rs | Vertex data structures |
-| 618 | tests/macros.rs | Test macros |
-| 591 | logging/tracing_utils/formatter.rs | Log formatting |
-| 510 | path/structs/rooted/index_range.rs | Rooted index range paths |
-| 502 | graph/insert.rs | Graph insertion logic |
+### ✅ All Large Files Split! (Phase 2 Complete)
 
-### 🟡 Large (300-500 lines) - Review for Splitting
+**Previously >500 lines (now split):**
+- ✅ logging/tracing_utils/config.rs (728 → 305 lines largest)
+- ✅ graph/vertex/data.rs (699 → 406 lines largest)
+- ✅ tests/macros.rs (618 → 292 lines largest)
+- ✅ logging/tracing_utils/formatter.rs (591 → 408 lines largest)
+- ✅ path/structs/rooted/index_range.rs (510 → 184 lines largest)
+- ✅ graph/insert.rs (502 → 118 lines largest)
+
+### 🟢 Largest Files Now (400-500 lines) - Acceptable
+| Lines | File | Purpose | Status |
+|-------|------|---------|--------|
+| 408 | logging/tracing_utils/formatter/event.rs | Event formatting | Post-split ✅ |
+| 406 | graph/vertex/data/children.rs | Child operations | Post-split ✅ |
+| 397 | tests/state_advance.rs | State advancement tests | Test file ✅ |
+| 396 | logging/tracing_utils/test_tracing.rs | Test tracing utilities | Acceptable ✅ |
+
+### 🟢 Medium (300-400 lines) - Good Size
 | Lines | File | Purpose |
 |-------|------|---------|
-| 397 | tests/state_advance.rs | State advancement tests |
-| 396 | logging/tracing_utils/test_tracing.rs | Test tracing utilities |
 | 391 | graph/vertex/token.rs | Token vertex operations |
 | 387 | graph/mod.rs | Main graph module |
 | 366 | path/structs/rooted/mod.rs | Rooted path structures |

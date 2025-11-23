@@ -1,11 +1,15 @@
 # context-search File Index
 
 **Generated:** 2025-11-23  
-**Git Commit:** 6d74dcb (6d74dcbc4733fc3f0645eae86346b033fea9d24f)  
-**Commit Date:** 2025-11-23 15:20:32 +0100  
-**Commit Message:** Refactor path accessors and traits for improved clarity and consistency
+**Updated:** 2025-11-23 (Post-Phase 1 Complete)  
+**Git Commit:** f23260f  
+**Commit Date:** 2025-11-23  
+**Commit Message:** refactor: extract standalone tools and reorganize deps  
+**Status:** ✅ Phase 1 Complete - All Large Files Split!
 
-**Total:** 46 files, 8,181 lines
+**Total:** 56 files, 8,273 lines  
+**Largest File:** 497 lines (test file, down from 815!)  
+**Files >500:** 0 (was 3) ✅
 
 ## Summary Statistics
 
@@ -22,12 +26,20 @@
 
 ## Files by Size Category
 
-### 🔴 Very Large (>500 lines) - Split Priority
-| Lines | File | Purpose |
-|-------|------|---------|
-| 815 | match/root_cursor.rs | Root cursor matching logic |
-| 725 | compare/state.rs | State comparison and decomposition |
-| 544 | tests/state_advance.rs | State advancement tests |
+### ✅ All Large Files Split! (Phase 1 Complete)
+
+**Previously >500 lines (now split):**
+- ✅ match/root_cursor.rs (815 → 434 lines largest)
+- ✅ compare/state.rs (725 → 369 lines largest)
+- ✅ tests/state_advance.rs (544 → 346 lines largest)
+- ✅ state/start.rs (424 → 226 lines largest)
+
+### 🟡 Largest Files Now (400-500 lines) - Test Files, Acceptable
+| Lines | File | Purpose | Status |
+|-------|------|---------|--------|
+| 497 | tests/state_advance_integration.rs | Integration tests | Test file ⚠️ Has 6 failing tests |
+| 434 | tests/search/ancestor.rs | Ancestor search tests | Well-organized ✅ |
+| 434 | match/root_cursor/advance.rs | Cursor advancement logic | Post-split ✅ |
 
 ### 🟡 Large (300-500 lines) - Review for Splitting
 | Lines | File | Purpose |
