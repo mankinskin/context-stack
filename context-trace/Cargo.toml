@@ -45,7 +45,7 @@ version = "^1.4"
 
 [dependencies.petgraph]
 #git = "https://github.com/mankinskin/petgraph"
-path = "../petgraph"
+path = "../deps/petgraph"
 
 [dependencies.serde]
 features = ["derive"]
