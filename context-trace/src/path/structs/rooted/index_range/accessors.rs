@@ -22,15 +22,17 @@ use crate::{
             },
             root::RootPattern,
         },
-        structs::rooted::{
-            role_path::{
-                HasRootChildIndex,
-                HasRootChildIndexMut,
-                HasRootChildToken,
+        structs::{
+            rooted::{
+                role_path::{
+                    HasRootChildIndex,
+                    HasRootChildIndexMut,
+                    HasRootChildToken,
+                },
+                root::RootedPath,
             },
-            root::RootedPath,
+            sub_path::PositionAnnotated,
         },
-        structs::sub_path::PositionAnnotated,
     },
     trace::{
         cache::key::props::LeafKey,
@@ -169,7 +171,9 @@ impl HasRootChildIndex<Start> for IndexRangePath {
     }
 }
 
-impl<EndNode> HasRootChildIndex<End> for IndexRangePath<ChildLocation, EndNode> {
+impl<EndNode> HasRootChildIndex<End>
+    for IndexRangePath<ChildLocation, EndNode>
+{
     fn root_child_index(&self) -> usize {
         self.end.root_entry
     }
