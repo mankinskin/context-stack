@@ -98,7 +98,6 @@ impl Searchable for PatternCursor {
                     batch_len = p.batch.len(),
                     "first parent batch obtained"
                 );
-                trace!(batch_details = %pretty(&p), "parent batch details");
 
                 Ok(SearchState {
                     query: self.path.clone(),

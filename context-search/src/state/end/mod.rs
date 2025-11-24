@@ -85,19 +85,21 @@ impl PathCoverage {
         end_pos: AtomPosition,
         trav: &G,
     ) -> Self {
-        // Simplify both paths
-        tracing::trace!(
-            "from_range_path BEFORE simplify: start_path.len={}, end_path.len={}",
-            path.start_path().len(),
-            path.end_path().len()
-        );
-        path.start_path_mut().simplify(trav);
-        path.end_path_mut().simplify(trav);
-        tracing::trace!(
-            "from_range_path AFTER simplify: start_path.len={}, end_path.len={}",
-            path.start_path().len(),
-            path.end_path().len()
-        );
+        if !path.start_path().is_empty() || !path.end_path().is_empty() {
+            // Simplify both paths
+            tracing::trace!(
+                "from_range_path BEFORE simplify: start_path.len={}, end_path.len={}",
+                path.start_path().len(),
+                path.end_path().len()
+            );
+            path.start_path_mut().simplify(trav);
+            path.end_path_mut().simplify(trav);
+            tracing::trace!(
+                "from_range_path AFTER simplify: start_path.len={}, end_path.len={}",
+                path.start_path().len(),
+                path.end_path().len()
+            );
+        }
 
         // Convert to plain path (strip position annotations) after simplification
         let path = path.into_plain();

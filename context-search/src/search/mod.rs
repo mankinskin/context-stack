@@ -124,113 +124,17 @@ pub struct SearchState<K: SearchKind> {
     pub(crate) query: PatternRangePath,
 }
 
-impl<K: SearchKind> Iterator for SearchState<K>
-where
-    K::Trav: Clone,
-{
-    type Item = MatchResult;
-    fn next(&mut self) -> Option<Self::Item> {
-        trace!("searching for next match");
-        match self.matches.find_next() {
-            Some(matched_state) => {
-                debug!(
-                    query_exhausted = matched_state.query_exhausted(),
-                    "found matched state"
-                );
-
-                // Update best_match if this match is better
-                let checkpoint_pos =
-                    *matched_state.cursor().atom_position.as_ref();
-
-                let should_update = match &self.matches.best_match {
-                    None => {
-                        debug!(
-                            root = %matched_state.root_parent(),
-                            checkpoint_pos = checkpoint_pos,
-                            "First match - setting as best_match"
-                        );
-                        true
-                    },
-                    Some(prev) => {
-                        let prev_checkpoint_pos =
-                            *prev.cursor().atom_position.as_ref();
-
-                        if checkpoint_pos > prev_checkpoint_pos {
-                            debug!(
-                                root = %matched_state.root_parent(),
-                                checkpoint_pos = checkpoint_pos,
-                                prev_checkpoint_pos = prev_checkpoint_pos,
-                                "Better match found (more query tokens matched)"
-                            );
-                            true
-                        } else if checkpoint_pos == prev_checkpoint_pos {
-                            // Same progress: prefer Complete over Mismatch
-                            let better = matched_state.query_exhausted()
-                                && !prev.query_exhausted();
-                            if better {
-                                debug!(
-                                    root = %matched_state.root_parent(),
-                                    "Same progress but Complete - updating"
-                                );
-                            }
-                            better
-                        } else {
-                            false
-                        }
-                    },
-                };
-
-                if should_update {
-                    // Trace start path for new best match
-                    if let Some(start_path) =
-                        matched_state.path().try_start_path()
-                    {
-                        let prev_start_len = self
-                            .matches
-                            .best_match
-                            .as_ref()
-                            .and_then(|p| p.path().try_start_path())
-                            .map(|p| p.len())
-                            .unwrap_or(0);
-                        let current_start_len = start_path.len();
-
-                        if current_start_len > prev_start_len {
-                            debug!(
-                                "Tracing incremental start path: prev_len={}, current_len={}",
-                                prev_start_len, current_start_len
-                            );
-                            TraceStart {
-                                end: &matched_state,
-                                pos: prev_start_len,
-                            }
-                            .trace(&mut self.matches.trace_ctx);
-                        }
-                    }
-
-                    self.matches.best_match = Some(matched_state.clone());
-                }
-
-                Some(matched_state)
-            },
-            None => {
-                trace!("no more matches found");
-                None
-            },
-        }
-    }
-}
-
 impl<K: SearchKind> SearchState<K>
 where
     K::Trav: Clone,
 {
     #[context_trace::instrument_sig(level = "info", skip(self))]
     pub(crate) fn search(mut self) -> Response {
-        info!("starting fold search");
         debug!(queue = %&self.matches.queue, "initial state");
 
         let mut iteration = 0;
-        while let Some(matched_state) = &mut self.next() {
+        let mut best_match = None;
+        while let Some(matched_state) = self.next() {
             iteration += 1;
             debug!(iteration, "tracing matched state");
             debug!(
@@ -244,13 +148,14 @@ where
                 }
             );
             matched_state.trace(&mut self.matches.trace_ctx);
+            best_match = Some(matched_state);
             debug!("Finished tracing MatchResult");
         }
 
         debug!(iterations = iteration, "fold completed");
 
         // Get the final matched state from best_match
-        let end = if let Some(checkpoint) = self.matches.best_match {
+        let end = if let Some(checkpoint) = best_match.take() {
             debug!(
                 root = %checkpoint.root_parent(),
                 checkpoint_pos = *checkpoint.cursor().atom_position.as_ref(),
@@ -288,5 +193,56 @@ where
 
         info!("search complete");
         response
+    }
+}
+impl<K: SearchKind> Iterator for SearchState<K>
+where
+    K::Trav: Clone,
+{
+    type Item = MatchResult;
+    fn next(&mut self) -> Option<Self::Item> {
+        trace!("searching for next match");
+        match self.matches.find_next() {
+            Some(matched_state) => {
+                // Update best_match if this match is better
+                let checkpoint_pos =
+                    *matched_state.cursor().atom_position.as_ref();
+
+                debug!(
+                    query_exhausted = matched_state.query_exhausted(),
+                    checkpoint_pos = checkpoint_pos,
+                    "found matched state"
+                );
+
+                // Trace start path for new best match
+                if let Some(start_path) = matched_state.path().try_start_path()
+                {
+                    let prev_start_len = matched_state
+                        .path()
+                        .try_start_path()
+                        .map(|p| p.len())
+                        .unwrap_or(0);
+                    let current_start_len = start_path.len();
+
+                    if current_start_len > prev_start_len {
+                        debug!(
+                                "Tracing incremental start path: prev_len={}, current_len={}",
+                                prev_start_len, current_start_len
+                            );
+                        TraceStart {
+                            end: &matched_state,
+                            pos: prev_start_len,
+                        }
+                        .trace(&mut self.matches.trace_ctx);
+                    }
+                }
+
+                Some(matched_state)
+            },
+            None => {
+                trace!("no more matches found");
+                None
+            },
+        }
     }
 }

@@ -75,9 +75,7 @@ impl CompactFormat for SearchNode {
     ) -> fmt::Result {
         match self {
             SearchNode::ParentCandidate(state) => state.fmt_compact(f),
-            SearchNode::PrefixQueue(queue) => {
-                write!(f, "PrefixQueue(size:{})", queue.len())
-            },
+            SearchNode::ChildCandidate(state) => state.fmt_compact(f),
         }
     }
 
@@ -88,10 +86,7 @@ impl CompactFormat for SearchNode {
     ) -> fmt::Result {
         match self {
             SearchNode::ParentCandidate(state) => state.fmt_indented(f, indent),
-            SearchNode::PrefixQueue(queue) => {
-                write_indent(f, indent)?;
-                write!(f, "PrefixQueue(size:{})", queue.len())
-            },
+            SearchNode::ChildCandidate(state) => state.fmt_indented(f, indent),
         }
     }
 }
@@ -114,7 +109,8 @@ where
         let query_pos: usize = self.query.current().atom_position.into();
         let index_pos: usize =
             (*self.child.current().child_state.target_pos().unwrap()).into();
-        let checkpoint_pos: usize = self.query.checkpoint().atom_position.into();
+        let checkpoint_pos: usize =
+            self.query.checkpoint().atom_position.into();
 
         write!(
             f,
@@ -141,7 +137,10 @@ where
 
         write_indent(f, indent + 1)?;
         write!(f, "child: ")?;
-        self.child.current().child_state.fmt_indented(f, indent + 1)?;
+        self.child
+            .current()
+            .child_state
+            .fmt_indented(f, indent + 1)?;
         writeln!(f, ",")?;
 
         write_indent(f, indent + 1)?;
@@ -159,7 +158,9 @@ where
     }
 }
 
-impl<EndNode: PathNode + CompactFormat> CompactFormat for CompareResult<EndNode> {
+impl<EndNode: PathNode + CompactFormat> CompactFormat
+    for CompareResult<EndNode>
+{
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,

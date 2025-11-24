@@ -190,9 +190,12 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                     CompareResult::Mismatch(self.mark_mismatch())
                 },
                 Equal => {
-                    trace!("equal width but not matching: need decomposition (both sides)");
+                    trace!("equal width but not matching: need prefixes of both tokens");
                     CompareResult::Prefixes(
-                        self.mode_prefixes(trav, GraphMajor),
+                        self.mode_prefixes(trav, GraphMajor)
+                            .into_iter()
+                            .chain(self.mode_prefixes(trav, QueryMajor))
+                            .collect(),
                     )
                 },
                 Greater => {

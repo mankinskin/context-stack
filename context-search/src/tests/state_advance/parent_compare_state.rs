@@ -72,23 +72,24 @@ fn test_parent_compare_state_advance_success() {
 
     // Verify cursors are created properly
     assert_eq!(
-        compare_root_state.token.query.current().atom_position,
+        compare_root_state.candidate.query.current().atom_position,
         parent_compare_state.cursor.atom_position
     );
     assert_eq!(
-        *context_trace::path::accessors::path_accessor::StatePosition::target_pos(
-            &compare_root_state
-                .token
-                .child
-                .current()
-                .child_state
-        ).unwrap(),
+        *StatePosition::target_pos(
+            &compare_root_state.candidate.child.current().child_state
+        )
+        .unwrap(),
         parent_compare_state.cursor.atom_position
     );
 
     // Verify checkpoint is preserved
     assert_eq!(
-        compare_root_state.token.query.checkpoint().atom_position,
+        compare_root_state
+            .candidate
+            .query
+            .checkpoint()
+            .atom_position,
         parent_compare_state.cursor.atom_position
     );
 }
@@ -207,7 +208,7 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
     // Verify the child cursor has the correct root
     assert_eq!(
         compare_root_state
-            .token
+            .candidate
             .child
             .current()
             .child_state
@@ -261,23 +262,27 @@ fn test_parent_compare_state_cursor_conversion() {
 
     // Verify PatternRangePath was converted to PatternPrefixPath
     tracing::info!(
-        cursor_path = ?compare_root_state.token.query.current().path,
+        cursor_path = ?compare_root_state.candidate.query.current().path,
         "Cursor path after conversion"
     );
 
     // Verify atom_position was preserved
     assert_eq!(
-        compare_root_state.token.query.current().atom_position,
+        compare_root_state.candidate.query.current().atom_position,
         AtomPosition::from(5),
         "Cursor atom_position should be preserved"
     );
     assert_eq!(
-        *context_trace::path::accessors::path_accessor::StatePosition::target_pos(&compare_root_state.token.child.current().child_state).unwrap(),
+        *StatePosition::target_pos(&compare_root_state.candidate.child.current().child_state).unwrap(),
         AtomPosition::from(0),
         "Child cursor target_pos should match parent_state root_pos (not query cursor position)"
     );
     assert_eq!(
-        compare_root_state.token.query.checkpoint().atom_position,
+        compare_root_state
+            .candidate
+            .query
+            .checkpoint()
+            .atom_position,
         AtomPosition::from(5),
         "Checkpoint atom_position should be preserved"
     );

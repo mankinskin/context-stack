@@ -28,7 +28,7 @@ use context_trace::trace::cache::key::directed::down::{
 pub(crate) struct CompareRootState {
     #[deref]
     #[deref_mut]
-    pub(crate) token:
+    pub(crate) candidate:
         CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>>,
     pub(crate) root_parent: ParentState,
 }
@@ -83,7 +83,7 @@ impl StateAdvance for ParentCompareState {
                 };
 
                 Ok(CompareRootState {
-                    token: CompareState {
+                    candidate: CompareState {
                         child: Checkpointed {
                             checkpoint: ChildCursor {
                                 child_state: child_state.clone(),

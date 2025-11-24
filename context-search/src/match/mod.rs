@@ -45,7 +45,7 @@ use NodeResult::*;
 #[derive(Debug)]
 pub(crate) enum SearchNode {
     ParentCandidate(ParentCompareState),
-    PrefixQueue(ChildQueue<CompareState<Candidate, Candidate>>),
+    ChildCandidate(CompareState<Candidate, Candidate>),
 }
 use SearchNode::*;
 
@@ -71,41 +71,34 @@ impl PartialOrd for SearchNode {
     }
 }
 
+impl GraphRoot for SearchNode {
+    fn root_parent(&self) -> Token {
+        match self {
+            SearchNode::ParentCandidate(state) =>
+                state.parent_state.path.root_parent(),
+            SearchNode::ChildCandidate(state) =>
+                state.child.current().child_state.root_parent(),
+        }
+    }
+}
 impl Ord for SearchNode {
     fn cmp(
         &self,
         other: &Self,
     ) -> Ordering {
-        let self_priority = match self {
-            SearchNode::ParentCandidate(state) => {
-                // Smaller tokens have higher priority (lower value)
-                let token = state.parent_state.path.root_parent();
-                token.width.0
-            },
-            SearchNode::PrefixQueue(_) => {
-                // PrefixQueues should be processed after all parent candidates
-                usize::MAX
-            },
-        };
+        let self_width = self.root_parent().width.0;
+        let other_width = other.root_parent().width.0;
 
-        let other_priority = match other {
-            SearchNode::ParentCandidate(state) => {
-                let token = state.parent_state.path.root_parent();
-                token.width.0
-            },
-            SearchNode::PrefixQueue(_) => usize::MAX,
-        };
-
-        // Reverse ordering: smaller priority values come first (min-heap behavior)
+        // Reverse ordering: smaller width values come first (min-heap behavior)
         // BinaryHeap is a max-heap by default, so we reverse the comparison
         // to get min-heap behavior (smallest widths popped first)
-        let result = other_priority.cmp(&self_priority);
+        let result = other_width.cmp(&self_width);
 
         // Debug output to verify ordering
         use tracing::trace;
         trace!(
-            self_width = self_priority,
-            other_width = other_priority,
+            self_width,
+            other_width,
             ordering = ?result,
             "SearchNode comparison for heap ordering"
         );
@@ -123,31 +116,28 @@ where
 {
     fn compare_next(
         trav: &K::Trav,
-        queue: ChildQueue<CompareState<Candidate, Candidate>>,
+        state: CompareState<Candidate, Candidate>,
     ) -> Option<NodeResult> {
-        let mut compare_iter = CompareIterator::<K>::new(trav.clone(), queue);
-        match compare_iter.next() {
-            Some(Some(CompareResult::FoundMatch(matched_state))) => {
+        match state.compare_leaf_tokens(trav) {
+            CompareResult::FoundMatch(matched_state) => {
                 // Return the matched state directly without conversion
                 // RootCursor will handle the conversion to Candidate with checkpoint update
                 Some(NodeResult::FoundMatch(Box::new(matched_state)))
             },
-            Some(Some(CompareResult::Mismatch(_))) => Some(Skip),
-            Some(Some(CompareResult::Prefixes(_))) => {
-                unreachable!("compare_iter.next() should never return Prefixes - they are consumed by the iterator")
+            CompareResult::Mismatch(_) => Some(Skip),
+            CompareResult::Prefixes(next) => {
+                tracing::debug!(
+                    num_prefixes = next.len(),
+                    "got Prefixes, extending queue"
+                );
+                Some(QueueMore(next.into_iter().map(ChildCandidate).collect()))
             },
-            Some(None) =>
-                Some(QueueMore(vec![PrefixQueue(compare_iter.children.queue)])),
-            None => None,
         }
     }
     fn consume(self) -> Option<NodeResult> {
         match self.0 {
             ParentCandidate(parent) => match parent.advance_state(&self.1) {
-                Ok(state) => Self::compare_next(
-                    self.1,
-                    ChildQueue::from_iter([state.token]),
-                ),
+                Ok(state) => Self::compare_next(self.1, state.candidate),
                 Err(parent) => Some(QueueMore(
                     K::Policy::next_batch(self.1, &parent)
                         .into_iter()
@@ -160,7 +150,7 @@ where
                         .collect(),
                 )),
             },
-            PrefixQueue(queue) => Self::compare_next(self.1, queue),
+            ChildCandidate(state) => Self::compare_next(self.1, state),
         }
     }
 }

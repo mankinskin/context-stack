@@ -37,13 +37,26 @@ impl MatchResult {
     }
 
     /// Check if the query was fully matched
-    /// Returns true if the cursor's atom_position indicates all query tokens were matched
-    /// The atom_position represents the cumulative width of matched tokens
+    /// Returns true if the cursor's path has reached the end of the pattern
+    /// and there are no more tokens to traverse
     pub fn query_exhausted(&self) -> bool {
-        use context_trace::PatternRoot;
-        let matched_tokens = usize::from(self.cursor.atom_position);
-        let query_length = self.cursor.path.pattern_root_pattern().len();
-        matched_tokens >= query_length
+        use context_trace::{
+            path::accessors::role::End,
+            HasPath,
+            HasRootChildIndex,
+        };
+        let at_end = self.cursor.path.is_at_pattern_end();
+        let path_empty = HasPath::path(self.cursor.path.end_path()).is_empty();
+        let end_index =
+            HasRootChildIndex::<End>::root_child_index(&self.cursor.path);
+        tracing::debug!(
+            at_end,
+            path_empty,
+            end_index,
+            end_path_len=%HasPath::path(self.cursor.path.end_path()).len(),
+            "query_exhausted check"
+        );
+        at_end && path_empty
     }
 
     /// Check if the result is a complete pre-existing token in the graph

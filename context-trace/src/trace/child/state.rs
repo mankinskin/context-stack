@@ -253,7 +253,7 @@ crate::impl_state_position! {
     for ChildState<EndNode> where [EndNode: PathNode] => {
         prev_pos: start_pos,
         root_pos: entry_pos,
-        target_pos: Some(entry_pos),
+        //target_pos: Some(entry_pos),
     }
 }
 
