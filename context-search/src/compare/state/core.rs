@@ -10,12 +10,15 @@ use crate::{
         PathCursor,
     },
 };
-use context_trace::*;
+use context_trace::{
+    path::accessors::has_path::HasRootedPath,
+    *,
+};
 use std::{
-    collections::VecDeque,
     fmt::Debug,
     marker::PhantomData,
 };
+use tracing::debug;
 
 /// Result of advancing only the query cursor
 ///
@@ -133,53 +136,57 @@ pub(crate) type MatchedCompareState =
     CompareState<Matched, Matched, PositionAnnotated<ChildLocation>>;
 
 impl<Q: CursorState, I: CursorState, EndNode: PathNode>
-    CompareState<Q, I, EndNode>
+    HasRootedPath<IndexRangePath<ChildLocation, EndNode>>
+    for CompareState<Q, I, EndNode>
 {
     /// Access the rooted path from the child cursor's state
-    pub(crate) fn rooted_path(
-        &self
-    ) -> &IndexRangePath<ChildLocation, EndNode> {
+    fn rooted_path(&self) -> &IndexRangePath<ChildLocation, EndNode> {
         &self.child.current().child_state.path
+    }
+    /// Access the rooted path from the child cursor's state
+    fn rooted_path_mut(
+        &mut self
+    ) -> &mut IndexRangePath<ChildLocation, EndNode> {
+        &mut self.child.current_mut().child_state.path
+    }
+}
+impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
+    pub(crate) fn update_checkpoint(&mut self) {
+        debug!(
+            query.checkpoint = %self.query.checkpoint,
+            query.current = %self.query.current,
+            //child.checkpoint = %self.child.checkpoint,
+            //child.current = %self.child.current,
+            "Marking current positions as checkpoints"
+        );
+        self.query.checkpoint = self.query.current.clone();
+        self.child.checkpoint = self.child.current.clone();
     }
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum CompareResult<
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum CompareLeafResult<
+    EndNode: PathNode = PositionAnnotated<ChildLocation>,
+> {
+    /// Result of comparing the candidate (matched or mismatched)
+    /// Both query and index cursors remain in their respective states
+    Finished(CompareEndResult<EndNode>),
+    /// Candidate needs decomposition into prefixes for comparison
+    Prefixes(ChildQueue<CompareState<Candidate, Candidate, EndNode>>),
+}
+#[derive(Clone, Debug)]
+pub(crate) enum CompareEndResult<
     EndNode: PathNode = PositionAnnotated<ChildLocation>,
 > {
     /// Result of comparing the candidate (matched or mismatched)
     /// Both query and index cursors remain in their respective states
     FoundMatch(CompareState<Matched, Matched, EndNode>),
     Mismatch(CompareState<Mismatched, Mismatched, EndNode>),
-    /// Candidate needs decomposition into prefixes for comparison
-    Prefixes(ChildQueue<CompareState<Candidate, Candidate, EndNode>>),
-}
-
-impl<Q: CursorState + Clone, I: CursorState + Clone, EndNode: PathNode>
-    CompareState<Q, I, EndNode>
-{
-    pub(crate) fn parent_state(&self) -> ParentCompareState {
-        // IMPORTANT: Use current cursor (not checkpoint) to create parent state
-        // The cursor.path is a PatternRangePath that tracks the current query position
-        // This is passed to ParentCompareState.cursor and used as the starting point
-        // for matching in parent roots, allowing incremental start path tracing:
-        // - Each parent match builds on the previous match's cursor position
-        // - Start paths can be traced incrementally from last match to new match
-        let cursor = PathCursor {
-            path: self.query.current().path.clone(),
-            atom_position: self.query.current().atom_position,
-            _state: PhantomData,
-        };
-
-        ParentCompareState {
-            parent_state: self.child.current().child_state.parent_state(),
-            cursor,
-        }
-    }
 }
 
 // Generic implementation for any EndNode type - methods that don't require LeafToken<End>
-impl<EndNode: PathNode> CompareState<Candidate, Candidate, EndNode> {}
+impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {}
 
 impl From<CompareState<Candidate, Candidate>>
     for ChildQueue<CompareState<Candidate, Candidate>>

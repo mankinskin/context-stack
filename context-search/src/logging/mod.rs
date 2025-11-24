@@ -6,7 +6,8 @@ use crate::{
     compare::{
         parent::ParentCompareState,
         state::{
-            CompareResult,
+            CompareEndResult,
+            CompareLeafResult,
             CompareState,
             PathPairMode,
         },
@@ -36,7 +37,7 @@ impl CompactFormat for ParentCompareState {
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
-        let cursor_pos: usize = self.cursor.atom_position.into();
+        let cursor_pos: usize = self.cursor.current().atom_position.into();
         let vertex = self.parent_state.path.root_parent();
         write!(f, "ParentCandidate(vertex:{}, pos:{})", vertex, cursor_pos)
     }
@@ -47,17 +48,14 @@ impl CompactFormat for ParentCompareState {
         indent: usize,
     ) -> fmt::Result {
         let vertex = self.parent_state.path.root_parent();
-        let cursor_pos: usize = self.cursor.atom_position.into();
 
         write_indent(f, indent)?;
         writeln!(f, "ParentCompareState {{")?;
         write_indent(f, indent + 1)?;
         writeln!(f, "vertex: {},", vertex)?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "cursor_pos: {},", cursor_pos)?;
-        write_indent(f, indent + 1)?;
-        writeln!(f, "cursor_path:")?;
-        self.cursor.path.fmt_indented(f, indent + 2)?;
+        writeln!(f, "cursor:")?;
+        self.cursor.fmt_indented(f, indent + 2)?;
         writeln!(f, ",")?;
         write_indent(f, indent + 1)?;
         writeln!(f, "parent_state:")?;
@@ -159,25 +157,22 @@ where
 }
 
 impl<EndNode: PathNode + CompactFormat> CompactFormat
-    for CompareResult<EndNode>
+    for CompareEndResult<EndNode>
 {
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
         match self {
-            CompareResult::FoundMatch(state) => {
+            CompareEndResult::FoundMatch(state) => {
                 write!(f, "Match(")?;
                 state.fmt_compact(f)?;
                 write!(f, ")")
             },
-            CompareResult::Mismatch(state) => {
+            CompareEndResult::Mismatch(state) => {
                 write!(f, "Mismatch(")?;
                 state.fmt_compact(f)?;
                 write!(f, ")")
-            },
-            CompareResult::Prefixes(queue) => {
-                write!(f, "Prefixes(count:{})", queue.len())
             },
         }
     }
@@ -188,7 +183,7 @@ impl<EndNode: PathNode + CompactFormat> CompactFormat
         indent: usize,
     ) -> fmt::Result {
         match self {
-            CompareResult::FoundMatch(state) => {
+            CompareEndResult::FoundMatch(state) => {
                 write_indent(f, indent)?;
                 writeln!(f, "FoundMatch(")?;
                 state.fmt_indented(f, indent + 1)?;
@@ -196,7 +191,7 @@ impl<EndNode: PathNode + CompactFormat> CompactFormat
                 write_indent(f, indent)?;
                 write!(f, ")")
             },
-            CompareResult::Mismatch(state) => {
+            CompareEndResult::Mismatch(state) => {
                 write_indent(f, indent)?;
                 writeln!(f, "Mismatch(")?;
                 state.fmt_indented(f, indent + 1)?;
@@ -204,14 +199,56 @@ impl<EndNode: PathNode + CompactFormat> CompactFormat
                 write_indent(f, indent)?;
                 write!(f, ")")
             },
-            CompareResult::Prefixes(queue) => {
+        }
+    }
+}
+impl<EndNode: PathNode + CompactFormat> CompactFormat
+    for CompareLeafResult<EndNode>
+{
+    fn fmt_compact(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        match self {
+            CompareLeafResult::Finished(state) => {
+                write!(f, "Finished(")?;
+                state.fmt_compact(f)?;
+                write!(f, ")")
+            },
+            CompareLeafResult::Prefixes(queue) => {
+                write!(f, "Prefixes(")?;
+                write!(f, "count: {}", queue.len())?;
+                write!(f, ")")
+            },
+        }
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut fmt::Formatter,
+        indent: usize,
+    ) -> fmt::Result {
+        match self {
+            CompareLeafResult::Finished(state) => {
                 write_indent(f, indent)?;
-                write!(f, "Prefixes(count:{})", queue.len())
+                writeln!(f, "Finished(")?;
+                state.fmt_indented(f, indent + 1)?;
+                writeln!(f)?;
+                write_indent(f, indent)?;
+                write!(f, ")")
+            },
+            CompareLeafResult::Prefixes(queue) => {
+                write_indent(f, indent)?;
+                writeln!(f, "Prefixes(")?;
+                write_indent(f, indent + 1)?;
+                write!(f, "count: {}", queue.len())?;
+                writeln!(f)?;
+                write_indent(f, indent)?;
+                write!(f, ")")
             },
         }
     }
 }
-
 impl<K: SearchKind> CompactFormat for SearchIterator<K> {
     fn fmt_compact(
         &self,
@@ -312,7 +349,7 @@ impl CompactFormat for SearchQueue {
 }
 
 // Implement Display for types to enable % formatting in tracing without Compact wrapper
-impl_display_via_compact!(CompareResult<EndNode> where EndNode: PathNode + CompactFormat);
+impl_display_via_compact!(CompareEndResult<EndNode> where EndNode: PathNode + CompactFormat);
 impl_display_via_compact!(CompareState<Q, I, EndNode> where Q: CursorState, I: CursorState, EndNode: PathNode);
 impl_display_via_compact!(SearchIterator<K> where K: SearchKind);
 impl_display_via_compact!(SearchQueue);

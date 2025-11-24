@@ -1,6 +1,6 @@
 mod advance;
 mod core;
-mod state;
+//mod state;
 
 pub(crate) use core::{
     CompareParentBatch,

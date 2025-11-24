@@ -5,16 +5,15 @@ use std::{
 
 use crate::{
     compare::{
-        iterator::CompareIterator,
         parent::ParentCompareState,
         state::{
-            CompareResult,
+            CompareEndResult,
+            CompareLeafResult::*,
             CompareState,
             MatchedCompareState,
         },
     },
     cursor::Candidate,
-    r#match::root_cursor::RootCursor,
     traversal::{
         policy::DirectedTraversalPolicy,
         SearchKind,
@@ -23,6 +22,7 @@ use crate::{
 use context_trace::*;
 
 use derive_new::new;
+use tracing::trace;
 pub(crate) mod iterator;
 pub(crate) mod root_cursor;
 
@@ -37,7 +37,7 @@ pub(crate) struct SearchQueue {
 #[derive(Debug)]
 pub(crate) enum NodeResult {
     QueueMore(Vec<SearchNode>),
-    FoundMatch(Box<MatchedCompareState>),
+    FoundMatch(MatchedCompareState),
     Skip,
 }
 use NodeResult::*;
@@ -95,13 +95,12 @@ impl Ord for SearchNode {
         let result = other_width.cmp(&self_width);
 
         // Debug output to verify ordering
-        use tracing::trace;
-        trace!(
-            self_width,
-            other_width,
-            ordering = ?result,
-            "SearchNode comparison for heap ordering"
-        );
+        //trace!(
+        //    self_width,
+        //    other_width,
+        //    ordering = ?result,
+        //    "SearchNode comparison for heap ordering"
+        //);
 
         result
     }
@@ -119,13 +118,13 @@ where
         state: CompareState<Candidate, Candidate>,
     ) -> Option<NodeResult> {
         match state.compare_leaf_tokens(trav) {
-            CompareResult::FoundMatch(matched_state) => {
+            Finished(CompareEndResult::FoundMatch(matched_state)) => {
                 // Return the matched state directly without conversion
                 // RootCursor will handle the conversion to Candidate with checkpoint update
-                Some(NodeResult::FoundMatch(Box::new(matched_state)))
+                Some(NodeResult::FoundMatch(matched_state))
             },
-            CompareResult::Mismatch(_) => Some(Skip),
-            CompareResult::Prefixes(next) => {
+            Finished(CompareEndResult::Mismatch(_)) => Some(Skip),
+            Prefixes(next) => {
                 tracing::debug!(
                     num_prefixes = next.len(),
                     "got Prefixes, extending queue"

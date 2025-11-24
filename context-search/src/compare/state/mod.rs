@@ -3,11 +3,11 @@ mod decomposition;
 mod transitions;
 
 pub(crate) use core::{
-    CompareResult,
+    CompareEndResult,
+    CompareLeafResult,
     CompareState,
     IndexAdvanceResult,
     MatchedCompareState,
     PathPairMode,
     QueryAdvanceResult,
 };
-pub(crate) use decomposition::PrefixStates;

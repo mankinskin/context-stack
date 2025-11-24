@@ -8,7 +8,7 @@ use crate::{
     compare::{
         iterator::CompareIterator,
         state::{
-            CompareResult,
+            CompareEndResult,
             IndexAdvanceResult,
             QueryAdvanceResult,
         },
@@ -34,6 +34,7 @@ use context_trace::{
 };
 use tracing::{
     debug,
+    info,
     trace,
 };
 
@@ -55,7 +56,7 @@ where
     /// - `Finished(Inconclusive)`: Root boundary reached - needs parent exploration
     #[context_trace::instrument_sig(level = "debug", skip(self))]
     pub(crate) fn advance_to_next_match(self) -> RootAdvanceResult<K> {
-        trace!("→ advance_to_next_match: starting advancement");
+        info!("→ advance_to_next_match: starting advancement");
 
         // Save trav before moving self
         let trav = self.trav.clone();
@@ -63,7 +64,7 @@ where
         // Step 1: Try to advance both cursors to get Candidate state
         let candidate_cursor = match self.advance_both_cursors_internal() {
             Ok(candidate) => {
-                trace!("→ advance_to_next_match: both cursors advanced to Candidate");
+                info!("→ advance_to_next_match: both cursors advanced to Candidate");
                 candidate
             },
             Err(Ok(())) => {
@@ -85,16 +86,16 @@ where
         };
 
         // Step 2: Compare tokens at candidate position
-        trace!(
+        info!(
             "→ advance_to_next_match: comparing tokens at candidate position"
         );
         let prev_candidate = candidate_cursor.state.clone();
-        match CompareIterator::<K>::new(trav.clone(), *candidate_cursor.state)
+        match CompareIterator::<K>::new(trav.clone(), candidate_cursor.state)
             .compare()
         {
-            CompareResult::FoundMatch(matched_state) => {
+            CompareEndResult::FoundMatch(matched_state) => {
                 // Successfully matched - return new Matched cursor
-                // CompareResult already has Matched states, SearchIterator will create checkpoint
+                // CompareEndResult already has Matched states, SearchIterator will create checkpoint
                 debug!(
                     root = %matched_state.child.current().child_state.path.root_parent(),
                     query_pos = *matched_state.query.current().atom_position.as_ref(),
@@ -102,17 +103,17 @@ where
                 );
 
                 RootAdvanceResult::Advanced(RootCursor {
-                    state: Box::new(matched_state),
+                    state: matched_state,
                     trav,
                 })
             },
-            CompareResult::Mismatch(_) => {
+            CompareEndResult::Mismatch(_) => {
                 // Found mismatch - check if we made progress
                 let checkpoint_pos =
                     *prev_candidate.query.checkpoint().atom_position.as_ref();
                 if checkpoint_pos == 0 {
                     // No progress - not a valid match, this shouldn't happen after a Matched state
-                    debug!("→ advance_to_next_match: immediate mismatch after match - this is unexpected");
+                    info!("→ advance_to_next_match: immediate mismatch after match - this is unexpected");
                     return RootAdvanceResult::Finished(
                         RootEndResult::Conclusive(ConclusiveEnd::Mismatch(
                             RootCursor {
@@ -124,7 +125,7 @@ where
                 }
 
                 // Found mismatch after progress - this is the maximum match for this root
-                debug!(
+                info!(
                     checkpoint_pos,
                     "→ advance_to_next_match: mismatch after progress - maximum match reached"
                 );
@@ -134,11 +135,6 @@ where
                         trav,
                     }),
                 ))
-            },
-            CompareResult::Prefixes(_) => {
-                unreachable!(
-                    "CompareIterator::compare() never returns Prefixes"
-                )
             },
         }
     }
@@ -228,7 +224,7 @@ where
             "    → advance_query: attempting to advance query cursor"
         );
 
-        let matched_state = *self.state;
+        let matched_state = self.state;
         let trav = self.trav;
 
         // Try to advance query cursor
@@ -244,7 +240,7 @@ where
                 );
                 // Query advanced successfully
                 Ok(RootCursor {
-                    state: Box::new(query_advanced),
+                    state: query_advanced,
                     trav,
                 })
             },
@@ -312,7 +308,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         RootCursor<K, Candidate, Candidate>,
         RootCursor<K, Candidate, Matched>,
     > {
-        let state = *self.state;
+        let state = self.state;
         let trav = self.trav;
 
         let root_parent = state.child.current().child_state.path.root_parent();
@@ -330,7 +326,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
                 );
                 // Both cursors advanced - return Candidate cursor
                 Ok(RootCursor {
-                    state: Box::new(both_advanced),
+                    state: both_advanced,
                     trav,
                 })
             },
@@ -341,7 +337,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
                 );
                 // Index ended but query continues - need parent exploration
                 Err(RootCursor {
-                    state: Box::new(query_only_advanced),
+                    state: query_only_advanced,
                     trav,
                 })
             },

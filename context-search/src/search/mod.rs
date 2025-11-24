@@ -1,6 +1,21 @@
+use std::marker::PhantomData;
+
 use crate::{
-    cursor::PatternCursor,
-    r#match::iterator::SearchIterator,
+    compare::state::CompareState,
+    cursor::{
+        Matched,
+        PatternCursor,
+    },
+    r#match::{
+        iterator::SearchIterator,
+        root_cursor::{
+            ConclusiveEnd,
+            RootAdvanceResult,
+            RootCursor,
+            RootEndResult,
+        },
+        SearchNode::ParentCandidate,
+    },
     state::{
         end::PathCoverage,
         matched::MatchResult,
@@ -170,7 +185,7 @@ where
             let cursor = PatternCursor {
                 atom_position: AtomPosition::default(),
                 path: self.query.clone(),
-                _state: std::marker::PhantomData,
+                _state: PhantomData,
             };
             let path = PathCoverage::EntireRoot(IndexRangePath::new_empty(
                 IndexRoot::from(PatternLocation::new(
@@ -194,6 +209,136 @@ where
         info!("search complete");
         response
     }
+    fn finish_root_cursor(
+        &mut self,
+        init_state: CompareState<Matched, Matched>,
+    ) -> MatchResult {
+        // Set initial root match as baseline for this root
+        let mut last_match = init_state;
+        debug!(
+            root = %last_match.child.current().child_state.root_parent(),
+            checkpoint_pos = *last_match.query.current().atom_position.as_ref(),
+            "New root match - finishing root cursor"
+        );
+
+        // Advance the root cursor step by step, updating best_match after each step
+        let final_state = loop {
+            last_match.update_checkpoint();
+            let root_cursor: RootCursor<K, Matched, Matched> = RootCursor {
+                trav: self.matches.trace_ctx.trav.clone(),
+                state: last_match.clone(),
+            };
+            match root_cursor.advance_to_next_match() {
+                RootAdvanceResult::Advanced(next_match) => {
+                    // Successfully advanced to next match - always update best_match
+                    let checkpoint_pos = *next_match
+                        .state
+                        .query
+                        .current()
+                        .atom_position
+                        .as_ref();
+                    debug!(
+                        root = %next_match.state.child.current().child_state.root_parent(),
+                        checkpoint_pos,
+                        "Match advanced - updating best_match"
+                    );
+
+                    // Continue with the new matched cursor
+                    last_match = next_match.state;
+                },
+                RootAdvanceResult::Finished(end_result) => {
+                    // Reached an end condition
+                    match end_result {
+                        RootEndResult::Conclusive(conclusive) => {
+                            // Conclusive end - this is the maximum match for the search
+                            match conclusive {
+                                ConclusiveEnd::Mismatch(_candidate_cursor) => {
+                                    // Found mismatch after progress - create final MatchResult
+                                    // Clone the state before consuming
+                                    debug!(
+                                        "Conclusive end: Mismatch - keeping best match"
+                                    );
+                                    // Continue searching from queue (no parent exploration for mismatch)
+                                },
+                                ConclusiveEnd::Exhausted => {
+                                    // Query exhausted - best_match should have the final result
+                                    debug!("Conclusive end: Exhausted - keeping best match");
+                                    // Return a clone so best_match remains set for the search layer
+                                },
+                            }
+                        },
+                        RootEndResult::Inconclusive(need_parent_cursor) => {
+                            // Root boundary reached - need parent exploration
+                            let checkpoint_state = need_parent_cursor
+                                .create_parent_exploration_state();
+                            let checkpoint_pos = *checkpoint_state
+                                .cursor()
+                                .atom_position
+                                .as_ref();
+                            debug!(
+                                checkpoint_root = %checkpoint_state.root_parent(),
+                                checkpoint_pos,
+                                "Inconclusive end - updating best_match"
+                            );
+
+                            // Get parent batch and continue searching
+                            match need_parent_cursor
+                                .get_parent_batch(&self.matches.trace_ctx.trav)
+                            {
+                                Some((_parent, batch)) => {
+                                    self.matches.queue.nodes.extend(
+                                        batch
+                                            .into_compare_batch()
+                                            .into_iter()
+                                            .map(ParentCandidate),
+                                    );
+                                },
+                                _ => {
+                                    debug!("No parents available - search exhausted");
+                                },
+                            }
+                        },
+                    }
+                    break last_match;
+                },
+            }
+        };
+        self.create_result_from_state(final_state)
+    }
+    /// Create a checkpoint MatchResult from the current matched state
+    /// This is used to update best_match after each successful advancement
+    pub(crate) fn create_result_from_state(
+        &self,
+        state: CompareState<Matched, Matched>,
+    ) -> MatchResult {
+        let result_query = state.query.current();
+        let result_child = state.child.current();
+
+        let mut path = result_child.child_state.path.clone();
+        let trav = &self.matches.trace_ctx.trav;
+        // Simplify paths
+        path.start_path_mut().simplify(trav);
+        path.end_path_mut().simplify(trav);
+
+        // Get the target token from the path
+        let target_token = path.role_rooted_leaf_token::<End, _>(trav);
+
+        // Use entry_pos from checkpoint_child
+        let _start_pos = result_child.child_state.start_pos;
+        let root_pos = result_child.child_state.entry_pos;
+        let end_pos = result_query.atom_position;
+
+        let target = DownKey::new(target_token, root_pos.into());
+
+        let path_enum = PathCoverage::from_range_path(
+            path, root_pos, target, end_pos, trav,
+        );
+
+        MatchResult {
+            cursor: result_query.clone(),
+            path: path_enum,
+        }
+    }
 }
 impl<K: SearchKind> Iterator for SearchState<K>
 where
@@ -202,9 +347,9 @@ where
     type Item = MatchResult;
     fn next(&mut self) -> Option<Self::Item> {
         trace!("searching for next match");
-        match self.matches.find_next() {
-            Some(matched_state) => {
-                // Update best_match if this match is better
+        match self.matches.find_next_root() {
+            Some(state) => {
+                let matched_state = self.finish_root_cursor(state);
                 let checkpoint_pos =
                     *matched_state.cursor().atom_position.as_ref();
 

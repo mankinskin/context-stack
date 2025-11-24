@@ -19,14 +19,8 @@ use crate::{
     cursor::PathCursor,
     search::Find,
     state::{
-        end::{
-            EndReason,
-            PathCoverage,
-        },
-        matched::{
-
-            MatchResult,
-        },
+        end::PathCoverage,
+        matched::MatchResult,
     },
     Response,
 };

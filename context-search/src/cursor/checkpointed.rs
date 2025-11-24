@@ -16,7 +16,14 @@ use super::{
     Mismatched,
     PathCursor,
 };
-use context_trace::PathNode;
+use context_trace::{
+    impl_display_via_compact,
+    logging::{
+        write_indent,
+        CompactFormat,
+    },
+    PathNode,
+};
 
 /// Trait for cursors that can have a checkpoint
 ///
@@ -190,5 +197,54 @@ where
             current: CursorStateMachine::to_mismatched(self.current),
             checkpoint: self.checkpoint,
         }
+    }
+}
+
+impl<T: CompactFormat + HasCheckpoint> CompactFormat for Checkpointed<T>
+where
+    T::Checkpoint: CompactFormat,
+{
+    fn fmt_compact(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        write!(f, "Checkpointed {{ ",)?;
+        write!(f, "checkpoint: ",)?;
+        self.current.fmt_compact(f)?;
+        write!(f, ", ",)?;
+        write!(f, "checkpoint: ",)?;
+        self.checkpoint.fmt_compact(f)?;
+        write!(f, "}}",)
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut std::fmt::Formatter,
+        indent: usize,
+    ) -> std::fmt::Result {
+        write_indent(f, indent)?;
+        writeln!(f, "Checkpointed {{")?;
+        write_indent(f, indent + 1)?;
+        write!(f, "checkpoint: ")?;
+        self.checkpoint.fmt_compact(f)?;
+        writeln!(f, ",")?;
+        write_indent(f, indent + 1)?;
+        write!(f, "current: ")?;
+        self.current.fmt_compact(f)?;
+        writeln!(f)?;
+        write_indent(f, indent)?;
+        write!(f, "}}")
+    }
+}
+
+impl<T: CompactFormat + HasCheckpoint> std::fmt::Display for Checkpointed<T>
+where
+    T::Checkpoint: CompactFormat,
+{
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        self.fmt_indented(f, 0)
     }
 }

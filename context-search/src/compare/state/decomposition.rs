@@ -1,15 +1,18 @@
 use super::core::{
-    CompareResult,
+    CompareEndResult,
     CompareState,
     PathPairMode,
 };
-use crate::cursor::{
-    Candidate,
-    Checkpointed,
-    ChildCursor,
-    CursorState,
-    MarkMatchState,
-    PathCursor,
+use crate::{
+    compare::state::core::CompareLeafResult,
+    cursor::{
+        Candidate,
+        Checkpointed,
+        ChildCursor,
+        CursorState,
+        MarkMatchState,
+        PathCursor,
+    },
 };
 use context_trace::{
     graph::vertex::token::{
@@ -17,7 +20,10 @@ use context_trace::{
         SubToken,
     },
     path::{
-        accessors::child::HasRootedLeafToken,
+        accessors::{
+            child::HasRootedLeafToken,
+            has_path::HasRootedPath,
+        },
         RolePathUtils,
     },
     *,
@@ -33,7 +39,6 @@ use tracing::{
     trace,
 };
 use PathPairMode::*;
-
 /// Helper function to decompose a token into its prefix children.
 /// Reduces code duplication across trait implementations.
 fn decompose_token_to_prefixes<G, State>(
@@ -154,7 +159,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
     pub(crate) fn compare_leaf_tokens<G: HasGraph>(
         self,
         trav: &G,
-    ) -> CompareResult<PositionAnnotated<ChildLocation>> {
+    ) -> CompareLeafResult<PositionAnnotated<ChildLocation>> {
         use Ordering::*;
         let path_leaf =
             self.rooted_path().role_rooted_leaf_token::<End, _>(trav);
@@ -182,16 +187,20 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                 width = *path_leaf.width(),
                 "tokens matched"
             );
-            CompareResult::FoundMatch(self.mark_match())
+            CompareLeafResult::Finished(CompareEndResult::FoundMatch(
+                self.mark_match(),
+            ))
         } else {
             match path_leaf.width().cmp(&query_leaf.width()) {
                 Equal if path_leaf.width() == TokenWidth(1) => {
                     trace!("atom mismatch: different atoms");
-                    CompareResult::Mismatch(self.mark_mismatch())
+                    CompareLeafResult::Finished(CompareEndResult::Mismatch(
+                        self.mark_mismatch(),
+                    ))
                 },
                 Equal => {
                     trace!("equal width but not matching: need prefixes of both tokens");
-                    CompareResult::Prefixes(
+                    CompareLeafResult::Prefixes(
                         self.mode_prefixes(trav, GraphMajor)
                             .into_iter()
                             .chain(self.mode_prefixes(trav, QueryMajor))
@@ -200,13 +209,13 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                 },
                 Greater => {
                     trace!("GraphMajor: path_width > query_width");
-                    CompareResult::Prefixes(
+                    CompareLeafResult::Prefixes(
                         self.mode_prefixes(trav, GraphMajor),
                     )
                 },
                 Less => {
                     trace!("QueryMajor: path_width < query_width");
-                    CompareResult::Prefixes(
+                    CompareLeafResult::Prefixes(
                         self.mode_prefixes(trav, QueryMajor),
                     )
                 },

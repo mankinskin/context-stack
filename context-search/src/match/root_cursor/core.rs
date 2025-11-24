@@ -5,12 +5,16 @@ use crate::{
     },
     cursor::{
         Candidate,
+        Checkpointed,
         CursorState,
         Matched,
         PatternCursor,
     },
     state::matched::MatchResult,
-    traversal::SearchKind,
+    traversal::{
+        policy::DirectedTraversalPolicy,
+        SearchKind,
+    },
 };
 use context_trace::*;
 use derive_more::{
@@ -58,7 +62,7 @@ pub(crate) struct RootCursor<
     Q: CursorState = Matched,
     I: CursorState = Matched,
 > {
-    pub(crate) state: Box<CompareState<Q, I>>,
+    pub(crate) state: CompareState<Q, I>,
     pub(crate) trav: K::Trav,
 }
 
@@ -67,7 +71,7 @@ pub(crate) struct CompareParentBatch {
     #[deref]
     #[deref_mut]
     pub(crate) batch: ParentBatch,
-    pub(crate) cursor: PatternCursor,
+    pub(crate) cursor: Checkpointed<PatternCursor<Candidate>>,
 }
 
 impl CompareParentBatch {
@@ -80,5 +84,28 @@ impl CompareParentBatch {
                 cursor: self.cursor.clone(),
             })
             .collect()
+    }
+}
+
+impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
+    pub(crate) fn get_parent_batch(
+        self,
+        trav: &K::Trav,
+    ) -> Option<(ParentCompareState, CompareParentBatch)> {
+        let parent = ParentCompareState {
+            parent_state: self.state.child.current().child_state.parent_state(),
+            cursor: self.state.query,
+        };
+        // Note: The cursor should already be advanced by the `advanced()` method
+        // before this function is called. We don't advance it again here.
+        if let Some(batch) = K::Policy::next_batch(trav, &parent.parent_state) {
+            let batch = CompareParentBatch {
+                batch,
+                cursor: parent.cursor.clone(),
+            };
+            Some((parent, batch))
+        } else {
+            None
+        }
     }
 }

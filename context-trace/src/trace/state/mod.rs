@@ -64,16 +64,14 @@ pub trait StateAdvance: Sized + Clone {
     ) -> Result<Self::Next, Self>;
 }
 pub trait IntoParentState: Sized {
-    fn into_parent_state<G: HasGraph>(
+    fn into_parent_state(
         self,
-        trav: &G,
         parent_entry: ChildLocation,
     ) -> ParentState;
 }
 impl IntoParentState for Token {
-    fn into_parent_state<G: HasGraph>(
+    fn into_parent_state(
         self,
-        _trav: &G,
         parent_entry: ChildLocation,
     ) -> ParentState {
         let width = self.width().0.into();

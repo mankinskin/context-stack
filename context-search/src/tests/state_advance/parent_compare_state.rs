@@ -8,7 +8,10 @@ use crate::{
         },
         state::CompareState,
     },
-    cursor::PatternCursor,
+    cursor::{
+        Checkpointed,
+        PatternCursor,
+    },
 };
 use context_trace::*;
 use std::marker::PhantomData;
@@ -48,7 +51,10 @@ fn test_parent_compare_state_advance_success() {
 
     let parent_compare_state = ParentCompareState {
         parent_state,
-        cursor,
+        cursor: Checkpointed {
+            checkpoint: cursor.clone(),
+            current: cursor.as_candidate(),
+        },
     };
 
     tracing::info!(?parent_compare_state, "Initial ParentCompareState");
@@ -73,14 +79,14 @@ fn test_parent_compare_state_advance_success() {
     // Verify cursors are created properly
     assert_eq!(
         compare_root_state.candidate.query.current().atom_position,
-        parent_compare_state.cursor.atom_position
+        parent_compare_state.cursor.current().atom_position
     );
     assert_eq!(
         *StatePosition::target_pos(
             &compare_root_state.candidate.child.current().child_state
         )
         .unwrap(),
-        parent_compare_state.cursor.atom_position
+        parent_compare_state.cursor.current().atom_position
     );
 
     // Verify checkpoint is preserved
@@ -90,7 +96,7 @@ fn test_parent_compare_state_advance_success() {
             .query
             .checkpoint()
             .atom_position,
-        parent_compare_state.cursor.atom_position
+        parent_compare_state.cursor.current().atom_position
     );
 }
 
@@ -129,7 +135,10 @@ fn test_parent_compare_state_advance_at_last_index() {
 
     let parent_compare_state = ParentCompareState {
         parent_state,
-        cursor,
+        cursor: Checkpointed {
+            checkpoint: cursor.clone(),
+            current: cursor.as_candidate(),
+        },
     };
 
     tracing::info!(?parent_compare_state, "ParentCompareState at last index");
@@ -186,7 +195,10 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
 
     let parent_compare_state = ParentCompareState {
         parent_state,
-        cursor,
+        cursor: Checkpointed {
+            checkpoint: cursor.clone(),
+            current: cursor.as_candidate(),
+        },
     };
 
     tracing::info!(
@@ -252,7 +264,10 @@ fn test_parent_compare_state_cursor_conversion() {
 
     let parent_compare_state = ParentCompareState {
         parent_state,
-        cursor,
+        cursor: Checkpointed {
+            checkpoint: cursor.clone(),
+            current: cursor.as_candidate(),
+        },
     };
 
     let result = parent_compare_state.clone().advance_state(&graph);
@@ -322,7 +337,10 @@ fn test_state_advance_error_propagation() {
 
     let parent_compare_state = ParentCompareState {
         parent_state,
-        cursor,
+        cursor: Checkpointed {
+            checkpoint: cursor.clone(),
+            current: cursor.as_candidate(),
+        },
     };
 
     tracing::info!(
@@ -339,8 +357,8 @@ fn test_state_advance_error_propagation() {
 
     let returned_state = result.unwrap_err();
     assert_eq!(
-        returned_state.cursor.atom_position,
-        parent_compare_state.cursor.atom_position,
+        returned_state.cursor.current().atom_position,
+        parent_compare_state.cursor.current().atom_position,
         "Original cursor should be returned on error"
     );
 }

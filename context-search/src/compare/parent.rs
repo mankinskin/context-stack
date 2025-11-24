@@ -38,7 +38,7 @@ pub(crate) struct ParentCompareState {
     #[deref]
     #[deref_mut]
     pub(crate) parent_state: ParentState,
-    pub(crate) cursor: PatternCursor,
+    pub(crate) cursor: Checkpointed<PatternCursor<Candidate>>,
 }
 
 #[context_trace::instrument_trait_impl]
@@ -52,11 +52,6 @@ impl StateAdvance for ParentCompareState {
         match self.parent_state.advance_state(trav) {
             Ok(next) => {
                 // Keep the cursor as a range path to properly track start/end positions
-                let cursor = PathCursor {
-                    path: self.cursor.path.clone(),
-                    atom_position: self.cursor.atom_position,
-                    _state: PhantomData,
-                };
                 debug!(
                     child_cursor=%next.child_state,
                     "Created child_cursor from parent_state"
@@ -66,7 +61,7 @@ impl StateAdvance for ParentCompareState {
                     .child_state
                     .role_leaf_token::<End, _>(trav)
                     .expect("parent should have valid end token");
-                let cursor_position = self.cursor.atom_position;
+                let cursor_position = self.cursor.current().atom_position;
 
                 // Clone and simplify the path, then convert to position-annotated
                 let mut simplified_path = next.child_state.path.clone();
@@ -84,6 +79,7 @@ impl StateAdvance for ParentCompareState {
 
                 Ok(CompareRootState {
                     candidate: CompareState {
+                        query: self.cursor,
                         child: Checkpointed {
                             checkpoint: ChildCursor {
                                 child_state: child_state.clone(),
@@ -93,10 +89,6 @@ impl StateAdvance for ParentCompareState {
                                 child_state,
                                 _state: PhantomData,
                             },
-                        },
-                        query: Checkpointed {
-                            current: cursor.clone(),
-                            checkpoint: self.cursor,
                         },
                         mode: GraphMajor,
                         target: DownKey::new(

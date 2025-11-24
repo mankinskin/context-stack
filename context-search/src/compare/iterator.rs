@@ -1,6 +1,7 @@
 use crate::{
     compare::state::{
-        CompareResult,
+        CompareEndResult,
+        CompareLeafResult::*,
         CompareState,
     },
     cursor::Candidate,
@@ -9,8 +10,6 @@ use crate::{
 use context_trace::*;
 
 use std::fmt::Debug;
-
-use crate::compare::state::CompareResult::*;
 
 #[derive(Debug)]
 pub(crate) struct CompareIterator<K: SearchKind> {
@@ -44,12 +43,12 @@ impl<K: SearchKind> CompareIterator<K> {
             >::new(trav, queue),
         }
     }
-    pub(crate) fn compare(mut self) -> CompareResult {
+    pub(crate) fn compare(mut self) -> CompareEndResult {
         self.find_map(|flow| flow).unwrap()
     }
 }
 impl<T: SearchKind> Iterator for CompareIterator<T> {
-    type Item = Option<CompareResult>;
+    type Item = Option<CompareEndResult>;
     fn next(&mut self) -> Option<Self::Item> {
         tracing::trace!(
             queue_len = self.children.queue.len(),
@@ -65,7 +64,7 @@ impl<T: SearchKind> Iterator for CompareIterator<T> {
                     self.children.queue.extend(next);
                     None
                 },
-                result => {
+                Finished(result) => {
                     tracing::trace!(
                         result = ?result,
                         "got result (Match/Mismatch)"

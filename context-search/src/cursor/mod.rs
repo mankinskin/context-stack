@@ -56,7 +56,8 @@ impl<P: GraphRoot, State: CursorState> GraphRoot for PathCursor<P, State> {
         self.path.root_parent()
     }
 }
-pub(crate) type PatternCursor = PathCursor<PatternRangePath>;
+pub(crate) type PatternCursor<State = Matched> =
+    PathCursor<PatternRangePath, State>;
 //pub(crate) type IndexCursor = PathCursor<IndexRangePath>;
 
 pub(crate) type PatternPrefixCursor = PathCursor<PatternPrefixPath>;

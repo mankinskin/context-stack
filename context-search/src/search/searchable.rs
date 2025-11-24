@@ -10,6 +10,7 @@ use tracing::{
 
 use crate::{
     cursor::{
+        Checkpointed,
         PatternCursor,
         PatternPrefixCursor,
     },
@@ -82,8 +83,6 @@ impl Searchable for PatternCursor {
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
-        debug!("starting pattern cursor search");
-
         // Get the starting token from the query pattern for the SearchIterator
         let start_token = self.path.role_root_child_token::<End, _>(&trav);
         debug!(start_token = %&start_token, "starting search from token");
@@ -122,33 +121,19 @@ impl<T: Searchable + Clone> Searchable for &T {
 }
 
 impl<const N: usize> Searchable for &'_ [Token; N] {
-    #[context_trace::instrument_sig(level = "trace", skip(self, trav), fields(token_count = N))]
     fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
-        debug!(token_count = N, "creating pattern range path from array");
-        trace!(tokens = ?self, "token array");
-
-        // Delegate to slice implementation which handles atom special case
         self.as_slice().start_search::<K>(trav)
     }
 }
 
 impl Searchable for &'_ [Token] {
-    #[context_trace::instrument_sig(level = "trace", skip(self, trav), fields(token_count = self.len()))]
     fn start_search<K: SearchKind>(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
-        debug!(
-            token_count = self.len(),
-            "creating pattern range path from slice"
-        );
-        trace!(tokens = ?self, "token slice");
-
-        // Convert the token slice to a PatternRangePath and start the search
-        // This works for both atoms and composite patterns now thanks to MatchState::Query
         PatternRangePath::from(self).start_search::<K>(trav)
     }
 }
@@ -188,17 +173,8 @@ impl Searchable for PatternRangePath {
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
-        debug!("converting pattern range path to cursor");
-        trace!(range_path_details = %self, "pattern range path details");
-
         let range_path = self.to_range_path();
-
-        let width = range_path.calc_width(&trav);
-        debug!("calc_width returned: {}", width);
-
         let cursor = range_path.into_cursor(&trav);
-        debug!(cursor_atom_pos = *cursor.atom_position, cursor_path = %cursor.path, "created cursor");
-
         cursor.start_search::<K>(trav)
     }
 }
@@ -209,5 +185,40 @@ impl Searchable for PatternPrefixCursor {
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
         PatternCursor::from(self).start_search(trav)
+    }
+}
+use crate::{
+    r#match::root_cursor::CompareParentBatch,
+    traversal::policy::DirectedTraversalPolicy,
+};
+
+impl StartCtx {
+    pub(crate) fn get_parent_batch<K: SearchKind>(
+        &self,
+        trav: &K::Trav,
+    ) -> Result<CompareParentBatch, ErrorState> {
+        let mut cursor = self.cursor.clone();
+        debug!(cursor_path = %cursor.path, "get_parent_batch - cursor path before root_child_token");
+        let start = self.cursor.path.role_root_child_token::<End, _>(trav);
+        let checkpoint = cursor.clone();
+        if cursor.advance(trav).is_continue() {
+            let batch = K::Policy::gen_parent_batch(trav, start, |_trav, p| {
+                start.into_parent_state(p)
+            });
+
+            let cursor = Checkpointed {
+                checkpoint,
+                current: cursor.as_candidate(),
+            };
+            Ok(CompareParentBatch { batch, cursor })
+        } else {
+            Err(ErrorState {
+                reason: ErrorReason::SingleIndex(Box::new(IndexWithPath {
+                    index: start,
+                    path: self.cursor.path.clone(),
+                })),
+                found: None,
+            })
+        }
     }
 }
