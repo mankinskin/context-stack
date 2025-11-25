@@ -380,7 +380,7 @@ fn test_state_advance_preserves_positions() {
 
     // ChildState has current_pos (which should equal parent's root_pos after advance)
     assert_eq!(
-        *root_child_state.child_state.target_pos(),
+        *root_child_state.child_state.target_offset(),
         parent_state.root_pos,
         "child current_pos should match parent root_pos"
     );

@@ -26,7 +26,7 @@ use context_trace::{
         write_indent,
         CompactFormat,
     },
-    path::accessors::path_accessor::StatePosition,
+    path::accessors::path_accessor::{HasTargetOffset, StatePosition},
     GraphRoot,
     PathNode,
 };
@@ -106,7 +106,7 @@ where
 
         let query_pos: usize = self.query.current().atom_position.into();
         let index_pos: usize =
-            (*self.child.current().child_state.target_pos().unwrap()).into();
+            (*self.child.current().child_state.target_offset()).into();
         let checkpoint_pos: usize =
             self.query.checkpoint().atom_position.into();
 

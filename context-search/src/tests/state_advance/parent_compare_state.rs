@@ -1,20 +1,23 @@
 //! Tests for ParentCompareState advancing to CompareRootState
 
-use crate::{
-    compare::{
-        parent::{
+#[cfg(test)]
+use {
+    crate::{
+        compare::parent::{
             CompareRootState,
             ParentCompareState,
         },
-        state::CompareState,
+        cursor::{
+            Checkpointed,
+            PatternCursor,
+        },
     },
-    cursor::{
-        Checkpointed,
-        PatternCursor,
+    context_trace::{
+        *,
+        path::accessors::path_accessor::HasTargetOffset,
     },
+    std::marker::PhantomData,
 };
-use context_trace::*;
-use std::marker::PhantomData;
 
 #[test]
 fn test_parent_compare_state_advance_success() {
@@ -82,10 +85,7 @@ fn test_parent_compare_state_advance_success() {
         parent_compare_state.cursor.current().atom_position
     );
     assert_eq!(
-        *StatePosition::target_pos(
-            &compare_root_state.candidate.child.current().child_state
-        )
-        .unwrap(),
+        *compare_root_state.candidate.child.current().child_state.target_offset(),
         parent_compare_state.cursor.current().atom_position
     );
 
@@ -288,9 +288,9 @@ fn test_parent_compare_state_cursor_conversion() {
         "Cursor atom_position should be preserved"
     );
     assert_eq!(
-        *StatePosition::target_pos(&compare_root_state.candidate.child.current().child_state).unwrap(),
+        *compare_root_state.candidate.child.current().child_state.target_offset(),
         AtomPosition::from(0),
-        "Child cursor target_pos should match parent_state root_pos (not query cursor position)"
+        "Child cursor target_offset should match parent_state root_pos (not query cursor position)"
     );
     assert_eq!(
         compare_root_state

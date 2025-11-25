@@ -61,28 +61,35 @@ pub trait StatePosition {
     /// Position of the root token
     fn root_pos(&self) -> &AtomPosition;
 
-    /// Target position (if applicable - None for states without targets)
-    fn target_pos(&self) -> Option<&AtomPosition> {
-        None
-    }
-
     /// Mutable access to prev position
     fn prev_pos_mut(&mut self) -> &mut AtomPosition;
 
     /// Mutable access to root position
     fn root_pos_mut(&mut self) -> &mut AtomPosition;
+}
 
-    /// Mutable access to target position (if applicable)
-    fn target_pos_mut(&mut self) -> Option<&mut AtomPosition> {
-        None
-    }
+/// Trait for types that have a target offset.
+///
+/// The target offset represents the **offset position before the target token**,
+/// not including the token's width. It indicates where in the atom sequence
+/// the target token begins.
+///
+/// For example, if matching pattern [a, b, c] and the target is token 'b':
+/// - If 'a' has width 1, then target_offset = 1 (position before 'b')
+/// - The position after 'b' would be target_offset + width(b)
+pub trait HasTargetOffset: StatePosition {
+    /// Get the offset position before the target token
+    fn target_offset(&self) -> &AtomPosition;
+
+    /// Get mutable access to the offset position before the target token
+    fn target_offset_mut(&mut self) -> &mut AtomPosition;
 }
 
 /// Macro to implement StatePosition for types with prev_pos and root_pos fields
 ///
 /// This macro reduces boilerplate for types that store position state.
 ///
-/// # Basic usage (no target_pos)
+/// # Basic usage
 /// ```ignore
 /// impl_state_position! {
 ///     for MyState => {
@@ -92,13 +99,12 @@ pub trait StatePosition {
 /// }
 /// ```
 ///
-/// # With target_pos
+/// # With generics
 /// ```ignore
 /// impl_state_position! {
-///     for MyState => {
-///         prev_pos: start_pos,
-///         root_pos: entry_pos,
-///         target_pos: Some(entry_pos),
+///     for MyState<T> where [T: Clone] => {
+///         prev_pos: prev_pos_field,
+///         root_pos: root_pos_field,
 ///     }
 /// }
 /// ```

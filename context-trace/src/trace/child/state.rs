@@ -248,12 +248,26 @@ impl<EndNode: PathNode> TargetKey for ChildState<EndNode> {
 
 // HasTargetPos impl removed - use StatePosition instead
 
-// StatePosition implementation using macro (with target_pos)
+// StatePosition implementation using macro
 crate::impl_state_position! {
     for ChildState<EndNode> where [EndNode: PathNode] => {
         prev_pos: start_pos,
         root_pos: entry_pos,
-        //target_pos: Some(entry_pos),
+    }
+}
+
+// HasTargetPos implementation
+// For ChildState, the target offset is the entry_pos - the offset position
+// where we entered the root token being examined (position before the token).
+impl<EndNode: PathNode> crate::path::accessors::path_accessor::HasTargetOffset
+    for ChildState<EndNode>
+{
+    fn target_offset(&self) -> &crate::AtomPosition {
+        &self.entry_pos
+    }
+
+    fn target_offset_mut(&mut self) -> &mut crate::AtomPosition {
+        &mut self.entry_pos
     }
 }
 

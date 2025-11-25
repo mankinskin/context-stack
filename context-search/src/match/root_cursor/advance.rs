@@ -26,7 +26,10 @@ use crate::{
     traversal::SearchKind,
 };
 use context_trace::{
-    path::RolePathUtils,
+    path::{
+        accessors::path_accessor::HasTargetOffset,
+        RolePathUtils,
+    },
     End,
     HasRootChildIndex,
     Start,
@@ -185,7 +188,7 @@ where
                     .root_parent();
                 trace!(
                     root = %root,
-                    child_pos = ?both_advanced.state.child.current().child_state.target_pos().unwrap(),
+                    child_pos = ?both_advanced.state.child.current().child_state.target_offset(),
                     "  → advance_both_cursors_internal: Step 2 complete - child advanced successfully, got <Candidate, Candidate>"
                 );
                 Ok(both_advanced)
