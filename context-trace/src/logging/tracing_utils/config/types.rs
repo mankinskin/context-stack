@@ -174,6 +174,9 @@ pub struct FormatConfig {
     /// Overrides LOG_FILTER env var if present
     #[serde(default)]
     pub log_filter: Option<String>,
+    /// Keep log files even when tests pass (overrides KEEP_LOGS env var if present)
+    #[serde(default)]
+    pub keep_logs: Option<bool>,
 }
 
 impl Default for FormatConfig {
@@ -189,6 +192,7 @@ impl Default for FormatConfig {
             show_timestamp: true,
             log_to_stdout: None,
             log_filter: None,
+            keep_logs: None,
         }
     }
 }

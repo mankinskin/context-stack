@@ -263,6 +263,8 @@ pub struct TracingConfig {
     pub span_events: FmtSpan,
     /// Formatting configuration
     pub format: FormatConfig,
+    /// Keep log files even when tests pass
+    pub keep_logs: bool,
 }
 
 impl Default for TracingConfig {
@@ -290,6 +292,19 @@ impl Default for TracingConfig {
             .ok()
             .or_else(|| format.log_filter.clone());
 
+        // Check for keep logs: env var takes precedence over config file
+        let keep_logs = env::var("KEEP_LOGS")
+            .ok()
+            .and_then(|v| {
+                Some(
+                    v == "1"
+                        || v.eq_ignore_ascii_case("true")
+                        || v.eq_ignore_ascii_case("yes"),
+                )
+            })
+            .or(format.keep_logs)
+            .unwrap_or(false);
+
         Self {
             log_dir: get_target_dir().join("test-logs"),
             stdout_level: Level::DEBUG,
@@ -300,6 +315,7 @@ impl Default for TracingConfig {
             file_filter_directives: filter_directives,
             span_events: FmtSpan::ENTER | FmtSpan::CLOSE,
             format,
+            keep_logs,
         }
     }
 }

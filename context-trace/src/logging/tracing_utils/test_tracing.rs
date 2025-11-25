@@ -362,8 +362,18 @@ impl Drop for TestTracing {
         // Check if we're unwinding (test panicked/failed)
         let is_panicking = std::thread::panicking();
 
-        if !is_panicking {
-            // Test passed - clean up log file
+        // Check if KEEP_LOGS is enabled
+        let keep_logs = std::env::var("KEEP_LOGS")
+            .ok()
+            .map(|v| {
+                v == "1"
+                    || v.eq_ignore_ascii_case("true")
+                    || v.eq_ignore_ascii_case("yes")
+            })
+            .unwrap_or(false);
+
+        if !is_panicking && !keep_logs {
+            // Test passed and KEEP_LOGS not set - clean up log file
             if let Some(ref path) = self.log_file_path {
                 tracing::info!(
                     log_file = %path.display(),
@@ -372,12 +382,19 @@ impl Drop for TestTracing {
                 fs::remove_file(path).ok();
             }
         } else {
-            // Test failed - keep log file
+            // Test failed or KEEP_LOGS enabled - keep log file
             if let Some(ref path) = self.log_file_path {
-                eprintln!(
-                    "\n❌ Test failed! Log file preserved at: {}",
-                    path.display()
-                );
+                if is_panicking {
+                    eprintln!(
+                        "\n❌ Test failed! Log file preserved at: {}",
+                        path.display()
+                    );
+                } else if keep_logs {
+                    eprintln!(
+                        "\n📝 Test passed! Log file kept at: {}",
+                        path.display()
+                    );
+                }
             }
         }
 
