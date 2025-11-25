@@ -1,6 +1,17 @@
-use crate::cursor::{
-    PathCursor,
-    PatternCursor,
+use crate::{
+    cursor::{
+        Checkpointed,
+        PathCursor,
+        PatternCursor,
+    },
+    r#match::{
+        iterator::SearchIterator,
+        root_cursor::CompareParentBatch,
+    },
+    search::SearchState,
+    traversal::policy::DirectedTraversalPolicy,
+    ErrorState,
+    SearchKind,
 };
 use context_trace::{
     logging::format_utils::pretty,
@@ -135,15 +146,72 @@ impl StartFoldPath for PatternEndPath {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct StartCtx {
+pub(crate) struct StartCtx<K: SearchKind> {
+    pub(crate) trav: K::Trav,
+    pub(crate) start_token: Token,
     pub(crate) cursor: PatternCursor,
 }
 
-impl std::fmt::Display for StartCtx {
+impl<K: SearchKind> std::fmt::Display for StartCtx<K> {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
         write!(f, "StartCtx{{ cursor: {} }}", self.cursor)
+    }
+}
+impl<K: SearchKind> StartCtx<K> {
+    pub(crate) fn into_search(self) -> Result<SearchState<K>, ErrorState> {
+        debug!("creating search from start context");
+        trace!(start_token = %self.start_token, cursor = %self.cursor, "start context details");
+        match self.get_parent_batch() {
+            Ok(p) => {
+                debug!(
+                    batch_len = p.batch.len(),
+                    "first parent batch obtained"
+                );
+
+                Ok(SearchState {
+                    query: self.cursor.path,
+                    matches: SearchIterator::new(
+                        self.trav,
+                        self.start_token,
+                        p,
+                    ),
+                })
+            },
+            Err(err) => {
+                debug!(error = %pretty(&err), "failed to get parent batch");
+                Err(err)
+            },
+        }
+    }
+    pub(crate) fn get_parent_batch(
+        &self
+    ) -> Result<CompareParentBatch, ErrorState> {
+        let mut cursor = self.cursor.clone();
+        debug!(cursor_path = %cursor.path, "get_parent_batch - cursor path before root_child_token");
+        let start = self.start_token;
+        let checkpoint = cursor.clone();
+        if cursor.advance(&self.trav).is_continue() {
+            let batch =
+                K::Policy::gen_parent_batch(&self.trav, start, |_trav, p| {
+                    start.into_parent_state(p)
+                });
+
+            let cursor = Checkpointed {
+                checkpoint,
+                current: cursor.as_candidate(),
+            };
+            Ok(CompareParentBatch { batch, cursor })
+        } else {
+            Err(ErrorState {
+                reason: ErrorReason::SingleIndex(Box::new(IndexWithPath {
+                    index: start,
+                    path: self.cursor.path.clone(),
+                })),
+                found: None,
+            })
+        }
     }
 }

@@ -34,24 +34,17 @@ use tracing::{
     warn,
 };
 
-#[derive(Debug, new)]
+#[derive(Debug)]
 pub(crate) struct SearchIterator<K: SearchKind> {
     pub(crate) trace_ctx: TraceCtx<K::Trav>,
     pub(crate) queue: SearchQueue,
 }
 impl<K: SearchKind> SearchIterator<K> {
-    #[context_trace::instrument_sig(level = "debug", skip(trav, p), fields(start_index = %start_index, parent_count = p.len()))]
-    pub(crate) fn start_parent(
+    pub(crate) fn new(
         trav: K::Trav,
         start_index: Token,
         p: CompareParentBatch,
     ) -> Self {
-        debug!("creating match iterator from parent batch");
-        trace!(parent_batch.len = p.len(),);
-        //trace!(
-        //    batch_details = %pretty(&p),
-        //    "parent batch composition"
-        //);
         SearchIterator {
             trace_ctx: TraceCtx {
                 trav,

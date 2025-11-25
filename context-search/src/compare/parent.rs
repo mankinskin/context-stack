@@ -61,7 +61,6 @@ impl StateAdvance for ParentCompareState {
                     .child_state
                     .role_leaf_token::<End, _>(trav)
                     .expect("parent should have valid end token");
-                let cursor_position = self.cursor.current().atom_position;
 
                 // Clone and simplify the path, then convert to position-annotated
                 let mut simplified_path = next.child_state.path.clone();
@@ -76,6 +75,8 @@ impl StateAdvance for ParentCompareState {
                     start_pos: next.child_state.start_pos,
                     path: annotated_path.clone(),
                 };
+
+                let cursor_position = self.cursor.current().atom_position;
 
                 Ok(CompareRootState {
                     candidate: CompareState {

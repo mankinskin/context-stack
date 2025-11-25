@@ -92,17 +92,7 @@ impl Ord for SearchNode {
         // Reverse ordering: smaller width values come first (min-heap behavior)
         // BinaryHeap is a max-heap by default, so we reverse the comparison
         // to get min-heap behavior (smallest widths popped first)
-        let result = other_width.cmp(&self_width);
-
-        // Debug output to verify ordering
-        //trace!(
-        //    self_width,
-        //    other_width,
-        //    ordering = ?result,
-        //    "SearchNode comparison for heap ordering"
-        //);
-
-        result
+        other_width.cmp(&self_width)
     }
 }
 

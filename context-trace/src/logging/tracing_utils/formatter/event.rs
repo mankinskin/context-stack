@@ -363,10 +363,8 @@ where
         }
 
         let trimmed = final_cleaned.trim();
-        if !trimmed.is_empty() {
-            for line in trimmed.lines() {
-                write!(writer, "\n{}    {}", gutter_indent, line)?;
-            }
+        for line in trimmed.lines() {
+            write!(writer, "\n{}    {}", gutter_indent, line)?;
         }
     }
     Ok(())

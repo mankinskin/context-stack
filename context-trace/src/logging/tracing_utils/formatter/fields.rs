@@ -7,10 +7,7 @@ pub(super) fn filter_span_fields(fields: &str) -> String {
     let mut cleaned = fields.to_string();
 
     // Remove fn_sig if it was shown inline with span name
-    let has_fn_sig = fields.contains("fn_sig=");
-    if has_fn_sig {
-        cleaned = remove_field(&cleaned, "fn_sig");
-    }
+    cleaned = remove_field(&cleaned, "fn_sig");
 
     // Remove message field as it's shown separately
     cleaned = remove_field(&cleaned, "message");
@@ -35,7 +32,7 @@ pub(super) fn filter_span_fields(fields: &str) -> String {
     }
 
     let final_cleaned = result_lines.join("\n");
-    final_cleaned.trim().to_string()
+    final_cleaned.to_string()
 }
 
 /// Remove a field from formatted fields string

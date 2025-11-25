@@ -87,27 +87,12 @@ impl Searchable for PatternCursor {
         let start_token = self.path.role_root_child_token::<End, _>(&trav);
         debug!(start_token = %&start_token, "starting search from token");
 
-        let start = StartCtx {
+        StartCtx {
+            trav,
+            start_token,
             cursor: self.clone(),
-        };
-
-        match start.get_parent_batch::<K>(&trav) {
-            Ok(p) => {
-                debug!(
-                    batch_len = p.batch.len(),
-                    "first parent batch obtained"
-                );
-
-                Ok(SearchState {
-                    query: self.path.clone(),
-                    matches: SearchIterator::start_parent(trav, start_token, p),
-                })
-            },
-            Err(err) => {
-                debug!(error = %pretty(&err), "failed to get parent batch");
-                Err(err)
-            },
         }
+        .into_search()
     }
 }
 
@@ -191,34 +176,3 @@ use crate::{
     r#match::root_cursor::CompareParentBatch,
     traversal::policy::DirectedTraversalPolicy,
 };
-
-impl StartCtx {
-    pub(crate) fn get_parent_batch<K: SearchKind>(
-        &self,
-        trav: &K::Trav,
-    ) -> Result<CompareParentBatch, ErrorState> {
-        let mut cursor = self.cursor.clone();
-        debug!(cursor_path = %cursor.path, "get_parent_batch - cursor path before root_child_token");
-        let start = self.cursor.path.role_root_child_token::<End, _>(trav);
-        let checkpoint = cursor.clone();
-        if cursor.advance(trav).is_continue() {
-            let batch = K::Policy::gen_parent_batch(trav, start, |_trav, p| {
-                start.into_parent_state(p)
-            });
-
-            let cursor = Checkpointed {
-                checkpoint,
-                current: cursor.as_candidate(),
-            };
-            Ok(CompareParentBatch { batch, cursor })
-        } else {
-            Err(ErrorState {
-                reason: ErrorReason::SingleIndex(Box::new(IndexWithPath {
-                    index: start,
-                    path: self.cursor.path.clone(),
-                })),
-                found: None,
-            })
-        }
-    }
-}

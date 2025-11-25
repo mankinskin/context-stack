@@ -152,16 +152,7 @@ where
         while let Some(matched_state) = self.next() {
             iteration += 1;
             debug!(iteration, "tracing matched state");
-            debug!(
-                "About to trace MatchResult: query_exhausted={}, path_variant={}",
-                matched_state.query_exhausted(),
-                match matched_state.path() {
-                    PathCoverage::Range(_) => "Range",
-                    PathCoverage::Postfix(_) => "Postfix",
-                    PathCoverage::Prefix(_) => "Prefix",
-                    PathCoverage::EntireRoot(_) => "EntireRoot",
-                }
-            );
+            debug!(matched_state=%pretty(&matched_state), "About to trace MatchResult");
             matched_state.trace(&mut self.matches.trace_ctx);
             best_match = Some(matched_state);
             debug!("Finished tracing MatchResult");

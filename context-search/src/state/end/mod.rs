@@ -1,4 +1,8 @@
 use context_trace::{
+    logging::{
+        write_indent,
+        CompactFormat,
+    },
     path::{
         accessors::has_path::HasRolePath,
         RolePathUtils,
@@ -179,5 +183,21 @@ impl PathCoverage {
             PathCoverage::Postfix(p) => Some(p.path.start_path()),
             PathCoverage::Prefix(_) | PathCoverage::EntireRoot(_) => None,
         }
+    }
+}
+
+impl std::fmt::Display for PathCoverage {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        let coverage = match self {
+            PathCoverage::Range(_) => "Range",
+            PathCoverage::Postfix(_) => "Postfix",
+            PathCoverage::Prefix(_) => "Prefix",
+            PathCoverage::EntireRoot(_) => "EntireRoot",
+        };
+        write!(f, "PathCoverage::{}(", coverage)?;
+        write!(f, ")")
     }
 }
