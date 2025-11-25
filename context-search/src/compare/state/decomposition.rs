@@ -139,16 +139,41 @@ where
     ) -> VecDeque<(SubToken, Self)> {
         let leaf = self.path.role_rooted_leaf_token::<End, _>(trav);
 
-        decompose_token_to_prefixes(leaf, trav, |_sub, child_location| {
+        debug!(
+            leaf = %leaf,
+            "getting prefix_children"
+        );
+        let prefix_children =
+            trav.graph().expect_vertex(leaf).prefix_children::<G>();
+        debug!(num_children = prefix_children.len(), "got prefix_children");
+
+        let sorted_children: Vec<_> = prefix_children
+            .iter()
+            .sorted_unstable_by(|a, b| {
+                b.token().width().cmp(&a.token().width())
+            })
+            .collect();
+
+        let mut result = VecDeque::new();
+
+        for sub in sorted_children {
+            let child_location = leaf.to_child_location(*sub.sub_location());
             let mut next_path = self.path.clone();
             next_path.path_append(child_location);
 
-            PathCursor {
+            // Position is base + this prefix's width (no accumulation across prefixes)
+            let cursor_position = base_position + *sub.token().width();
+
+            let cursor = PathCursor {
                 path: next_path,
-                atom_position: base_position,
+                atom_position: cursor_position,
                 _state: PhantomData,
-            }
-        })
+            };
+            result.push_back((sub.clone(), cursor));
+        }
+
+        debug!("returning prefixes");
+        result
     }
 }
 

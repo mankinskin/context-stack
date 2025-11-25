@@ -325,9 +325,43 @@ where
             path, root_pos, target, end_pos, trav,
         );
 
+        // Simplify query cursor path: remove child locations pointing to last sub_index
+        let mut simplified_cursor = result_query.clone();
+        Self::simplify_query_cursor(&mut simplified_cursor, trav);
+
         MatchResult {
-            cursor: result_query.clone(),
+            cursor: simplified_cursor,
             path: path_enum,
+        }
+    }
+
+    /// Simplify query cursor by removing redundant child locations
+    /// that point to the last sub_index of their parent token
+    fn simplify_query_cursor<G: HasGraph>(
+        cursor: &mut PatternCursor,
+        trav: &G,
+    ) {
+        use context_trace::{
+            path::accessors::role::End,
+            PathAccessor,
+        };
+
+        let end_path = cursor.path.end_path_mut();
+        let graph = trav.graph();
+
+        // Remove trailing child locations that point to the last child in their parent
+        while let Some(location) = PathAccessor::path(end_path).last() {
+            let pattern = graph.expect_pattern_at(location);
+            // Check if this is the last child in the pattern
+            let is_last = location.sub_index == pattern.len() - 1;
+
+            if is_last {
+                // Remove this redundant location
+                PathAccessor::path_mut(end_path).pop();
+            } else {
+                // Not at the end, stop simplifying
+                break;
+            }
         }
     }
 }
