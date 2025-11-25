@@ -11,4 +11,5 @@
 //! - State consistency after advancement (cursors, positions, etc.)
 
 mod compare_state;
+mod integration;
 mod parent_compare_state;
