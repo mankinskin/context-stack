@@ -280,9 +280,9 @@ impl CompactFormat for ParentState {
         write_indent(f, indent + 1)?;
         writeln!(f, "root_pos: {},", usize::from(self.root_pos))?;
         write_indent(f, indent + 1)?;
-        write!(f, "path: ")?;
-        self.path.fmt_indented(f, indent + 1)?;
-        writeln!(f)?;
+        writeln!(f, "path:")?;
+        self.path.fmt_indented(f, indent + 2)?;
+        write!(f, "\n")?;
         write_indent(f, indent)?;
         write!(f, "}}")
     }

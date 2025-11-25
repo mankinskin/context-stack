@@ -362,9 +362,14 @@ where
             final_cleaned = remove_associated_types(&final_cleaned);
         }
 
-        let trimmed = final_cleaned.trim();
+        // Only trim leading/trailing newlines, not spaces (to preserve field indentation)
+        let trimmed = final_cleaned.trim_matches('\n');
+
+        // Remove empty lines (that may have been left by field removal)
         for line in trimmed.lines() {
-            write!(writer, "\n{}    {}", gutter_indent, line)?;
+            if !line.trim().is_empty() {
+                write!(writer, "\n{}{}", gutter_indent, line)?;
+            }
         }
     }
     Ok(())
