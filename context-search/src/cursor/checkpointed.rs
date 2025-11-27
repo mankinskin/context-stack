@@ -35,21 +35,31 @@ use std::{
 /// Marker trait for candidate state control
 ///
 /// Controls whether the Checkpointed cursor has an advanced candidate or is at checkpoint.
-pub trait CandidateState: 'static {}
+/// Uses an associated type to encode the presence/absence of candidate data in the type system.
+pub trait CandidateState: 'static {
+    /// The type of candidate data stored
+    /// - `()` for AtCheckpoint (no candidate)
+    /// - `C` for HasCandidate (cursor stored)
+    type CandidateData<C>;
+}
 
 /// At checkpoint - no candidate exists, only checkpoint
 ///
 /// Used for finalized results like MatchResult where we store only the confirmed checkpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AtCheckpoint;
-impl CandidateState for AtCheckpoint {}
+impl CandidateState for AtCheckpoint {
+    type CandidateData<C> = ();
+}
 
 /// Has candidate - candidate cursor exists alongside checkpoint
 ///
 /// Used during active search/comparison when cursors are exploring ahead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HasCandidate;
-impl CandidateState for HasCandidate {}
+impl CandidateState for HasCandidate {
+    type CandidateData<C> = C;
+}
 
 /// Trait for cursors that can have a checkpoint
 ///
@@ -95,8 +105,9 @@ where
 
 /// Encapsulates a cursor with its checkpoint state
 ///
-/// Uses space-efficient storage: `candidate: Option<C>` is None when at checkpoint,
-/// Some when advanced beyond. This saves 50% space when cursors match their checkpoints.
+/// Uses type-level encoding for candidate presence:
+/// - `AtCheckpoint`: candidate field has type `()` (zero-sized)
+/// - `HasCandidate`: candidate field has type `C` (cursor stored)
 ///
 /// # Type Parameters
 /// - `C`: The cursor type being wrapped (e.g., `PathCursor<P, S>` or `ChildCursor<S, N>`)
@@ -104,8 +115,7 @@ where
 ///
 /// # Invariants
 /// - `checkpoint` is always in Matched state
-/// - When `S = AtCheckpoint`: `candidate` is None (enforced by construction)
-/// - When `S = HasCandidate`: `candidate` is Some (enforced by construction)
+/// - Candidate presence is encoded in the type system via `S::CandidateData<C>`
 /// - `checkpoint.atom_position <= candidate.atom_position` (checkpoint never ahead of candidate)
 /// - Updates to checkpoint only happen via `mark_match()`
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -114,9 +124,9 @@ pub struct Checkpointed<C: HasCheckpoint, S: CandidateState = AtCheckpoint> {
     /// This is updated only when `mark_match()` is called
     pub(crate) checkpoint: C::Checkpoint,
 
-    /// Advanced cursor position beyond checkpoint (None when at checkpoint)
-    /// Only Some when cursor has advanced beyond last confirmed match
-    pub(crate) candidate: Option<C>,
+    /// Advanced cursor position beyond checkpoint
+    /// Type depends on S: `()` for AtCheckpoint, `C` for HasCandidate
+    pub(crate) candidate: S::CandidateData<C>,
 
     /// Phantom data for candidate state marker
     pub(crate) _state: PhantomData<S>,
@@ -128,11 +138,6 @@ impl<C: HasCheckpoint, S: CandidateState> Checkpointed<C, S> {
     pub(crate) fn checkpoint(&self) -> &C::Checkpoint {
         &self.checkpoint
     }
-
-    /// Check if currently at checkpoint (no advancement)
-    pub(crate) fn at_checkpoint(&self) -> bool {
-        self.candidate.is_none()
-    }
 }
 
 // Methods only available when at checkpoint (AtCheckpoint)
@@ -141,9 +146,15 @@ impl<C: HasCheckpoint> Checkpointed<C, AtCheckpoint> {
     pub(crate) fn new(checkpoint: C::Checkpoint) -> Self {
         Self {
             checkpoint,
-            candidate: None,
+            candidate: (),
             _state: PhantomData,
         }
+    }
+
+    /// Check if currently at checkpoint (always true for AtCheckpoint)
+    #[inline]
+    pub(crate) fn at_checkpoint(&self) -> bool {
+        true
     }
 }
 
@@ -156,25 +167,21 @@ impl<C: HasCheckpoint> Checkpointed<C, HasCandidate> {
     ) -> Self {
         Self {
             checkpoint,
-            candidate: Some(candidate),
+            candidate,
             _state: PhantomData,
         }
     }
 
     /// Get reference to the advanced candidate
-    /// Guaranteed to exist by type system
+    /// Guaranteed to exist by type system (stored directly, not in Option)
     pub(crate) fn candidate(&self) -> &C {
-        self.candidate
-            .as_ref()
-            .expect("HasCandidate state guarantees candidate exists")
+        &self.candidate
     }
 
     /// Get mutable reference to the advanced candidate
-    /// Guaranteed to exist by type system
+    /// Guaranteed to exist by type system (stored directly, not in Option)
     pub(crate) fn candidate_mut(&mut self) -> &mut C {
-        self.candidate
-            .as_mut()
-            .expect("HasCandidate state guarantees candidate exists")
+        &mut self.candidate
     }
 
     /// Get reference to current cursor position (alias for candidate)
@@ -187,6 +194,12 @@ impl<C: HasCheckpoint> Checkpointed<C, HasCandidate> {
     #[inline]
     pub(crate) fn current_mut(&mut self) -> &mut C {
         self.candidate_mut()
+    }
+
+    /// Check if currently at checkpoint (always false for HasCandidate)
+    #[inline]
+    pub(crate) fn at_checkpoint(&self) -> bool {
+        false
     }
 }
 
@@ -204,7 +217,7 @@ where
     ) -> Checkpointed<PathCursor<P, Candidate>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint.clone(),
-            candidate: Some(CursorStateMachine::to_candidate(&self.checkpoint)),
+            candidate: CursorStateMachine::to_candidate(&self.checkpoint),
             _state: PhantomData,
         }
     }
@@ -221,13 +234,10 @@ where
     pub(crate) fn mark_match(
         self
     ) -> Checkpointed<PathCursor<P, Matched>, HasCandidate> {
-        let matched = CursorStateMachine::to_matched(
-            self.candidate
-                .expect("HasCandidate state guarantees candidate exists"),
-        );
+        let matched = CursorStateMachine::to_matched(self.candidate);
         Checkpointed {
             checkpoint: matched.clone(),
-            candidate: Some(matched),
+            candidate: matched,
             _state: PhantomData,
         }
     }
@@ -241,10 +251,7 @@ where
     ) -> Checkpointed<PathCursor<P, Mismatched>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint,
-            candidate: Some(CursorStateMachine::to_mismatched(
-                self.candidate
-                    .expect("HasCandidate state guarantees candidate exists"),
-            )),
+            candidate: CursorStateMachine::to_mismatched(self.candidate),
             _state: PhantomData,
         }
     }
@@ -265,7 +272,7 @@ where
     ) -> Checkpointed<ChildCursor<Candidate, EndNode>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint.clone(),
-            candidate: Some(CursorStateMachine::to_candidate(&self.checkpoint)),
+            candidate: CursorStateMachine::to_candidate(&self.checkpoint),
             _state: PhantomData,
         }
     }
@@ -283,13 +290,10 @@ where
     pub(crate) fn mark_match(
         self
     ) -> Checkpointed<ChildCursor<Matched, EndNode>, HasCandidate> {
-        let matched = CursorStateMachine::to_matched(
-            self.candidate
-                .expect("HasCandidate state guarantees candidate exists"),
-        );
+        let matched = CursorStateMachine::to_matched(self.candidate);
         Checkpointed {
             checkpoint: matched.clone(),
-            candidate: Some(matched),
+            candidate: matched,
             _state: PhantomData,
         }
     }
@@ -303,18 +307,18 @@ where
     ) -> Checkpointed<ChildCursor<Mismatched, EndNode>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint,
-            candidate: Some(CursorStateMachine::to_mismatched(
-                self.candidate
-                    .expect("HasCandidate state guarantees candidate exists"),
-            )),
+            candidate: CursorStateMachine::to_mismatched(self.candidate),
             _state: PhantomData,
         }
     }
 }
 
-// Implement CompactFormat for Checkpointed
-impl<T: CompactFormat + HasCheckpoint, S: CandidateState> CompactFormat
-    for Checkpointed<T, S>
+// ============================================================================
+// CompactFormat implementations
+// ============================================================================
+
+impl<T: CompactFormat + HasCheckpoint> CompactFormat
+    for Checkpointed<T, AtCheckpoint>
 where
     T::Checkpoint: CompactFormat,
 {
@@ -322,14 +326,7 @@ where
         &self,
         f: &mut std::fmt::Formatter,
     ) -> std::fmt::Result {
-        write!(f, "Checkpointed {{ ")?;
-        write!(f, "checkpoint: ")?;
-        self.checkpoint.fmt_compact(f)?;
-        if let Some(candidate) = &self.candidate {
-            write!(f, ", candidate: ")?;
-            candidate.fmt_compact(f)?;
-        }
-        write!(f, " }}")
+        write!(f, "Checkpointed(at_checkpoint)")
     }
 
     fn fmt_indented(
@@ -337,25 +334,60 @@ where
         f: &mut std::fmt::Formatter,
         indent: usize,
     ) -> std::fmt::Result {
-        write_indent(f, indent)?;
-        writeln!(f, "Checkpointed {{")?;
-        write_indent(f, indent + 1)?;
-        write!(f, "checkpoint: ")?;
-        self.checkpoint.fmt_compact(f)?;
-        writeln!(f, ",")?;
-        if let Some(candidate) = &self.candidate {
-            write_indent(f, indent + 1)?;
-            write!(f, "candidate: ")?;
-            candidate.fmt_compact(f)?;
-            writeln!(f, ",")?;
-        }
-        write_indent(f, indent)?;
-        write!(f, "}}")
+        writeln!(f, "{}Checkpointed {{", " ".repeat(indent))?;
+        writeln!(f, "{}  checkpoint:", " ".repeat(indent))?;
+        self.checkpoint.fmt_indented(f, indent + 4)?;
+        writeln!(
+            f,
+            "{}  candidate: (none - at checkpoint)",
+            " ".repeat(indent)
+        )?;
+        writeln!(f, "{}}}", " ".repeat(indent))
     }
 }
 
-impl<T: CompactFormat + HasCheckpoint, S: CandidateState> std::fmt::Display
-    for Checkpointed<T, S>
+impl<T: CompactFormat + HasCheckpoint> CompactFormat
+    for Checkpointed<T, HasCandidate>
+where
+    T: CompactFormat,
+    T::Checkpoint: CompactFormat,
+{
+    fn fmt_compact(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        write!(f, "Checkpointed(has_candidate)")
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut std::fmt::Formatter,
+        indent: usize,
+    ) -> std::fmt::Result {
+        writeln!(f, "{}Checkpointed {{", " ".repeat(indent))?;
+        writeln!(f, "{}  checkpoint:", " ".repeat(indent))?;
+        self.checkpoint.fmt_indented(f, indent + 4)?;
+        writeln!(f, "{}  candidate:", " ".repeat(indent))?;
+        self.candidate.fmt_indented(f, indent + 4)?;
+        writeln!(f, "{}}}", " ".repeat(indent))
+    }
+}
+
+impl<T: CompactFormat + HasCheckpoint> std::fmt::Display
+    for Checkpointed<T, AtCheckpoint>
+where
+    T::Checkpoint: CompactFormat,
+{
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        self.fmt_indented(f, 0)
+    }
+}
+
+impl<T: CompactFormat + HasCheckpoint> std::fmt::Display
+    for Checkpointed<T, HasCandidate>
 where
     T::Checkpoint: CompactFormat,
 {
@@ -390,7 +422,7 @@ where
                 use super::MarkMatchState;
                 Ok(Checkpointed {
                     checkpoint: self.checkpoint,
-                    candidate: Some(candidate.mark_match()),
+                    candidate: candidate.mark_match(),
                     _state: PhantomData,
                 })
             },
@@ -420,10 +452,10 @@ where
         match child_state.advance_state(trav) {
             Ok(advanced_state) => Ok(Checkpointed {
                 checkpoint: self.checkpoint,
-                candidate: Some(ChildCursor {
+                candidate: ChildCursor {
                     child_state: advanced_state,
                     _state: std::marker::PhantomData,
-                }),
+                },
                 _state: PhantomData,
             }),
             Err(_failed_state) => {

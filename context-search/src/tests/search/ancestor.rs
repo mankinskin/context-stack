@@ -1,3 +1,4 @@
+use crate::state::matched::CheckpointedCursor;
 #[cfg(test)]
 use {
     crate::{
@@ -250,26 +251,31 @@ fn find_ancestor2() {
         byz_found,
         Response {
             end: MatchResult {
-            path: PathCoverage::Postfix(PostfixEnd {
-                root_pos: 2.into(),
-                path: RootedRolePath::new(
-                    PatternLocation::new(xabyz, xaby_z_id,),
-                    RolePath::new(
-                        0,
-                        vec![ChildLocation::new(xaby, xa_by_id, 1,)],
-                    ),
-                )
-            }),
-            cursor: Checkpointed::<PatternCursor>::new(PatternCursor {
-                path: RootedRangePath::new(
-                    query.clone(),
-                    RolePath::new_empty(0),
-                    RolePath::new_empty(1),
-                ),
-                atom_position: 3.into(),
-                _state: std::marker::PhantomData,
-            }),
-        },            cache: TraceCache {
+                path: PathCoverage::Postfix(PostfixEnd {
+                    root_pos: 2.into(),
+                    path: RootedRolePath::new(
+                        PatternLocation::new(xabyz, xaby_z_id,),
+                        RolePath::new(
+                            0,
+                            vec![ChildLocation::new(xaby, xa_by_id, 1,)],
+                        ),
+                    )
+                }),
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<
+                    PatternCursor,
+                >::new(
+                    PatternCursor {
+                        path: RootedRangePath::new(
+                            query.clone(),
+                            RolePath::new_empty(0),
+                            RolePath::new_empty(1),
+                        ),
+                        atom_position: 3.into(),
+                        _state: std::marker::PhantomData,
+                    }
+                )),
+            },
+            cache: TraceCache {
                 entries: HashMap::from_iter([
                     (
                         xabyz.index,
@@ -420,15 +426,19 @@ fn find_ancestor3() {
                         ),
                     )
                 }),
-                cursor: Checkpointed::<PatternCursor>::new(PatternCursor {
-                    path: RootedRangePath::new(
-                        query.clone(),
-                        RolePath::new_empty(0),
-                        RolePath::new_empty(1),
-                    ),
-                    atom_position: 3.into(),
-                    _state: std::marker::PhantomData,
-                }),
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<
+                    PatternCursor,
+                >::new(
+                    PatternCursor {
+                        path: RootedRangePath::new(
+                            query.clone(),
+                            RolePath::new_empty(0),
+                            RolePath::new_empty(1),
+                        ),
+                        atom_position: 3.into(),
+                        _state: std::marker::PhantomData,
+                    }
+                )),
             },
         }
     );

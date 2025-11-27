@@ -77,21 +77,20 @@ fn find_consecutive1() {
     
     // Test candidate state - THIS IS THE KEY ASSERTION
     assert!(
-        fin1.end.cursor.candidate.is_some(),
+        fin1.end.cursor.has_candidate(),
         "Cursor should have a candidate (advanced position) after parent exploration"
     );
     
-    if let Some(ref candidate) = fin1.end.cursor.candidate {
-        let candidate_end = HasRootChildIndex::<End>::root_child_index(&candidate.path);
-        assert_eq!(
-            *candidate.atom_position.as_ref(), 4,
-            "Candidate atom_position should be 4 (advanced beyond checkpoint)"
-        );
-        assert_eq!(
-            candidate_end, 3,
-            "Candidate end_index should be 3 (pointing to first unmatched token 'a')"
-        );
-    }
+    let candidate = fin1.end.cursor.cursor();
+    let candidate_end = HasRootChildIndex::<End>::root_child_index(&candidate.path);
+    assert_eq!(
+        *candidate.atom_position.as_ref(), 4,
+        "Candidate atom_position should be 4 (advanced beyond checkpoint)"
+    );
+    assert_eq!(
+        candidate_end, 3,
+        "Candidate end_index should be 3 (pointing to first unmatched token 'a')"
+    );
     assert!(
         !fin1.query_exhausted(),
         "Query should not be exhausted after matching only ghi"

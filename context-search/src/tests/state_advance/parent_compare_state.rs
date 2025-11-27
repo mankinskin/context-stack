@@ -56,7 +56,7 @@ fn test_parent_compare_state_advance_success() {
         parent_state,
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };
@@ -138,7 +138,7 @@ fn test_parent_compare_state_advance_at_last_index() {
         parent_state,
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };
@@ -199,7 +199,7 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
         parent_state,
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };
@@ -269,7 +269,7 @@ fn test_parent_compare_state_cursor_conversion() {
         parent_state,
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };
@@ -343,7 +343,7 @@ fn test_state_advance_error_propagation() {
         parent_state,
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };

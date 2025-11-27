@@ -87,10 +87,10 @@ impl StateAdvance for ParentCompareState {
                                 child_state: child_state.clone(),
                                 _state: PhantomData,
                             },
-                            candidate: Some(ChildCursor {
+                            candidate: ChildCursor {
                                 child_state,
                                 _state: PhantomData,
-                            }),
+                            },
                             _state: PhantomData,
                         },
                         mode: GraphMajor,

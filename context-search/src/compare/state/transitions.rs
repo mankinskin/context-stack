@@ -153,10 +153,10 @@ impl StateAdvance for CompareState<Candidate, Candidate, ChildLocation> {
             Ok(child_state) => Ok(CompareState {
                 child: Checkpointed {
                     checkpoint: self.child.checkpoint().clone(),
-                    candidate: Some(ChildCursor {
+                    candidate: ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    }),
+                    },
                     _state: PhantomData,
                 },
                 ..self
@@ -164,10 +164,10 @@ impl StateAdvance for CompareState<Candidate, Candidate, ChildLocation> {
             Err(child_state) => Ok(CompareState {
                 child: Checkpointed {
                     checkpoint: self.child.checkpoint().clone(),
-                    candidate: Some(ChildCursor {
+                    candidate: ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    }),
+                    },
                     _state: PhantomData,
                 },
                 ..self
@@ -187,10 +187,10 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
             Ok(child_state) => Ok(CompareState {
                 child: Checkpointed {
                     checkpoint: self.child.checkpoint().clone(),
-                    candidate: Some(ChildCursor {
+                    candidate: ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    }),
+                    },
                     _state: PhantomData,
                 },
                 query: self.query,
@@ -200,10 +200,10 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
             Err(child_state) => Ok(CompareState {
                 child: Checkpointed {
                     checkpoint: self.child.checkpoint().clone(),
-                    candidate: Some(ChildCursor {
+                    candidate: ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    }),
+                    },
                     _state: PhantomData,
                 },
                 query: self.query,

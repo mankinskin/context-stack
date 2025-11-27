@@ -14,6 +14,7 @@ use {
             Checkpointed,
             PatternCursor,
         },
+        state::matched::CheckpointedCursor,
     },
     context_trace::{
         path::accessors::path_accessor::HasTargetOffset,
@@ -62,11 +63,10 @@ fn test_advancement_chain_through_multiple_states() {
 
         let parent_compare_state = ParentCompareState {
             parent_state,
-            cursor: Checkpointed {
-                checkpoint: cursor.clone(),
-                candidate: Some(cursor.as_candidate()),
-                _state: PhantomData,
-            },
+            cursor: Checkpointed::with_candidate(
+                cursor.clone(),
+                cursor.as_candidate(),
+            ),
         };
 
         // Should advance successfully for indices 0, 1, 2
@@ -131,7 +131,7 @@ fn test_advancement_preserves_atom_positions() {
             parent_state,
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
-                candidate: Some(cursor.as_candidate()),
+                candidate: cursor.as_candidate(),
                 _state: PhantomData,
             },
         };
@@ -228,7 +228,7 @@ fn test_advancement_with_different_pattern_sizes() {
             parent_state,
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
-                candidate: Some(cursor.as_candidate()),
+                candidate: cursor.as_candidate(),
                 _state: PhantomData,
             },
         };
@@ -276,7 +276,7 @@ fn test_advancement_fails_at_boundaries() {
         parent_state: parent_state.clone(),
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };
@@ -342,7 +342,7 @@ fn test_advancement_with_nested_patterns() {
         parent_state,
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };
@@ -403,7 +403,7 @@ fn test_state_advance_idempotency_on_error() {
         parent_state: parent_state.clone(),
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            candidate: Some(cursor.as_candidate()),
+            candidate: cursor.as_candidate(),
                 _state: PhantomData,
         },
     };

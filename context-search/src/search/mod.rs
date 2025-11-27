@@ -18,7 +18,10 @@ use crate::{
     },
     state::{
         end::PathCoverage,
-        matched::MatchResult,
+        matched::{
+            CheckpointedCursor,
+            MatchResult,
+        },
     },
     traversal::TraceStart,
     Response,
@@ -183,14 +186,17 @@ where
                 checkpointed::Checkpointed,
                 PathCursor,
             };
-            let cursor = Checkpointed::<PathCursor<_>>::new(raw_cursor);
+            let cursor = Checkpointed::<PatternCursor<_>>::new(raw_cursor);
             let path = PathCoverage::EntireRoot(IndexRangePath::new_empty(
                 IndexRoot::from(PatternLocation::new(
                     start_token,
                     PatternId::default(),
                 )),
             ));
-            MatchResult { path, cursor }
+            MatchResult {
+                path,
+                cursor: CheckpointedCursor::AtCheckpoint(cursor),
+            }
         };
 
         trace!(end = %pretty(&end), "final matched state");
@@ -340,28 +346,37 @@ where
             path, root_pos, target, end_pos, trav,
         );
 
-        // Clone the candidate cursor (which represents the final matched position) and simplify
-        let mut simplified_checkpoint = state.query.candidate().clone();
+        // Clone and simplify the checkpoint and candidate cursors
+        let mut simplified_checkpoint = state.query.checkpoint().clone();
         Self::simplify_query_cursor(&mut simplified_checkpoint, trav);
+        
+        let mut simplified_candidate = state.query.candidate().clone();
+        Self::simplify_query_cursor(&mut simplified_candidate, trav);
 
-        // Preserve the candidate if it exists (advanced position for parent exploration)
-        // Clone and simplify the candidate cursor if present
-        let _simplified_candidate = state.query.candidate.as_ref().map(|c| {
-            let mut simplified = c.clone();
-            Self::simplify_query_cursor(&mut simplified, trav);
-            simplified
-        });
-
-        // Create Checkpointed with AtCheckpoint state (no candidate in final result)
-        use crate::cursor::checkpointed::Checkpointed;
-        let cursor_state = Checkpointed {
-            checkpoint: simplified_checkpoint,
-            candidate: None,
-            _state: PhantomData,
+        // Create Checkpointed with appropriate state based on whether candidate advanced
+        // If candidate == checkpoint, use AtCheckpoint (no progress beyond last match)
+        // If candidate > checkpoint, use HasCandidate (preserves candidate for consecutive searches)
+        use crate::cursor::checkpointed::{
+            Checkpointed,
+            HasCandidate,
+        };
+        
+        let cursor = if simplified_candidate == simplified_checkpoint {
+            // No candidate advancement - create AtCheckpoint
+            CheckpointedCursor::AtCheckpoint(
+                Checkpointed::new(simplified_checkpoint)
+            )
+        } else {
+            // Candidate advanced beyond checkpoint - create HasCandidate
+            let cursor_state = Checkpointed::<_, HasCandidate>::with_candidate(
+                simplified_checkpoint,
+                simplified_candidate,
+            );
+            CheckpointedCursor::HasCandidate(cursor_state)
         };
 
         MatchResult {
-            cursor: cursor_state,
+            cursor,
             path: path_enum,
         }
     }

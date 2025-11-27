@@ -47,25 +47,25 @@ fn test_compare_state_candidate_advance() {
     let checkpoint = PatternCursor {
         path: pattern_path,
         atom_position: AtomPosition::from(0),
-        _state: PhantomData,
+        _state: PhantomData
     };
 
     let compare_state = CompareState {
         child: crate::cursor::Checkpointed {
-            candidate: Some(crate::cursor::ChildCursor {
+            candidate: crate::cursor::ChildCursor {
                 child_state: child_state.clone(),
-                _state: PhantomData,
-            }),
+                _state: PhantomData
+            },
             checkpoint: crate::cursor::ChildCursor {
                 child_state,
-                _state: PhantomData,
+                _state: PhantomData
             },
-            _state: PhantomData,
+            _state: PhantomData
         },
         query: crate::cursor::Checkpointed {
-            candidate: Some(cursor),
+            candidate: cursor,
             checkpoint,
-            _state: PhantomData,
+            _state: PhantomData
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
         target: context_trace::trace::cache::key::directed::down::DownKey::new(
@@ -129,31 +129,31 @@ fn test_compare_state_matched_advance() {
     let cursor: PathCursor<PatternRangePath, Matched> = PathCursor {
         path: pattern_path.clone(),
         atom_position: AtomPosition::from(0),
-        _state: PhantomData,
+        _state: PhantomData
     };
 
     let checkpoint = PatternCursor {
         path: pattern_path,
         atom_position: AtomPosition::from(0),
-        _state: PhantomData,
+        _state: PhantomData
     };
 
     let compare_state = CompareState {
         child: crate::cursor::Checkpointed {
-            candidate: Some(crate::cursor::ChildCursor {
+            candidate: crate::cursor::ChildCursor {
                 child_state: child_state.clone(),
-                _state: PhantomData,
-            }),
+                _state: PhantomData
+            },
             checkpoint: crate::cursor::ChildCursor {
                 child_state,
-                _state: PhantomData,
+                _state: PhantomData
             },
-            _state: PhantomData,
+            _state: PhantomData
         },
         query: crate::cursor::Checkpointed {
-            candidate: Some(cursor),
+            candidate: cursor,
             checkpoint,
-            _state: PhantomData,
+            _state: PhantomData
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
         target: context_trace::trace::cache::key::directed::down::DownKey::new(

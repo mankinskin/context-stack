@@ -202,7 +202,7 @@ impl<K: SearchKind> StartCtx<K> {
 
             let cursor = Checkpointed {
                 checkpoint,
-                candidate: Some(cursor.as_candidate()),
+                candidate: cursor.as_candidate(),
                 _state: PhantomData,
             };
             Ok(CompareParentBatch { batch, cursor })

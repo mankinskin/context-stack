@@ -21,7 +21,10 @@ use crate::{
     },
     state::{
         end::PathCoverage,
-        matched::MatchResult,
+        matched::{
+            CheckpointedCursor,
+            MatchResult,
+        },
     },
     traversal::SearchKind,
 };
@@ -300,7 +303,7 @@ where
                     Checkpointed::<PathCursor<_>>::new(checkpoint_cursor);
 
                 Err(MatchResult {
-                    cursor: cursor_state,
+                    cursor: CheckpointedCursor::AtCheckpoint(cursor_state),
                     path: PathCoverage::from_range_path(
                         path, root_pos, target, end_pos, &trav,
                     ),
@@ -379,22 +382,22 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
 
         // Clone the Checkpointed<PatternCursor> preserving both checkpoint and candidate
-        // Convert from Checkpointed<PathCursor<_, Candidate>> to Checkpointed<PathCursor<_, Matched>>
-        // This is a type-level conversion only - the candidate represents an exploration position,
-        // not a confirmed match. We preserve it so the next search can start from the advanced position.
-        use crate::cursor::checkpointed::Checkpointed;
-        let cursor_state = Checkpointed {
-            checkpoint: self.state.query.checkpoint().clone(),
-            candidate: self.state.query.candidate.as_ref().map(|c| {
-                // Type-level conversion Candidate → Matched without semantic state change
-                PathCursor {
-                    path: c.path.clone(),
-                    atom_position: c.atom_position,
-                    _state: std::marker::PhantomData::<Matched>,
-                }
-            }),
-            _state: PhantomData,
+        // The candidate represents the exploration position (advanced beyond checkpoint)
+        use crate::cursor::checkpointed::{
+            Checkpointed,
+            HasCandidate,
         };
+        
+        let candidate_converted = PathCursor {
+            path: self.state.query.candidate().path.clone(),
+            atom_position: self.state.query.candidate().atom_position,
+            _state: std::marker::PhantomData::<Matched>,
+        };
+        
+        let cursor_state = Checkpointed::<_, HasCandidate>::with_candidate(
+            self.state.query.checkpoint().clone(),
+            candidate_converted,
+        );
 
         let end_pos = checkpoint.atom_position;
 
@@ -404,7 +407,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         );
 
         MatchResult {
-            cursor: cursor_state,
+            cursor: CheckpointedCursor::HasCandidate(cursor_state),
             path: path_enum,
         }
     }

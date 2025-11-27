@@ -8,6 +8,7 @@ use crate::{
         checkpointed::{
             AtCheckpoint,
             Checkpointed,
+            HasCandidate,
         },
         Matched,
         PatternCursor,
@@ -16,16 +17,54 @@ use crate::{
 };
 use context_trace::*;
 
+/// Checkpointed cursor state for MatchResult
+///
+/// This enum encodes whether the match has an advanced candidate (from parent exploration)
+/// or just a checkpoint (no further exploration).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CheckpointedCursor {
+    /// At checkpoint - no candidate, only the confirmed match position
+    AtCheckpoint(Checkpointed<PatternCursor<Matched>, AtCheckpoint>),
+    /// Has candidate - advanced position from parent exploration
+    HasCandidate(Checkpointed<PatternCursor<Matched>, HasCandidate>),
+}
+
+impl CheckpointedCursor {
+    /// Get the checkpoint cursor (always available)
+    pub fn checkpoint(&self) -> &PatternCursor<Matched> {
+        match self {
+            CheckpointedCursor::AtCheckpoint(c) => c.checkpoint(),
+            CheckpointedCursor::HasCandidate(c) => c.checkpoint(),
+        }
+    }
+
+    /// Get the cursor for consecutive searches
+    ///
+    /// Returns the candidate (advanced position) if available, otherwise the checkpoint.
+    /// This allows consecutive searches to continue from where parent exploration left off.
+    pub fn cursor(&self) -> &PatternCursor<Matched> {
+        match self {
+            CheckpointedCursor::AtCheckpoint(c) => c.checkpoint(),
+            CheckpointedCursor::HasCandidate(c) => c.candidate(),
+        }
+    }
+
+    /// Check if this has a candidate (advanced position from parent exploration)
+    pub fn has_candidate(&self) -> bool {
+        matches!(self, CheckpointedCursor::HasCandidate(_))
+    }
+}
+
 /// A matched state - query matched at least partially in this root
 ///
-/// The cursor tracks only the checkpoint (confirmed match).
+/// The cursor can be either at checkpoint (no candidate) or have a candidate (from parent exploration).
 /// Use query_exhausted() to check if the entire query was matched.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MatchResult {
     /// The path in the graph where the match occurred
     pub path: PathCoverage,
-    /// The checkpointed cursor at checkpoint (AtCheckpoint state)
-    pub cursor: Checkpointed<PatternCursor<Matched>, AtCheckpoint>,
+    /// The checkpointed cursor (either AtCheckpoint or HasCandidate)
+    pub cursor: CheckpointedCursor,
 }
 impl GraphRoot for MatchResult {
     fn root_parent(&self) -> Token {
@@ -43,9 +82,7 @@ impl MatchResult {
     /// Returns the candidate (advanced position) if available, otherwise the checkpoint.
     /// This allows consecutive searches to continue from where parent exploration left off.
     pub fn cursor(&self) -> &PatternCursor<Matched> {
-        // If we have a candidate (from parent exploration), use it for consecutive searches
-        // Otherwise, use the checkpoint (last confirmed match position)
-        self.cursor.candidate.as_ref().unwrap_or_else(|| self.cursor.checkpoint())
+        self.cursor.cursor()
     }
 
     /// Check if the query was fully matched

@@ -326,10 +326,11 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                                 target: DownKey::new(token, target_pos),
                                 child: Checkpointed {
                                     checkpoint: self.child.checkpoint().clone(),
-                                    candidate: Some(ChildCursor {
+                                    candidate: ChildCursor {
+
                                         child_state,
                                         _state: PhantomData,
-                                    }),
+                                    },
                                     _state: PhantomData,
                                 },
                                 mode: self.mode,
@@ -390,7 +391,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                                 mode: self.mode,
                                 query: Checkpointed {
                                     checkpoint: self.query.checkpoint().clone(),
-                                    candidate: Some(cursor),
+                                    candidate: cursor,
                                     _state: PhantomData,
                                 },
                             }

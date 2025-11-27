@@ -1,4 +1,5 @@
 #![allow(unused)]
+use crate::state::matched::CheckpointedCursor;
 use context_trace::trace::cache::{
     position::PositionCache,
     vertex::VertexCache,
@@ -73,11 +74,11 @@ fn prefix1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: Checkpointed::<PathCursor<_>>::new(PathCursor {
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<PathCursor<_>>::new(PathCursor {
                     atom_position: 5.into(),
                     path: res.end.cursor().path.clone(),
                     _state: PhantomData,
-                }),
+                })),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {
@@ -176,11 +177,11 @@ fn postfix1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: Checkpointed::<PathCursor<_>>::new(PathCursor {
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<PathCursor<_>>::new(PathCursor {
                     atom_position: 7.into(),
                     path: res.end.cursor().path.clone(),
                     _state: PhantomData,
-                }),
+                })),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {
@@ -272,11 +273,11 @@ fn range1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: Checkpointed::<PathCursor<_>>::new(PathCursor {
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<PathCursor<_>>::new(PathCursor {
                     atom_position: 4.into(),
                     path: res.end.cursor().path.clone(),
                     _state: PhantomData,
-                }),
+                })),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {
