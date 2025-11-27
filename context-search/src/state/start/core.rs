@@ -21,6 +21,7 @@ use context_trace::{
     },
     *,
 };
+use std::marker::PhantomData;
 use tracing::{
     debug,
     trace,
@@ -202,6 +203,7 @@ impl<K: SearchKind> StartCtx<K> {
             let cursor = Checkpointed {
                 checkpoint,
                 candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
             };
             Ok(CompareParentBatch { batch, cursor })
         } else {

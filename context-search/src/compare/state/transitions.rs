@@ -7,6 +7,7 @@ use crate::cursor::{
     Candidate,
     Checkpointed,
     ChildCursor,
+    CursorStateMachine,
     MarkMatchState,
     Matched,
     Mismatched,
@@ -85,19 +86,19 @@ impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
         trav: &G,
     ) -> QueryAdvanceResult<EndNode> {
         debug!(
-            cursor = %self.query.current(),
+            cursor = %self.query.candidate(),
             "advancing query cursor only"
         );
 
-        // Try to advance the query cursor's current position
-        match self.query.current_mut().advance(trav) {
+        // Try to advance the query cursor's candidate position
+        match self.query.candidate_mut().advance(trav) {
             Continue(_) => {
                 trace!("query cursor advance succeeded");
-                // Convert query to candidate state (checkpoint remains unchanged)
-                let query_candidate = self.query.as_candidate();
-
+                // Convert candidate from Matched to Candidate state
+                let advanced_candidate = CursorStateMachine::to_candidate(self.query.candidate());
+                
                 QueryAdvanceResult::Advanced(CompareState {
-                    query: query_candidate,
+                    query: Checkpointed::with_candidate(self.query.checkpoint, advanced_candidate),
                     child: self.child,
                     target: self.target,
                     mode: self.mode,
@@ -116,25 +117,26 @@ impl CompareState<Candidate, Matched, PositionAnnotated<ChildLocation>> {
         self,
         trav: &G,
     ) -> IndexAdvanceResult<PositionAnnotated<ChildLocation>> {
-        // Advance the checkpointed child cursor using StateAdvance
-        match self.child.advance_state(trav) {
-            Ok(advanced_child) => {
+        // Advance the child cursor's candidate using its child_state
+        let child_state_clone = self.child.candidate().child_state.clone();
+        match child_state_clone.advance_state(trav) {
+            Ok(child_state) => {
                 // Successfully advanced - convert to Candidate state
+                let advanced_child = CursorStateMachine::to_candidate(&ChildCursor::<Matched, _> {
+                    child_state,
+                    _state: PhantomData,
+                });
+                
                 IndexAdvanceResult::Advanced(CompareState {
-                    child: advanced_child.as_candidate(),
+                    child: Checkpointed::with_candidate(self.child.checkpoint, advanced_child),
                     query: self.query,
                     target: self.target,
                     mode: self.mode,
                 })
             },
-            Err(original_child) => {
+            Err(_) => {
                 // Child cursor cannot advance (at boundary)
-                IndexAdvanceResult::Exhausted(CompareState {
-                    child: original_child,
-                    query: self.query,
-                    target: self.target,
-                    mode: self.mode,
-                })
+                IndexAdvanceResult::Exhausted(self)
             },
         }
     }
@@ -146,7 +148,7 @@ impl StateAdvance for CompareState<Candidate, Candidate, ChildLocation> {
         self,
         trav: &G,
     ) -> Result<Self, Self> {
-        let child_state_clone = self.child.current().child_state.clone();
+        let child_state_clone = self.child.candidate().child_state.clone();
         match child_state_clone.advance_state(trav) {
             Ok(child_state) => Ok(CompareState {
                 child: Checkpointed {
@@ -155,6 +157,7 @@ impl StateAdvance for CompareState<Candidate, Candidate, ChildLocation> {
                         child_state,
                         _state: PhantomData,
                     }),
+                    _state: PhantomData,
                 },
                 ..self
             }),
@@ -165,6 +168,7 @@ impl StateAdvance for CompareState<Candidate, Candidate, ChildLocation> {
                         child_state,
                         _state: PhantomData,
                     }),
+                    _state: PhantomData,
                 },
                 ..self
             }),
@@ -178,7 +182,7 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
         self,
         trav: &G,
     ) -> Result<Self, Self> {
-        let child_state_clone = self.child.current().child_state.clone();
+        let child_state_clone = self.child.candidate().child_state.clone();
         match child_state_clone.advance_state(trav) {
             Ok(child_state) => Ok(CompareState {
                 child: Checkpointed {
@@ -187,6 +191,7 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
                         child_state,
                         _state: PhantomData,
                     }),
+                    _state: PhantomData,
                 },
                 query: self.query,
                 target: self.target,
@@ -199,6 +204,7 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
                         child_state,
                         _state: PhantomData,
                     }),
+                    _state: PhantomData,
                 },
                 query: self.query,
                 target: self.target,

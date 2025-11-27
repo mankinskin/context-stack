@@ -35,6 +35,7 @@ use context_trace::{
     Start,
     *,
 };
+use std::marker::PhantomData;
 use tracing::{
     debug,
     info,
@@ -392,6 +393,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
                     _state: std::marker::PhantomData::<Matched>,
                 }
             }),
+            _state: PhantomData,
         };
 
         let end_pos = checkpoint.atom_position;

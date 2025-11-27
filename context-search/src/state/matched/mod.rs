@@ -6,9 +6,10 @@
 use crate::{
     cursor::{
         checkpointed::{
+            AtCheckpoint,
             Checkpointed,
-            CheckpointedRef,
         },
+        Matched,
         PatternCursor,
     },
     state::end::PathCoverage,
@@ -17,14 +18,14 @@ use context_trace::*;
 
 /// A matched state - query matched at least partially in this root
 ///
-/// The cursor tracks both checkpoint (confirmed match) and current position (exploration).
+/// The cursor tracks only the checkpoint (confirmed match).
 /// Use query_exhausted() to check if the entire query was matched.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MatchResult {
     /// The path in the graph where the match occurred
     pub path: PathCoverage,
-    /// The checkpointed cursor tracking both confirmed and exploration positions
-    pub cursor: Checkpointed<PatternCursor>,
+    /// The checkpointed cursor at checkpoint (AtCheckpoint state)
+    pub cursor: Checkpointed<PatternCursor<Matched>, AtCheckpoint>,
 }
 impl GraphRoot for MatchResult {
     fn root_parent(&self) -> Token {
@@ -37,11 +38,14 @@ impl MatchResult {
         &self.path
     }
 
-    /// Get the checkpoint cursor (last confirmed match position)
+    /// Get the cursor for consecutive searches
     ///
-    /// This is the most commonly used accessor and represents the confirmed match state.
-    pub fn cursor(&self) -> CheckpointedRef<'_, PatternCursor> {
-        self.cursor.current()
+    /// Returns the candidate (advanced position) if available, otherwise the checkpoint.
+    /// This allows consecutive searches to continue from where parent exploration left off.
+    pub fn cursor(&self) -> &PatternCursor<Matched> {
+        // If we have a candidate (from parent exploration), use it for consecutive searches
+        // Otherwise, use the checkpoint (last confirmed match position)
+        self.cursor.candidate.as_ref().unwrap_or_else(|| self.cursor.checkpoint())
     }
 
     /// Check if the query was fully matched
@@ -53,17 +57,17 @@ impl MatchResult {
             HasPath,
             HasRootChildIndex,
         };
-        // Check current position (may be advanced for parent exploration)
-        let current = self.cursor.current();
-        let at_end = current.path.is_at_pattern_end();
-        let path_empty = HasPath::path(current.path.end_path()).is_empty();
+        // Check checkpoint position
+        let checkpoint = self.cursor.checkpoint();
+        let at_end = checkpoint.path.is_at_pattern_end();
+        let path_empty = HasPath::path(checkpoint.path.end_path()).is_empty();
         let end_index =
-            HasRootChildIndex::<End>::root_child_index(&current.path);
+            HasRootChildIndex::<End>::root_child_index(&checkpoint.path);
         tracing::debug!(
             at_end,
             path_empty,
             end_index,
-            end_path_len=%HasPath::path(current.path.end_path()).len(),
+            end_path_len=%HasPath::path(checkpoint.path.end_path()).len(),
             "query_exhausted check"
         );
         at_end && path_empty

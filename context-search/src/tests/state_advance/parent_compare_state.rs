@@ -57,6 +57,7 @@ fn test_parent_compare_state_advance_success() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 
@@ -138,6 +139,7 @@ fn test_parent_compare_state_advance_at_last_index() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 
@@ -198,6 +200,7 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 
@@ -267,6 +270,7 @@ fn test_parent_compare_state_cursor_conversion() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 
@@ -340,6 +344,7 @@ fn test_state_advance_error_propagation() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 

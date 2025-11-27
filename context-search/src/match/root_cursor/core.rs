@@ -7,6 +7,7 @@ use crate::{
         Candidate,
         Checkpointed,
         CursorState,
+        HasCandidate,
         Matched,
         PatternCursor,
     },
@@ -71,7 +72,7 @@ pub(crate) struct CompareParentBatch {
     #[deref]
     #[deref_mut]
     pub(crate) batch: ParentBatch,
-    pub(crate) cursor: Checkpointed<PatternCursor<Candidate>>,
+    pub(crate) cursor: Checkpointed<PatternCursor<Candidate>, HasCandidate>,
 }
 
 impl CompareParentBatch {

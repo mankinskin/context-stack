@@ -1,7 +1,10 @@
 use context_trace::*;
 
 use crate::{
-    cursor::checkpointed::CheckpointedRef,
+    cursor::{
+        Matched,
+        PatternCursor,
+    },
     state::{
         end::PathCoverage,
         matched::MatchResult,
@@ -75,7 +78,7 @@ impl Response {
     /// Get the query pattern cursor from the response
     pub fn query_cursor(
         &self
-    ) -> CheckpointedRef<'_, crate::cursor::PatternCursor> {
+    ) -> &PatternCursor<Matched> {
         self.end.cursor()
     }
 

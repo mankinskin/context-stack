@@ -6,6 +6,7 @@ use crate::{
         ChildCursor,
         CursorState,
         CursorStateMachine,
+        HasCandidate,
         HasCheckpoint,
         Matched,
         Mismatched,
@@ -77,12 +78,13 @@ impl std::fmt::Display for PathPairMode {
 ///
 /// # Checkpointed Cursor Architecture
 ///
-/// Each cursor is wrapped in a `Checkpointed<C>` type that encapsulates:
-/// - **current**: The position being evaluated (state controlled by generic Q or I)
+/// Each cursor is wrapped in a `Checkpointed<C, S>` type that encapsulates:
+/// - **candidate**: The position being evaluated (state controlled by generic Q or I)
 /// - **checkpoint**: Last confirmed match (always Matched state)
+/// - **S**: CandidateState - HasCandidate during search, AtCheckpoint in final results
 ///
-/// This ensures cursor and checkpoint are always managed together, preventing
-/// desynchronization bugs.
+/// During active search, all CompareState instances use HasCandidate state to track
+/// both checkpoint and candidate positions. Only MatchResult (final result) uses AtCheckpoint.
 ///
 /// ## Query Cursor (`query`)
 /// - Tracks position in the query pattern being searched for
@@ -92,14 +94,14 @@ impl std::fmt::Display for PathPairMode {
 /// ## Child Cursor (`child`)
 /// - Tracks position in the graph/index path being searched
 /// - Uses `ChildCursor<I, EndNode>` wrapping ChildState with IndexRangePath
-/// - Position tracked via `child.current().child_state`
+/// - Position tracked via `child.candidate().child_state`
 ///
 /// # atom_position Tracking
 ///
 /// The `atom_position` field represents the number of atoms consumed:
 /// - Starts at 0 at the beginning of a pattern
 /// - Increments by token width when advancing
-/// - checkpoint.atom_position ≤ current.atom_position (current explores ahead)
+/// - checkpoint.atom_position ≤ candidate.atom_position (candidate explores ahead)
 ///
 /// Example: Matching pattern [a,b,c] where b,c form a composite token "bc":
 /// ```text
@@ -109,11 +111,11 @@ impl std::fmt::Display for PathPairMode {
 ///
 /// After matching 'a':
 ///   query.checkpoint().atom_position = 1 (consumed 'a')
-///   query.current().atom_position = 1 (about to test 'bc')
+///   query.candidate().atom_position = 1 (about to test 'bc')
 ///
 /// While testing 'bc':
 ///   query.checkpoint().atom_position = 1 (still at 'a')
-///   query.current().atom_position = 3 (would consume through 'c')
+///   query.candidate().atom_position = 3 (would consume through 'c')
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CompareState<
@@ -121,13 +123,13 @@ pub(crate) struct CompareState<
     I: CursorState = Candidate,
     EndNode: PathNode = PositionAnnotated<ChildLocation>,
 > {
-    /// Query cursor with checkpoint (state controlled by generic parameter Q)
+    /// Query cursor with checkpoint and candidate (HasCandidate state during search)
     /// Uses PatternRangePath to properly track start/end positions during matching
-    pub(crate) query: Checkpointed<PathCursor<PatternRangePath, Q>>,
+    pub(crate) query: Checkpointed<PathCursor<PatternRangePath, Q>, HasCandidate>,
 
-    /// Index cursor with checkpoint (state controlled by generic parameter I)
+    /// Index cursor with checkpoint and candidate (HasCandidate state during search)
     /// The ChildState contains the IndexRangePath being traversed with position-annotated end nodes
-    pub(crate) child: Checkpointed<ChildCursor<I, EndNode>>,
+    pub(crate) child: Checkpointed<ChildCursor<I, EndNode>, HasCandidate>,
 
     pub(crate) target: DownKey,
     pub(crate) mode: PathPairMode,
@@ -141,43 +143,37 @@ impl<Q: CursorState, I: CursorState, EndNode: PathNode>
     HasRootedPath<IndexRangePath<ChildLocation, EndNode>>
     for CompareState<Q, I, EndNode>
 {
-    /// Access the rooted path from the child cursor's state
+    /// Access the rooted path from the child cursor's candidate state
     fn rooted_path(&self) -> &IndexRangePath<ChildLocation, EndNode> {
-        // Return reference to the path in either candidate or checkpoint
-        match &self.child.candidate {
-            Some(candidate) => &candidate.child_state.path,
-            None => &self.child.checkpoint.child_state.path,
-        }
+        // Return reference to the path in candidate (HasCandidate state guarantees it exists)
+        &self.child.candidate().child_state.path
     }
-    /// Access the rooted path from the child cursor's state
+    
+    /// Access the rooted path from the child cursor's candidate state (mutable)
     fn rooted_path_mut(
         &mut self
     ) -> &mut IndexRangePath<ChildLocation, EndNode> {
-        // Materialize candidate if needed, then return mutable reference
-        if self.child.candidate.is_none() {
-            self.child.candidate = Some(<ChildCursor<I, EndNode>>::from_checkpoint(&self.child.checkpoint));
-        }
-        &mut self.child.candidate.as_mut().unwrap().child_state.path
+        // Return mutable reference to candidate's path (HasCandidate state guarantees it exists)
+        &mut self.child.candidate_mut().child_state.path
     }
 }
 impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
     pub(crate) fn update_checkpoint(&mut self) {
         debug!(
             query.checkpoint = %self.query.checkpoint(),
-            query.current = %self.query.current(),
-            //child.checkpoint = %self.child.checkpoint(),
-            //child.current = %self.child.current(),
+            query.candidate = %self.query.candidate(),
             "Marking current positions as checkpoints"
         );
-        // Update checkpoint from candidate if it exists (meaning cursor advanced)
-        // If candidate is None, we're already at checkpoint
-        if let Some(candidate) = self.query.candidate.take() {
-            self.query.checkpoint = CursorStateMachine::to_matched(candidate);
-        }
-        if let Some(candidate) = self.child.candidate.take() {
-            self.child.checkpoint = CursorStateMachine::to_matched(candidate);
-        }
-        // After this, both are at checkpoint (candidate = None)
+        // Update checkpoint from candidate (both are Matched state)
+        // Take candidate and convert to checkpoint
+        self.query.checkpoint = self.query.candidate().clone();
+        self.child.checkpoint = self.child.candidate().clone();
+        
+        // Now update candidate to match checkpoint (no advancement)
+        *self.query.candidate_mut() = self.query.checkpoint.clone();
+        *self.child.candidate_mut() = self.child.checkpoint.clone();
+        
+        // After this, checkpoint and candidate are synchronized
     }
 }
 

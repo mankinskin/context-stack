@@ -330,6 +330,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                                         child_state,
                                         _state: PhantomData,
                                     }),
+                                    _state: PhantomData,
                                 },
                                 mode: self.mode,
                                 query: self.query.clone(),
@@ -390,6 +391,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                                 query: Checkpointed {
                                     checkpoint: self.query.checkpoint().clone(),
                                     candidate: Some(cursor),
+                                    _state: PhantomData,
                                 },
                             }
                         },

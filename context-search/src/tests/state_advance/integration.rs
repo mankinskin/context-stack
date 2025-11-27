@@ -65,6 +65,7 @@ fn test_advancement_chain_through_multiple_states() {
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
                 candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
             },
         };
 
@@ -77,11 +78,8 @@ fn test_advancement_chain_through_multiple_states() {
         );
 
         let advanced = result.unwrap();
-        tracing::info!(
-            ?advanced,
-            "Advanced successfully from index {}",
-            start_index
-        );
+        tracing::trace!(?advanced);
+        tracing::info!("Advanced successfully from index {}", start_index);
 
         // Verify the child state is properly set up
         assert!(
@@ -134,6 +132,7 @@ fn test_advancement_preserves_atom_positions() {
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
                 candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
             },
         };
 
@@ -230,6 +229,7 @@ fn test_advancement_with_different_pattern_sizes() {
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
                 candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
             },
         };
 
@@ -277,6 +277,7 @@ fn test_advancement_fails_at_boundaries() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 
@@ -342,6 +343,7 @@ fn test_advancement_with_nested_patterns() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 
@@ -402,6 +404,7 @@ fn test_state_advance_idempotency_on_error() {
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
             candidate: Some(cursor.as_candidate()),
+                _state: PhantomData,
         },
     };
 

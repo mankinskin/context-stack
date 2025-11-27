@@ -340,23 +340,24 @@ where
             path, root_pos, target, end_pos, trav,
         );
 
-        // Clone the checkpoint cursor and simplify
-        let mut simplified_checkpoint = state.query.checkpoint().clone();
+        // Clone the candidate cursor (which represents the final matched position) and simplify
+        let mut simplified_checkpoint = state.query.candidate().clone();
         Self::simplify_query_cursor(&mut simplified_checkpoint, trav);
 
         // Preserve the candidate if it exists (advanced position for parent exploration)
         // Clone and simplify the candidate cursor if present
-        let simplified_candidate = state.query.candidate.as_ref().map(|c| {
+        let _simplified_candidate = state.query.candidate.as_ref().map(|c| {
             let mut simplified = c.clone();
             Self::simplify_query_cursor(&mut simplified, trav);
             simplified
         });
 
-        // Create Checkpointed preserving both checkpoint and candidate
+        // Create Checkpointed with AtCheckpoint state (no candidate in final result)
         use crate::cursor::checkpointed::Checkpointed;
         let cursor_state = Checkpointed {
             checkpoint: simplified_checkpoint,
-            candidate: simplified_candidate,
+            candidate: None,
+            _state: PhantomData,
         };
 
         MatchResult {

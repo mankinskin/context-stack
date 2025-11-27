@@ -4,6 +4,7 @@ use crate::{
         Candidate,
         Checkpointed,
         ChildCursor,
+        HasCandidate,
         PathCursor,
         PatternCursor,
     },
@@ -38,7 +39,7 @@ pub(crate) struct ParentCompareState {
     #[deref]
     #[deref_mut]
     pub(crate) parent_state: ParentState,
-    pub(crate) cursor: Checkpointed<PatternCursor<Candidate>>,
+    pub(crate) cursor: Checkpointed<PatternCursor<Candidate>, HasCandidate>,
 }
 
 #[context_trace::instrument_trait_impl]
@@ -76,7 +77,7 @@ impl StateAdvance for ParentCompareState {
                     path: annotated_path.clone(),
                 };
 
-                let cursor_position = self.cursor.current().atom_position;
+                let cursor_position = self.cursor.candidate().atom_position;
 
                 Ok(CompareRootState {
                     candidate: CompareState {
@@ -90,6 +91,7 @@ impl StateAdvance for ParentCompareState {
                                 child_state,
                                 _state: PhantomData,
                             }),
+                            _state: PhantomData,
                         },
                         mode: GraphMajor,
                         target: DownKey::new(

@@ -27,7 +27,29 @@ use context_trace::{
     HasGraph,
     PathNode,
 };
-use std::ops::ControlFlow;
+use std::{
+    marker::PhantomData,
+    ops::ControlFlow,
+};
+
+/// Marker trait for candidate state control
+///
+/// Controls whether the Checkpointed cursor has an advanced candidate or is at checkpoint.
+pub trait CandidateState: 'static {}
+
+/// At checkpoint - no candidate exists, only checkpoint
+///
+/// Used for finalized results like MatchResult where we store only the confirmed checkpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AtCheckpoint;
+impl CandidateState for AtCheckpoint {}
+
+/// Has candidate - candidate cursor exists alongside checkpoint
+///
+/// Used during active search/comparison when cursors are exploring ahead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HasCandidate;
+impl CandidateState for HasCandidate {}
 
 /// Trait for cursors that can have a checkpoint
 ///
@@ -71,31 +93,6 @@ where
     }
 }
 
-/// Reference to current cursor position (either checkpoint or candidate)
-///
-/// Provides unified access to the current cursor without exposing the internal
-/// Option-based storage. Can be pattern matched or converted to references.
-///
-/// When at checkpoint, owns a temporary cursor converted from checkpoint.
-/// When at candidate, borrows the candidate.
-#[derive(Debug)]
-pub enum CheckpointedRef<'a, C> {
-    /// At checkpoint (owns converted cursor from checkpoint)
-    Checkpoint(C),
-    /// Advanced beyond checkpoint (borrows candidate)
-    Candidate(&'a C),
-}
-
-impl<'a, C> CheckpointedRef<'a, C> {
-    /// Get reference to the cursor regardless of variant
-    pub(crate) fn as_ref(&self) -> &C {
-        match self {
-            CheckpointedRef::Checkpoint(c) => c,
-            CheckpointedRef::Candidate(c) => c,
-        }
-    }
-}
-
 /// Encapsulates a cursor with its checkpoint state
 ///
 /// Uses space-efficient storage: `candidate: Option<C>` is None when at checkpoint,
@@ -103,15 +100,16 @@ impl<'a, C> CheckpointedRef<'a, C> {
 ///
 /// # Type Parameters
 /// - `C`: The cursor type being wrapped (e.g., `PathCursor<P, S>` or `ChildCursor<S, N>`)
+/// - `S`: The candidate state marker (AtCheckpoint or HasCandidate)
 ///
 /// # Invariants
 /// - `checkpoint` is always in Matched state
-/// - `candidate.is_none()` when current position equals checkpoint
-/// - `candidate.is_some()` when advanced beyond checkpoint
+/// - When `S = AtCheckpoint`: `candidate` is None (enforced by construction)
+/// - When `S = HasCandidate`: `candidate` is Some (enforced by construction)
 /// - `checkpoint.atom_position <= candidate.atom_position` (checkpoint never ahead of candidate)
 /// - Updates to checkpoint only happen via `mark_match()`
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Checkpointed<C: HasCheckpoint> {
+pub struct Checkpointed<C: HasCheckpoint, S: CandidateState = AtCheckpoint> {
     /// Last confirmed match position (always Matched state)
     /// This is updated only when `mark_match()` is called
     pub(crate) checkpoint: C::Checkpoint,
@@ -119,228 +117,204 @@ pub struct Checkpointed<C: HasCheckpoint> {
     /// Advanced cursor position beyond checkpoint (None when at checkpoint)
     /// Only Some when cursor has advanced beyond last confirmed match
     pub(crate) candidate: Option<C>,
+
+    /// Phantom data for candidate state marker
+    pub(crate) _state: PhantomData<S>,
 }
 
-impl<C: HasCheckpoint> Checkpointed<C> {
+// Common methods available on all Checkpointed regardless of state
+impl<C: HasCheckpoint, S: CandidateState> Checkpointed<C, S> {
     /// Get the checkpoint cursor (always Matched state)
     pub(crate) fn checkpoint(&self) -> &C::Checkpoint {
         &self.checkpoint
-    }
-
-    /// Get reference to current cursor position (checkpoint or candidate)
-    ///
-    /// Returns CheckpointedRef enum that can be pattern-matched
-    pub(crate) fn current(&self) -> CheckpointedRef<C> {
-        match &self.candidate {
-            None => CheckpointedRef::Checkpoint(C::from_checkpoint(
-                &self.checkpoint,
-            )),
-            Some(candidate) => CheckpointedRef::Candidate(candidate),
-        }
-    }
-
-    /// Get mutable reference to current cursor, materializing candidate if needed
-    ///
-    /// This converts the checkpoint to a candidate if we're currently at checkpoint.
-    /// After calling this, `self.candidate` will be `Some`.
-    pub(crate) fn current_mut(&mut self) -> &mut C {
-        if self.candidate.is_none() {
-            // Convert checkpoint to C and store as candidate
-            self.candidate = Some(C::from_checkpoint(&self.checkpoint));
-        }
-        self.candidate.as_mut().unwrap()
     }
 
     /// Check if currently at checkpoint (no advancement)
     pub(crate) fn at_checkpoint(&self) -> bool {
         self.candidate.is_none()
     }
+}
 
-    /// Get reference to current cursor, extracting from CheckpointedRef
-    ///
-    /// This is a convenience method that wraps current() and extracts the reference.
-    /// The returned reference borrows from the CheckpointedRef, which may own a temporary.
+// Methods only available when at checkpoint (AtCheckpoint)
+impl<C: HasCheckpoint> Checkpointed<C, AtCheckpoint> {
+    /// Create a new checkpointed cursor at checkpoint (no candidate)
+    pub(crate) fn new(checkpoint: C::Checkpoint) -> Self {
+        Self {
+            checkpoint,
+            candidate: None,
+            _state: PhantomData,
+        }
+    }
+}
+
+// Methods only available when has candidate (HasCandidate)
+impl<C: HasCheckpoint> Checkpointed<C, HasCandidate> {
+    /// Create a checkpointed cursor with an advanced candidate
+    pub(crate) fn with_candidate(
+        checkpoint: C::Checkpoint,
+        candidate: C,
+    ) -> Self {
+        Self {
+            checkpoint,
+            candidate: Some(candidate),
+            _state: PhantomData,
+        }
+    }
+
+    /// Get reference to the advanced candidate
+    /// Guaranteed to exist by type system
+    pub(crate) fn candidate(&self) -> &C {
+        self.candidate
+            .as_ref()
+            .expect("HasCandidate state guarantees candidate exists")
+    }
+
+    /// Get mutable reference to the advanced candidate
+    /// Guaranteed to exist by type system
+    pub(crate) fn candidate_mut(&mut self) -> &mut C {
+        self.candidate
+            .as_mut()
+            .expect("HasCandidate state guarantees candidate exists")
+    }
+
+    /// Get reference to current cursor position (alias for candidate)
     #[inline]
-    pub(crate) fn current_as_ref(
-        &self
-    ) -> impl std::ops::Deref<Target = C> + '_ {
-        self.current()
+    pub(crate) fn current(&self) -> &C {
+        self.candidate()
+    }
+
+    /// Get mutable reference to current cursor position (alias for candidate_mut)
+    #[inline]
+    pub(crate) fn current_mut(&mut self) -> &mut C {
+        self.candidate_mut()
     }
 }
 
-// Implement Deref for CheckpointedRef so it can be used transparently
-impl<'a, C> std::ops::Deref for CheckpointedRef<'a, C> {
-    type Target = C;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_ref()
-    }
-}
-
-// Implement Display for CheckpointedRef by delegating to inner cursor
-impl<'a, C: std::fmt::Display> std::fmt::Display for CheckpointedRef<'a, C> {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        self.as_ref().fmt(f)
-    }
-}
-
-// Implement CompactFormat for CheckpointedRef by delegating to inner cursor
-impl<'a, C: CompactFormat> CompactFormat for CheckpointedRef<'a, C> {
-    fn fmt_compact(
-        &self,
-        f: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result {
-        self.as_ref().fmt_compact(f)
-    }
-
-    fn fmt_indented(
-        &self,
-        f: &mut std::fmt::Formatter,
-        indent: usize,
-    ) -> std::fmt::Result {
-        self.as_ref().fmt_indented(f, indent)
-    }
-}
-
-// Implementation for PathCursor<P, S>
-impl<P> Checkpointed<PathCursor<P, Matched>>
+// Implementation for PathCursor<P, S> - state transitions
+impl<P> Checkpointed<PathCursor<P, Matched>, AtCheckpoint>
 where
     P: Clone,
 {
-    /// Create a new checkpointed cursor from an initial matched position
-    ///
-    /// Starts with candidate=None (at checkpoint).
-    pub(crate) fn new(initial: PathCursor<P, Matched>) -> Self {
-        Self {
-            checkpoint: initial,
-            candidate: None,
-        }
-    }
-
-    /// Convert current cursor to Candidate state (for next comparison)
+    /// Convert checkpoint cursor to Candidate state with candidate
     ///
     /// The checkpoint remains unchanged at the last matched position.
+    /// Returns HasCandidate state with the new candidate cursor.
     pub(crate) fn as_candidate(
         &self
-    ) -> Checkpointed<PathCursor<P, Candidate>> {
-        let current_cursor = match &self.candidate {
-            None => &self.checkpoint,
-            Some(c) => c,
-        };
+    ) -> Checkpointed<PathCursor<P, Candidate>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint.clone(),
-            candidate: Some(CursorStateMachine::to_candidate(current_cursor)),
+            candidate: Some(CursorStateMachine::to_candidate(&self.checkpoint)),
+            _state: PhantomData,
         }
     }
 }
 
-impl<P> Checkpointed<PathCursor<P, Candidate>>
+impl<P> Checkpointed<PathCursor<P, Candidate>, HasCandidate>
 where
     P: Clone,
 {
     /// Mark the current position as matched, updating the checkpoint
     ///
     /// This transitions the candidate cursor to Matched state and updates
-    /// the checkpoint. Sets candidate=None since we're now at checkpoint.
-    pub(crate) fn mark_match(self) -> Checkpointed<PathCursor<P, Matched>> {
+    /// the checkpoint. Returns HasCandidate state (keeps candidate structure).
+    pub(crate) fn mark_match(
+        self
+    ) -> Checkpointed<PathCursor<P, Matched>, HasCandidate> {
         let matched = CursorStateMachine::to_matched(
-            self.candidate.expect("Candidate cursor must exist"),
+            self.candidate
+                .expect("HasCandidate state guarantees candidate exists"),
         );
         Checkpointed {
-            checkpoint: matched,
-            candidate: None,
+            checkpoint: matched.clone(),
+            candidate: Some(matched),
+            _state: PhantomData,
         }
     }
 
     /// Mark the current position as mismatched, keeping the checkpoint
     ///
     /// This transitions the candidate cursor to Mismatched state without
-    /// updating the checkpoint.
+    /// updating the checkpoint. Stays in HasCandidate state.
     pub(crate) fn mark_mismatch(
         self
-    ) -> Checkpointed<PathCursor<P, Mismatched>> {
+    ) -> Checkpointed<PathCursor<P, Mismatched>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint,
             candidate: Some(CursorStateMachine::to_mismatched(
-                self.candidate.expect("Candidate cursor must exist"),
+                self.candidate
+                    .expect("HasCandidate state guarantees candidate exists"),
             )),
+            _state: PhantomData,
         }
     }
 }
 
 // Implementation for ChildCursor<S, EndNode>
-impl<EndNode: PathNode> Checkpointed<ChildCursor<Matched, EndNode>>
+impl<EndNode: PathNode>
+    Checkpointed<ChildCursor<Matched, EndNode>, AtCheckpoint>
 where
     EndNode: Clone,
 {
-    /// Create a new checkpointed child cursor from an initial matched position
-    ///
-    /// Starts with candidate=None (at checkpoint).
-    pub(crate) fn new(initial: ChildCursor<Matched, EndNode>) -> Self {
-        Self {
-            checkpoint: initial,
-            candidate: None,
-        }
-    }
-
-    /// Convert current cursor to Candidate state (for next comparison)
+    /// Convert checkpoint cursor to Candidate state with candidate
     ///
     /// The checkpoint remains unchanged at the last matched position.
+    /// Returns HasCandidate state with the new candidate cursor.
     pub(crate) fn as_candidate(
         &self
-    ) -> Checkpointed<ChildCursor<Candidate, EndNode>> {
-        let current_cursor = match &self.candidate {
-            None => &self.checkpoint,
-            Some(c) => c,
-        };
+    ) -> Checkpointed<ChildCursor<Candidate, EndNode>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint.clone(),
-            candidate: Some(CursorStateMachine::to_candidate(current_cursor)),
+            candidate: Some(CursorStateMachine::to_candidate(&self.checkpoint)),
+            _state: PhantomData,
         }
     }
 }
 
-impl<EndNode: PathNode> Checkpointed<ChildCursor<Candidate, EndNode>>
+impl<EndNode: PathNode>
+    Checkpointed<ChildCursor<Candidate, EndNode>, HasCandidate>
 where
     EndNode: Clone,
 {
     /// Mark the current position as matched, updating the checkpoint
     ///
     /// This transitions the candidate cursor to Matched state and updates
-    /// the checkpoint. Sets candidate=None since we're now at checkpoint.
+    /// the checkpoint. Returns HasCandidate state.
     pub(crate) fn mark_match(
         self
-    ) -> Checkpointed<ChildCursor<Matched, EndNode>> {
+    ) -> Checkpointed<ChildCursor<Matched, EndNode>, HasCandidate> {
         let matched = CursorStateMachine::to_matched(
-            self.candidate.expect("Candidate cursor must exist"),
+            self.candidate
+                .expect("HasCandidate state guarantees candidate exists"),
         );
         Checkpointed {
-            checkpoint: matched,
-            candidate: None,
+            checkpoint: matched.clone(),
+            candidate: Some(matched),
+            _state: PhantomData,
         }
     }
 
     /// Mark the current position as mismatched, keeping the checkpoint
     ///
     /// This transitions the candidate cursor to Mismatched state without
-    /// updating the checkpoint.
+    /// updating the checkpoint. Stays in HasCandidate state.
     pub(crate) fn mark_mismatch(
         self
-    ) -> Checkpointed<ChildCursor<Mismatched, EndNode>> {
+    ) -> Checkpointed<ChildCursor<Mismatched, EndNode>, HasCandidate> {
         Checkpointed {
             checkpoint: self.checkpoint,
             candidate: Some(CursorStateMachine::to_mismatched(
-                self.candidate.expect("Candidate cursor must exist"),
+                self.candidate
+                    .expect("HasCandidate state guarantees candidate exists"),
             )),
+            _state: PhantomData,
         }
     }
 }
 
 // Implement CompactFormat for Checkpointed
-impl<T: CompactFormat + HasCheckpoint> CompactFormat for Checkpointed<T>
+impl<T: CompactFormat + HasCheckpoint, S: CandidateState> CompactFormat
+    for Checkpointed<T, S>
 where
     T::Checkpoint: CompactFormat,
 {
@@ -380,7 +354,8 @@ where
     }
 }
 
-impl<T: CompactFormat + HasCheckpoint> std::fmt::Display for Checkpointed<T>
+impl<T: CompactFormat + HasCheckpoint, S: CandidateState> std::fmt::Display
+    for Checkpointed<T, S>
 where
     T::Checkpoint: CompactFormat,
 {
@@ -396,23 +371,17 @@ where
 // StateAdvance implementations
 // ============================================================================
 
-impl<P> StateAdvance for Checkpointed<PathCursor<P, Matched>>
+impl<P> StateAdvance for Checkpointed<PathCursor<P, Matched>, AtCheckpoint>
 where
     P: Clone,
     PathCursor<P, Candidate>: Advance,
 {
-    type Next = Self;
+    type Next = Checkpointed<PathCursor<P, Matched>, HasCandidate>;
 
     fn advance_state<G: HasGraph>(
         self,
         trav: &G,
     ) -> Result<Self::Next, Self> {
-        // Only advance from checkpoint state
-        debug_assert!(
-            self.candidate.is_none(),
-            "advance_state should only be called when at checkpoint"
-        );
-
         // Convert checkpoint to candidate and advance
         let mut candidate = CursorStateMachine::to_candidate(&self.checkpoint);
         match candidate.advance(trav) {
@@ -422,6 +391,7 @@ where
                 Ok(Checkpointed {
                     checkpoint: self.checkpoint,
                     candidate: Some(candidate.mark_match()),
+                    _state: PhantomData,
                 })
             },
             ControlFlow::Break(()) => {
@@ -433,24 +403,18 @@ where
 }
 
 impl<EndNode: PathNode> StateAdvance
-    for Checkpointed<ChildCursor<Matched, EndNode>>
+    for Checkpointed<ChildCursor<Matched, EndNode>, AtCheckpoint>
 where
     EndNode: Clone,
     context_trace::ChildState<EndNode>:
         StateAdvance<Next = context_trace::ChildState<EndNode>>,
 {
-    type Next = Self;
+    type Next = Checkpointed<ChildCursor<Matched, EndNode>, HasCandidate>;
 
     fn advance_state<G: HasGraph>(
         self,
         trav: &G,
     ) -> Result<Self::Next, Self> {
-        // Only advance from checkpoint state
-        debug_assert!(
-            self.candidate.is_none(),
-            "advance_state should only be called when at checkpoint"
-        );
-
         // Advance checkpoint's child_state
         let child_state = self.checkpoint.child_state.clone();
         match child_state.advance_state(trav) {
@@ -460,6 +424,7 @@ where
                     child_state: advanced_state,
                     _state: std::marker::PhantomData,
                 }),
+                _state: PhantomData,
             }),
             Err(_failed_state) => {
                 // Cannot advance from checkpoint

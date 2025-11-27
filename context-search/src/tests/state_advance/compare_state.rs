@@ -60,10 +60,12 @@ fn test_compare_state_candidate_advance() {
                 child_state,
                 _state: PhantomData,
             },
+            _state: PhantomData,
         },
         query: crate::cursor::Checkpointed {
             candidate: Some(cursor),
             checkpoint,
+            _state: PhantomData,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
         target: context_trace::trace::cache::key::directed::down::DownKey::new(
@@ -146,10 +148,12 @@ fn test_compare_state_matched_advance() {
                 child_state,
                 _state: PhantomData,
             },
+            _state: PhantomData,
         },
         query: crate::cursor::Checkpointed {
             candidate: Some(cursor),
             checkpoint,
+            _state: PhantomData,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
         target: context_trace::trace::cache::key::directed::down::DownKey::new(
