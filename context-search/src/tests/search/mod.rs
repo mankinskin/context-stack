@@ -2,11 +2,15 @@ pub(crate) mod ancestor;
 pub(crate) mod consecutive;
 pub(crate) mod parent;
 
+use crate::cursor::PathCursor;
 #[cfg(test)]
 use {
     crate::search::Find,
     crate::{
-        cursor::PatternCursor,
+        cursor::{
+            checkpointed::Checkpointed,
+            PatternCursor,
+        },
         state::end::{
             range::RangeEnd,
             PathCoverage,
@@ -169,7 +173,7 @@ fn find_pattern1() {
                     RolePath::new(1, vec![ChildLocation::new(yz, y_z_id, 0)],),
                 ),
             }),
-            cursor: PatternCursor {
+            cursor: Checkpointed::<PatternCursor>::new(PatternCursor {
                 path: RootedRangePath::new(
                     query.clone(),
                     RolePath::new(0, vec![]),
@@ -177,7 +181,7 @@ fn find_pattern1() {
                 ),
                 atom_position: 3.into(),
                 _state: std::marker::PhantomData,
-            },
+            }),
         }
     );
 }

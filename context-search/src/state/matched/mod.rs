@@ -4,21 +4,24 @@
 //! The checkpoint position in the cursor indicates how many query tokens matched.
 
 use crate::{
-    cursor::PatternCursor,
+    cursor::{
+        checkpointed::Checkpointed,
+        PatternCursor,
+    },
     state::end::PathCoverage,
 };
 use context_trace::*;
 
 /// A matched state - query matched at least partially in this root
 ///
-/// The cursor's atom_position indicates how far into the query pattern we matched.
+/// The cursor tracks both checkpoint (confirmed match) and current position (exploration).
 /// Use query_exhausted() to check if the entire query was matched.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MatchResult {
     /// The path in the graph where the match occurred
     pub path: PathCoverage,
-    /// The cursor indicating position in the query pattern
-    pub cursor: PatternCursor,
+    /// The checkpointed cursor tracking both confirmed and exploration positions
+    pub cursor: Checkpointed<PatternCursor>,
 }
 impl GraphRoot for MatchResult {
     fn root_parent(&self) -> Token {
@@ -31,9 +34,11 @@ impl MatchResult {
         &self.path
     }
 
-    /// Get the cursor (checkpoint)
+    /// Get the checkpoint cursor (last confirmed match position)
+    ///
+    /// This is the most commonly used accessor and represents the confirmed match state.
     pub fn cursor(&self) -> &PatternCursor {
-        &self.cursor
+        self.cursor.checkpoint()
     }
 
     /// Check if the query was fully matched
@@ -45,15 +50,17 @@ impl MatchResult {
             HasPath,
             HasRootChildIndex,
         };
-        let at_end = self.cursor.path.is_at_pattern_end();
-        let path_empty = HasPath::path(self.cursor.path.end_path()).is_empty();
+        // Check current position (may be advanced for parent exploration)
+        let current = self.cursor.current();
+        let at_end = current.path.is_at_pattern_end();
+        let path_empty = HasPath::path(current.path.end_path()).is_empty();
         let end_index =
-            HasRootChildIndex::<End>::root_child_index(&self.cursor.path);
+            HasRootChildIndex::<End>::root_child_index(&current.path);
         tracing::debug!(
             at_end,
             path_empty,
             end_index,
-            end_path_len=%HasPath::path(self.cursor.path.end_path()).len(),
+            end_path_len=%HasPath::path(current.path.end_path()).len(),
             "query_exhausted check"
         );
         at_end && path_empty

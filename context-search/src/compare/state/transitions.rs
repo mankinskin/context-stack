@@ -116,36 +116,26 @@ impl CompareState<Candidate, Matched, PositionAnnotated<ChildLocation>> {
         self,
         trav: &G,
     ) -> IndexAdvanceResult<PositionAnnotated<ChildLocation>> {
-        let candidate_child_cursor = self.child.current().as_candidate();
-        match candidate_child_cursor.child_state.advance_state(trav) {
-            Ok(advanced_child_state) => {
-                // TODO: Update positions in the advanced state
+        // Advance the checkpointed child cursor using StateAdvance
+        match self.child.advance_state(trav) {
+            Ok(advanced_child) => {
+                // Successfully advanced - convert to Candidate state
                 IndexAdvanceResult::Advanced(CompareState {
-                    child: Checkpointed {
-                        checkpoint: self.child.checkpoint().clone(),
-                        candidate: Some(ChildCursor {
-                            child_state: advanced_child_state,
-                            _state: PhantomData,
-                        }),
-                    },
+                    child: advanced_child.as_candidate(),
                     query: self.query,
                     target: self.target,
                     mode: self.mode,
                 })
             },
-            Err(failed_child_state) =>
+            Err(original_child) => {
+                // Child cursor cannot advance (at boundary)
                 IndexAdvanceResult::Exhausted(CompareState {
-                    child: Checkpointed {
-                        checkpoint: self.child.checkpoint().clone(),
-                        candidate: Some(ChildCursor {
-                            child_state: failed_child_state,
-                            _state: PhantomData,
-                        }),
-                    },
+                    child: original_child,
                     query: self.query,
                     target: self.target,
                     mode: self.mode,
-                }),
+                })
+            },
         }
     }
 }

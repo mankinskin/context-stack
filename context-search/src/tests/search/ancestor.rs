@@ -1,7 +1,10 @@
 #[cfg(test)]
 use {
     crate::{
-        cursor::PatternCursor,
+        cursor::{
+            checkpointed::Checkpointed,
+            PatternCursor,
+        },
         search::Find,
         state::end::{
             postfix::PostfixEnd,
@@ -247,28 +250,26 @@ fn find_ancestor2() {
         byz_found,
         Response {
             end: MatchResult {
-                path: PathCoverage::Postfix(PostfixEnd {
-                    root_pos: 2.into(),
-                    path: RootedRolePath::new(
-                        PatternLocation::new(xabyz, xaby_z_id,),
-                        RolePath::new(
-                            0,
-                            vec![ChildLocation::new(xaby, xa_by_id, 1,)],
-                        ),
-                    )
-                }),
-                cursor: PatternCursor {
-                    path: RootedRangePath::new(
-                        query.clone(),
-                        RolePath::new_empty(0),
-                        RolePath::new_empty(1),
+            path: PathCoverage::Postfix(PostfixEnd {
+                root_pos: 2.into(),
+                path: RootedRolePath::new(
+                    PatternLocation::new(xabyz, xaby_z_id,),
+                    RolePath::new(
+                        0,
+                        vec![ChildLocation::new(xaby, xa_by_id, 1,)],
                     ),
-                    atom_position: 3.into(),
-                    _state: std::marker::PhantomData,
-                },
-            },
-
-            cache: TraceCache {
+                )
+            }),
+            cursor: Checkpointed::<PatternCursor>::new(PatternCursor {
+                path: RootedRangePath::new(
+                    query.clone(),
+                    RolePath::new_empty(0),
+                    RolePath::new_empty(1),
+                ),
+                atom_position: 3.into(),
+                _state: std::marker::PhantomData,
+            }),
+        },            cache: TraceCache {
                 entries: HashMap::from_iter([
                     (
                         xabyz.index,
@@ -419,7 +420,7 @@ fn find_ancestor3() {
                         ),
                     )
                 }),
-                cursor: PatternCursor {
+                cursor: Checkpointed::<PatternCursor>::new(PatternCursor {
                     path: RootedRangePath::new(
                         query.clone(),
                         RolePath::new_empty(0),
@@ -427,7 +428,7 @@ fn find_ancestor3() {
                     ),
                     atom_position: 3.into(),
                     _state: std::marker::PhantomData,
-                },
+                }),
             },
         }
     );

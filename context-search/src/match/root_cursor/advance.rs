@@ -289,8 +289,16 @@ where
                 );
 
                 let target = DownKey::new(target_index, root_pos.into());
+                
+                // Wrap cursor in Checkpointed (at checkpoint, no candidate)
+                use crate::cursor::{
+                    checkpointed::Checkpointed,
+                    PathCursor,
+                };
+                let cursor_state = Checkpointed::<PathCursor<_>>::new(checkpoint_cursor);
+                
                 Err(MatchResult {
-                    cursor: checkpoint_cursor,
+                    cursor: cursor_state,
                     path: PathCoverage::from_range_path(
                         path, root_pos, target, end_pos, &trav,
                     ),
@@ -368,14 +376,18 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
 
         let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
 
-        // Use current query cursor's PATH (advanced beyond checkpoint when child cannot advance)
-        // This ensures end_index points to next token to match, not last matched
-        // But keep checkpoint's atom_position (number of tokens successfully matched)
-        let end_cursor = PathCursor {
-            path: self.state.query.current().path.clone(),
-            atom_position: checkpoint.atom_position,
-            _state: std::marker::PhantomData::<Matched>,
+        // Clone the Checkpointed<PatternCursor> and convert to Matched state
+        // We need Checkpointed<PathCursor<_, Matched>> but have Checkpointed<PathCursor<_, Candidate>>
+        // So clone checkpoint (already Matched) and candidate (convert to Matched)
+        use crate::cursor::{
+            checkpointed::Checkpointed,
+            MarkMatchState,
         };
+        let cursor_state = Checkpointed {
+            checkpoint: self.state.query.checkpoint().clone(),
+            candidate: self.state.query.candidate.as_ref().map(|c| c.clone().mark_match()),
+        };
+
         let end_pos = checkpoint.atom_position;
 
         let target = DownKey::new(target_index, root_pos.into());
@@ -384,7 +396,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         );
 
         MatchResult {
-            cursor: end_cursor,
+            cursor: cursor_state,
             path: path_enum,
         }
     }

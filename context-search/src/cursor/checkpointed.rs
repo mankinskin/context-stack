@@ -22,8 +22,12 @@ use context_trace::{
         write_indent,
         CompactFormat,
     },
+    trace::state::StateAdvance,
+    Advance,
+    HasGraph,
     PathNode,
 };
+use std::ops::ControlFlow;
 
 /// Trait for cursors that can have a checkpoint
 ///
@@ -385,5 +389,82 @@ where
         f: &mut std::fmt::Formatter,
     ) -> std::fmt::Result {
         self.fmt_indented(f, 0)
+    }
+}
+
+// ============================================================================
+// StateAdvance implementations
+// ============================================================================
+
+impl<P> StateAdvance for Checkpointed<PathCursor<P, Matched>>
+where
+    P: Clone,
+    PathCursor<P, Candidate>: Advance,
+{
+    type Next = Self;
+
+    fn advance_state<G: HasGraph>(
+        self,
+        trav: &G,
+    ) -> Result<Self::Next, Self> {
+        // Only advance from checkpoint state
+        debug_assert!(
+            self.candidate.is_none(),
+            "advance_state should only be called when at checkpoint"
+        );
+
+        // Convert checkpoint to candidate and advance
+        let mut candidate = CursorStateMachine::to_candidate(&self.checkpoint);
+        match candidate.advance(trav) {
+            ControlFlow::Continue(()) => {
+                // Successfully advanced - convert to matched and return with new candidate
+                use super::MarkMatchState;
+                Ok(Checkpointed {
+                    checkpoint: self.checkpoint,
+                    candidate: Some(candidate.mark_match()),
+                })
+            },
+            ControlFlow::Break(()) => {
+                // Cannot advance from checkpoint
+                Err(self)
+            },
+        }
+    }
+}
+
+impl<EndNode: PathNode> StateAdvance
+    for Checkpointed<ChildCursor<Matched, EndNode>>
+where
+    EndNode: Clone,
+    context_trace::ChildState<EndNode>:
+        StateAdvance<Next = context_trace::ChildState<EndNode>>,
+{
+    type Next = Self;
+
+    fn advance_state<G: HasGraph>(
+        self,
+        trav: &G,
+    ) -> Result<Self::Next, Self> {
+        // Only advance from checkpoint state
+        debug_assert!(
+            self.candidate.is_none(),
+            "advance_state should only be called when at checkpoint"
+        );
+
+        // Advance checkpoint's child_state
+        let child_state = self.checkpoint.child_state.clone();
+        match child_state.advance_state(trav) {
+            Ok(advanced_state) => Ok(Checkpointed {
+                checkpoint: self.checkpoint,
+                candidate: Some(ChildCursor {
+                    child_state: advanced_state,
+                    _state: std::marker::PhantomData,
+                }),
+            }),
+            Err(_failed_state) => {
+                // Cannot advance from checkpoint
+                Err(self)
+            },
+        }
     }
 }

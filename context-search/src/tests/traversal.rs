@@ -16,7 +16,10 @@ use pretty_assertions::{
 use std::convert::TryInto;
 
 use crate::{
-    cursor::PathCursor,
+    cursor::{
+        checkpointed::Checkpointed,
+        PathCursor,
+    },
     search::Find,
     state::{
         end::PathCoverage,
@@ -70,11 +73,11 @@ fn prefix1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: PathCursor {
+                cursor: Checkpointed::<PathCursor<_>>::new(PathCursor {
                     atom_position: 5.into(),
                     path: res.end.cursor().path.clone(),
                     _state: PhantomData,
-                },
+                }),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {
@@ -173,11 +176,11 @@ fn postfix1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: PathCursor {
+                cursor: Checkpointed::<PathCursor<_>>::new(PathCursor {
                     atom_position: 7.into(),
                     path: res.end.cursor().path.clone(),
                     _state: PhantomData,
-                },
+                }),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {
@@ -269,11 +272,11 @@ fn range1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: PathCursor {
+                cursor: Checkpointed::<PathCursor<_>>::new(PathCursor {
                     atom_position: 4.into(),
                     path: res.end.cursor().path.clone(),
                     _state: PhantomData,
-                },
+                }),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {

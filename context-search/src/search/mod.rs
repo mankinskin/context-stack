@@ -173,11 +173,17 @@ where
             // No matches found - create empty mismatch at position 0
             debug!("No matches found, creating empty mismatch");
             let start_token = self.query.path_root()[0];
-            let cursor = PatternCursor {
+            let raw_cursor = PatternCursor {
                 atom_position: AtomPosition::default(),
                 path: self.query.clone(),
                 _state: PhantomData,
             };
+            // Wrap in Checkpointed (at checkpoint, no candidate)
+            use crate::cursor::{
+                checkpointed::Checkpointed,
+                PathCursor,
+            };
+            let cursor = Checkpointed::<PathCursor<_>>::new(raw_cursor);
             let path = PathCoverage::EntireRoot(IndexRangePath::new_empty(
                 IndexRoot::from(PatternLocation::new(
                     start_token,
@@ -325,12 +331,20 @@ where
             path, root_pos, target, end_pos, trav,
         );
 
-        // Simplify query cursor path: remove child locations pointing to last sub_index
-        let mut simplified_cursor = result_query.clone();
+        // Clone the checkpoint cursor and simplify
+        let mut simplified_cursor = state.query.checkpoint().clone();
         Self::simplify_query_cursor(&mut simplified_cursor, trav);
 
+        // Create Checkpointed with only checkpoint (no candidate)
+        // This represents a confirmed match state with no advancement
+        use crate::cursor::{
+            checkpointed::Checkpointed,
+            PathCursor,
+        };
+        let cursor_state = Checkpointed::<PathCursor<_>>::new(simplified_cursor);
+
         MatchResult {
-            cursor: simplified_cursor,
+            cursor: cursor_state,
             path: path_enum,
         }
     }
