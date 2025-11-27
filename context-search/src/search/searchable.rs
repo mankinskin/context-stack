@@ -3,18 +3,13 @@ use context_trace::{
     *,
 };
 use derive_new::new;
-use tracing::{
-    debug,
-    trace,
-};
+use tracing::debug;
 
 use crate::{
     cursor::{
-        Checkpointed,
         PatternCursor,
         PatternPrefixCursor,
     },
-    r#match::iterator::SearchIterator,
     search::SearchState,
     state::{
         result::Response,
@@ -172,7 +167,3 @@ impl Searchable for PatternPrefixCursor {
         PatternCursor::from(self).start_search(trav)
     }
 }
-use crate::{
-    r#match::root_cursor::CompareParentBatch,
-    traversal::policy::DirectedTraversalPolicy,
-};

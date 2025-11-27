@@ -22,7 +22,6 @@ use crate::{
 use context_trace::*;
 
 use derive_new::new;
-use tracing::trace;
 pub(crate) mod iterator;
 pub(crate) mod root_cursor;
 

@@ -1,19 +1,10 @@
 use context_trace::{
-    logging::{
-        write_indent,
-        CompactFormat,
-    },
     path::{
         accessors::has_path::HasRolePath,
         RolePathUtils,
     },
     RootedPath,
     *,
-};
-
-use crate::{
-    compare::parent::ParentCompareState,
-    cursor::PatternCursor,
 };
 
 pub(crate) mod postfix;
@@ -153,6 +144,7 @@ impl PathCoverage {
             },
         }
     }
+    #[allow(dead_code)]
     pub(crate) fn from_start_path<G: HasGraph>(
         mut path: IndexStartPath,
         root_pos: AtomPosition,

@@ -17,11 +17,7 @@ use super::{
     PathCursor,
 };
 use context_trace::{
-    impl_display_via_compact,
-    logging::{
-        write_indent,
-        CompactFormat,
-    },
+    logging::CompactFormat,
     trace::state::StateAdvance,
     Advance,
     HasGraph,
@@ -68,6 +64,7 @@ pub(crate) trait HasCheckpoint {
     type Checkpoint;
 
     /// Convert checkpoint (Matched state) to current cursor type
+    #[allow(dead_code)]
     fn from_checkpoint(checkpoint: &Self::Checkpoint) -> Self;
 }
 
@@ -119,6 +116,7 @@ where
 /// - `checkpoint.atom_position <= candidate.atom_position` (checkpoint never ahead of candidate)
 /// - Updates to checkpoint only happen via `mark_match()`
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(private_bounds)]
 pub struct Checkpointed<C: HasCheckpoint, S: CandidateState = AtCheckpoint> {
     /// Last confirmed match position (always Matched state)
     /// This is updated only when `mark_match()` is called
@@ -133,6 +131,7 @@ pub struct Checkpointed<C: HasCheckpoint, S: CandidateState = AtCheckpoint> {
 }
 
 // Common methods available on all Checkpointed regardless of state
+#[allow(private_bounds)]
 impl<C: HasCheckpoint, S: CandidateState> Checkpointed<C, S> {
     /// Get the checkpoint cursor (always Matched state)
     pub(crate) fn checkpoint(&self) -> &C::Checkpoint {
@@ -141,6 +140,7 @@ impl<C: HasCheckpoint, S: CandidateState> Checkpointed<C, S> {
 }
 
 // Methods only available when at checkpoint (AtCheckpoint)
+#[allow(private_bounds)]
 impl<C: HasCheckpoint> Checkpointed<C, AtCheckpoint> {
     /// Create a new checkpointed cursor at checkpoint (no candidate)
     pub(crate) fn new(checkpoint: C::Checkpoint) -> Self {
@@ -153,12 +153,14 @@ impl<C: HasCheckpoint> Checkpointed<C, AtCheckpoint> {
 
     /// Check if currently at checkpoint (always true for AtCheckpoint)
     #[inline]
+    #[allow(dead_code)]
     pub(crate) fn at_checkpoint(&self) -> bool {
         true
     }
 }
 
 // Methods only available when has candidate (HasCandidate)
+#[allow(private_bounds)]
 impl<C: HasCheckpoint> Checkpointed<C, HasCandidate> {
     /// Create a checkpointed cursor with an advanced candidate
     pub(crate) fn with_candidate(
@@ -192,12 +194,14 @@ impl<C: HasCheckpoint> Checkpointed<C, HasCandidate> {
 
     /// Get mutable reference to current cursor position (alias for candidate_mut)
     #[inline]
+    #[allow(dead_code)]
     pub(crate) fn current_mut(&mut self) -> &mut C {
         self.candidate_mut()
     }
 
     /// Check if currently at checkpoint (always false for HasCandidate)
     #[inline]
+    #[allow(dead_code)]
     pub(crate) fn at_checkpoint(&self) -> bool {
         false
     }
@@ -212,6 +216,7 @@ where
     ///
     /// The checkpoint remains unchanged at the last matched position.
     /// Returns HasCandidate state with the new candidate cursor.
+    #[allow(dead_code)]
     pub(crate) fn as_candidate(
         &self
     ) -> Checkpointed<PathCursor<P, Candidate>, HasCandidate> {
@@ -267,6 +272,7 @@ where
     ///
     /// The checkpoint remains unchanged at the last matched position.
     /// Returns HasCandidate state with the new candidate cursor.
+    #[allow(dead_code)]
     pub(crate) fn as_candidate(
         &self
     ) -> Checkpointed<ChildCursor<Candidate, EndNode>, HasCandidate> {

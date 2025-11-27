@@ -5,7 +5,6 @@ use crate::{
         Checkpointed,
         ChildCursor,
         HasCandidate,
-        PathCursor,
         PatternCursor,
     },
 };

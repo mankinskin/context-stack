@@ -11,7 +11,6 @@ use crate::{
         Matched,
         PatternCursor,
     },
-    state::matched::MatchResult,
     traversal::{
         policy::DirectedTraversalPolicy,
         SearchKind,

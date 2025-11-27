@@ -6,10 +6,7 @@ pub(crate) mod start;
 
 use std::cmp::Ordering;
 
-use context_trace::{
-    path::accessors::path_accessor::StatePosition,
-    *,
-};
+use context_trace::*;
 
 use inner_kind::InnerKind;
 

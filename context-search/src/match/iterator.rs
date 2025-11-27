@@ -2,13 +2,7 @@ use crate::{
     compare::state::CompareState,
     cursor::Matched,
     r#match::{
-        root_cursor::{
-            CompareParentBatch,
-            ConclusiveEnd,
-            RootAdvanceResult,
-            RootCursor,
-            RootEndResult,
-        },
+        root_cursor::CompareParentBatch,
         NodeConsumer,
         NodeResult::{
             self,
@@ -16,22 +10,15 @@ use crate::{
         },
         SearchNode::{
             self,
-            ParentCandidate,
         },
         SearchQueue,
     },
-    state::matched::MatchResult,
     traversal::SearchKind,
 };
-use context_trace::{
-    logging::format_utils::pretty,
-    *,
-};
-use derive_new::new;
+use context_trace::*;
 use tracing::{
     debug,
     trace,
-    warn,
 };
 
 #[derive(Debug)]

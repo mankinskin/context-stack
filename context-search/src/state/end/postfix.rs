@@ -5,7 +5,6 @@ use context_trace::{
         CompactFormat,
     },
     path::accessors::has_path::IntoRolePath,
-    RootedStartPathAccessor,
     *,
 };
 use derive_more::derive::{

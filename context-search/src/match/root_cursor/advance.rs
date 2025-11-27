@@ -15,7 +15,6 @@ use crate::{
     },
     cursor::{
         Candidate,
-        MarkMatchState,
         Matched,
         PathCursor,
     },
@@ -38,7 +37,6 @@ use context_trace::{
     Start,
     *,
 };
-use std::marker::PhantomData;
 use tracing::{
     debug,
     info,

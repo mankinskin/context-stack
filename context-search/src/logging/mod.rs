@@ -26,7 +26,7 @@ use context_trace::{
         write_indent,
         CompactFormat,
     },
-    path::accessors::path_accessor::{HasTargetOffset, StatePosition},
+    path::accessors::path_accessor::HasTargetOffset,
     GraphRoot,
     PathNode,
 };

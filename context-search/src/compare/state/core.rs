@@ -1,26 +1,18 @@
-use crate::{
-    compare::parent::ParentCompareState,
-    cursor::{
+use crate::cursor::{
         Candidate,
         Checkpointed,
         ChildCursor,
         CursorState,
-        CursorStateMachine,
         HasCandidate,
-        HasCheckpoint,
         Matched,
         Mismatched,
         PathCursor,
-    },
-};
+    };
 use context_trace::{
     path::accessors::has_path::HasRootedPath,
     *,
 };
-use std::{
-    fmt::Debug,
-    marker::PhantomData,
-};
+use std::fmt::Debug;
 use tracing::debug;
 
 /// Result of advancing only the query cursor

@@ -184,7 +184,6 @@ where
             // Wrap in Checkpointed (at checkpoint, no candidate)
             use crate::cursor::{
                 checkpointed::Checkpointed,
-                PathCursor,
             };
             let cursor = Checkpointed::<PatternCursor<_>>::new(raw_cursor);
             let path = PathCoverage::EntireRoot(IndexRangePath::new_empty(
@@ -387,10 +386,7 @@ where
         cursor: &mut PatternCursor,
         trav: &G,
     ) {
-        use context_trace::{
-            path::accessors::role::End,
-            PathAccessor,
-        };
+        use context_trace::PathAccessor;
 
         let end_path = cursor.path.end_path_mut();
         let graph = trav.graph();
