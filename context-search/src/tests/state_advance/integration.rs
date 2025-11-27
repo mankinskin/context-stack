@@ -64,7 +64,7 @@ fn test_advancement_chain_through_multiple_states() {
             parent_state,
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
-                current: cursor.as_candidate(),
+                candidate: Some(cursor.as_candidate()),
             },
         };
 
@@ -133,7 +133,7 @@ fn test_advancement_preserves_atom_positions() {
             parent_state,
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
-                current: cursor.as_candidate(),
+                candidate: Some(cursor.as_candidate()),
             },
         };
 
@@ -229,7 +229,7 @@ fn test_advancement_with_different_pattern_sizes() {
             parent_state,
             cursor: Checkpointed {
                 checkpoint: cursor.clone(),
-                current: cursor.as_candidate(),
+                candidate: Some(cursor.as_candidate()),
             },
         };
 
@@ -276,7 +276,7 @@ fn test_advancement_fails_at_boundaries() {
         parent_state: parent_state.clone(),
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            current: cursor.as_candidate(),
+            candidate: Some(cursor.as_candidate()),
         },
     };
 
@@ -341,7 +341,7 @@ fn test_advancement_with_nested_patterns() {
         parent_state,
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            current: cursor.as_candidate(),
+            candidate: Some(cursor.as_candidate()),
         },
     };
 
@@ -401,7 +401,7 @@ fn test_state_advance_idempotency_on_error() {
         parent_state: parent_state.clone(),
         cursor: Checkpointed {
             checkpoint: cursor.clone(),
-            current: cursor.as_candidate(),
+            candidate: Some(cursor.as_candidate()),
         },
     };
 

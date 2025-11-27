@@ -122,11 +122,11 @@ impl CompareState<Candidate, Matched, PositionAnnotated<ChildLocation>> {
                 // TODO: Update positions in the advanced state
                 IndexAdvanceResult::Advanced(CompareState {
                     child: Checkpointed {
-                        current: ChildCursor {
+                        checkpoint: self.child.checkpoint().clone(),
+                        candidate: Some(ChildCursor {
                             child_state: advanced_child_state,
                             _state: PhantomData,
-                        },
-                        checkpoint: self.child.checkpoint().clone(),
+                        }),
                     },
                     query: self.query,
                     target: self.target,
@@ -136,11 +136,11 @@ impl CompareState<Candidate, Matched, PositionAnnotated<ChildLocation>> {
             Err(failed_child_state) =>
                 IndexAdvanceResult::Exhausted(CompareState {
                     child: Checkpointed {
-                        current: ChildCursor {
+                        checkpoint: self.child.checkpoint().clone(),
+                        candidate: Some(ChildCursor {
                             child_state: failed_child_state,
                             _state: PhantomData,
-                        },
-                        checkpoint: self.child.checkpoint().clone(),
+                        }),
                     },
                     query: self.query,
                     target: self.target,
@@ -160,21 +160,21 @@ impl StateAdvance for CompareState<Candidate, Candidate, ChildLocation> {
         match child_state_clone.advance_state(trav) {
             Ok(child_state) => Ok(CompareState {
                 child: Checkpointed {
-                    current: ChildCursor {
+                    checkpoint: self.child.checkpoint().clone(),
+                    candidate: Some(ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    },
-                    checkpoint: self.child.checkpoint().clone(),
+                    }),
                 },
                 ..self
             }),
             Err(child_state) => Ok(CompareState {
                 child: Checkpointed {
-                    current: ChildCursor {
+                    checkpoint: self.child.checkpoint().clone(),
+                    candidate: Some(ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    },
-                    checkpoint: self.child.checkpoint().clone(),
+                    }),
                 },
                 ..self
             }),
@@ -192,11 +192,11 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
         match child_state_clone.advance_state(trav) {
             Ok(child_state) => Ok(CompareState {
                 child: Checkpointed {
-                    current: ChildCursor {
+                    checkpoint: self.child.checkpoint().clone(),
+                    candidate: Some(ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    },
-                    checkpoint: self.child.checkpoint().clone(),
+                    }),
                 },
                 query: self.query,
                 target: self.target,
@@ -204,11 +204,11 @@ impl StateAdvance for CompareState<Matched, Matched, ChildLocation> {
             }),
             Err(child_state) => Ok(CompareState {
                 child: Checkpointed {
-                    current: ChildCursor {
+                    checkpoint: self.child.checkpoint().clone(),
+                    candidate: Some(ChildCursor {
                         child_state,
                         _state: PhantomData,
-                    },
-                    checkpoint: self.child.checkpoint().clone(),
+                    }),
                 },
                 query: self.query,
                 target: self.target,

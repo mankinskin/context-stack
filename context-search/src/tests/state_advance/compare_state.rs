@@ -52,17 +52,17 @@ fn test_compare_state_candidate_advance() {
 
     let compare_state = CompareState {
         child: crate::cursor::Checkpointed {
-            current: crate::cursor::ChildCursor {
+            candidate: Some(crate::cursor::ChildCursor {
                 child_state: child_state.clone(),
                 _state: PhantomData,
-            },
+            }),
             checkpoint: crate::cursor::ChildCursor {
                 child_state,
                 _state: PhantomData,
             },
         },
         query: crate::cursor::Checkpointed {
-            current: cursor,
+            candidate: Some(cursor),
             checkpoint,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
@@ -138,17 +138,17 @@ fn test_compare_state_matched_advance() {
 
     let compare_state = CompareState {
         child: crate::cursor::Checkpointed {
-            current: crate::cursor::ChildCursor {
+            candidate: Some(crate::cursor::ChildCursor {
                 child_state: child_state.clone(),
                 _state: PhantomData,
-            },
+            }),
             checkpoint: crate::cursor::ChildCursor {
                 child_state,
                 _state: PhantomData,
             },
         },
         query: crate::cursor::Checkpointed {
-            current: cursor,
+            candidate: Some(cursor),
             checkpoint,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,

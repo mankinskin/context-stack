@@ -6,7 +6,7 @@ pub(crate) mod path;
 pub(crate) mod position;
 pub(crate) mod state_machine;
 
-pub(crate) use checkpointed::Checkpointed;
+pub(crate) use checkpointed::{Checkpointed, HasCheckpoint};
 pub(crate) use state_machine::CursorStateMachine;
 
 //pub trait CursorPath: GraphRoot {}

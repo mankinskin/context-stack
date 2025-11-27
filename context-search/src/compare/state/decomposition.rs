@@ -189,10 +189,10 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
         let path_leaf =
             self.rooted_path().role_rooted_leaf_token::<End, _>(trav);
         let query_leaf =
-            self.query.current().role_rooted_leaf_token::<End, _>(trav);
+            (*self.query.current()).role_rooted_leaf_token::<End, _>(trav);
 
         let cursor_end_index = HasRootChildIndex::<End>::root_child_index(
-            &self.query.current().path,
+            &(*self.query.current()).path,
         );
         debug!(
             path_leaf = %path_leaf,
@@ -325,11 +325,11 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                             CompareState {
                                 target: DownKey::new(token, target_pos),
                                 child: Checkpointed {
-                                    current: ChildCursor {
+                                    checkpoint: self.child.checkpoint().clone(),
+                                    candidate: Some(ChildCursor {
                                         child_state,
                                         _state: PhantomData,
-                                    },
-                                    checkpoint: self.child.checkpoint().clone(),
+                                    }),
                                 },
                                 mode: self.mode,
                                 query: self.query.clone(),
@@ -388,8 +388,8 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                                 child: self.child.clone(),
                                 mode: self.mode,
                                 query: Checkpointed {
-                                    current: cursor,
                                     checkpoint: self.query.checkpoint().clone(),
+                                    candidate: Some(cursor),
                                 },
                             }
                         },

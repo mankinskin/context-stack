@@ -86,10 +86,10 @@ impl StateAdvance for ParentCompareState {
                                 child_state: child_state.clone(),
                                 _state: PhantomData,
                             },
-                            current: ChildCursor {
+                            candidate: Some(ChildCursor {
                                 child_state,
                                 _state: PhantomData,
-                            },
+                            }),
                         },
                         mode: GraphMajor,
                         target: DownKey::new(

@@ -5,6 +5,8 @@ use crate::{
         Checkpointed,
         ChildCursor,
         CursorState,
+        CursorStateMachine,
+        HasCheckpoint,
         Matched,
         Mismatched,
         PathCursor,
@@ -141,26 +143,41 @@ impl<Q: CursorState, I: CursorState, EndNode: PathNode>
 {
     /// Access the rooted path from the child cursor's state
     fn rooted_path(&self) -> &IndexRangePath<ChildLocation, EndNode> {
-        &self.child.current().child_state.path
+        // Return reference to the path in either candidate or checkpoint
+        match &self.child.candidate {
+            Some(candidate) => &candidate.child_state.path,
+            None => &self.child.checkpoint.child_state.path,
+        }
     }
     /// Access the rooted path from the child cursor's state
     fn rooted_path_mut(
         &mut self
     ) -> &mut IndexRangePath<ChildLocation, EndNode> {
-        &mut self.child.current_mut().child_state.path
+        // Materialize candidate if needed, then return mutable reference
+        if self.child.candidate.is_none() {
+            self.child.candidate = Some(<ChildCursor<I, EndNode>>::from_checkpoint(&self.child.checkpoint));
+        }
+        &mut self.child.candidate.as_mut().unwrap().child_state.path
     }
 }
 impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
     pub(crate) fn update_checkpoint(&mut self) {
         debug!(
-            query.checkpoint = %self.query.checkpoint,
-            query.current = %self.query.current,
-            //child.checkpoint = %self.child.checkpoint,
-            //child.current = %self.child.current,
+            query.checkpoint = %self.query.checkpoint(),
+            query.current = %self.query.current(),
+            //child.checkpoint = %self.child.checkpoint(),
+            //child.current = %self.child.current(),
             "Marking current positions as checkpoints"
         );
-        self.query.checkpoint = self.query.current.clone();
-        self.child.checkpoint = self.child.current.clone();
+        // Update checkpoint from candidate if it exists (meaning cursor advanced)
+        // If candidate is None, we're already at checkpoint
+        if let Some(candidate) = self.query.candidate.take() {
+            self.query.checkpoint = CursorStateMachine::to_matched(candidate);
+        }
+        if let Some(candidate) = self.child.candidate.take() {
+            self.child.checkpoint = CursorStateMachine::to_matched(candidate);
+        }
+        // After this, both are at checkpoint (candidate = None)
     }
 }
 

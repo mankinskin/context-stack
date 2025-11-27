@@ -201,7 +201,7 @@ impl<K: SearchKind> StartCtx<K> {
 
             let cursor = Checkpointed {
                 checkpoint,
-                current: cursor.as_candidate(),
+                candidate: Some(cursor.as_candidate()),
             };
             Ok(CompareParentBatch { batch, cursor })
         } else {

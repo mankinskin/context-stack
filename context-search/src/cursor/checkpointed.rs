@@ -30,39 +30,91 @@ use context_trace::{
 /// Maps a cursor type to its Matched version for checkpoint storage
 pub(crate) trait HasCheckpoint {
     type Checkpoint;
+
+    /// Convert checkpoint (Matched state) to current cursor type
+    fn from_checkpoint(checkpoint: &Self::Checkpoint) -> Self;
 }
 
-impl<P, S: CursorState> HasCheckpoint for PathCursor<P, S> {
+impl<P, S: CursorState> HasCheckpoint for PathCursor<P, S>
+where
+    P: Clone,
+{
     type Checkpoint = PathCursor<P, Matched>;
+
+    fn from_checkpoint(checkpoint: &Self::Checkpoint) -> Self {
+        // Convert Matched cursor to target state
+        PathCursor {
+            path: checkpoint.path.clone(),
+            atom_position: checkpoint.atom_position,
+            _state: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<S: CursorState, EndNode: PathNode> HasCheckpoint
     for ChildCursor<S, EndNode>
+where
+    EndNode: Clone,
 {
     type Checkpoint = ChildCursor<Matched, EndNode>;
+
+    fn from_checkpoint(checkpoint: &Self::Checkpoint) -> Self {
+        // Convert Matched cursor to target state
+        ChildCursor {
+            child_state: checkpoint.child_state.clone(),
+            _state: std::marker::PhantomData,
+        }
+    }
+}
+
+/// Reference to current cursor position (either checkpoint or candidate)
+///
+/// Provides unified access to the current cursor without exposing the internal
+/// Option-based storage. Can be pattern matched or converted to references.
+///
+/// When at checkpoint, owns a temporary cursor converted from checkpoint.
+/// When at candidate, borrows the candidate.
+#[derive(Debug)]
+pub(crate) enum CheckpointedRef<'a, C> {
+    /// At checkpoint (owns converted cursor from checkpoint)
+    Checkpoint(C),
+    /// Advanced beyond checkpoint (borrows candidate)
+    Candidate(&'a C),
+}
+
+impl<'a, C> CheckpointedRef<'a, C> {
+    /// Get reference to the cursor regardless of variant
+    pub(crate) fn as_ref(&self) -> &C {
+        match self {
+            CheckpointedRef::Checkpoint(c) => c,
+            CheckpointedRef::Candidate(c) => c,
+        }
+    }
 }
 
 /// Encapsulates a cursor with its checkpoint state
 ///
-/// The `current` cursor may be in any state (Candidate/Matched/Mismatched),
-/// while the `checkpoint` is always in Matched state, representing the last
-/// confirmed match position.
+/// Uses space-efficient storage: `candidate: Option<C>` is None when at checkpoint,
+/// Some when advanced beyond. This saves 50% space when cursors match their checkpoints.
 ///
 /// # Type Parameters
 /// - `C`: The cursor type being wrapped (e.g., `PathCursor<P, S>` or `ChildCursor<S, N>`)
 ///
 /// # Invariants
 /// - `checkpoint` is always in Matched state
-/// - `checkpoint.atom_position <= current.atom_position` (checkpoint never ahead)
+/// - `candidate.is_none()` when current position equals checkpoint
+/// - `candidate.is_some()` when advanced beyond checkpoint
+/// - `checkpoint.atom_position <= candidate.atom_position` (checkpoint never ahead of candidate)
 /// - Updates to checkpoint only happen via `mark_match()`
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Checkpointed<C: HasCheckpoint> {
-    /// Current cursor position (may be Candidate/Matched/Mismatched)
-    pub(crate) current: C,
-
     /// Last confirmed match position (always Matched state)
     /// This is updated only when `mark_match()` is called
     pub(crate) checkpoint: C::Checkpoint,
+
+    /// Advanced cursor position beyond checkpoint (None when at checkpoint)
+    /// Only Some when cursor has advanced beyond last confirmed match
+    pub(crate) candidate: Option<C>,
 }
 
 impl<C: HasCheckpoint> Checkpointed<C> {
@@ -71,14 +123,81 @@ impl<C: HasCheckpoint> Checkpointed<C> {
         &self.checkpoint
     }
 
-    /// Get the current cursor
-    pub(crate) fn current(&self) -> &C {
-        &self.current
+    /// Get reference to current cursor position (checkpoint or candidate)
+    ///
+    /// Returns CheckpointedRef enum that can be pattern-matched
+    pub(crate) fn current(&self) -> CheckpointedRef<C> {
+        match &self.candidate {
+            None => CheckpointedRef::Checkpoint(C::from_checkpoint(
+                &self.checkpoint,
+            )),
+            Some(candidate) => CheckpointedRef::Candidate(candidate),
+        }
     }
 
-    /// Get mutable access to current cursor (for internal use)
+    /// Get mutable reference to current cursor, materializing candidate if needed
+    ///
+    /// This converts the checkpoint to a candidate if we're currently at checkpoint.
+    /// After calling this, `self.candidate` will be `Some`.
     pub(crate) fn current_mut(&mut self) -> &mut C {
-        &mut self.current
+        if self.candidate.is_none() {
+            // Convert checkpoint to C and store as candidate
+            self.candidate = Some(C::from_checkpoint(&self.checkpoint));
+        }
+        self.candidate.as_mut().unwrap()
+    }
+
+    /// Check if currently at checkpoint (no advancement)
+    pub(crate) fn at_checkpoint(&self) -> bool {
+        self.candidate.is_none()
+    }
+
+    /// Get reference to current cursor, extracting from CheckpointedRef
+    ///
+    /// This is a convenience method that wraps current() and extracts the reference.
+    /// The returned reference borrows from the CheckpointedRef, which may own a temporary.
+    #[inline]
+    pub(crate) fn current_as_ref(
+        &self
+    ) -> impl std::ops::Deref<Target = C> + '_ {
+        self.current()
+    }
+}
+
+// Implement Deref for CheckpointedRef so it can be used transparently
+impl<'a, C> std::ops::Deref for CheckpointedRef<'a, C> {
+    type Target = C;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+// Implement Display for CheckpointedRef by delegating to inner cursor
+impl<'a, C: std::fmt::Display> std::fmt::Display for CheckpointedRef<'a, C> {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        self.as_ref().fmt(f)
+    }
+}
+
+// Implement CompactFormat for CheckpointedRef by delegating to inner cursor
+impl<'a, C: CompactFormat> CompactFormat for CheckpointedRef<'a, C> {
+    fn fmt_compact(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        self.as_ref().fmt_compact(f)
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut std::fmt::Formatter,
+        indent: usize,
+    ) -> std::fmt::Result {
+        self.as_ref().fmt_indented(f, indent)
     }
 }
 
@@ -89,11 +208,11 @@ where
 {
     /// Create a new checkpointed cursor from an initial matched position
     ///
-    /// Both current and checkpoint start at the same position.
+    /// Starts with candidate=None (at checkpoint).
     pub(crate) fn new(initial: PathCursor<P, Matched>) -> Self {
         Self {
-            checkpoint: initial.clone(),
-            current: initial,
+            checkpoint: initial,
+            candidate: None,
         }
     }
 
@@ -103,9 +222,13 @@ where
     pub(crate) fn as_candidate(
         &self
     ) -> Checkpointed<PathCursor<P, Candidate>> {
+        let current_cursor = match &self.candidate {
+            None => &self.checkpoint,
+            Some(c) => c,
+        };
         Checkpointed {
-            current: CursorStateMachine::to_candidate(&self.current),
             checkpoint: self.checkpoint.clone(),
+            candidate: Some(CursorStateMachine::to_candidate(current_cursor)),
         }
     }
 }
@@ -116,26 +239,30 @@ where
 {
     /// Mark the current position as matched, updating the checkpoint
     ///
-    /// This transitions the current cursor to Matched state and updates
-    /// the checkpoint to match the new position.
+    /// This transitions the candidate cursor to Matched state and updates
+    /// the checkpoint. Sets candidate=None since we're now at checkpoint.
     pub(crate) fn mark_match(self) -> Checkpointed<PathCursor<P, Matched>> {
-        let matched = CursorStateMachine::to_matched(self.current);
+        let matched = CursorStateMachine::to_matched(
+            self.candidate.expect("Candidate cursor must exist"),
+        );
         Checkpointed {
-            checkpoint: matched.clone(),
-            current: matched,
+            checkpoint: matched,
+            candidate: None,
         }
     }
 
     /// Mark the current position as mismatched, keeping the checkpoint
     ///
-    /// This transitions the current cursor to Mismatched state without
+    /// This transitions the candidate cursor to Mismatched state without
     /// updating the checkpoint.
     pub(crate) fn mark_mismatch(
         self
     ) -> Checkpointed<PathCursor<P, Mismatched>> {
         Checkpointed {
-            current: CursorStateMachine::to_mismatched(self.current),
             checkpoint: self.checkpoint,
+            candidate: Some(CursorStateMachine::to_mismatched(
+                self.candidate.expect("Candidate cursor must exist"),
+            )),
         }
     }
 }
@@ -147,11 +274,11 @@ where
 {
     /// Create a new checkpointed child cursor from an initial matched position
     ///
-    /// Both current and checkpoint start at the same position.
+    /// Starts with candidate=None (at checkpoint).
     pub(crate) fn new(initial: ChildCursor<Matched, EndNode>) -> Self {
         Self {
-            checkpoint: initial.clone(),
-            current: initial,
+            checkpoint: initial,
+            candidate: None,
         }
     }
 
@@ -161,9 +288,13 @@ where
     pub(crate) fn as_candidate(
         &self
     ) -> Checkpointed<ChildCursor<Candidate, EndNode>> {
+        let current_cursor = match &self.candidate {
+            None => &self.checkpoint,
+            Some(c) => c,
+        };
         Checkpointed {
-            current: CursorStateMachine::to_candidate(&self.current),
             checkpoint: self.checkpoint.clone(),
+            candidate: Some(CursorStateMachine::to_candidate(current_cursor)),
         }
     }
 }
@@ -174,32 +305,37 @@ where
 {
     /// Mark the current position as matched, updating the checkpoint
     ///
-    /// This transitions the current cursor to Matched state and updates
-    /// the checkpoint to match the new position.
+    /// This transitions the candidate cursor to Matched state and updates
+    /// the checkpoint. Sets candidate=None since we're now at checkpoint.
     pub(crate) fn mark_match(
         self
     ) -> Checkpointed<ChildCursor<Matched, EndNode>> {
-        let matched = CursorStateMachine::to_matched(self.current);
+        let matched = CursorStateMachine::to_matched(
+            self.candidate.expect("Candidate cursor must exist"),
+        );
         Checkpointed {
-            checkpoint: matched.clone(),
-            current: matched,
+            checkpoint: matched,
+            candidate: None,
         }
     }
 
     /// Mark the current position as mismatched, keeping the checkpoint
     ///
-    /// This transitions the current cursor to Mismatched state without
+    /// This transitions the candidate cursor to Mismatched state without
     /// updating the checkpoint.
     pub(crate) fn mark_mismatch(
         self
     ) -> Checkpointed<ChildCursor<Mismatched, EndNode>> {
         Checkpointed {
-            current: CursorStateMachine::to_mismatched(self.current),
             checkpoint: self.checkpoint,
+            candidate: Some(CursorStateMachine::to_mismatched(
+                self.candidate.expect("Candidate cursor must exist"),
+            )),
         }
     }
 }
 
+// Implement CompactFormat for Checkpointed
 impl<T: CompactFormat + HasCheckpoint> CompactFormat for Checkpointed<T>
 where
     T::Checkpoint: CompactFormat,
@@ -208,13 +344,14 @@ where
         &self,
         f: &mut std::fmt::Formatter,
     ) -> std::fmt::Result {
-        write!(f, "Checkpointed {{ ",)?;
-        write!(f, "checkpoint: ",)?;
-        self.current.fmt_compact(f)?;
-        write!(f, ", ",)?;
-        write!(f, "checkpoint: ",)?;
+        write!(f, "Checkpointed {{ ")?;
+        write!(f, "checkpoint: ")?;
         self.checkpoint.fmt_compact(f)?;
-        write!(f, "}}",)
+        if let Some(candidate) = &self.candidate {
+            write!(f, ", candidate: ")?;
+            candidate.fmt_compact(f)?;
+        }
+        write!(f, " }}")
     }
 
     fn fmt_indented(
@@ -228,10 +365,12 @@ where
         write!(f, "checkpoint: ")?;
         self.checkpoint.fmt_compact(f)?;
         writeln!(f, ",")?;
-        write_indent(f, indent + 1)?;
-        write!(f, "current: ")?;
-        self.current.fmt_compact(f)?;
-        writeln!(f)?;
+        if let Some(candidate) = &self.candidate {
+            write_indent(f, indent + 1)?;
+            write!(f, "candidate: ")?;
+            candidate.fmt_compact(f)?;
+            writeln!(f, ",")?;
+        }
         write_indent(f, indent)?;
         write!(f, "}}")
     }
