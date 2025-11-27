@@ -79,7 +79,7 @@ where
 /// When at checkpoint, owns a temporary cursor converted from checkpoint.
 /// When at candidate, borrows the candidate.
 #[derive(Debug)]
-pub(crate) enum CheckpointedRef<'a, C> {
+pub enum CheckpointedRef<'a, C> {
     /// At checkpoint (owns converted cursor from checkpoint)
     Checkpoint(C),
     /// Advanced beyond checkpoint (borrows candidate)
@@ -111,7 +111,7 @@ impl<'a, C> CheckpointedRef<'a, C> {
 /// - `checkpoint.atom_position <= candidate.atom_position` (checkpoint never ahead of candidate)
 /// - Updates to checkpoint only happen via `mark_match()`
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Checkpointed<C: HasCheckpoint> {
+pub struct Checkpointed<C: HasCheckpoint> {
     /// Last confirmed match position (always Matched state)
     /// This is updated only when `mark_match()` is called
     pub(crate) checkpoint: C::Checkpoint,

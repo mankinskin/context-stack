@@ -60,15 +60,38 @@ fn find_consecutive1() {
     tracing::debug!(%checkpoint_pos, %start_index, %end_index, "After first search");
     tracing::debug!(%cursor.path, "Cursor path");
 
+    // Check the internal Checkpointed structure
+    tracing::debug!(?fin1.end.cursor, "Full Checkpointed cursor state");
+    
+    // Test checkpoint state
+    let checkpoint = fin1.end.cursor.checkpoint();
+    let checkpoint_end = HasRootChildIndex::<End>::root_child_index(&checkpoint.path);
     assert_eq!(
-        checkpoint_pos, 3,
-        "Checkpoint position should be 3 after matching ghi"
+        *checkpoint.atom_position.as_ref(), 3,
+        "Checkpoint atom_position should be 3 after matching ghi"
     );
-    assert_eq!(start_index, 0, "Start index should be 0");
     assert_eq!(
-        end_index, 3,
-        "End index should be 3 (pointing to first unmatched token 'a')"
+        checkpoint_end, 2,
+        "Checkpoint end_index should be 2 (last matched token 'i')"
     );
+    
+    // Test candidate state - THIS IS THE KEY ASSERTION
+    assert!(
+        fin1.end.cursor.candidate.is_some(),
+        "Cursor should have a candidate (advanced position) after parent exploration"
+    );
+    
+    if let Some(ref candidate) = fin1.end.cursor.candidate {
+        let candidate_end = HasRootChildIndex::<End>::root_child_index(&candidate.path);
+        assert_eq!(
+            *candidate.atom_position.as_ref(), 4,
+            "Candidate atom_position should be 4 (advanced beyond checkpoint)"
+        );
+        assert_eq!(
+            candidate_end, 3,
+            "Candidate end_index should be 3 (pointing to first unmatched token 'a')"
+        );
+    }
     assert!(
         !fin1.query_exhausted(),
         "Query should not be exhausted after matching only ghi"

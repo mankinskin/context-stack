@@ -289,14 +289,15 @@ where
                 );
 
                 let target = DownKey::new(target_index, root_pos.into());
-                
+
                 // Wrap cursor in Checkpointed (at checkpoint, no candidate)
                 use crate::cursor::{
                     checkpointed::Checkpointed,
                     PathCursor,
                 };
-                let cursor_state = Checkpointed::<PathCursor<_>>::new(checkpoint_cursor);
-                
+                let cursor_state =
+                    Checkpointed::<PathCursor<_>>::new(checkpoint_cursor);
+
                 Err(MatchResult {
                     cursor: cursor_state,
                     path: PathCoverage::from_range_path(
@@ -376,16 +377,21 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
 
         let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
 
-        // Clone the Checkpointed<PatternCursor> and convert to Matched state
-        // We need Checkpointed<PathCursor<_, Matched>> but have Checkpointed<PathCursor<_, Candidate>>
-        // So clone checkpoint (already Matched) and candidate (convert to Matched)
-        use crate::cursor::{
-            checkpointed::Checkpointed,
-            MarkMatchState,
-        };
+        // Clone the Checkpointed<PatternCursor> preserving both checkpoint and candidate
+        // Convert from Checkpointed<PathCursor<_, Candidate>> to Checkpointed<PathCursor<_, Matched>>
+        // This is a type-level conversion only - the candidate represents an exploration position,
+        // not a confirmed match. We preserve it so the next search can start from the advanced position.
+        use crate::cursor::checkpointed::Checkpointed;
         let cursor_state = Checkpointed {
             checkpoint: self.state.query.checkpoint().clone(),
-            candidate: self.state.query.candidate.as_ref().map(|c| c.clone().mark_match()),
+            candidate: self.state.query.candidate.as_ref().map(|c| {
+                // Type-level conversion Candidate → Matched without semantic state change
+                PathCursor {
+                    path: c.path.clone(),
+                    atom_position: c.atom_position,
+                    _state: std::marker::PhantomData::<Matched>,
+                }
+            }),
         };
 
         let end_pos = checkpoint.atom_position;

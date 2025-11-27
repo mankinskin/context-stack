@@ -1,8 +1,11 @@
 use context_trace::*;
 
-use crate::state::{
-    end::PathCoverage,
-    matched::MatchResult,
+use crate::{
+    cursor::checkpointed::CheckpointedRef,
+    state::{
+        end::PathCoverage,
+        matched::MatchResult,
+    },
 };
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -70,13 +73,10 @@ impl Response {
     }
 
     /// Get the query pattern cursor from the response
-    pub fn query_cursor(&self) -> &crate::cursor::PatternCursor {
+    pub fn query_cursor(
+        &self
+    ) -> CheckpointedRef<'_, crate::cursor::PatternCursor> {
         self.end.cursor()
-    }
-
-    /// Get the query pattern path from the response
-    pub fn query_pattern(&self) -> &PatternRangePath {
-        &self.end.cursor().path
     }
 
     /// Get the root token from the located path

@@ -5,7 +5,10 @@
 
 use crate::{
     cursor::{
-        checkpointed::Checkpointed,
+        checkpointed::{
+            Checkpointed,
+            CheckpointedRef,
+        },
         PatternCursor,
     },
     state::end::PathCoverage,
@@ -37,8 +40,8 @@ impl MatchResult {
     /// Get the checkpoint cursor (last confirmed match position)
     ///
     /// This is the most commonly used accessor and represents the confirmed match state.
-    pub fn cursor(&self) -> &PatternCursor {
-        self.cursor.checkpoint()
+    pub fn cursor(&self) -> CheckpointedRef<'_, PatternCursor> {
+        self.cursor.current()
     }
 
     /// Check if the query was fully matched

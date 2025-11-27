@@ -219,6 +219,9 @@ where
         );
 
         // Advance the root cursor step by step, updating best_match after each step
+        // Option to store MatchResult directly when created during parent exploration
+        let mut parent_exploration_result: Option<MatchResult> = None;
+
         let final_state = loop {
             last_match.update_checkpoint();
             let root_cursor: RootCursor<K, Matched, Matched> = RootCursor {
@@ -294,13 +297,19 @@ where
                                     debug!("No parents available - search exhausted");
                                 },
                             }
+                            // Store the MatchResult with advanced query candidate
+                            parent_exploration_result = Some(checkpoint_state);
                         },
                     }
                     break last_match;
                 },
             }
         };
-        self.create_result_from_state(final_state)
+
+        // If we have a parent exploration result, use it directly (preserves candidate)
+        // Otherwise, create result from final state (which only has checkpoint)
+        parent_exploration_result
+            .unwrap_or_else(|| self.create_result_from_state(final_state))
     }
     /// Create a checkpoint MatchResult from the current matched state
     /// This is used to update best_match after each successful advancement
@@ -332,16 +341,23 @@ where
         );
 
         // Clone the checkpoint cursor and simplify
-        let mut simplified_cursor = state.query.checkpoint().clone();
-        Self::simplify_query_cursor(&mut simplified_cursor, trav);
+        let mut simplified_checkpoint = state.query.checkpoint().clone();
+        Self::simplify_query_cursor(&mut simplified_checkpoint, trav);
 
-        // Create Checkpointed with only checkpoint (no candidate)
-        // This represents a confirmed match state with no advancement
-        use crate::cursor::{
-            checkpointed::Checkpointed,
-            PathCursor,
+        // Preserve the candidate if it exists (advanced position for parent exploration)
+        // Clone and simplify the candidate cursor if present
+        let simplified_candidate = state.query.candidate.as_ref().map(|c| {
+            let mut simplified = c.clone();
+            Self::simplify_query_cursor(&mut simplified, trav);
+            simplified
+        });
+
+        // Create Checkpointed preserving both checkpoint and candidate
+        use crate::cursor::checkpointed::Checkpointed;
+        let cursor_state = Checkpointed {
+            checkpoint: simplified_checkpoint,
+            candidate: simplified_candidate,
         };
-        let cursor_state = Checkpointed::<PathCursor<_>>::new(simplified_cursor);
 
         MatchResult {
             cursor: cursor_state,
