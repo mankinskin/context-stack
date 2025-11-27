@@ -6,20 +6,21 @@
 //! - Edge cases and boundary conditions
 //! - State invariants during advancement
 
-use crate::{
-    compare::parent::ParentCompareState,
-    cursor::{
-        Checkpointed,
-        MarkMatchState,
-        PathCursor,
-        PatternCursor,
+#[cfg(test)]
+use {
+    crate::{
+        compare::parent::ParentCompareState,
+        cursor::{
+            Checkpointed,
+            PatternCursor,
+        },
     },
+    context_trace::{
+        path::accessors::path_accessor::HasTargetOffset,
+        *,
+    },
+    std::marker::PhantomData,
 };
-use context_trace::{
-    path::accessors::path_accessor::HasTargetOffset,
-    *,
-};
-use std::marker::PhantomData;
 
 #[test]
 fn test_advancement_chain_through_multiple_states() {
@@ -304,8 +305,10 @@ fn test_advancement_with_nested_patterns() {
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
-        (ab, ab_id) => [a, b],
-        (cd, cd_id) => [c, d],
+        ab => [a, b],
+        cd => [c, d],
+    );
+    insert_patterns!(graph,
         (abcd, abcd_id) => [ab, cd]
     );
     let _tracing = init_test_tracing!(&graph);

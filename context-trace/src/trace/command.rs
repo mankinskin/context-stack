@@ -128,6 +128,7 @@ impl Traceable for PostfixCommand {
 pub struct PrefixCommand {
     pub path: IndexEndPath,
     pub add_edges: bool,
+    pub root_pos: AtomPosition,
     pub end_pos: AtomPosition,
 }
 impl Traceable for PrefixCommand {
@@ -136,8 +137,11 @@ impl Traceable for PrefixCommand {
         ctx: &mut TraceCtx<G>,
     ) {
         let root_exit = self.path.role_root_child_location::<End>();
+
+        // Use root_pos for the exit_key to ensure TD cache entries are at the root position
+        // This matches the behavior of RangeCommand for consistency
         let exit_key = DownKey {
-            pos: self.end_pos.into(),
+            pos: self.root_pos.into(),
             index: root_exit.parent,
         };
         let target = DownKey {

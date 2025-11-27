@@ -11,6 +11,7 @@ use std::fmt;
 pub struct PrefixEnd {
     pub(crate) path: IndexEndPath,
     pub(crate) target: DownKey,
+    pub(crate) root_pos: AtomPosition,
     pub(crate) end_pos: AtomPosition,
 }
 impl From<&PrefixEnd> for PrefixCommand {
@@ -18,6 +19,7 @@ impl From<&PrefixEnd> for PrefixCommand {
         PrefixCommand {
             add_edges: true,
             path: value.path.clone(),
+            root_pos: value.root_pos,
             end_pos: value.end_pos,
         }
     }
@@ -36,7 +38,12 @@ impl CompactFormat for PrefixEnd {
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
-        write!(f, "PrefixEnd(end_pos:{})", usize::from(self.end_pos))
+        write!(
+            f,
+            "PrefixEnd(root_pos:{}, end_pos:{})",
+            usize::from(self.root_pos),
+            usize::from(self.end_pos)
+        )
     }
 
     fn fmt_indented(
@@ -46,6 +53,8 @@ impl CompactFormat for PrefixEnd {
     ) -> fmt::Result {
         write_indent(f, indent)?;
         writeln!(f, "PrefixEnd {{")?;
+        write_indent(f, indent + 1)?;
+        writeln!(f, "root_pos: {},", usize::from(self.root_pos))?;
         write_indent(f, indent + 1)?;
         writeln!(f, "end_pos: {},", usize::from(self.end_pos))?;
         write_indent(f, indent + 1)?;

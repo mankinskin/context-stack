@@ -72,7 +72,7 @@ impl RootKey for PathCoverage {
             match self {
                 PathCoverage::Range(s) => s.root_pos.into(),
                 PathCoverage::Postfix(p) => p.root_pos.into(),
-                PathCoverage::Prefix(_) => 0.into(),
+                PathCoverage::Prefix(p) => p.root_pos.into(),
                 PathCoverage::EntireRoot(_) => 0.into(),
             },
         )
@@ -127,6 +127,7 @@ impl PathCoverage {
                 PathCoverage::Prefix(PrefixEnd {
                     path: path.into(),
                     target,
+                    root_pos,
                     end_pos,
                 }),
             (false, _, true, true) | (true, false, true, true) => {

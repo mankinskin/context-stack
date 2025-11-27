@@ -61,6 +61,7 @@ fn prefix1() {
         e_f_id,
         ..
     } = &*Env1::get_expected();
+    let _tracing = init_test_tracing!(graph);
 
     let query = vec![*a, *bc, *d, *e];
     let res: Response = graph.find_ancestor(query).unwrap();
@@ -163,6 +164,7 @@ fn postfix1() {
         abcdef_ghi_id,
         ..
     } = &*Env1::get_expected();
+    let _tracing = init_test_tracing!(graph);
 
     let query = vec![*c, *d, *ef, *ghi];
     let res: Response = graph.find_ancestor(query).unwrap();
