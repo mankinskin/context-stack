@@ -1,4 +1,3 @@
-use crate::state::matched::CheckpointedCursor;
 #[cfg(test)]
 use {
     crate::{
@@ -7,12 +6,17 @@ use {
             PatternCursor,
         },
         search::Find,
-        state::end::{
-            postfix::PostfixEnd,
-            PathCoverage,
+        state::{
+            end::{
+                postfix::PostfixEnd,
+                PathCoverage,
+            },
+            matched::{
+                CheckpointedCursor,
+                MatchResult,
+            },
+            result::Response,
         },
-        state::matched::MatchResult,
-        state::result::Response,
     },
     context_trace::*,
     itertools::*,
@@ -139,32 +143,32 @@ fn find_ancestor1_a_b_c() {
     assert_eq!(response.query_exhausted(), true);
 }
 // Test: Pattern [a, b, c, c] should partially match token abc - only first 3 tokens match
-//#[test]
-//fn find_ancestor1_a_b_c_c() {
-//    let Env1 {
-//        graph,
-//        a,
-//        b,
-//        c,
-//        abc,
-//        ..
-//    } = &*Env1::get_expected();
-//    let _tracing = init_test_tracing!(graph);
-//
-//    let query = vec![
-//        Token::new(a, 1),
-//        Token::new(b, 1),
-//        Token::new(c, 1),
-//        Token::new(c, 1),
-//    ];
-//    let response = graph.find_ancestor(&query).unwrap();
-//    assert_matches!(
-//        response.end.path,
-//        PathCoverage::EntireRoot(ref path)
-//            if path.path_root().pattern_location().parent == *abc
-//    );
-//    assert_eq!(response.query_exhausted(), false);
-//}
+#[test]
+fn find_ancestor1_a_b_c_c() {
+    let Env1 {
+        graph,
+        a,
+        b,
+        c,
+        abc,
+        ..
+    } = &*Env1::get_expected();
+    let _tracing = init_test_tracing!(graph);
+
+    let query = vec![
+        Token::new(a, 1),
+        Token::new(b, 1),
+        Token::new(c, 1),
+        Token::new(c, 1),
+    ];
+    let response = graph.find_ancestor(&query).unwrap();
+    assert_matches!(
+        response.end.path,
+        PathCoverage::EntireRoot(ref path)
+            if path.path_root().pattern_location().parent == *abc
+    );
+    assert_eq!(response.query_exhausted(), false);
+}
 
 // Test: Long pattern [a,b,a,b,a,b,a,b,c,d,e,f,g,h,i] should match ababababcdefghi (Complete)
 #[test]
@@ -225,28 +229,6 @@ fn find_ancestor2() {
     let query = vec![by, z];
     let byz_found = graph.find_ancestor(&query).unwrap();
 
-    assert_eq!(
-        byz_found.end.path().clone(),
-        PathCoverage::Postfix(PostfixEnd {
-            root_pos: 2.into(),
-            path: RootedRolePath::new(
-                PatternLocation::new(xabyz, xaby_z_id,),
-                RolePath::new(0, vec![ChildLocation::new(xaby, xa_by_id, 1,)],),
-            )
-        })
-    );
-    assert_eq!(
-        byz_found.end.cursor().clone(),
-        PatternCursor {
-            path: RootedRangePath::new(
-                query.clone(),
-                RolePath::new_empty(0),
-                RolePath::new_empty(1),
-            ),
-            atom_position: 3.into(),
-            _state: std::marker::PhantomData,
-        }
-    );
     assert_eq!(
         byz_found,
         Response {

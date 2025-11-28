@@ -77,6 +77,11 @@ impl MatchResult {
         &self.path
     }
 
+    /// Get the checkpoint cursor (always the confirmed match position)
+    pub fn checkpoint(&self) -> &PatternCursor<Matched> {
+        self.cursor.checkpoint()
+    }
+
     /// Get the cursor for consecutive searches
     ///
     /// Returns the candidate (advanced position) if available, otherwise the checkpoint.

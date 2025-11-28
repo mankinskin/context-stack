@@ -18,7 +18,7 @@ pub struct InitInterval {
 impl From<Response> for InitInterval {
     fn from(state: Response) -> Self {
         let root = state.root_token();
-        let end_bound = state.cursor_position();
+        let end_bound = state.checkpoint_position();
         Self {
             cache: state.cache,
             root,

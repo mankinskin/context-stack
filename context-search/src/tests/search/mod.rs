@@ -1,9 +1,8 @@
-use crate::state::matched::CheckpointedCursor;
 pub(crate) mod ancestor;
 pub(crate) mod consecutive;
+pub(crate) mod insert_scenarios;
 pub(crate) mod parent;
 
-use crate::cursor::PathCursor;
 #[cfg(test)]
 use {
     crate::search::Find,

@@ -76,9 +76,7 @@ impl Response {
     }
 
     /// Get the query pattern cursor from the response
-    pub fn query_cursor(
-        &self
-    ) -> &PatternCursor<Matched> {
+    pub fn query_cursor(&self) -> &PatternCursor<Matched> {
         self.end.cursor()
     }
 
@@ -88,8 +86,17 @@ impl Response {
     }
 
     /// Get the cursor atom position
+    /// Returns the candidate position if available, otherwise the checkpoint position.
+    /// This is useful for consecutive searches.
     pub fn cursor_position(&self) -> AtomPosition {
         self.end.cursor().atom_position
+    }
+
+    /// Get the checkpoint atom position
+    /// Always returns the confirmed match position, never the exploratory candidate position.
+    /// This should be used for insertion boundaries and other operations that need the confirmed match extent.
+    pub fn checkpoint_position(&self) -> AtomPosition {
+        self.end.checkpoint().atom_position
     }
 }
 

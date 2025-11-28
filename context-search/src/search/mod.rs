@@ -182,9 +182,7 @@ where
                 _state: PhantomData,
             };
             // Wrap in Checkpointed (at checkpoint, no candidate)
-            use crate::cursor::{
-                checkpointed::Checkpointed,
-            };
+            use crate::cursor::checkpointed::Checkpointed;
             let cursor = Checkpointed::<PatternCursor<_>>::new(raw_cursor);
             let path = PathCoverage::EntireRoot(IndexRangePath::new_empty(
                 IndexRoot::from(PatternLocation::new(
@@ -322,7 +320,6 @@ where
         &self,
         state: CompareState<Matched, Matched>,
     ) -> MatchResult {
-        let result_query = state.query.current();
         let result_child = state.child.current();
 
         let mut path = result_child.child_state.path.clone();
@@ -337,7 +334,8 @@ where
         // Use entry_pos from checkpoint_child
         let _start_pos = result_child.child_state.start_pos;
         let root_pos = result_child.child_state.entry_pos;
-        let end_pos = result_query.atom_position;
+        // Use checkpoint position for end_pos (confirmed match boundary, not exploratory candidate)
+        let end_pos = state.query.checkpoint().atom_position;
 
         let target = DownKey::new(target_token, root_pos.into());
 
@@ -348,7 +346,7 @@ where
         // Clone and simplify the checkpoint and candidate cursors
         let mut simplified_checkpoint = state.query.checkpoint().clone();
         Self::simplify_query_cursor(&mut simplified_checkpoint, trav);
-        
+
         let mut simplified_candidate = state.query.candidate().clone();
         Self::simplify_query_cursor(&mut simplified_candidate, trav);
 
@@ -359,12 +357,12 @@ where
             Checkpointed,
             HasCandidate,
         };
-        
+
         let cursor = if simplified_candidate == simplified_checkpoint {
             // No candidate advancement - create AtCheckpoint
-            CheckpointedCursor::AtCheckpoint(
-                Checkpointed::new(simplified_checkpoint)
-            )
+            CheckpointedCursor::AtCheckpoint(Checkpointed::new(
+                simplified_checkpoint,
+            ))
         } else {
             // Candidate advanced beyond checkpoint - create HasCandidate
             let cursor_state = Checkpointed::<_, HasCandidate>::with_candidate(
