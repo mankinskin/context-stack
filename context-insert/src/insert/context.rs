@@ -78,7 +78,7 @@ impl<R: InsertResult> InsertCtx<R> {
                 // Check if the query was exhausted and result is full token
                 if result.query_exhausted() && result.is_full_token() {
                     // Extract the query pattern from the cursor and the root token from the complete path
-                    let query_path = result.query_pattern().clone();
+                    let query_path = result.query_cursor().path().clone();
                     let root_token = result.root_token();
                     Ok(R::try_init(IndexWithPath {
                         index: root_token,

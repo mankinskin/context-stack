@@ -6,7 +6,10 @@ pub(crate) mod path;
 pub(crate) mod position;
 pub(crate) mod state_machine;
 
-pub(crate) use checkpointed::{Checkpointed, HasCandidate};
+pub(crate) use checkpointed::{
+    Checkpointed,
+    HasCandidate,
+};
 pub(crate) use state_machine::CursorStateMachine;
 
 //pub trait CursorPath: GraphRoot {}
@@ -104,6 +107,11 @@ impl<P> From<P> for PathCursor<P> {
 
 // State transition methods
 impl<P> PathCursor<P, Matched> {
+    /// Get a reference to the path
+    pub fn path(&self) -> &P {
+        &self.path
+    }
+
     /// Convert a Matched cursor to a Candidate by creating a copy
     /// This preserves the matched position for potential revert
     pub(crate) fn as_candidate(&self) -> PathCursor<P, Candidate>

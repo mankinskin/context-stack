@@ -14,7 +14,7 @@ impl ResultExtraction for () {
 }
 impl ResultExtraction for PatternRangePath {
     fn extract_from(state: &Response) -> Self {
-        state.query_pattern().clone()
+        state.query_cursor().path().clone()
     }
 }
 pub trait TryInitWith<T>: Sized {
