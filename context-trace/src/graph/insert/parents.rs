@@ -2,6 +2,7 @@
 
 use crate::{
     HashSet,
+    Hypergraph,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
@@ -21,10 +22,7 @@ use crate::{
     },
 };
 
-impl<G> crate::graph::Hypergraph<G>
-where
-    G: GraphKind,
-{
+impl<G: GraphKind> Hypergraph<G> {
     /// Utility: builds total width, indices and tokens for pattern
     pub(super) fn to_width_indices_children(
         &self,
@@ -85,7 +83,10 @@ where
                 ));
             });
     }
+}
 
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn append_to_pattern(
         &mut self,
         parent: impl ToToken,

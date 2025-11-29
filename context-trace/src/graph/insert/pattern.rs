@@ -1,6 +1,7 @@
 //! Single pattern insertion operations
 
 use crate::{
+    Hypergraph,
     graph::{
         kind::GraphKind,
         vertex::{
@@ -16,10 +17,7 @@ use crate::{
     },
 };
 
-impl<G> crate::graph::Hypergraph<G>
-where
-    G: GraphKind,
-{
+impl<G: GraphKind> Hypergraph<G> {
     /// Create new node from a pattern
     #[track_caller]
     pub fn insert_pattern_with_id(
@@ -65,7 +63,10 @@ where
         let indices = pattern.into_pattern();
         self.insert_pattern_with_id(indices).0
     }
+}
 
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
     /// Create new node from a pattern
     pub(crate) fn force_insert_pattern(
         &mut self,

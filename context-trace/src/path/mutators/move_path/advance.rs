@@ -1,9 +1,6 @@
 use std::ops::ControlFlow;
 
-use crate::path::{
-    mutators::move_path::path::MovePath,
-    structs::rooted::PathNode,
-};
+use crate::path::mutators::move_path::path::MovePath;
 
 use crate::{
     direction::Right,

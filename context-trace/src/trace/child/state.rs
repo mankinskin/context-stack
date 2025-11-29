@@ -6,7 +6,6 @@ use crate::{
     HasPath,
     PathNode,
     PathRole,
-    PositionAnnotated,
     RootPattern,
     RootedPath,
     TargetKey,
@@ -19,11 +18,7 @@ use crate::{
         RolePathUtils,
         accessors::{
             child::HasLeafToken,
-            has_path::{
-                HasRolePath,
-                IntoRootedRolePath,
-            },
-            path_accessor::PathAccessor,
+            has_path::HasRolePath,
             role::{
                 End,
                 Start,

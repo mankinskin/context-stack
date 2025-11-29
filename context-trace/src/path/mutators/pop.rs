@@ -7,7 +7,6 @@ use crate::{
             rooted::{
                 role_path::RootedRolePath,
                 root::PathRoot,
-                PathNode,
             },
         },
     },
@@ -18,7 +17,9 @@ pub trait PathPop<Node = ChildLocation> {
     fn path_pop(&mut self) -> Option<Node>;
 }
 
-impl<Role: PathRole, Root: PathRoot> PathPop<ChildLocation> for RootedRolePath<Role, Root> {
+impl<Role: PathRole, Root: PathRoot> PathPop<ChildLocation>
+    for RootedRolePath<Role, Root>
+{
     fn path_pop(&mut self) -> Option<ChildLocation> {
         self.role_path.path_pop()
     }

@@ -1,7 +1,5 @@
 //! Field filtering and display logic
 
-use super::field_visitor::FieldVisitor;
-
 /// Filter span fields by removing special fields that are shown elsewhere
 pub(super) fn filter_span_fields(fields: &str) -> String {
     let mut cleaned = fields.to_string();
@@ -75,12 +73,4 @@ fn remove_field(
     } else {
         fields.to_string()
     }
-}
-
-/// Format non-message fields for regular events
-pub(super) fn format_event_fields(formatted_fields: &str) -> String {
-    // Parse fields - this is simplified, in reality we'd need proper field iteration
-    // For now, just return the cleaned fields
-    let cleaned = remove_field(formatted_fields, "message");
-    cleaned.trim().to_string()
 }

@@ -16,8 +16,8 @@ use crate::{
         getters::ErrorReason,
         kind::GraphKind,
         vertex::{
-            IndexPosition,
             ChildPatterns,
+            IndexPosition,
             has_vertex_index::ToToken,
             location::{
                 SubLocation,
@@ -27,6 +27,7 @@ use crate::{
                 self,
                 IntoPattern,
                 Pattern,
+                id::PatternId,
                 pattern_range::PatternRangeIndex,
                 pattern_width,
             },
@@ -34,7 +35,6 @@ use crate::{
                 SubToken,
                 Token,
             },
-            pattern::id::PatternId,
         },
     },
     trace::has_graph::{
@@ -43,11 +43,14 @@ use crate::{
     },
 };
 use itertools::Itertools;
-use std::{num::NonZeroUsize, slice::SliceIndex};
+use std::{
+    num::NonZeroUsize,
+    slice::SliceIndex,
+};
 
 /// Helper function to clone child patterns into iterator
 pub(crate) fn clone_child_patterns(
-    tokens: &'_ ChildPatterns,
+    tokens: &'_ ChildPatterns
 ) -> impl Iterator<Item = Pattern> + '_ {
     tokens.values().cloned()
 }
@@ -146,28 +149,6 @@ impl VertexData {
             .expect("Range in pattern")
     }
 
-    /// Get child pattern at specific position
-    pub(crate) fn get_child_pattern_position(
-        &self,
-        id: &PatternId,
-        pos: IndexPosition,
-    ) -> Result<&Token, ErrorReason> {
-        self.children
-            .get(id)
-            .and_then(|p| p.get(pos))
-            .ok_or(ErrorReason::NoTokenPatterns)
-    }
-
-    /// Find child pattern with specified prefix width
-    pub(crate) fn get_child_pattern_with_prefix_width(
-        &self,
-        width: NonZeroUsize,
-    ) -> Option<(&PatternId, &Pattern)> {
-        self.children
-            .iter()
-            .find(|(_pid, pat)| pat[0].width == width.get())
-    }
-
     /// Get child token at specific location
     pub(crate) fn get_child_at(
         &self,
@@ -188,26 +169,6 @@ impl VertexData {
         self.get_child_at(location).unwrap()
     }
 
-    /// Get mutable child token at location
-    pub(crate) fn get_child_mut_at(
-        &mut self,
-        location: &SubLocation,
-    ) -> Result<&mut Token, ErrorReason> {
-        self.children
-            .get_mut(&location.pattern_id)
-            .ok_or(ErrorReason::InvalidPattern(location.pattern_id))?
-            .get_mut(location.sub_index)
-            .ok_or(ErrorReason::InvalidChild(location.sub_index))
-    }
-
-    /// Get mutable child token at location, panicking if not found
-    pub(crate) fn expect_child_mut_at(
-        &mut self,
-        location: &SubLocation,
-    ) -> &mut Token {
-        self.get_child_mut_at(location).unwrap()
-    }
-
     /// Get pattern length, panicking if not found
     #[track_caller]
     pub(crate) fn expect_pattern_len(
@@ -226,15 +187,6 @@ impl VertexData {
             &self.expect_child_pattern(&loc.pattern_id)[0..loc.sub_index],
         )
     }
-
-    /// Find child pattern ID matching predicate
-    pub(crate) fn find_child_pattern_id(
-        &self,
-        f: impl FnMut(&(&PatternId, &Pattern)) -> bool,
-    ) -> Option<PatternId> {
-        self.children.iter().find(f).map(|r| *r.0)
-    }
-
     /// Add a child pattern without updating cache
     pub(crate) fn add_pattern_no_update(
         &mut self,
@@ -250,22 +202,6 @@ impl VertexData {
         self.validate();
     }
 
-    /// Add multiple child patterns without updating cache
-    pub(crate) fn add_patterns_no_update(
-        &mut self,
-        patterns: impl IntoIterator<Item = (PatternId, Pattern)>,
-    ) {
-        for (id, pat) in patterns {
-            if pat.len() < 2 {
-                assert!(pat.len() > 1);
-            }
-            self.children.insert(id, pat.into_pattern());
-        }
-        #[cfg(any(test, feature = "test-api"))]
-        self.invalidate_string_cache();
-        self.validate();
-    }
-
     /// Iterator over cloned child patterns
     pub(crate) fn child_pattern_iter(
         &'_ self
@@ -276,44 +212,6 @@ impl VertexData {
     /// Get set of all child patterns
     pub fn child_pattern_set(&self) -> HashSet<Pattern> {
         self.child_pattern_iter().collect()
-    }
-
-    /// Get vector of all child patterns
-    pub(crate) fn child_pattern_vec(&self) -> Vec<Pattern> {
-        self.child_pattern_iter().collect()
-    }
-
-    /// Get largest postfix token across all patterns
-    pub(crate) fn largest_postfix(&self) -> (PatternId, Token) {
-        let (id, c) = self
-            .children
-            .iter()
-            .fold(None, |acc: Option<(&PatternId, &Token)>, (pid, p)| {
-                if let Some(acc) = acc {
-                    let c = p.last().unwrap();
-                    if c.width > acc.1.width {
-                        Some((pid, c))
-                    } else {
-                        Some(acc)
-                    }
-                } else {
-                    Some((pid, p.last().unwrap()))
-                }
-            })
-            .unwrap();
-        (*id, *c)
-    }
-
-    /// Iterator over all child tokens
-    pub(crate) fn all_children_iter(&self) -> impl IntoIterator<Item = &Token> {
-        self.children.iter().flat_map(|(_, pat)| pat.iter())
-    }
-
-    /// Iterator over all localized child tokens
-    pub(crate) fn all_localized_children_iter(
-        &self
-    ) -> impl IntoIterator<Item = (ChildLocation, &Token)> {
-        localized_children_iter_for_index(self.to_child(), &self.children)
     }
 
     /// Get top-down containment nodes
@@ -383,24 +281,110 @@ impl VertexData {
             })
             .collect::<Vec<_>>()
     }
+}
 
-    // Commented out methods - preserved for future use
-    /*
-    pub(crate) fn find_ancestor_with_range(
+#[allow(dead_code)]
+impl VertexData {
+    /// Get child pattern at specific position
+    pub(crate) fn get_child_pattern_position(
         &self,
-        half: Pattern,
-        range: impl PatternRangeIndex,
-    ) -> Result<PatternId, ErrorReason> {
-        self.tokens
-            .iter()
-            .find_map(|(id, pat)| {
-                if pat[range.clone()] == half[..] {
-                    Some(*id)
-                } else {
-                    None
-                }
-            })
+        id: &PatternId,
+        pos: IndexPosition,
+    ) -> Result<&Token, ErrorReason> {
+        self.children
+            .get(id)
+            .and_then(|p| p.get(pos))
             .ok_or(ErrorReason::NoTokenPatterns)
     }
-    */
+
+    /// Find child pattern with specified prefix width
+    pub(crate) fn get_child_pattern_with_prefix_width(
+        &self,
+        width: NonZeroUsize,
+    ) -> Option<(&PatternId, &Pattern)> {
+        self.children
+            .iter()
+            .find(|(_pid, pat)| pat[0].width == width.get())
+    }
+
+    /// Get mutable child token at location
+    pub(crate) fn get_child_mut_at(
+        &mut self,
+        location: &SubLocation,
+    ) -> Result<&mut Token, ErrorReason> {
+        self.children
+            .get_mut(&location.pattern_id)
+            .ok_or(ErrorReason::InvalidPattern(location.pattern_id))?
+            .get_mut(location.sub_index)
+            .ok_or(ErrorReason::InvalidChild(location.sub_index))
+    }
+
+    /// Get mutable child token at location, panicking if not found
+    pub(crate) fn expect_child_mut_at(
+        &mut self,
+        location: &SubLocation,
+    ) -> &mut Token {
+        self.get_child_mut_at(location).unwrap()
+    }
+
+    /// Find child pattern ID matching predicate
+    pub(crate) fn find_child_pattern_id(
+        &self,
+        f: impl FnMut(&(&PatternId, &Pattern)) -> bool,
+    ) -> Option<PatternId> {
+        self.children.iter().find(f).map(|r| *r.0)
+    }
+
+    /// Add multiple child patterns without updating cache
+    pub(crate) fn add_patterns_no_update(
+        &mut self,
+        patterns: impl IntoIterator<Item = (PatternId, Pattern)>,
+    ) {
+        for (id, pat) in patterns {
+            if pat.len() < 2 {
+                assert!(pat.len() > 1);
+            }
+            self.children.insert(id, pat.into_pattern());
+        }
+        #[cfg(any(test, feature = "test-api"))]
+        self.invalidate_string_cache();
+        self.validate();
+    }
+    /// Get vector of all child patterns
+    pub(crate) fn child_pattern_vec(&self) -> Vec<Pattern> {
+        self.child_pattern_iter().collect()
+    }
+
+    /// Get largest postfix token across all patterns
+    pub(crate) fn largest_postfix(&self) -> (PatternId, Token) {
+        let (id, c) = self
+            .children
+            .iter()
+            .fold(None, |acc: Option<(&PatternId, &Token)>, (pid, p)| {
+                if let Some(acc) = acc {
+                    let c = p.last().unwrap();
+                    if c.width > acc.1.width {
+                        Some((pid, c))
+                    } else {
+                        Some(acc)
+                    }
+                } else {
+                    Some((pid, p.last().unwrap()))
+                }
+            })
+            .unwrap();
+        (*id, *c)
+    }
+
+    /// Iterator over all child tokens
+    pub(crate) fn all_children_iter(&self) -> impl IntoIterator<Item = &Token> {
+        self.children.iter().flat_map(|(_, pat)| pat.iter())
+    }
+
+    /// Iterator over all localized child tokens
+    pub(crate) fn all_localized_children_iter(
+        &self
+    ) -> impl IntoIterator<Item = (ChildLocation, &Token)> {
+        localized_children_iter_for_index(self.to_child(), &self.children)
+    }
 }

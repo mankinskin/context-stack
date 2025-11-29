@@ -145,6 +145,15 @@ impl ChildLocation {
             sub_index,
         }
     }
+    pub(crate) fn to_sub_location(self) -> SubLocation {
+        SubLocation {
+            pattern_id: self.pattern_id,
+            sub_index: self.sub_index,
+        }
+    }
+}
+#[allow(dead_code)]
+impl ChildLocation {
     pub(crate) fn get_child_in<'a>(
         &self,
         patterns: &'a ChildPatterns,
@@ -198,12 +207,6 @@ impl ChildLocation {
         PatternLocation {
             parent: self.parent,
             pattern_id,
-        }
-    }
-    pub(crate) fn to_sub_location(self) -> SubLocation {
-        SubLocation {
-            pattern_id: self.pattern_id,
-            sub_index: self.sub_index,
         }
     }
 }

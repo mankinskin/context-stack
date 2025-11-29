@@ -24,6 +24,7 @@ use crate::{
     },
 };
 
+#[allow(dead_code)]
 impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn get_pattern_at(
         &self,
@@ -42,7 +43,7 @@ impl<G: GraphKind> Hypergraph<G> {
         location: impl IntoPatternLocation,
     ) -> &Pattern {
         let location = location.into_pattern_location();
-        self.get_pattern_at(location.clone()).unwrap_or_else(|_| {
+        self.get_pattern_at(location).unwrap_or_else(|_| {
             panic!("Pattern not found at location {:#?}", location)
         })
     }

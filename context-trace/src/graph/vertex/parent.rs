@@ -70,9 +70,6 @@ impl Parent {
     pub(crate) fn get_width(&self) -> TokenWidth {
         self.width
     }
-    pub(crate) fn any_pattern_index(&self) -> PatternIndex {
-        *self.pattern_indices.iter().next().unwrap()
-    }
     pub(crate) fn add_pattern_index(
         &mut self,
         pattern_id: PatternId,
@@ -92,12 +89,6 @@ impl Parent {
             pattern_id,
             sub_index,
         });
-    }
-    pub(crate) fn exists_at_pos(
-        &self,
-        p: usize,
-    ) -> bool {
-        self.pattern_indices.iter().any(|i| i.sub_index == p)
     }
     pub(crate) fn exists_at_pos_in_pattern(
         &self,
@@ -128,6 +119,18 @@ impl Parent {
                 v.expect_child_pattern(&i.pattern_id).len() == i.sub_index + 1
             })
             .cloned()
+    }
+}
+#[allow(dead_code)]
+impl Parent {
+    pub(crate) fn any_pattern_index(&self) -> PatternIndex {
+        *self.pattern_indices.iter().next().unwrap()
+    }
+    pub(crate) fn exists_at_pos(
+        &self,
+        p: usize,
+    ) -> bool {
+        self.pattern_indices.iter().any(|i| i.sub_index == p)
     }
     /// filter for pattern indices which occur at start of their patterns
     pub(crate) fn filter_pattern_indices_at_prefix(

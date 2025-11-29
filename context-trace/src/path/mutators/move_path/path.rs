@@ -1,14 +1,15 @@
 use crate::{
     direction::Direction,
-    graph::vertex::location::child::ChildLocation,
     path::{
         accessors::role::PathRole,
         mutators::{
             append::PathAppend,
             move_path::root::MoveRootIndex,
-            pop::PathPop,
         },
-        structs::rooted::{PathNode, IntoChildLocation},
+        structs::rooted::{
+            IntoChildLocation,
+            PathNode,
+        },
     },
     trace::has_graph::HasGraph,
 };
@@ -18,9 +19,9 @@ pub trait MovePath<D: Direction, R: PathRole>:
     PathAppend + MoveRootIndex<D, R>
 {
     type Node: PathNode;
-    
+
     fn path_pop_node(&mut self) -> Option<Self::Node>;
-    
+
     fn move_path_segment<G: HasGraph>(
         &mut self,
         node: &mut Self::Node,
@@ -30,7 +31,7 @@ pub trait MovePath<D: Direction, R: PathRole>:
     fn move_path<G: HasGraph>(
         &mut self,
         trav: &G,
-    ) -> ControlFlow<()> 
+    ) -> ControlFlow<()>
     where
         Self::Node: PathNode,
     {

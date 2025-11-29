@@ -7,21 +7,9 @@ use crate::{
     TokenWidth,
     graph::vertex::{
         ChildPatterns,
-        Parent,
         VertexIndex,
         VertexParents,
-        has_vertex_index::HasVertexIndex,
         key::VertexKey,
-        location::{
-            SubLocation,
-            child::ChildLocation,
-        },
-        pattern::{
-            self,
-            Pattern,
-            id::PatternId,
-            pattern_width,
-        },
         token::Token,
     },
 };
@@ -89,7 +77,7 @@ impl Clone for VertexData {
         Self {
             width: self.width,
             index: self.index,
-            key: self.key.clone(),
+            key: self.key,
             parents: self.parents.clone(),
             children: self.children.clone(),
             cached_string: std::sync::RwLock::new(None), // Don't clone cache
@@ -135,6 +123,7 @@ impl VertexData {
     }
 
     /// Get mutable reference to parent relationships
+    #[allow(dead_code)]
     pub(crate) fn parents_mut(&mut self) -> &mut VertexParents {
         &mut self.parents
     }
@@ -168,6 +157,7 @@ impl VertexData {
 
     /// Validate that vertex doesn't have only one parent and one child
     #[track_caller]
+    #[allow(dead_code)]
     pub(crate) fn validate_links(&self) {
         assert!(self.children.len() != 1 || self.parents.len() != 1);
     }

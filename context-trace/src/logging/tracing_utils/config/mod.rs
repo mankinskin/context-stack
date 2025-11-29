@@ -8,8 +8,4 @@ pub use loader::TracingConfig;
 pub use types::{
     FormatConfig,
     PanicConfig,
-    SpanCloseConfig,
-    SpanEnterConfig,
-    TraitContextConfig,
-    WhitespaceConfig,
 };

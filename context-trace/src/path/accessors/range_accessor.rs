@@ -9,19 +9,22 @@
 /// - Concrete role-specific access (Start vs End)
 ///
 /// For simple path vector access, use PathAccessor instead.
-
 use crate::{
     graph::vertex::location::child::ChildLocation,
     path::{
         accessors::{
             has_path::HasRolePath,
-            role::{End, Start, PathRole},
+            role::{
+                End,
+                PathRole,
+                Start,
+            },
         },
         structs::{
             role_path::RolePath,
             rooted::{
                 role_path::RootedRolePath,
-                root::{PathRoot, RootedPath},
+                root::RootedPath,
             },
         },
     },
@@ -35,17 +38,17 @@ use crate::{
 /// # Example
 /// ```ignore
 /// use context_trace::{StartPathAccessor, RolePath, Start};
-/// 
+///
 /// fn get_start_entry<T: StartPathAccessor>(path: &T) -> usize {
 ///     path.start_path().root_entry
 /// }
 /// ```
 pub trait StartPathAccessor {
     type Node;
-    
+
     /// Get immutable reference to the Start role path
     fn start_path(&self) -> &RolePath<Start, Self::Node>;
-    
+
     /// Get mutable reference to the Start role path
     fn start_path_mut(&mut self) -> &mut RolePath<Start, Self::Node>;
 }
@@ -58,17 +61,17 @@ pub trait StartPathAccessor {
 /// # Example
 /// ```ignore
 /// use context_trace::{EndPathAccessor, RolePath, End};
-/// 
+///
 /// fn get_end_entry<T: EndPathAccessor>(path: &T) -> usize {
 ///     path.end_path().root_entry
 /// }
 /// ```
 pub trait EndPathAccessor {
     type Node;
-    
+
     /// Get immutable reference to the End role path
     fn end_path(&self) -> &RolePath<End, Self::Node>;
-    
+
     /// Get mutable reference to the End role path
     fn end_path_mut(&mut self) -> &mut RolePath<End, Self::Node>;
 }
@@ -81,7 +84,7 @@ pub trait EndPathAccessor {
 /// # Example
 /// ```ignore
 /// use context_trace::{RangePathAccessor, StartPathAccessor, EndPathAccessor};
-/// 
+///
 /// fn compare_entries<T: RangePathAccessor>(range: &T) -> (usize, usize) {
 ///     (
 ///         range.start_path().root_entry,
@@ -112,25 +115,29 @@ impl<T> RangePathAccessor for T where T: StartPathAccessor + EndPathAccessor {}
 /// # Example
 /// ```ignore
 /// use context_trace::{RootedStartPathAccessor, RolePath, Start};
-/// 
+///
 /// fn process_rooted_start<T: RootedStartPathAccessor>(path: &T) {
 ///     let root = path.path_root();
 ///     let role_path = path.start_role_path();
 ///     let complete = path.rooted_start_path();
 /// }
 /// ```
-pub trait RootedStartPathAccessor: RootedPath + HasRolePath<Start, Node = ChildLocation> {
+pub trait RootedStartPathAccessor:
+    RootedPath + HasRolePath<Start, Node = ChildLocation>
+{
     /// Get the complete rooted Start path
-    fn rooted_start_path(&self) -> RootedRolePath<Start, Self::Root, ChildLocation> {
+    fn rooted_start_path(
+        &self
+    ) -> RootedRolePath<Start, Self::Root, ChildLocation> {
         let root = self.path_root();
         self.role_path().clone().into_rooted(root)
     }
-    
+
     /// Get reference to the Start role path (convenience method)
     fn start_role_path(&self) -> &RolePath<Start, ChildLocation> {
         self.role_path()
     }
-    
+
     /// Get mutable reference to the Start role path (convenience method)
     fn start_role_path_mut(&mut self) -> &mut RolePath<Start, ChildLocation> {
         self.role_path_mut()
@@ -155,25 +162,29 @@ pub trait RootedStartPathAccessor: RootedPath + HasRolePath<Start, Node = ChildL
 /// # Example
 /// ```ignore
 /// use context_trace::{RootedEndPathAccessor, RolePath, End};
-/// 
+///
 /// fn process_rooted_end<T: RootedEndPathAccessor>(path: &T) {
 ///     let root = path.path_root();
 ///     let role_path = path.end_role_path();
 ///     let complete = path.rooted_end_path();
 /// }
 /// ```
-pub trait RootedEndPathAccessor: RootedPath + HasRolePath<End, Node = ChildLocation> {
+pub trait RootedEndPathAccessor:
+    RootedPath + HasRolePath<End, Node = ChildLocation>
+{
     /// Get the complete rooted End path
-    fn rooted_end_path(&self) -> RootedRolePath<End, Self::Root, ChildLocation> {
+    fn rooted_end_path(
+        &self
+    ) -> RootedRolePath<End, Self::Root, ChildLocation> {
         let root = self.path_root();
         self.role_path().clone().into_rooted(root)
     }
-    
+
     /// Get reference to the End role path (convenience method)
     fn end_role_path(&self) -> &RolePath<End, ChildLocation> {
         self.role_path()
     }
-    
+
     /// Get mutable reference to the End role path (convenience method)
     fn end_role_path_mut(&mut self) -> &mut RolePath<End, ChildLocation> {
         self.role_path_mut()
@@ -187,7 +198,9 @@ pub trait RootedEndPathAccessor: RootedPath + HasRolePath<End, Node = ChildLocat
 ///
 /// This trait is automatically implemented for any type that implements both
 /// `RootedPath` and `HasRolePath<R, Node = ChildLocation>`.
-pub trait RootedRolePathAccessor<R: PathRole>: RootedPath + HasRolePath<R, Node = ChildLocation> {
+pub trait RootedRolePathAccessor<R: PathRole>:
+    RootedPath + HasRolePath<R, Node = ChildLocation>
+{
     /// Get the complete rooted role path
     fn rooted_role_path(&self) -> RootedRolePath<R, Self::Root, ChildLocation> {
         let root = self.path_root();
@@ -196,17 +209,17 @@ pub trait RootedRolePathAccessor<R: PathRole>: RootedPath + HasRolePath<R, Node 
 }
 
 // Blanket implementations for automatic trait satisfaction
-impl<T> RootedStartPathAccessor for T 
-where 
-    T: RootedPath + HasRolePath<Start, Node = ChildLocation> 
-{}
+impl<T> RootedStartPathAccessor for T where
+    T: RootedPath + HasRolePath<Start, Node = ChildLocation>
+{
+}
 
-impl<T> RootedEndPathAccessor for T 
-where 
-    T: RootedPath + HasRolePath<End, Node = ChildLocation> 
-{}
+impl<T> RootedEndPathAccessor for T where
+    T: RootedPath + HasRolePath<End, Node = ChildLocation>
+{
+}
 
-impl<R: PathRole, T> RootedRolePathAccessor<R> for T 
-where 
-    T: RootedPath + HasRolePath<R, Node = ChildLocation> 
-{}
+impl<R: PathRole, T> RootedRolePathAccessor<R> for T where
+    T: RootedPath + HasRolePath<R, Node = ChildLocation>
+{
+}

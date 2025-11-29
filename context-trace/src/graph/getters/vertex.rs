@@ -294,6 +294,9 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> impl Iterator<Item = (&VertexKey, &VertexData)> {
         self.graph.iter()
     }
+}
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn vertex_iter_mut(
         &mut self
     ) -> impl Iterator<Item = (&VertexKey, &mut VertexData)> {

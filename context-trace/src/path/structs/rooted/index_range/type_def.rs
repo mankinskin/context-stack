@@ -1,14 +1,12 @@
 //! Type definition and basic conversions for IndexRangePath
 
 use crate::{
-    direction::Right,
     graph::vertex::location::child::ChildLocation,
     path::{
         accessors::{
             has_path::IntoRolePath,
             role::{
                 End,
-                PathRole,
                 Start,
             },
         },

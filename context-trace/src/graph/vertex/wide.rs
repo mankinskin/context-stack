@@ -60,7 +60,7 @@ impl<T: Wide> Wide for &'_ mut T {
 //}
 impl Wide for VertexData {
     fn width(&self) -> TokenWidth {
-        self.width.into()
+        self.width
     }
 }
 
@@ -76,6 +76,7 @@ impl Wide for DownKey {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) trait WideMut: Wide {
     fn width_mut(&mut self) -> &mut TokenWidth;
 }

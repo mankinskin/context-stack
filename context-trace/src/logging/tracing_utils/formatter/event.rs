@@ -6,10 +6,7 @@ use super::{
     fields::filter_span_fields,
     helpers::extract_trait_context,
     string_utils::strip_ansi_codes,
-    syntax::{
-        self,
-        highlight_rust_signature,
-    },
+    syntax::highlight_rust_signature,
 };
 
 use std::fmt::{

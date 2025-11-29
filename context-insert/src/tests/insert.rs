@@ -224,8 +224,10 @@ fn index_prefix1() {
         (heldld, heldld_id) => [h, e, ld, ld]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
-    let fold_res =
-        Searchable::search::<InsertTraversal>(vec![h, e, l, l], graph.clone());
+    let fold_res = Searchable::<InsertTraversal>::search(
+        vec![h, e, l, l],
+        graph.clone().into(),
+    );
     assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
     let state = fold_res.unwrap();
     let init = InitInterval::from(state);
@@ -278,8 +280,10 @@ fn index_postfix1() {
         (ababcd, ababcd_id) => [ab, ab, c, d]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
-    let fold_res =
-        Searchable::search::<InsertTraversal>(vec![b, c, d, d], graph.clone());
+    let fold_res = Searchable::<InsertTraversal>::search(
+        vec![b, c, d, d],
+        graph.clone().into(),
+    );
 
     assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
     let state = fold_res.unwrap();

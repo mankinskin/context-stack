@@ -1,21 +1,23 @@
-use crate::graph::{
-    kind::GraphKind,
-    vertex::location::pattern::{
-        IntoPatternLocation,
-        PatternLocation,
+use crate::{
+    Hypergraph,
+    graph::{
+        kind::GraphKind,
+        vertex::location::pattern::{
+            IntoPatternLocation,
+            PatternLocation,
+        },
     },
 };
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) enum ValidationError {
     InvalidPatternRange(String, PatternLocation, usize, usize),
     InvalidPattern(PatternLocation),
 }
 
-impl<G> crate::graph::Hypergraph<G>
-where
-    G: GraphKind,
-{
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn validate_pattern_indexing_range_at(
         &self,
         location: impl IntoPatternLocation,

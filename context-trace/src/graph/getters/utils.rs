@@ -7,10 +7,7 @@ use crate::graph::{
     kind::GraphKind,
     vertex::{
         has_vertex_data::HasVertexData,
-        has_vertex_index::{
-            HasVertexIndex,
-            ToToken,
-        },
+        has_vertex_index::HasVertexIndex,
         location::pattern::IntoPatternLocation,
         parent::PatternIndex,
         pattern::pattern_range::PatternRangeIndex,
@@ -24,6 +21,7 @@ use std::{
     slice::SliceIndex,
 };
 
+#[allow(dead_code)]
 impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn get_common_pattern_in_parent(
         &self,

@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::{
-    Token,
     Pattern,
+    Token,
     graph::{
         getters::ErrorReason,
         vertex::PatternId,
@@ -50,6 +50,7 @@ impl<
 > PatternRangeIndex<T> for R
 {
 }
+#[allow(dead_code)]
 pub(crate) trait StartInclusive {
     fn start(&self) -> usize;
 }
@@ -73,6 +74,7 @@ impl StartInclusive for std::ops::Range<usize> {
         self.start
     }
 }
+#[allow(dead_code)]
 pub(crate) trait EndInclusive {
     fn end(&self) -> usize;
 }

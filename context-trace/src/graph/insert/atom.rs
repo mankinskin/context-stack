@@ -1,6 +1,7 @@
 //! Atom insertion and management operations
 
 use crate::{
+    Hypergraph,
     TokenWidth,
     graph::{
         kind::GraphKind,
@@ -20,10 +21,7 @@ use crate::{
     },
 };
 
-impl<G> crate::graph::Hypergraph<G>
-where
-    G: GraphKind,
-{
+impl<G: GraphKind> Hypergraph<G> {
     fn insert_atom_key(
         &mut self,
         atom: Atom<G::Atom>,
@@ -41,16 +39,6 @@ where
     ) -> Token {
         self.insert_atom_key(atom, data.key);
         self.insert_vertex_data(data)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn insert_atom_builder(
-        &mut self,
-        atom: Atom<G::Atom>,
-        builder: VertexDataBuilder,
-    ) -> Token {
-        let data = self.finish_vertex_builder(builder);
-        self.insert_atom_data(atom, data)
     }
 
     /// Insert single atom node
@@ -71,6 +59,18 @@ where
             .into_iter()
             .map(|atom| self.insert_atom(atom))
             .collect()
+    }
+}
+
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
+    pub(crate) fn insert_atom_builder(
+        &mut self,
+        atom: Atom<G::Atom>,
+        builder: VertexDataBuilder,
+    ) -> Token {
+        let data = self.finish_vertex_builder(builder);
+        self.insert_atom_data(atom, data)
     }
 
     pub(crate) fn new_atom_indices(

@@ -3,6 +3,7 @@
 use itertools::Itertools;
 
 use crate::{
+    Hypergraph,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
@@ -18,10 +19,7 @@ use crate::{
     },
 };
 
-impl<G> crate::graph::Hypergraph<G>
-where
-    G: GraphKind,
-{
+impl<G: GraphKind> Hypergraph<G> {
     /// Add pattern to existing node
     pub fn add_pattern_with_update(
         &mut self,
@@ -94,7 +92,10 @@ where
                 node
             })
     }
+}
 
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
     #[track_caller]
     pub(crate) fn try_insert_patterns(
         &mut self,

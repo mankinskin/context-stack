@@ -266,14 +266,6 @@ pub(crate) fn prefix<T: ToToken + Clone>(
     pattern.get(0..index).unwrap_or(pattern).to_vec()
 }
 
-pub(crate) fn infix<T: ToToken + Clone>(
-    pattern: &'_ [T],
-    start: usize,
-    end: usize,
-) -> Vec<T> {
-    pattern.get(start..end).unwrap_or(&[]).to_vec()
-}
-
 pub(crate) fn postfix<T: ToToken + Clone>(
     pattern: &'_ [T],
     index: usize,
@@ -294,6 +286,15 @@ pub(crate) fn replace_in_pattern(
         .collect()
 }
 
+#[allow(dead_code)]
+pub(crate) fn infix<T: ToToken + Clone>(
+    pattern: &'_ [T],
+    start: usize,
+    end: usize,
+) -> Vec<T> {
+    pattern.get(start..end).unwrap_or(&[]).to_vec()
+}
+#[allow(dead_code)]
 pub(crate) fn single_child_patterns(
     halves: Vec<Pattern>
 ) -> Result<Token, Vec<Pattern>> {
@@ -304,6 +305,7 @@ pub(crate) fn single_child_patterns(
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn single_child_pattern(half: Pattern) -> Result<Token, Pattern> {
     match (half.len(), half.first()) {
         (1, Some(first)) => Ok(*first),
@@ -311,6 +313,7 @@ pub(crate) fn single_child_pattern(half: Pattern) -> Result<Token, Pattern> {
     }
 }
 
+#[allow(dead_code)]
 /// Split a pattern before the specified index
 pub(crate) fn split_pattern_at_index<T: ToToken + Clone>(
     pattern: &'_ [T],
@@ -319,6 +322,7 @@ pub(crate) fn split_pattern_at_index<T: ToToken + Clone>(
     (prefix(pattern, index), postfix(pattern, index))
 }
 
+#[allow(dead_code)]
 pub(crate) fn split_context<T: ToToken + Clone>(
     pattern: &'_ [T],
     index: usize,

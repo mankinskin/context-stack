@@ -29,13 +29,9 @@ use serde::{
 use vertex::{
     VertexIndex,
     atom::Atom,
-    has_vertex_index::{
-        HasVertexIndex,
-        ToToken,
-    },
+    has_vertex_index::HasVertexIndex,
     pattern::IntoPattern,
     token::Token,
-    wide::Wide,
 };
 
 pub mod child_strings;

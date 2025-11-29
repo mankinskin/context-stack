@@ -13,7 +13,7 @@ pub trait ToInsertCtx<R: InsertResult = Token>: HasGraphMut {
 
     fn insert(
         &self,
-        searchable: impl Searchable,
+        searchable: impl Searchable<InsertTraversal>,
     ) -> Result<R, ErrorState> {
         self.insert_context().insert(searchable)
     }
@@ -26,7 +26,7 @@ pub trait ToInsertCtx<R: InsertResult = Token>: HasGraphMut {
     }
     fn insert_or_get_complete(
         &self,
-        searchable: impl Searchable,
+        searchable: impl Searchable<InsertTraversal>,
     ) -> Result<Result<R, R::Error>, ErrorReason> {
         self.insert_context().insert_or_get_complete(searchable)
     }

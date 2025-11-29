@@ -27,16 +27,6 @@ impl<G: GraphKind> Hypergraph<G> {
             .get(location.sub_index)
             .ok_or(ErrorReason::NoTokenPatterns) // todo: better error
     }
-    pub(crate) fn get_child_mut_at(
-        &mut self,
-        location: impl IntoChildLocation,
-    ) -> Result<&mut Token, ErrorReason> {
-        let location = location.into_child_location();
-        let pattern = self.get_pattern_mut_at(location)?;
-        pattern
-            .get_mut(location.sub_index)
-            .ok_or(ErrorReason::NoTokenPatterns) // todo: better error
-    }
     #[track_caller]
     pub fn expect_child_at(
         &self,
@@ -47,7 +37,32 @@ impl<G: GraphKind> Hypergraph<G> {
             panic!("Token not found at location {:#?}", location)
         })
     }
-    #[track_caller]
+    pub(crate) fn expect_child_offset(
+        &self,
+        loc: &ChildLocation,
+    ) -> usize {
+        self.expect_vertex(loc.vertex_index())
+            .expect_child_offset(&loc.to_sub_location())
+            .0
+    }
+    pub(crate) fn to_child(
+        &self,
+        index: impl HasVertexIndex,
+    ) -> Token {
+        Token::new(index.vertex_index(), self.expect_index_width(&index))
+    }
+    #[allow(dead_code)]
+    pub(crate) fn get_child_mut_at(
+        &mut self,
+        location: impl IntoChildLocation,
+    ) -> Result<&mut Token, ErrorReason> {
+        let location = location.into_child_location();
+        let pattern = self.get_pattern_mut_at(location)?;
+        pattern
+            .get_mut(location.sub_index)
+            .ok_or(ErrorReason::NoTokenPatterns) // todo: better error
+    }
+    #[allow(dead_code)]
     pub(crate) fn expect_child_mut_at(
         &mut self,
         location: impl IntoChildLocation,
@@ -57,6 +72,7 @@ impl<G: GraphKind> Hypergraph<G> {
             panic!("Token not found at location {:#?}", location)
         })
     }
+    #[allow(dead_code)]
     pub(crate) fn expect_is_at_end(
         &self,
         location: &ChildLocation,
@@ -65,25 +81,14 @@ impl<G: GraphKind> Hypergraph<G> {
             .expect_pattern_len(&location.pattern_id)
             == location.sub_index + 1
     }
-    pub(crate) fn expect_child_offset(
-        &self,
-        loc: &ChildLocation,
-    ) -> usize {
-        self.expect_vertex(loc.vertex_index())
-            .expect_child_offset(&loc.to_sub_location()).0
-    }
+    #[allow(dead_code)]
     pub(crate) fn expect_child(
         &self,
         index: impl HasVertexIndex,
     ) -> Token {
         self.to_child(index)
     }
-    pub(crate) fn to_child(
-        &self,
-        index: impl HasVertexIndex,
-    ) -> Token {
-        Token::new(index.vertex_index(), self.expect_index_width(&index))
-    }
+    #[allow(dead_code)]
     pub(crate) fn to_children(
         &self,
         indices: impl IntoIterator<Item = impl HasVertexIndex>,

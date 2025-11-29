@@ -277,12 +277,10 @@ impl Default for TracingConfig {
         // Env var takes precedence over config file value
         let log_to_stdout = env::var("LOG_STDOUT")
             .ok()
-            .and_then(|v| {
-                Some(
-                    v == "1"
-                        || v.eq_ignore_ascii_case("true")
-                        || v.eq_ignore_ascii_case("yes"),
-                )
+            .map(|v| {
+                v == "1"
+                    || v.eq_ignore_ascii_case("true")
+                    || v.eq_ignore_ascii_case("yes")
             })
             .or(format.log_to_stdout)
             .unwrap_or(false);
@@ -295,12 +293,10 @@ impl Default for TracingConfig {
         // Check for keep logs: env var takes precedence over config file
         let keep_logs = env::var("KEEP_LOGS")
             .ok()
-            .and_then(|v| {
-                Some(
-                    v == "1"
-                        || v.eq_ignore_ascii_case("true")
-                        || v.eq_ignore_ascii_case("yes"),
-                )
+            .map(|v| {
+                v == "1"
+                    || v.eq_ignore_ascii_case("true")
+                    || v.eq_ignore_ascii_case("yes")
             })
             .or(format.keep_logs)
             .unwrap_or(false);

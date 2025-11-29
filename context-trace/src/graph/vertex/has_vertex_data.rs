@@ -48,6 +48,7 @@ pub trait HasVertexStringRepr: HasVertexIndex {
 
 impl<T: HasVertexIndex> HasVertexStringRepr for T {}
 
+#[allow(dead_code)]
 pub(crate) trait HasVertexDataMut: HasVertexData {
     fn vertex_mut<
         'a,

@@ -20,7 +20,6 @@ use crate::{
                 PathRole,
                 Start,
             },
-            root::RootPattern,
         },
         structs::{
             rooted::{

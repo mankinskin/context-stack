@@ -1,4 +1,3 @@
-use crate::graph::vertex::has_vertex_index::HasVertexIndex;
 use serde::{
     Deserialize,
     Serialize,

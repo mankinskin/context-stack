@@ -12,7 +12,15 @@ use crate::graph::{
     },
 };
 
+#[allow(dead_code)]
 impl<G: GraphKind> Hypergraph<G> {
+    #[track_caller]
+    pub(crate) fn expect_parents(
+        &self,
+        index: impl HasVertexIndex,
+    ) -> &VertexParents {
+        self.expect_vertex(index.vertex_index()).parents()
+    }
     #[track_caller]
     pub(crate) fn expect_parent(
         &self,
@@ -30,13 +38,6 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> &mut Parent {
         self.expect_vertex_mut(index.vertex_index())
             .expect_parent_mut(parent)
-    }
-    #[track_caller]
-    pub(crate) fn expect_parents(
-        &self,
-        index: impl HasVertexIndex,
-    ) -> &VertexParents {
-        self.expect_vertex(index.vertex_index()).parents()
     }
     #[track_caller]
     pub(crate) fn expect_parents_mut(

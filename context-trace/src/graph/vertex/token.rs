@@ -216,9 +216,6 @@ impl Token {
     pub fn get_string_repr(&self) -> Option<String> {
         crate::graph::test_graph::get_token_string_from_test_graph(*self.index)
     }
-    pub(crate) fn get_width(&self) -> usize {
-        self.width.0
-    }
     pub fn to_pattern_location(
         self,
         pattern_id: PatternId,
@@ -230,6 +227,12 @@ impl Token {
         sub: SubLocation,
     ) -> ChildLocation {
         ChildLocation::new(self, sub.pattern_id, sub.sub_index)
+    }
+}
+#[allow(dead_code)]
+impl Token {
+    pub(crate) fn get_width(&self) -> usize {
+        self.width.0
     }
     pub(crate) fn down_key(
         self,
@@ -259,7 +262,7 @@ impl PartialOrd for Token {
         &self,
         other: &Self,
     ) -> Option<std::cmp::Ordering> {
-        Some(self.index.cmp(&other.index))
+        Some(self.cmp(other))
     }
 }
 

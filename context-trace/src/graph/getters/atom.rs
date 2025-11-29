@@ -30,13 +30,6 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> Token {
         Token::new(self.expect_atom_index(atom), 1)
     }
-    pub fn get_atom_children(
-        &self,
-        atoms: impl IntoIterator<Item = impl AsAtom<G::Atom>>,
-    ) -> Result<Pattern, ErrorReason> {
-        self.to_atom_children_iter(atoms)
-            .collect::<Result<Pattern, _>>()
-    }
     #[track_caller]
     pub fn expect_atom_children(
         &self,
@@ -46,17 +39,19 @@ impl<G: GraphKind> Hypergraph<G> {
             .expect("Failed to convert atoms to tokens")
             .into_pattern()
     }
-    pub(crate) fn get_atom_data(
+    #[track_caller]
+    pub(crate) fn expect_atom_index(
         &self,
-        atom: &Atom<G::Atom>,
-    ) -> Result<&VertexData, ErrorReason> {
-        self.get_vertex(self.get_atom_index(atom)?)
+        atom: impl AsAtom<G::Atom>,
+    ) -> VertexIndex {
+        self.get_atom_index(atom).expect("Atom does not exist")
     }
-    pub(crate) fn get_atom_data_mut(
-        &mut self,
-        atom: &Atom<G::Atom>,
-    ) -> Result<&mut VertexData, ErrorReason> {
-        self.get_vertex_mut(self.get_atom_index(atom)?)
+    pub fn get_atom_children(
+        &self,
+        atoms: impl IntoIterator<Item = impl AsAtom<G::Atom>>,
+    ) -> Result<Pattern, ErrorReason> {
+        self.to_atom_children_iter(atoms)
+            .collect::<Result<Pattern, _>>()
     }
     pub(crate) fn get_atom_index(
         &self,
@@ -77,25 +72,6 @@ impl<G: GraphKind> Hypergraph<G> {
             .copied()
             .ok_or(ErrorReason::UnknownAtom)
     }
-    pub(crate) fn get_atom_child(
-        &self,
-        atom: impl AsAtom<G::Atom>,
-    ) -> Result<Token, ErrorReason> {
-        self.get_atom_index(atom).map(|i| Token::new(i, 1))
-    }
-    #[track_caller]
-    pub(crate) fn expect_atom_index(
-        &self,
-        atom: impl AsAtom<G::Atom>,
-    ) -> VertexIndex {
-        self.get_atom_index(atom).expect("Atom does not exist")
-    }
-    pub(crate) fn to_atom_keys_iter<'a>(
-        &'a self,
-        atoms: impl IntoIterator<Item = impl AsAtom<G::Atom>> + 'a,
-    ) -> impl Iterator<Item = Result<VertexKey, ErrorReason>> + 'a {
-        atoms.into_iter().map(move |atom| self.get_atom_key(atom))
-    }
     pub(crate) fn to_atom_index_iter<'a>(
         &'a self,
         atoms: impl IntoIterator<Item = impl AsAtom<G::Atom>> + 'a,
@@ -109,6 +85,35 @@ impl<G: GraphKind> Hypergraph<G> {
         self.to_atom_index_iter(atoms)
             .map(move |r| r.map(|index| Token::new(index, 1)))
     }
+    #[allow(dead_code)]
+    pub(crate) fn get_atom_data(
+        &self,
+        atom: &Atom<G::Atom>,
+    ) -> Result<&VertexData, ErrorReason> {
+        self.get_vertex(self.get_atom_index(atom)?)
+    }
+    #[allow(dead_code)]
+    pub(crate) fn get_atom_data_mut(
+        &mut self,
+        atom: &Atom<G::Atom>,
+    ) -> Result<&mut VertexData, ErrorReason> {
+        self.get_vertex_mut(self.get_atom_index(atom)?)
+    }
+    #[allow(dead_code)]
+    pub(crate) fn get_atom_child(
+        &self,
+        atom: impl AsAtom<G::Atom>,
+    ) -> Result<Token, ErrorReason> {
+        self.get_atom_index(atom).map(|i| Token::new(i, 1))
+    }
+    #[allow(dead_code)]
+    pub(crate) fn to_atom_keys_iter<'a>(
+        &'a self,
+        atoms: impl IntoIterator<Item = impl AsAtom<G::Atom>> + 'a,
+    ) -> impl Iterator<Item = Result<VertexKey, ErrorReason>> + 'a {
+        atoms.into_iter().map(move |atom| self.get_atom_key(atom))
+    }
+    #[allow(dead_code)]
     pub(crate) fn get_atom_indices(
         &self,
         atoms: impl IntoIterator<Item = impl AsAtom<G::Atom>>,
@@ -121,6 +126,7 @@ impl<G: GraphKind> Hypergraph<G> {
         }
         Ok(v)
     }
+    #[allow(dead_code)]
     pub(crate) fn expect_atom_indices(
         &self,
         atoms: impl IntoIterator<Item = impl AsAtom<G::Atom>>,

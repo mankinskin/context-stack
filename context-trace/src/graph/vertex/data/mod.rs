@@ -8,12 +8,15 @@ mod core;
 mod parents;
 
 // Re-export main types
-pub use core::{VertexData, VertexDataBuilder};
+pub use core::{
+    VertexData,
+    VertexDataBuilder,
+};
 
-// Re-export helper functions
-pub(crate) use children::{clone_child_patterns, localized_children_iter_for_index};
-
-use crate::logging::compact_format::{write_indent, CompactFormat};
+use crate::logging::compact_format::{
+    CompactFormat,
+    write_indent,
+};
 
 /// Display implementation for VertexData
 impl std::fmt::Display for VertexData {

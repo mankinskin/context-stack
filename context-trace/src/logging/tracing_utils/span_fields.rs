@@ -2,14 +2,12 @@
 
 use super::field_visitor::FieldVisitor;
 use std::fmt;
-use tracing::field::Field;
 use tracing_subscriber::{
     field::RecordFields,
     fmt::{
         FormatFields,
         format::Writer,
     },
-    registry::LookupSpan,
 };
 
 /// Custom span field formatter that uses our FieldVisitor

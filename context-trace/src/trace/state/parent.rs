@@ -20,12 +20,9 @@ use crate::{
             move_path::key::AdvanceKey,
             raise::PathRaise,
         },
-        structs::{
-            rooted::{
-                role_path::IndexStartPath,
-                root::RootedPath,
-            },
-            sub_path::PositionAnnotated,
+        structs::rooted::{
+            role_path::IndexStartPath,
+            root::RootedPath,
         },
     },
     trace::{

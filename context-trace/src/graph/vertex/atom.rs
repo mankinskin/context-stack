@@ -72,6 +72,7 @@ pub trait AtomData: Debug + PartialEq + Clone + Wide {}
 
 impl<T: Debug + PartialEq + Clone + Wide> AtomData for T {}
 
+#[allow(dead_code)]
 #[derive(Hash, Debug, Clone, PartialEq, Eq, Copy)]
 pub(crate) struct NoAtom;
 
@@ -87,6 +88,7 @@ pub(crate) enum NewAtomIndex {
     Known(crate::graph::vertex::VertexIndex),
 }
 
+#[allow(dead_code)]
 impl NewAtomIndex {
     pub(crate) fn is_known(&self) -> bool {
         matches!(self, Self::Known(_))
@@ -152,6 +154,7 @@ impl<T: Atomize> AsAtom<T> for T {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct CtxInfo<T: Atomize> {
     pub(crate) atom: Atom<T>,
@@ -159,6 +162,7 @@ pub(crate) struct CtxInfo<T: Atomize> {
     pub(crate) outgoing_groups: Vec<Vec<Atom<T>>>,
 }
 
+#[allow(dead_code)]
 pub(crate) trait CtxLink: Sized + Clone {
     fn index(&self) -> &EdgeIndex;
     fn into_index(self) -> EdgeIndex {
@@ -172,6 +176,7 @@ impl CtxLink for EdgeIndex {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) trait CtxMapping<E: CtxLink> {
     /// Get distance groups for incoming edges
     fn incoming(&self) -> &Vec<E>;
@@ -193,6 +198,7 @@ pub(crate) trait CtxMapping<E: CtxLink> {
     //}
 }
 
+#[allow(dead_code)]
 pub(crate) trait AtomCtx<T: Atomize, E: CtxLink>: Sized {
     type Mapping: CtxMapping<E>;
     fn atom(&self) -> &Atom<T>;
@@ -217,6 +223,7 @@ pub(crate) trait AtomCtx<T: Atomize, E: CtxLink>: Sized {
     //}
 }
 
+#[allow(dead_code)]
 pub(crate) fn groups_to_string<
     T: Atomize,
     E: CtxLink,

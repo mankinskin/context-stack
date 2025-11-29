@@ -1,7 +1,6 @@
 //! Position annotation methods for IndexRangePath
 
 use crate::{
-    TokenWidth,
     graph::vertex::{
         location::child::ChildLocation,
         pattern::{
@@ -13,14 +12,8 @@ use crate::{
     },
     path::{
         accessors::{
-            has_path::{
-                HasPath,
-                HasRolePath,
-            },
-            role::{
-                End,
-                PathRole,
-            },
+            has_path::HasRolePath,
+            role::PathRole,
         },
         mutators::move_path::key::{
             AdvanceKey,

@@ -1,6 +1,5 @@
 pub(crate) mod root;
 
-use auto_impl::auto_impl;
 use crate::{
     GraphRootChild,
     graph::vertex::{
@@ -21,7 +20,7 @@ use crate::{
 };
 
 /// Access to the leaf token of a path (the token at the path's end point)
-/// 
+///
 /// This trait provides methods to access the leaf token's location and value.
 pub trait HasLeafToken<R: PathRole>:
     HasRootChildIndex<R> + HasPath<R, Node = ChildLocation>
@@ -67,8 +66,8 @@ impl<R: PathRole, T: HasLeafToken<R> + GraphRootChild<R>>
     }
 }
 
-impl<R: PathRole, T: HasLeafToken<R> + HasRootChildToken<R>> HasRootedLeafToken<R>
-    for T
+impl<R: PathRole, T: HasLeafToken<R> + HasRootChildToken<R>>
+    HasRootedLeafToken<R> for T
 {
     fn rooted_leaf_token<G: HasGraph>(
         &self,

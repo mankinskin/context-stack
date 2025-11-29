@@ -1,6 +1,7 @@
 //! Range insertion operations
 
 use crate::{
+    Hypergraph,
     graph::{
         getters::{
             ErrorReason,
@@ -22,10 +23,8 @@ use crate::{
     },
 };
 
-impl<G> crate::graph::Hypergraph<G>
-where
-    G: GraphKind,
-{
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
     #[track_caller]
     pub(crate) fn try_insert_range_in(
         &mut self,

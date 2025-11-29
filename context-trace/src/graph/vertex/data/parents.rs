@@ -21,6 +21,7 @@ use crate::{
 };
 use either::Either;
 
+#[allow(dead_code)]
 impl VertexData {
     /// Get parent relationship by vertex index
     pub(crate) fn get_parent(

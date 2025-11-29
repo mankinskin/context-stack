@@ -1,6 +1,7 @@
 //! Basic vertex insertion operations
 
 use crate::{
+    Hypergraph,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
@@ -9,16 +10,12 @@ use crate::{
                 VertexData,
                 VertexDataBuilder,
             },
-            key::VertexKey,
             token::Token,
         },
     },
 };
 
-impl<G> crate::graph::Hypergraph<G>
-where
-    G: GraphKind,
-{
+impl<G: GraphKind> Hypergraph<G> {
     #[allow(dead_code)]
     pub(crate) fn insert_vertex_builder(
         &mut self,
@@ -31,7 +28,7 @@ where
     #[allow(dead_code)]
     pub(crate) fn finish_vertex_builder(
         &mut self,
-        mut builder: VertexDataBuilder,
+        builder: VertexDataBuilder,
     ) -> VertexData {
         builder.index(self.next_vertex_index()).build().unwrap()
     }
@@ -45,7 +42,10 @@ where
         self.graph.insert(data.key, data);
         c
     }
+}
 
+#[allow(dead_code)]
+impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn validate_vertex(
         &self,
         index: impl crate::graph::vertex::has_vertex_index::HasVertexIndex,
