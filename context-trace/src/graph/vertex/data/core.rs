@@ -4,14 +4,14 @@
 //! and basic accessor methods for vertex properties.
 
 use crate::{
-    TokenWidth,
     graph::vertex::{
+        key::VertexKey,
+        token::Token,
         ChildPatterns,
         VertexIndex,
         VertexParents,
-        key::VertexKey,
-        token::Token,
     },
+    TokenWidth,
 };
 use derive_builder::Builder;
 use serde::{
@@ -87,7 +87,7 @@ impl Clone for VertexData {
 
 impl VertexData {
     /// Create a new VertexData with the given index and width
-    pub(crate) fn new(
+    pub fn new(
         index: VertexIndex,
         width: TokenWidth,
     ) -> Self {

@@ -66,8 +66,12 @@ impl ReadCtx {
                         ExpansionCtx::new(self.clone(), &mut cursor)
                             .find_largest_bundle();
                     assert!(cursor.end_path().is_empty());
-                    [&[expansion], &cursor.root[cursor.end.root_entry + 1..]]
-                        .concat()
+                    [
+                        &[expansion],
+                        &cursor.path_root()
+                            [cursor.role_root_child_index::<End>() + 1..],
+                    ]
+                    .concat()
                 },
                 Err((err, _)) => match err {
                     ErrorReason::SingleIndex(c) => vec![c.index],

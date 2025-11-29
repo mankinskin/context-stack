@@ -188,7 +188,7 @@ impl VertexData {
         )
     }
     /// Add a child pattern without updating cache
-    pub(crate) fn add_pattern_no_update(
+    pub fn add_pattern_no_update(
         &mut self,
         id: PatternId,
         pat: Pattern,

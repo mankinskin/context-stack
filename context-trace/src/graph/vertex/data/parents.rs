@@ -64,7 +64,7 @@ impl VertexData {
     }
 
     /// Add a parent relationship at the given location
-    pub(crate) fn add_parent(
+    pub fn add_parent(
         &mut self,
         loc: ChildLocation,
     ) {

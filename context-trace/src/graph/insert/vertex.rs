@@ -34,7 +34,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
 
     /// Insert raw vertex data
-    pub(crate) fn insert_vertex_data(
+    pub fn insert_vertex_data(
         &mut self,
         data: VertexData,
     ) -> Token {

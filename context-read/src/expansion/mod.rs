@@ -136,7 +136,7 @@ impl<'a> ExpansionCtx<'a> {
                 },
             start_bound,
         } = exp;
-        let start_bound = *start_bound;
+        let start_bound = (*start_bound).into();
         let overlap = postfix_path.role_leaf_token::<End, _>(&self.cursor.ctx);
         let prefix_path = expansion.prefix_path(&self.cursor.ctx, overlap);
 

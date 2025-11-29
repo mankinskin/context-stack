@@ -19,11 +19,11 @@ impl From<BandCtx<'_>> for Band {
 #[derivative(Ord, Eq, PartialEq, PartialOrd)]
 pub struct Band {
     pub pattern: Pattern,
-    pub start_bound: usize,
-    pub end_bound: usize, // key for ordering
+    pub start_bound: AtomPosition,
+    pub end_bound: AtomPosition, // key for ordering
 }
-impl Borrow<usize> for Band {
-    fn borrow(&self) -> &usize {
+impl Borrow<AtomPosition> for Band {
+    fn borrow(&self) -> &AtomPosition {
         &self.end_bound
     }
 }
@@ -36,8 +36,8 @@ impl Band {
         postfix: Token,
     ) {
         let width = self.postfix().width();
-        self.start_bound += width;
-        self.end_bound += width;
+        self.start_bound += width.0;
+        self.end_bound += width.0;
         self.pattern.push(postfix);
     }
 }
@@ -49,15 +49,15 @@ impl Band {
 impl From<Token> for Band {
     fn from(first: Token) -> Self {
         Self {
-            start_bound: 0,
-            end_bound: first.width(),
+            start_bound: 0.into(),
+            end_bound: first.width().0.into(),
             pattern: Pattern::from(vec![first]),
         }
     }
 }
-impl From<(usize, Pattern)> for Band {
-    fn from((start_bound, pattern): (usize, Pattern)) -> Self {
-        let end_bound = start_bound + pattern_width(&pattern);
+impl From<(AtomPosition, Pattern)> for Band {
+    fn from((start_bound, pattern): (AtomPosition, Pattern)) -> Self {
+        let end_bound: AtomPosition = start_bound + pattern_width(&pattern).0;
         Self {
             pattern,
             start_bound,
@@ -74,7 +74,7 @@ pub struct Overlap {
     pub start_bound: usize, // key for ordering
 }
 impl Overlap {
-    pub fn end_bound(&self) -> usize {
-        self.start_bound + self.width()
+    pub fn end_bound(&self) -> AtomPosition {
+        (self.start_bound + self.width().0).into()
     }
 }

@@ -31,8 +31,8 @@ impl BandChain {
         Self {
             bands: Some(Band {
                 pattern: Pattern::from(vec![index]),
-                start_bound: 0,
-                end_bound: index.width(),
+                start_bound: 0.into(),
+                end_bound: index.width().0.into(),
             })
             .into_iter()
             .collect(),
@@ -41,7 +41,7 @@ impl BandChain {
     }
     pub fn ends_at(
         &self,
-        bound: usize,
+        bound: AtomPosition,
     ) -> Option<BandCtx<'_>> {
         debug!("ends_at");
         let band = self.bands.get(&bound)?;
@@ -73,7 +73,7 @@ impl BandChain {
     ) {
         debug!("append_front_complement");
         let pattern = Pattern::from(vec![complement, exp]);
-        let band = Band::from((0, pattern));
+        let band = Band::from((0.into(), pattern));
         self.append(band);
     }
     pub fn pop_first(&mut self) -> Option<Band> {

@@ -286,7 +286,7 @@ impl<G: GraphKind> Hypergraph<G> {
         self.get_key_for_index(index).expect("Key does not exist")
     }
 
-    pub(crate) fn next_vertex_index(&self) -> VertexIndex {
+    pub fn next_vertex_index(&self) -> VertexIndex {
         self.graph.len().into()
     }
     pub(crate) fn vertex_iter(

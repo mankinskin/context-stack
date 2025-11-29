@@ -36,8 +36,8 @@ pub struct StackBand {
     pub expansion: StackBandEnd,
 }
 impl StartBound for StackBand {
-    fn start_bound(&self) -> usize {
-        self.back_context.width()
+    fn start_bound(&self) -> AtomPosition {
+        self.back_context.width().into()
     }
 }
 

@@ -88,7 +88,7 @@ impl GraphBuilder {
         &mut self,
         node: BuilderNode,
     ) {
-        for rule in match node.index.width() {
+        for rule in match node.index.width().0 {
             1 => vec![],
             2 => vec![node.prefix_rule()],
             _ => vec![node.prefix_rule(), node.postfix_rule()],

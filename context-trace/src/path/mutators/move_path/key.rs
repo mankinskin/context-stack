@@ -6,6 +6,7 @@ use derive_more::{
 };
 
 use crate::{
+    TokenWidth,
     direction::{
         Direction,
         Left,
@@ -15,10 +16,27 @@ use crate::{
 };
 
 #[derive(
-    Clone, Debug, Copy, Hash, Eq, PartialEq, Add, Sub, Deref, DerefMut, Default,
+    Clone,
+    Debug,
+    Copy,
+    Hash,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Add,
+    Sub,
+    Deref,
+    DerefMut,
+    Default,
 )]
 pub struct AtomPosition(pub(crate) usize);
 
+impl From<TokenWidth> for AtomPosition {
+    fn from(width: TokenWidth) -> Self {
+        Self(width.0)
+    }
+}
 impl std::fmt::Display for AtomPosition {
     fn fmt(
         &self,

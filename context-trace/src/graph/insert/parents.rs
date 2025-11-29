@@ -87,7 +87,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
 #[allow(dead_code)]
 impl<G: GraphKind> Hypergraph<G> {
-    pub(crate) fn append_to_pattern(
+    pub fn append_to_pattern(
         &mut self,
         parent: impl ToToken,
         pattern_id: PatternId,

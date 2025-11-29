@@ -17,11 +17,11 @@ pub enum ChainOp {
 #[derive(Debug)]
 pub struct BandExpansion {
     pub expansion: IndexWithPath,
-    pub start_bound: usize,
+    pub start_bound: AtomPosition,
     pub postfix_path: IndexEndPath,
 }
 impl StartBound for BandExpansion {
-    fn start_bound(&self) -> usize {
+    fn start_bound(&self) -> AtomPosition {
         self.start_bound
     }
 }
@@ -29,22 +29,22 @@ impl StartBound for BandExpansion {
 pub struct BandCap {
     pub postfix_path: IndexEndPath,
     pub expansion: Token,
-    pub start_bound: usize,
+    pub start_bound: AtomPosition,
 }
 
 pub trait StartBound: Sized {
-    fn start_bound(&self) -> usize;
+    fn start_bound(&self) -> AtomPosition;
 }
 pub trait EndBound: Sized {
-    fn end_bound(&self) -> usize;
+    fn end_bound(&self) -> AtomPosition;
 }
-impl StartBound for (usize, Band) {
-    fn start_bound(&self) -> usize {
+impl StartBound for (AtomPosition, Band) {
+    fn start_bound(&self) -> AtomPosition {
         self.0
     }
 }
-impl EndBound for (Band, usize) {
-    fn end_bound(&self) -> usize {
+impl EndBound for (Band, AtomPosition) {
+    fn end_bound(&self) -> AtomPosition {
         self.1
     }
 }
