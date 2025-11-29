@@ -3,6 +3,10 @@ use std::marker::PhantomData;
 use crate::{
     compare::state::CompareState,
     cursor::{
+        checkpointed::{
+            Checkpointed,
+            HasCandidate,
+        },
         Matched,
         PatternCursor,
     },
@@ -23,7 +27,6 @@ use crate::{
             MatchResult,
         },
     },
-    traversal::TraceStart,
     Response,
     SearchKind,
 };
@@ -36,8 +39,8 @@ use context_trace::{
     logging::format_utils::pretty,
     *,
 };
-
 pub use searchable::Searchable;
+
 use tracing::{
     debug,
     info,
@@ -146,18 +149,10 @@ where
     pub(crate) fn search(mut self) -> Response {
         debug!(queue = %&self.matches.queue, "initial state");
 
-        let mut iteration = 0;
         let mut best_match = None;
-        while let Some(matched_state) = self.next() {
-            iteration += 1;
-            debug!(iteration, "tracing matched state");
-            debug!(matched_state=%pretty(&matched_state), "About to trace MatchResult");
-            matched_state.trace(&mut self.matches.trace_ctx);
-            best_match = Some(matched_state);
-            debug!("Finished tracing MatchResult");
+        for item in self.by_ref() {
+            best_match = Some(item);
         }
-
-        debug!(iterations = iteration, "fold completed");
 
         // Get the final matched state from best_match
         let end = if let Some(checkpoint) = best_match.take() {
@@ -341,18 +336,10 @@ where
 
         // Clone and simplify the checkpoint and candidate cursors
         let mut simplified_checkpoint = state.query.checkpoint().clone();
-        Self::simplify_query_cursor(&mut simplified_checkpoint, trav);
+        simplified_checkpoint.path.end_path_mut().simplify(trav);
 
         let mut simplified_candidate = state.query.candidate().clone();
-        Self::simplify_query_cursor(&mut simplified_candidate, trav);
-
-        // Create Checkpointed with appropriate state based on whether candidate advanced
-        // If candidate == checkpoint, use AtCheckpoint (no progress beyond last match)
-        // If candidate > checkpoint, use HasCandidate (preserves candidate for consecutive searches)
-        use crate::cursor::checkpointed::{
-            Checkpointed,
-            HasCandidate,
-        };
+        simplified_candidate.path.end_path_mut().simplify(trav);
 
         let cursor = if simplified_candidate == simplified_checkpoint {
             // No candidate advancement - create AtCheckpoint
@@ -371,33 +358,6 @@ where
         MatchResult {
             cursor,
             path: path_enum,
-        }
-    }
-
-    /// Simplify query cursor by removing redundant child locations
-    /// that point to the last sub_index of their parent token
-    fn simplify_query_cursor<G: HasGraph>(
-        cursor: &mut PatternCursor,
-        trav: &G,
-    ) {
-        use context_trace::PathAccessor;
-
-        let end_path = cursor.path.end_path_mut();
-        let graph = trav.graph();
-
-        // Remove trailing child locations that point to the last child in their parent
-        while let Some(location) = PathAccessor::path(end_path).last() {
-            let pattern = graph.expect_pattern_at(location);
-            // Check if this is the last child in the pattern
-            let is_last = location.sub_index == pattern.len() - 1;
-
-            if is_last {
-                // Remove this redundant location
-                PathAccessor::path_mut(end_path).pop();
-            } else {
-                // Not at the end, stop simplifying
-                break;
-            }
         }
     }
 }
@@ -419,30 +379,6 @@ where
                     checkpoint_pos = checkpoint_pos,
                     "found matched state"
                 );
-
-                // Trace start path for new best match
-                if let Some(start_path) = matched_state.path().try_start_path()
-                {
-                    let prev_start_len = matched_state
-                        .path()
-                        .try_start_path()
-                        .map(|p| p.len())
-                        .unwrap_or(0);
-                    let current_start_len = start_path.len();
-
-                    if current_start_len > prev_start_len {
-                        debug!(
-                                "Tracing incremental start path: prev_len={}, current_len={}",
-                                prev_start_len, current_start_len
-                            );
-                        TraceStart {
-                            end: &matched_state,
-                            pos: prev_start_len,
-                        }
-                        .trace(&mut self.matches.trace_ctx);
-                    }
-                }
-
                 Some(matched_state)
             },
             None => {

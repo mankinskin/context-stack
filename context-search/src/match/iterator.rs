@@ -13,6 +13,7 @@ use crate::{
         },
         SearchQueue,
     },
+    state::matched,
     traversal::SearchKind,
 };
 use context_trace::*;

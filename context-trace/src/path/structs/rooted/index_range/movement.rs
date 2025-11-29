@@ -2,8 +2,10 @@
 
 use std::ops::ControlFlow;
 
+use super::IndexRangePath;
 use crate::{
     PathNode,
+    RootedRangePath,
     direction::{
         Direction,
         Left,
@@ -27,7 +29,11 @@ use crate::{
         },
         structs::{
             rooted::{
-                role_path::RootedRolePath,
+                role_path::{
+                    HasRootChildIndex,
+                    HasRootChildIndexMut,
+                    RootedRolePath,
+                },
                 root::PathRoot,
             },
             sub_path::PositionAnnotated,
@@ -37,12 +43,6 @@ use crate::{
         HasGraph,
         TravDir,
     },
-};
-
-use super::IndexRangePath;
-use crate::path::structs::rooted::role_path::{
-    HasRootChildIndex,
-    HasRootChildIndexMut,
 };
 
 impl<EndNode: PathNode> MoveRootIndex<Right, End>
@@ -93,11 +93,7 @@ impl<EndNode: PathNode> MoveRootIndex<Left, End>
 }
 
 impl<D: Direction, Root: PathRoot> MovePath<D, End>
-    for crate::path::structs::rooted::RootedRangePath<
-        Root,
-        ChildLocation,
-        ChildLocation,
-    >
+    for RootedRangePath<Root, ChildLocation, ChildLocation>
 where
     Self: MoveRootIndex<D> + PathAppend,
     ChildLocation: MoveLeaf<D>,
@@ -119,11 +115,7 @@ where
 
 // MovePath implementation for position-annotated paths
 impl<D: Direction, Root: PathRoot> MovePath<D, End>
-    for crate::path::structs::rooted::RootedRangePath<
-        Root,
-        ChildLocation,
-        PositionAnnotated<ChildLocation>,
-    >
+    for RootedRangePath<Root, ChildLocation, PositionAnnotated<ChildLocation>>
 where
     Self: MoveRootIndex<D> + PathAppend,
     ChildLocation: MoveLeaf<D>,
@@ -147,11 +139,7 @@ where
 
 // PathPop implementation for position-annotated paths
 impl<Root: PathRoot> PathPop<PositionAnnotated<ChildLocation>>
-    for crate::path::structs::rooted::RootedRangePath<
-        Root,
-        ChildLocation,
-        PositionAnnotated<ChildLocation>,
-    >
+    for RootedRangePath<Root, ChildLocation, PositionAnnotated<ChildLocation>>
 {
     fn path_pop(&mut self) -> Option<PositionAnnotated<ChildLocation>> {
         self.end.sub_path.path.pop()

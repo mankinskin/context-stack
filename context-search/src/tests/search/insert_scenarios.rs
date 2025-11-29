@@ -1140,7 +1140,9 @@ fn search_complete_token_a_bc() {
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
-        (bc, bc_ids) => [b, c],
+        bc => [b, c],
+    );
+    insert_patterns!(graph,
         (abc, abc_ids) => [a, bc]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
