@@ -1,19 +1,3 @@
-use crate::{
-    state::{
-        end::{
-            postfix::PostfixEnd,
-            prefix::PrefixEnd,
-            range::RangeEnd,
-            PathCoverage,
-        },
-        matched::{
-            CheckpointedCursor,
-            MatchResult,
-        },
-    },
-    Find,
-    Response,
-};
 /// Tests that replicate graph scenarios from context-insert tests
 /// to verify search algorithm correctness independently
 #[cfg(test)]
@@ -23,7 +7,22 @@ use {
             checkpointed::Checkpointed,
             PatternCursor,
         },
-        search::Searchable,
+        search::context::AncestorSearchTraversal,
+        state::{
+            end::{
+                postfix::PostfixEnd,
+                prefix::PrefixEnd,
+                range::RangeEnd,
+                PathCoverage,
+            },
+            matched::{
+                CheckpointedCursor,
+                MatchResult,
+            },
+        },
+        Find,
+        Response,
+        Searchable,
     },
     context_trace::trace::cache::key::directed::{
         down::{
@@ -33,12 +32,74 @@ use {
         DirectedKey,
     },
     context_trace::*,
-    pretty_assertions::{
-        assert_eq,
-        assert_matches,
-    },
+    pretty_assertions::assert_eq,
 };
 
+#[test]
+fn prefix1() {
+    let mut graph = Hypergraph::default();
+    insert_atoms!(graph, {h, e, l, d});
+    insert_patterns!(graph,
+        (ld, ld_id) => [l, d],
+        (heldld, heldld_id) => [h, e, ld, ld]
+    );
+    let _tracing = context_trace::init_test_tracing!(&graph);
+    let res = Searchable::<AncestorSearchTraversal>::search(
+        vec![h, e, l, l],
+        graph.into(),
+    );
+    assert_eq!(
+        res,
+        Ok(Response {
+            end: MatchResult {
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
+                    PatternCursor {
+                        path: RootedRangePath::new(
+                            vec![h, e, l, l],
+                            RolePath::new_empty(0),
+                            RolePath::new_empty(2),
+                        ),
+                        atom_position: 3.into(),
+                        _state: Default::default()
+                    }
+                )),
+                path: PathCoverage::Prefix(PrefixEnd {
+                    path: RootedRolePath::new(
+                        PatternLocation::new(heldld, heldld_id),
+                        RolePath::new(
+                            2,
+                            vec![ChildLocation::new(ld, ld_id, 0)]
+                        )
+                    ),
+                    target: DownKey {
+                        index: l,
+                        pos: DownPosition(1.into()),
+                    },
+                    root_pos: 1.into(),
+                    end_pos: 3.into(),
+                }),
+            },
+            cache: build_trace_cache!(
+                heldld => (
+                    BU {},
+                    TD { 2 => ld -> (heldld_id, 2) },
+                ),
+                ld => (
+                    BU {},
+                    TD { 2 => l -> (ld_id, 0) },
+                ),
+                h => (
+                    BU {},
+                    TD {},
+                ),
+                l => (
+                    BU {},
+                    TD { 2 },
+                ),
+            ),
+        })
+    );
+}
 #[test]
 fn search_pattern1_by_z() {
     let mut graph = HypergraphRef::default();
@@ -149,8 +210,8 @@ fn search_pattern1_ab_y() {
     let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
-        (ab, ab_ids) => [[a, b]],
-        (by, by_ids) => [[b, y]],
+        ab => [[a, b]],
+        by => [[b, y]],
     );
     insert_patterns!(graph,
         yz => [[y, z]],

@@ -239,7 +239,7 @@ fn index_prefix1() {
             cache: build_trace_cache!(
                 heldld => (
                     BU {},
-                    TD {2 => ld -> (heldld_id, 2) },
+                    TD { 2 => ld -> (heldld_id, 2) },
                 ),
                 ld => (
                     BU {},

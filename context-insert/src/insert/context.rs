@@ -53,7 +53,7 @@ impl<R: InsertResult> From<HypergraphRef> for InsertCtx<R> {
 impl<R: InsertResult> InsertCtx<R> {
     pub fn insert(
         &mut self,
-        searchable: impl Searchable,
+        searchable: impl Searchable<InsertTraversal>,
     ) -> Result<R, ErrorState> {
         self.insert_result(searchable)
             .and_then(|res| res.map_err(|root| root.into()))
@@ -71,9 +71,9 @@ impl<R: InsertResult> InsertCtx<R> {
     }
     fn insert_result(
         &mut self,
-        searchable: impl Searchable,
+        searchable: impl Searchable<InsertTraversal>,
     ) -> Result<Result<R, R::Error>, ErrorState> {
-        match searchable.search::<InsertTraversal>(self.graph.clone()) {
+        match searchable.search(self.graph.clone()) {
             Ok(result) => {
                 // Check if the query was exhausted and result is full token
                 if result.query_exhausted() && result.is_full_token() {
@@ -97,7 +97,7 @@ impl<R: InsertResult> InsertCtx<R> {
     }
     pub fn insert_or_get_complete(
         &mut self,
-        searchable: impl Searchable,
+        searchable: impl Searchable<InsertTraversal>,
     ) -> Result<Result<R, R::Error>, ErrorReason> {
         self.insert_result(searchable).map_err(|err| err.reason)
     }

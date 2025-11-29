@@ -38,6 +38,7 @@ one-of = "0.2"
 charify = "0.1"
 once_cell = "1.20"
 toml = "0.8"
+maplit = "1.0"
 
 [dependencies.pretty_assertions]
 features = ["unstable"]

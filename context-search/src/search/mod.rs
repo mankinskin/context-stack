@@ -81,15 +81,13 @@ pub trait Find: HasGraph {
     #[context_trace::instrument_sig(level = "info", skip(self, searchable))]
     fn find_parent(
         &self,
-        searchable: impl Searchable,
+        searchable: impl Searchable<ParentSearchTraversal<Self>>,
     ) -> SearchResult
     where
         Self: Clone,
     {
         debug!("starting parent search");
-        let result = searchable
-            .search::<ParentSearchTraversal<Self>>(self.ctx())
-            .map_err(|err| err.reason);
+        let result = searchable.search(self.ctx()).map_err(|err| err.reason);
 
         match &result {
             Ok(_response) => debug!("parent search succeeded"),
@@ -103,15 +101,13 @@ pub trait Find: HasGraph {
     #[context_trace::instrument_sig(level = "info", skip(self, searchable))]
     fn find_ancestor(
         &self,
-        searchable: impl Searchable,
+        searchable: impl Searchable<AncestorSearchTraversal<Self>>,
     ) -> SearchResult
     where
         Self: Clone,
     {
         debug!("starting ancestor search");
-        let result = searchable
-            .search::<AncestorSearchTraversal<Self>>(self.ctx())
-            .map_err(|err| err.reason);
+        let result = searchable.search(self.ctx()).map_err(|err| err.reason);
 
         match &result {
             Ok(_response) => debug!("ancestor search succeeded"),

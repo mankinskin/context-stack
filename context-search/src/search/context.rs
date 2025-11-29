@@ -14,7 +14,7 @@ impl<T: HasGraph> DirectedTraversalPolicy for AncestorPolicy<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct ParentPolicy<T: HasGraph>(std::marker::PhantomData<T>);
+pub struct ParentPolicy<T: HasGraph>(std::marker::PhantomData<T>);
 
 impl<T: HasGraph> DirectedTraversalPolicy for ParentPolicy<T> {
     type Trav = T;
@@ -30,9 +30,14 @@ impl<T: HasGraph> DirectedTraversalPolicy for ParentPolicy<T> {
 pub struct SearchCtx<T: HasGraph> {
     pub(crate) graph: T,
 }
+impl<T: HasGraph> From<T> for SearchCtx<T> {
+    fn from(value: T) -> Self {
+        Self { graph: value }
+    }
+}
 
 #[derive(Debug)]
-pub(crate) struct AncestorSearchTraversal<T: HasGraph>(
+pub struct AncestorSearchTraversal<T: HasGraph = Hypergraph>(
     std::marker::PhantomData<T>,
 );
 impl<T: HasGraph> Default for AncestorSearchTraversal<T> {
@@ -50,9 +55,7 @@ impl<T: HasGraph> SearchKind for AncestorSearchTraversal<T> {
     type EndNode = PositionAnnotated<ChildLocation>;
 }
 #[derive(Debug)]
-pub(crate) struct ParentSearchTraversal<T: HasGraph>(
-    std::marker::PhantomData<T>,
-);
+pub struct ParentSearchTraversal<T: HasGraph>(std::marker::PhantomData<T>);
 impl<T: HasGraph> Default for ParentSearchTraversal<T> {
     fn default() -> Self {
         Self(Default::default())
