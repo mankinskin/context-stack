@@ -43,27 +43,22 @@ impl TraceCache {
     pub fn add_state<E: Into<EditKind>>(
         &mut self,
         edit: E,
-        add_edges: bool,
     ) -> (DirectedKey, bool) {
         let edit = edit.into();
         let key = edit.target_key();
-        tracing::debug!(
-            "add_state: index={}, pos={:?}",
-            key.index,
-            key.pos
-        );
+        tracing::debug!("add_state: index={}, pos={:?}", key.index, key.pos);
         if let Some(ve) = self.entries.get_mut(&key.index.vertex_index()) {
             if ve.get_mut(&key.pos).is_some() {
                 (key, false)
             } else {
-                let pe = PositionCache::build_edge(self, edit, add_edges);
+                let pe = PositionCache::build_edge(self, edit);
                 let ve =
                     self.entries.get_mut(&key.index.vertex_index()).unwrap();
                 ve.insert(&key.pos, pe);
                 (key, true)
             }
         } else {
-            self.new_entry(key.clone(), edit, add_edges);
+            self.new_entry(key.clone(), edit);
             (key, true)
         }
     }
@@ -71,10 +66,9 @@ impl TraceCache {
         &mut self,
         key: DirectedKey,
         edit: EditKind,
-        add_edges: bool,
     ) {
         let mut ve = VertexCache::from(key.index);
-        let pe = PositionCache::build_edge(self, edit, add_edges);
+        let pe = PositionCache::build_edge(self, edit);
         ve.insert(&key.pos, pe);
         self.entries.insert(key.index.vertex_index(), ve);
     }

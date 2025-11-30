@@ -41,18 +41,16 @@ impl PositionCache {
     pub fn build_edge(
         cache: &mut TraceCache,
         state: EditKind,
-        add_edges: bool,
     ) -> Self {
         // create all bottom edges (created upwards or downwards)
         let mut bottom = HashMap::default();
-        match (add_edges, state) {
-            (false, _) => {},
-            (_, EditKind::Parent(edit)) => {
+        match state {
+            EditKind::Parent(edit) => {
                 // created by upwards traversal
                 bottom
                     .insert(edit.prev.into(), edit.location.to_sub_location());
             },
-            (_, EditKind::Child(edit)) => {
+            EditKind::Child(edit) => {
                 // created by downwards traversal
                 let prev = cache.force_mut(&(edit.prev.into()));
                 prev.bottom.insert(

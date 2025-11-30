@@ -82,7 +82,7 @@ fn trace_cache_add_state_creates_new_entries() {
     };
 
     // Add the state with edges
-    let (key, was_new) = cache.add_state(edit, true);
+    let (key, was_new) = cache.add_state(edit);
 
     // Should be a new entry
     assert!(was_new);
@@ -117,11 +117,11 @@ fn trace_cache_add_state_idempotent_for_existing_entries() {
     };
 
     // Add the state first time
-    let (_key1, was_new1) = cache.add_state(edit.clone(), true);
+    let (_key1, was_new1) = cache.add_state(edit.clone());
     assert!(was_new1);
 
     // Add the same state again
-    let (_key2, was_new2) = cache.add_state(edit, true);
+    let (_key2, was_new2) = cache.add_state(edit);
 
     // Should not be new the second time
     assert!(!was_new2);
@@ -160,44 +160,12 @@ fn trace_cache_add_state_with_edges_creates_bottom_edges() {
     };
 
     // Add with edges
-    let (key, was_new) = cache.add_state(edit, true);
+    let (key, was_new) = cache.add_state(edit);
     assert!(was_new);
 
     // Check that bottom edge was created
     let pos_cache = cache.get(&key).expect("position cache exists");
     assert!(pos_cache.num_bu_edges() > 0);
-}
-
-#[test]
-fn trace_cache_add_state_without_edges_creates_no_bottom_edges() {
-    let _tracing = init_test_tracing!();
-
-    let mut graph = HypergraphRef::default();
-    insert_atoms!(graph, {a, b});
-    insert_patterns!(graph,
-        (ab, ab_id) => [a, b]
-    );
-
-    let mut cache = TraceCache::new(a);
-
-    let edit = NewTraceEdge::<BottomUp> {
-        prev: UpKey {
-            index: a,
-            pos: 1.into(),
-        },
-        target: UpKey {
-            index: ab,
-            pos: 1.into(),
-        },
-        location: ChildLocation::new(ab, ab_id, 0),
-    };
-
-    // Add without edges (add_edges = false)
-    let (key, _was_new) = cache.add_state(edit, false);
-
-    // Check that no bottom edges were created
-    let pos_cache = cache.get(&key).expect("position cache exists");
-    assert_eq!(pos_cache.num_bu_edges(), 0);
 }
 
 #[test]

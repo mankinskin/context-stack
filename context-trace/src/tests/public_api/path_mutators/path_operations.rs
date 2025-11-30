@@ -38,7 +38,6 @@ fn trace_ctx_postfix_traces_path_upward() {
 
     let command = PostfixCommand {
         path: start_path,
-        add_edges: true,
         root_up_key: UpKey {
             index: ab,
             pos: 1.into(),
@@ -77,7 +76,6 @@ fn trace_ctx_prefix_traces_path_downward() {
 
     let command = PrefixCommand {
         path: end_path,
-        add_edges: true,
         end_pos: AtomPosition::from(1), // Test case - position at start
         root_pos: AtomPosition::from(0),
     };
@@ -202,7 +200,6 @@ fn trace_cache_accumulates_across_multiple_commands() {
     let path1 = IndexStartPath::new_location(loc1);
     let cmd1 = PostfixCommand {
         path: path1,
-        add_edges: true,
         root_up_key: UpKey {
             index: ab,
             pos: 0.into(),
@@ -218,7 +215,6 @@ fn trace_cache_accumulates_across_multiple_commands() {
     let path2 = IndexStartPath::new_location(loc2);
     let cmd2 = PostfixCommand {
         path: path2,
-        add_edges: true,
         root_up_key: UpKey {
             index: cd,
             pos: 0.into(),

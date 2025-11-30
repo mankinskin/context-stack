@@ -1,6 +1,5 @@
 use crate::{
     graph::vertex::{
-        token::Token,
         has_vertex_index::ToToken,
         location::child::ChildLocation,
         pattern::{
@@ -12,12 +11,13 @@ use crate::{
             postfix,
             prefix,
         },
+        token::Token,
     },
     path::accessors::border::PathBorder,
     trace::{
         BottomUp,
         TopDown,
-        TraceDirection,
+        role::TraceDirection,
     },
 };
 use std::{
@@ -139,7 +139,8 @@ impl PathRole for Start {
         pattern_width(pattern_pre_ctx(
             pattern.iter().map(Borrow::borrow),
             index,
-        )).0
+        ))
+        .0
     }
     fn inner_ctx_width<T: Borrow<Token>>(
         pattern: &'_ [T],
@@ -148,7 +149,8 @@ impl PathRole for Start {
         pattern_width(pattern_post_ctx(
             pattern.iter().map(Borrow::borrow),
             index,
-        )).0
+        ))
+        .0
     }
     fn inner_width<T: Borrow<Token>>(
         pattern: &'_ [T],

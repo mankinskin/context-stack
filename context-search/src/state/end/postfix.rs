@@ -55,7 +55,6 @@ impl From<&'_ PostfixEnd> for PostfixCommand {
             usize::from(value.root_pos)
         );
         PostfixCommand {
-            add_edges: true,
             path: value.path.clone(),
             root_up_key: UpKey::new(
                 *value.path.path_root().parent(),

@@ -1,6 +1,7 @@
 use std::{
     cmp::PartialEq,
     fmt::Debug,
+    ops::Range,
 };
 
 use child::*;
@@ -43,5 +44,22 @@ impl HasSubIndex for SubLocation {
 impl From<ChildLocation> for SubLocation {
     fn from(value: ChildLocation) -> Self {
         value.to_sub_location()
+    }
+}
+
+pub struct SubRangeLocation {
+    pub pattern_id: PatternId,
+    pub sub_range: Range<usize>,
+}
+
+impl SubRangeLocation {
+    pub fn new(
+        pattern_id: PatternId,
+        sub_range: Range<usize>,
+    ) -> Self {
+        Self {
+            pattern_id,
+            sub_range,
+        }
     }
 }

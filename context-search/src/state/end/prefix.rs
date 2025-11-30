@@ -17,7 +17,6 @@ pub struct PrefixEnd {
 impl From<&PrefixEnd> for PrefixCommand {
     fn from(value: &PrefixEnd) -> Self {
         PrefixCommand {
-            add_edges: true,
             path: value.path.clone(),
             root_pos: value.root_pos,
             end_pos: value.end_pos,

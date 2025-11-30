@@ -222,7 +222,6 @@ pub use crate::{
         },
     },
     trace::{
-        StateDirection,
         TraceCtx,
         cache::{
             TraceCache,

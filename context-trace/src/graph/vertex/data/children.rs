@@ -21,7 +21,9 @@ use crate::{
             has_vertex_index::ToToken,
             location::{
                 SubLocation,
+                SubRangeLocation,
                 child::ChildLocation,
+                pattern::PatternRangeLocation,
             },
             pattern::{
                 self,
@@ -185,6 +187,15 @@ impl VertexData {
     ) -> TokenWidth {
         pattern_width(
             &self.expect_child_pattern(&loc.pattern_id)[0..loc.sub_index],
+        )
+    }
+    /// Get child token offset at location
+    pub fn expect_child_range_offset(
+        &self,
+        loc: &SubRangeLocation,
+    ) -> TokenWidth {
+        pattern_width(
+            &self.expect_child_pattern(&loc.pattern_id)[loc.sub_range.clone()],
         )
     }
     /// Add a child pattern without updating cache

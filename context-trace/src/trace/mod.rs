@@ -2,18 +2,14 @@ pub mod cache;
 pub mod child;
 pub mod command;
 pub mod has_graph;
+pub mod role;
 pub mod state;
 pub mod traceable;
 
 use crate::{
     graph::vertex::location::child::ChildLocation,
     path::{
-        RolePathUtils,
-        accessors::{
-            child::root::GraphRootChild,
-            has_path::HasRolePath,
-            role::PathRole,
-        },
+        accessors::role::PathRole,
         mutators::move_path::key::AtomPosition,
     },
     trace::{
@@ -23,113 +19,22 @@ use crate::{
                 DirectedKey,
                 down::DownKey,
             },
-            new::NewTraceEdge,
         },
+        role::TraceDirection,
         traceable::Traceable,
     },
 };
-use cache::{
-    key::directed::{
-        HasAtomPosition,
-        down::DownPosition,
-        up::{
-            UpKey,
-            UpPosition,
-        },
+use cache::key::directed::{
+    HasAtomPosition,
+    down::DownPosition,
+    up::{
+        UpKey,
+        UpPosition,
     },
-    new::EditKind,
 };
 use command::TraceCommand;
 use has_graph::HasGraph;
 use std::fmt::Debug;
-
-#[derive(Clone, Debug, PartialEq, Eq, Copy, Hash)]
-pub enum StateDirection {
-    BottomUp,
-    TopDown,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BottomUp;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TopDown;
-// - trace
-//      - End paths: top down
-//      - Start paths: bottom up
-// - keys are relative to the start index
-pub trait TraceRolePath<Role: PathRole>:
-    RolePathUtils + HasRolePath<Role, Node = ChildLocation> + GraphRootChild<Role>
-{
-}
-impl<
-    Role: PathRole,
-    P: RolePathUtils + HasRolePath<Role, Node = ChildLocation> + GraphRootChild<Role>,
-> TraceRolePath<Role> for P
-{
-}
-
-// o ->x o ->x o ->x root x-> o x-> o
-//
-// - Start Up Key: (start, start.width())
-// - Up Segment Key: (segment, pos in segment)
-// - Root Up Key: (root, entry pos in root)
-// - Root Down Key: (root, exit pos in root)
-// - Down Segment Key: (segment, exit pos in root)
-//
-//       Root
-//
-//     /^        >\
-//   Segment    Segment
-//    /^           >\
-// Start         End
-pub trait TraceRole<Role: PathRole> {
-    fn trace_sub_path<P: TraceRolePath<Role>>(
-        &mut self,
-        path: &P,
-        prev: RoleTraceKey<Role>,
-        add_edges: bool,
-    ) -> RoleTraceKey<Role>;
-}
-pub type RoleEdit<R> = NewTraceEdge<<R as PathRole>::Direction>;
-
-impl<G: HasGraph, Role: PathRole> TraceRole<Role> for TraceCtx<G>
-where
-    EditKind: From<NewTraceEdge<<Role as PathRole>::Direction>>,
-{
-    fn trace_sub_path<P: TraceRolePath<Role>>(
-        &mut self,
-        path: &P,
-        prev_key: RoleTraceKey<Role>,
-        add_edges: bool,
-    ) -> RoleTraceKey<Role> {
-        let graph = self.trav.graph();
-
-        tracing::trace!(?prev_key, "trace_sub_path start");
-
-        let result = path.raw_child_path().iter().cloned().fold(
-            prev_key,
-            |prev, location| {
-                tracing::trace!(?prev, ?location, "fold iteration");
-                let target =
-                    Role::Direction::build_key(&graph, *prev.pos(), &location);
-                tracing::trace!(?target, "build_key result");
-                self.cache.add_state(
-                    RoleEdit::<Role> {
-                        target,
-                        prev,
-                        location,
-                    },
-                    add_edges,
-                );
-                target
-            },
-        );
-
-        tracing::trace!(?result, "trace_sub_path result");
-        result
-    }
-}
 
 #[derive(Debug)]
 pub struct TraceCtx<G: HasGraph> {
@@ -137,26 +42,6 @@ pub struct TraceCtx<G: HasGraph> {
     pub cache: TraceCache,
 }
 impl<G: HasGraph> TraceCtx<G> {
-    //fn skip_key(
-    //    &mut self,
-    //    root_entry: usize, // sub index
-    //    root_up_pos: UpPosition,
-    //    root_exit: ChildLocation,
-    //) -> RoleTraceKey<End> {
-    //    let graph = self.trav.graph();
-
-    //    let pattern = graph.expect_pattern_at(root_exit.clone());
-    //    let root_down_pos = root_up_pos.0
-    //        + pattern
-    //            .get(root_entry + 1..root_exit.sub_index)
-    //            .map(pattern_width)
-    //            .unwrap_or_default();
-
-    //    DownKey::new(
-    //        *graph.expect_child_at(root_exit.clone()),
-    //        root_down_pos.into(),
-    //    )
-    //}
     pub fn trace_command(
         &mut self,
         command: TraceCommand,
@@ -174,49 +59,11 @@ impl<T: HasAtomPosition + Debug + Clone + Into<DirectedKey> + Copy> TraceKey
 {
 }
 
-pub type RoleTraceKey<Role> =
+pub(crate) type RoleTraceKey<Role> =
     <<Role as PathRole>::Direction as TraceDirection>::Key;
-pub trait TraceDirection {
-    type Opposite: TraceDirection;
-    type Key: TraceKey;
-    fn build_key<G: HasGraph>(
-        trav: &G,
-        last_pos: AtomPosition,
-        location: &ChildLocation,
-    ) -> Self::Key;
-}
 
-impl TraceDirection for BottomUp {
-    type Opposite = TopDown;
-    type Key = UpKey;
-    fn build_key<G: HasGraph>(
-        _trav: &G,
-        last_pos: AtomPosition,
-        location: &ChildLocation,
-    ) -> Self::Key {
-        UpKey {
-            index: location.parent,
-            // Keep the same position when moving up the hierarchy
-            // The position represents where we are in the parent pattern
-            pos: UpPosition::from(last_pos),
-        }
-    }
-}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BottomUp;
 
-impl TraceDirection for TopDown {
-    type Opposite = BottomUp;
-    type Key = DownKey;
-    fn build_key<G: HasGraph>(
-        trav: &G,
-        last_pos: AtomPosition,
-        location: &ChildLocation,
-    ) -> Self::Key {
-        let graph = trav.graph();
-        let index = *graph.expect_child_at(location);
-        let delta = graph.expect_child_offset(location);
-        DownKey {
-            index,
-            pos: DownPosition::from(last_pos + delta),
-        }
-    }
-}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TopDown;

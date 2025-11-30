@@ -20,7 +20,6 @@ use crate::{
         RoleTraceKey,
         TopDown,
         TraceCtx,
-        TraceRole,
         cache::{
             key::directed::{
                 down::DownKey,
@@ -32,6 +31,7 @@ use crate::{
             new::NewTraceEdge,
         },
         has_graph::HasGraph,
+        role::TraceRole,
         traceable::Traceable,
     },
 };
@@ -57,7 +57,6 @@ impl Traceable for TraceCommand {
 #[derive(Debug)]
 pub struct PostfixCommand {
     pub path: IndexStartPath,
-    pub add_edges: bool,
     pub root_up_key: RoleTraceKey<Start>,
 }
 impl Traceable for PostfixCommand {
@@ -65,45 +64,14 @@ impl Traceable for PostfixCommand {
         self,
         ctx: &mut TraceCtx<G>,
     ) {
-        tracing::debug!(
-            "PostfixCommand::trace called with root_up_key.pos={}",
-            self.root_up_key.pos.0
-        );
         let first = self.path.role_leaf_token_location::<Start>().unwrap();
         let start_index = *ctx.trav.graph().expect_child_at(first);
-        tracing::debug!(
-            "PostfixCommand: first={:?}, start_index={}, start_index.width()={}",
-            first,
-            start_index,
-            start_index.width()
-        );
-        tracing::trace!(
-            ?first,
-            ?start_index,
-            "PostfixCommand: leaf and start_index"
-        );
         let initial_prev = UpKey {
             index: start_index,
             pos: start_index.width().0.into(),
         };
-        tracing::debug!(
-            "PostfixCommand: calling trace_sub_path with initial_prev.pos={}",
-            initial_prev.pos.0
-        );
-        let sub_path_prev = TraceRole::<Start>::trace_sub_path(
-            ctx,
-            &self.path,
-            initial_prev,
-            self.add_edges,
-        );
-        tracing::debug!(
-            "PostfixCommand: trace_sub_path returned prev.pos={}",
-            sub_path_prev.pos.0
-        );
-        tracing::trace!(
-            ?sub_path_prev,
-            "PostfixCommand: trace_sub_path returned"
-        );
+        let sub_path_prev =
+            TraceRole::<Start>::trace_sub_path(ctx, &self.path, initial_prev);
         let location = self.path.role_root_child_location::<Start>();
         // For cache consistency, use the root position (from root_up_key) for prev
         // The prev points to the child token at the parent's position
@@ -111,23 +79,17 @@ impl Traceable for PostfixCommand {
             index: sub_path_prev.index,
             pos: self.root_up_key.pos,
         };
-        tracing::debug!(
-            "Creating bottom-up edge with position={}",
-            self.root_up_key.pos.0
-        );
         let new = NewTraceEdge::<BottomUp> {
             target: self.root_up_key,
             prev,
             location,
         };
-        tracing::trace!(?new, "PostfixCommand: creating NewTraceEdge");
-        ctx.cache.add_state(new, self.add_edges);
+        ctx.cache.add_state(new);
     }
 }
 #[derive(Debug)]
 pub struct PrefixCommand {
     pub path: IndexEndPath,
-    pub add_edges: bool,
     pub root_pos: AtomPosition,
     pub end_pos: AtomPosition,
 }
@@ -137,15 +99,15 @@ impl Traceable for PrefixCommand {
         ctx: &mut TraceCtx<G>,
     ) {
         let root_exit = self.path.role_root_child_location::<End>();
+        let exit_pos = self.end_pos;
 
-        // Use root_pos for the exit_key to ensure TD cache entries are at the root position
-        // This matches the behavior of RangeCommand for consistency
         let exit_key = DownKey {
-            pos: self.root_pos.into(),
+            pos: exit_pos.into(),
             index: root_exit.parent,
         };
+        let target_index = self.path.role_rooted_leaf_token(&ctx.trav);
         let target = DownKey {
-            index: *ctx.trav.graph().expect_child_at(root_exit),
+            index: target_index,
             pos: exit_key.pos,
         };
         let new = NewTraceEdge::<TopDown> {
@@ -153,14 +115,9 @@ impl Traceable for PrefixCommand {
             prev: exit_key,
             location: root_exit,
         };
-        ctx.cache.add_state(new, self.add_edges);
+        ctx.cache.add_state(new);
 
-        TraceRole::<End>::trace_sub_path(
-            ctx,
-            &self.path,
-            target,
-            self.add_edges,
-        );
+        TraceRole::<End>::trace_sub_path(ctx, &self.path, target);
     }
 }
 
@@ -176,11 +133,6 @@ impl Traceable for RangeCommand {
         self,
         ctx: &mut TraceCtx<G>,
     ) {
-        tracing::debug!(
-            "RangeCommand::trace called with root_pos={}, end_pos={}",
-            self.root_pos.0,
-            usize::from(self.end_pos)
-        );
         let first = self.path.role_leaf_token_location::<Start>().unwrap();
         let start_index = *ctx.trav.graph().expect_child_at(first);
         let sub_path_prev = TraceRole::<Start>::trace_sub_path(
@@ -190,7 +142,6 @@ impl Traceable for RangeCommand {
                 index: start_index,
                 pos: start_index.width().0.into(),
             },
-            self.add_edges,
         );
         // For cache consistency, prev should use the parent's current position (root_pos)
         // The prev points to the child token, but at the parent's position
@@ -203,42 +154,46 @@ impl Traceable for RangeCommand {
             index: root_entry.parent,
             pos: self.root_pos,
         };
-        tracing::debug!(
-            "Creating bottom-up edge: parent={}, pos={}",
-            root_entry.parent,
-            self.root_pos.0
-        );
         let new = NewTraceEdge::<BottomUp> {
             target: root_up_key,
             prev,
             location: root_entry,
         };
-        ctx.cache.add_state(new, self.add_edges);
+        ctx.cache.add_state(new);
 
         let root_exit = self.path.role_root_child_location::<End>();
 
-        // Use root_pos for the exit_key to ensure TD cache entries are at the root position
-        // For TD cache consistency, target should also use root_pos (not end_pos)
+        // Calculate exit position for top-down tracing:
+        // exit_pos = entry_pos (root_pos) + atom_offset within the pattern
+        // The atom_offset is the sum of widths of all children before root_exit
+        let (exit_pos, target_index) = {
+            let graph = ctx.trav.graph();
+            let pattern = graph.expect_pattern_at(root_exit);
+            let atom_offset: usize = pattern
+                .iter()
+                .take(root_exit.sub_index)
+                .map(|token| token.width().0)
+                .sum();
+            let exit_pos = AtomPosition::from(self.root_pos.0 + atom_offset);
+            let target_index = *graph.expect_child_at(root_exit);
+            (exit_pos, target_index)
+        };
+
         let exit_key = DownKey {
-            pos: self.root_pos.0.into(),
+            pos: exit_pos.into(),
             index: root_exit.parent,
         };
         let target = DownKey {
-            pos: self.root_pos.0.into(),
-            index: *ctx.trav.graph().expect_child_at(root_exit),
+            pos: exit_key.pos,
+            index: target_index,
         };
         let new = NewTraceEdge::<TopDown> {
             target,
             prev: exit_key,
             location: root_exit,
         };
-        ctx.cache.add_state(new, self.add_edges);
+        ctx.cache.add_state(new);
 
-        TraceRole::<End>::trace_sub_path(
-            ctx,
-            &self.path,
-            target,
-            self.add_edges,
-        );
+        TraceRole::<End>::trace_sub_path(ctx, &self.path, target);
     }
 }
