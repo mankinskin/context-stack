@@ -3,24 +3,21 @@ use context_trace::{
         write_indent,
         CompactFormat,
     },
+    trace::cache::key::directed::down::DownPosition,
     *,
 };
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PrefixEnd {
+pub(crate) struct PrefixEnd {
     pub(crate) path: IndexEndPath,
     pub(crate) target: DownKey,
-    pub(crate) root_pos: AtomPosition,
+    pub(crate) exit_pos: DownPosition,
     pub(crate) end_pos: AtomPosition,
 }
 impl From<&PrefixEnd> for PrefixCommand {
     fn from(value: &PrefixEnd) -> Self {
-        PrefixCommand {
-            path: value.path.clone(),
-            root_pos: value.root_pos,
-            end_pos: value.end_pos,
-        }
+        PrefixCommand::new(value.path.clone(), value.exit_pos)
     }
 }
 impl Traceable for &PrefixEnd {
@@ -39,8 +36,8 @@ impl CompactFormat for PrefixEnd {
     ) -> fmt::Result {
         write!(
             f,
-            "PrefixEnd(root_pos:{}, end_pos:{})",
-            usize::from(self.root_pos),
+            "PrefixEnd(exit_pos:{}, end_pos:{})",
+            usize::from(self.exit_pos.0),
             usize::from(self.end_pos)
         )
     }
@@ -53,7 +50,7 @@ impl CompactFormat for PrefixEnd {
         write_indent(f, indent)?;
         writeln!(f, "PrefixEnd {{")?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "root_pos: {},", usize::from(self.root_pos))?;
+        writeln!(f, "root_pos: {},", usize::from(self.exit_pos.0))?;
         write_indent(f, indent + 1)?;
         writeln!(f, "end_pos: {},", usize::from(self.end_pos))?;
         write_indent(f, indent + 1)?;

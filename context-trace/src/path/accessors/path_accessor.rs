@@ -129,19 +129,19 @@ macro_rules! impl_state_position {
     ) => {
         impl $crate::path::accessors::path_accessor::StatePosition for $ty {
             fn prev_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
-                &self.$prev_field
+                &self.$prev_field.0
             }
 
             fn root_pos(&self) -> &$crate::path::mutators::move_path::key::AtomPosition {
-                &self.$root_field
+                &self.$root_field.0
             }
 
             fn prev_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
-                &mut self.$prev_field
+                &mut self.$prev_field.0
             }
 
             fn root_pos_mut(&mut self) -> &mut $crate::path::mutators::move_path::key::AtomPosition {
-                &mut self.$root_field
+                &mut self.$root_field.0
             }
         }
     };

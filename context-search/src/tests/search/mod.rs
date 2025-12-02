@@ -161,7 +161,8 @@ fn find_pattern1() {
         aby_found.end,
         MatchResult {
             path: PathCoverage::Range(RangeEnd {
-                root_pos: 2.into(),
+                entry_pos: 2.into(),
+                exit_pos: 2.into(),
                 target: DownKey::new(y, 2.into()),
                 end_pos: 3.into(),
                 path: RootedRangePath::new(

@@ -17,7 +17,7 @@ use crate::{
     trace::{
         BottomUp,
         TopDown,
-        role::TraceDirection,
+        traceable::role::TraceDirection,
     },
 };
 use std::{

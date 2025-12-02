@@ -3,6 +3,10 @@ use context_trace::{
         accessors::has_path::HasRolePath,
         RolePathUtils,
     },
+    trace::cache::key::directed::{
+        down::DownPosition,
+        up::UpPosition,
+    },
     RootedPath,
     *,
 };
@@ -61,9 +65,9 @@ impl RootKey for PathCoverage {
         UpKey::new(
             self.root_parent(),
             match self {
-                PathCoverage::Range(s) => s.root_pos.into(),
-                PathCoverage::Postfix(p) => p.root_pos.into(),
-                PathCoverage::Prefix(p) => p.root_pos.into(),
+                PathCoverage::Range(s) => s.entry_pos.into(),
+                PathCoverage::Postfix(p) => p.entry_pos.into(),
+                PathCoverage::Prefix(_) => 0.into(),
                 PathCoverage::EntireRoot(_) => 0.into(),
             },
         )
@@ -75,7 +79,8 @@ impl PathCoverage {
             ChildLocation,
             PositionAnnotated<ChildLocation>,
         >,
-        root_pos: AtomPosition,
+        root_pos: UpPosition,
+        exit_pos: DownPosition,
         target: DownKey,
         end_pos: AtomPosition,
         trav: &G,
@@ -118,26 +123,30 @@ impl PathCoverage {
                 PathCoverage::Prefix(PrefixEnd {
                     path: path.into(),
                     target,
-                    root_pos,
+                    exit_pos,
                     end_pos,
                 }),
             (false, _, true, true) | (true, false, true, true) => {
                 let path: IndexStartPath = path.into();
                 tracing::trace!(
-                    "Creating PostfixEnd with root_pos={}",
-                    usize::from(root_pos)
+                    "Creating PostfixEnd with exit_pos={}",
+                    usize::from(exit_pos.0)
                 );
-                PathCoverage::Postfix(PostfixEnd { path, root_pos })
+                PathCoverage::Postfix(PostfixEnd {
+                    path,
+                    entry_pos: root_pos,
+                })
             },
             _ => {
                 tracing::trace!(
                     "Creating RangeEnd: root_pos={}, end_pos={}",
-                    usize::from(root_pos),
+                    usize::from(root_pos.0),
                     usize::from(end_pos)
                 );
                 PathCoverage::Range(RangeEnd {
                     path,
-                    root_pos,
+                    exit_pos,
+                    entry_pos: root_pos,
                     target,
                     end_pos,
                 })
@@ -147,7 +156,7 @@ impl PathCoverage {
     #[allow(dead_code)]
     pub(crate) fn from_start_path<G: HasGraph>(
         mut path: IndexStartPath,
-        root_pos: AtomPosition,
+        root_pos: UpPosition,
         trav: &G,
     ) -> Self {
         path.role_path_mut().simplify(trav);
@@ -156,7 +165,10 @@ impl PathCoverage {
             path.raw_child_path().is_empty(),
         ) {
             (true, true) => PathCoverage::EntireRoot(path.into()),
-            _ => PathCoverage::Postfix(PostfixEnd { path, root_pos }),
+            _ => PathCoverage::Postfix(PostfixEnd {
+                path,
+                entry_pos: root_pos,
+            }),
         }
     }
 

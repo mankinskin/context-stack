@@ -2,12 +2,14 @@ use crate::{
     AtomPosition,
     ChildLocation,
     DownKey,
+    End,
     GraphRootChild,
     HasAtomPosition,
     HasGraph,
     HasRolePath,
     PathRole,
     RolePathUtils,
+    Start,
     TraceCtx,
     UpKey,
     trace::{
@@ -28,7 +30,7 @@ use crate::{
     },
 };
 
-pub trait TraceRolePath<Role: PathRole>:
+pub trait RoleTraceablePath<Role: PathRole>:
     RolePathUtils + HasRolePath<Role, Node = ChildLocation> + GraphRootChild<Role>
 {
 }
@@ -37,36 +39,60 @@ impl<
     P: RolePathUtils
         + HasRolePath<Role, Node = ChildLocation>
         + GraphRootChild<Role>,
-> TraceRolePath<Role> for P
+> RoleTraceablePath<Role> for P
 {
-}
-
-pub trait TraceRole<Role: PathRole> {
-    fn trace_sub_path<P: TraceRolePath<Role>>(
-        &mut self,
-        path: &P,
-        prev: RoleTraceKey<Role>,
-    ) -> RoleTraceKey<Role>;
 }
 pub type RoleEdit<R> = NewTraceEdge<<R as PathRole>::Direction>;
 
-impl<G: HasGraph, Role: PathRole> TraceRole<Role> for TraceCtx<G>
+pub trait TracePathUtils {
+    fn trace_start_sub_path<G: HasGraph>(
+        &self,
+        ctx: &mut TraceCtx<G>,
+        prev: RoleTraceKey<Start>,
+    ) -> RoleTraceKey<Start>
+    where
+        Self: TraceRoleSubPath<Start>,
+    {
+        self.trace_role_sub_path(ctx, prev)
+    }
+
+    fn trace_end_sub_path<G: HasGraph>(
+        &self,
+        ctx: &mut TraceCtx<G>,
+        prev: RoleTraceKey<End>,
+    ) -> RoleTraceKey<End>
+    where
+        Self: TraceRoleSubPath<End>,
+    {
+        self.trace_role_sub_path(ctx, prev)
+    }
+}
+impl<T: TraceRoleSubPath<Start> + TraceRoleSubPath<End>> TracePathUtils for T {}
+pub trait TraceRoleSubPath<Role: PathRole>: RoleTraceablePath<Role> {
+    fn trace_role_sub_path<G: HasGraph>(
+        &self,
+        ctx: &mut TraceCtx<G>,
+        prev: RoleTraceKey<Role>,
+    ) -> RoleTraceKey<Role>;
+}
+
+impl<Role: PathRole, P: RoleTraceablePath<Role>> TraceRoleSubPath<Role> for P
 where
     EditKind: From<NewTraceEdge<<Role as PathRole>::Direction>>,
 {
-    fn trace_sub_path<P: TraceRolePath<Role>>(
-        &mut self,
-        path: &P,
+    fn trace_role_sub_path<G: HasGraph>(
+        &self,
+        ctx: &mut TraceCtx<G>,
         prev_key: RoleTraceKey<Role>,
     ) -> RoleTraceKey<Role> {
-        let graph = self.trav.graph();
+        let graph = ctx.trav.graph();
 
-        path.raw_child_path()
+        self.raw_child_path()
             .iter()
             .fold(prev_key, |prev, location| {
                 let target =
                     Role::Direction::build_key(&graph, *prev.pos(), location);
-                self.cache
+                ctx.cache
                     .add_state(RoleEdit::<Role>::new(target, prev, *location));
                 target
             })
@@ -74,7 +100,6 @@ where
 }
 
 pub trait TraceDirection {
-    type Opposite: TraceDirection;
     type Key: TraceKey;
     fn build_key<G: HasGraph>(
         trav: &G,
@@ -84,7 +109,6 @@ pub trait TraceDirection {
 }
 
 impl TraceDirection for BottomUp {
-    type Opposite = TopDown;
     type Key = UpKey;
     fn build_key<G: HasGraph>(
         _trav: &G,
@@ -99,7 +123,6 @@ impl TraceDirection for BottomUp {
 }
 
 impl TraceDirection for TopDown {
-    type Opposite = BottomUp;
     type Key = DownKey;
     fn build_key<G: HasGraph>(
         trav: &G,

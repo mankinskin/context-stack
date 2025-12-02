@@ -40,9 +40,15 @@ use crate::{
         },
     },
     trace::{
-        cache::key::props::{
-            LeafKey,
-            RootKey,
+        cache::key::{
+            directed::{
+                down::DownPosition,
+                up::UpPosition,
+            },
+            props::{
+                LeafKey,
+                RootKey,
+            },
         },
         has_graph::HasGraph,
         state::{
@@ -82,7 +88,8 @@ pub struct RootChildState<EndNode: PathNode = ChildLocation> {
 /// The `start_pos` represents the position to use for tracing the start path (for bottom-up edges).
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
 pub struct ChildState<EndNode: PathNode = ChildLocation> {
-    pub entry_pos: AtomPosition,
+    pub entry_pos: UpPosition,
+    pub exit_pos: DownPosition,
     pub start_pos: AtomPosition,
     #[deref]
     #[deref_mut]
@@ -244,27 +251,27 @@ impl<EndNode: PathNode> TargetKey for ChildState<EndNode> {
 // HasTargetPos impl removed - use StatePosition instead
 
 // StatePosition implementation using macro
-crate::impl_state_position! {
-    for ChildState<EndNode> where [EndNode: PathNode] => {
-        prev_pos: start_pos,
-        root_pos: entry_pos,
-    }
-}
+//crate::impl_state_position! {
+//    for ChildState<EndNode> where [EndNode: PathNode] => {
+//        prev_pos: start_pos,
+//        root_pos: entry_pos,
+//    }
+//}
 
 // HasTargetPos implementation
 // For ChildState, the target offset is the entry_pos - the offset position
 // where we entered the root token being examined (position before the token).
-impl<EndNode: PathNode> crate::path::accessors::path_accessor::HasTargetOffset
-    for ChildState<EndNode>
-{
-    fn target_offset(&self) -> &crate::AtomPosition {
-        &self.entry_pos
-    }
-
-    fn target_offset_mut(&mut self) -> &mut crate::AtomPosition {
-        &mut self.entry_pos
-    }
-}
+//impl<EndNode: PathNode> crate::path::accessors::path_accessor::HasTargetOffset
+//    for ChildState<EndNode>
+//{
+//    fn target_offset(&self) -> &crate::AtomPosition {
+//        &self.entry_pos.0
+//    }
+//
+//    fn target_offset_mut(&mut self) -> &mut crate::AtomPosition {
+//        &mut self.entry_pos.0
+//    }
+//}
 
 impl LeafKey for ChildState<ChildLocation> {
     fn leaf_location(&self) -> ChildLocation {

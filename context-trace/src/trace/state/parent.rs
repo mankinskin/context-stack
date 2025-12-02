@@ -29,7 +29,10 @@ use crate::{
         cache::key::{
             directed::{
                 DirectedKey,
-                up::UpKey,
+                up::{
+                    UpKey,
+                    UpPosition,
+                },
             },
             props::{
                 RootKey,
@@ -69,8 +72,8 @@ pub struct ParentBatch {
 /// Tracks positions for path raising and traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParentState {
-    pub prev_pos: AtomPosition,
-    pub root_pos: AtomPosition,
+    pub prev_pos: UpPosition,
+    pub root_pos: UpPosition,
     pub path: IndexStartPath,
 }
 
@@ -101,7 +104,8 @@ impl StateAdvance for ParentState {
             Ok(RootChildState {
                 child_state: ChildState {
                     entry_pos: root_pos,
-                    start_pos: prev_pos, // Use prev_pos for start path tracing
+                    exit_pos: root_pos.0.into(),
+                    start_pos: prev_pos.0, // Use prev_pos for start path tracing
                     path: path.into_range(next_i),
                 },
                 root_parent,
@@ -130,6 +134,7 @@ impl PathRaise for ParentState {
 
         self.prev_pos = self.root_pos;
         self.root_pos
+            .0
             .advance_key(pattern_width(&prev_pattern[path.root_entry + 1..]).0);
 
         let prev = self.path.root.location.to_child_location(path.root_entry);

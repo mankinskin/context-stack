@@ -24,6 +24,16 @@ impl UpPosition {
     }
 }
 
+impl From<UpPosition> for usize {
+    fn from(val: UpPosition) -> Self {
+        usize::from(val.0)
+    }
+}
+impl From<UpPosition> for AtomPosition {
+    fn from(val: UpPosition) -> Self {
+        val.0
+    }
+}
 impl From<usize> for UpPosition {
     fn from(value: usize) -> Self {
         Self(value.into())

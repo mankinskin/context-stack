@@ -105,15 +105,15 @@ where
         };
 
         let query_pos: usize = self.query.current().atom_position.into();
-        let index_pos: usize =
-            (*self.child.current().child_state.target_offset()).into();
+        //let index_pos: usize =
+        // (*self.child.current().child_state.target_offset()).into();
         let checkpoint_pos: usize =
             self.query.checkpoint().atom_position.into();
 
         write!(
             f,
-            "Compare(mode:{}, query@{}, index@{}, checkpoint@{})",
-            mode_str, query_pos, index_pos, checkpoint_pos
+            "Compare(mode:{}, query@{}, checkpoint@{})",
+            mode_str, query_pos, checkpoint_pos
         )
     }
 

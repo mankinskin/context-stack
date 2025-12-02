@@ -5,6 +5,7 @@ use context_trace::{
         CompactFormat,
     },
     path::accessors::has_path::IntoRolePath,
+    trace::cache::key::directed::up::UpPosition,
     *,
 };
 use derive_more::derive::{
@@ -17,7 +18,7 @@ pub struct PostfixEnd {
     #[deref]
     #[deref_mut]
     pub(crate) path: IndexStartPath,
-    pub(crate) root_pos: AtomPosition,
+    pub(crate) entry_pos: UpPosition,
 }
 // HasRootPos implementation removed - use StatePosition instead if needed
 impl RootedPath for PostfixEnd {
@@ -51,16 +52,14 @@ impl Traceable for &'_ PostfixEnd {
 impl From<&'_ PostfixEnd> for PostfixCommand {
     fn from(value: &'_ PostfixEnd) -> Self {
         tracing::trace!(
-            "Creating PostfixCommand from PostfixEnd: root_pos={}",
-            usize::from(value.root_pos)
+            "Creating PostfixCommand from PostfixEnd: entry_pos={}",
+            usize::from(value.entry_pos.0)
         );
-        PostfixCommand {
-            path: value.path.clone(),
-            root_up_key: UpKey::new(
-                *value.path.path_root().parent(),
-                value.root_pos.into(),
-            ),
-        }
+        PostfixCommand::new(
+            value.path.clone(),
+            value.path.role_root_child_location::<Start>(),
+            value.entry_pos,
+        )
     }
 }
 
@@ -69,7 +68,7 @@ impl CompactFormat for PostfixEnd {
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
-        write!(f, "PostfixEnd(root_pos:{})", usize::from(self.root_pos))
+        write!(f, "PostfixEnd(root_pos:{})", usize::from(self.entry_pos.0))
     }
 
     fn fmt_indented(
@@ -80,7 +79,7 @@ impl CompactFormat for PostfixEnd {
         write_indent(f, indent)?;
         writeln!(f, "PostfixEnd {{")?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "root_pos: {},", usize::from(self.root_pos))?;
+        writeln!(f, "entry_pos: {},", usize::from(self.entry_pos.0))?;
         write_indent(f, indent + 1)?;
         writeln!(f, "path: {:?}", &self.path)?;
         write_indent(f, indent)?;

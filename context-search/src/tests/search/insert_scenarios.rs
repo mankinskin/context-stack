@@ -75,7 +75,7 @@ fn prefix1() {
                         index: l,
                         pos: DownPosition(1.into()),
                     },
-                    root_pos: 1.into(),
+                    exit_pos: 1.into(),
                     end_pos: 3.into(),
                 }),
             },
@@ -132,7 +132,7 @@ fn search_pattern1_by_z() {
         Response {
             end: MatchResult {
                 path: PathCoverage::Postfix(PostfixEnd {
-                    root_pos: 2.into(),
+                    entry_pos: 2.into(),
                     path: RootedRolePath::new(
                         PatternLocation::new(xabyz, xaby_z_id),
                         RolePath::new(
@@ -291,7 +291,7 @@ fn search_pattern1_ab_y() {
                             vec![ChildLocation::new(xab, xab_pat_id, 1)],
                         ),
                     ),
-                    root_pos: 2.into(),
+                    entry_pos: 2.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
                     PatternCursor {
@@ -440,7 +440,8 @@ fn search_pattern2_a_b_y() {
                         index: y,
                         pos: DownPosition(2.into()),
                     },
-                    root_pos: 2.into(),
+                    entry_pos: 2.into(),
+                    exit_pos: 2.into(),
                     end_pos: 3.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
@@ -520,7 +521,7 @@ fn search_pattern2_a_b() {
                         PatternLocation::new(xab, xab_pat_id),
                         RolePath::new_empty(1),
                     ),
-                    root_pos: 1.into(),
+                    entry_pos: 1.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
                     PatternCursor {
@@ -638,7 +639,8 @@ fn search_infix1_a_b_y() {
                         index: y,
                         pos: DownPosition(1.into()),
                     },
-                    root_pos: 1.into(),
+                    entry_pos: 1.into(),
+                    exit_pos: 1.into(),
                     end_pos: 3.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
@@ -741,7 +743,8 @@ fn search_infix1_a_b() {
                         index: b,
                         pos: DownPosition(1.into()),
                     },
-                    root_pos: 1.into(),
+                    entry_pos: 1.into(),
+                    exit_pos: 1.into(),
                     end_pos: 2.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
@@ -844,7 +847,7 @@ fn search_infix2_a_b_c_d() {
                         index: d,
                         pos: DownPosition(1.into()),
                     },
-                    root_pos: 1.into(),
+                    exit_pos: 1.into(),
                     end_pos: 4.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
@@ -940,7 +943,7 @@ fn search_postfix1_b_c_d_d() {
                             vec![ChildLocation::new(ab, ab_pat_id, 1)],
                         ),
                     ),
-                    root_pos: 1.into(),
+                    entry_pos: 1.into(),
                 }),
                 cursor: CheckpointedCursor::HasCandidate(Checkpointed {
                     checkpoint: PatternCursor {

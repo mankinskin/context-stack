@@ -257,11 +257,6 @@ pub use crate::{
                 RootChildState,
             },
         },
-        command::{
-            PostfixCommand,
-            PrefixCommand,
-            RangeCommand,
-        },
         has_graph::{
             HasGraph,
             HasGraphMut,
@@ -276,7 +271,12 @@ pub use crate::{
                 ParentState,
             },
         },
-        traceable::Traceable,
+        traceable::{
+            PostfixCommand,
+            PrefixCommand,
+            RangeCommand,
+            Traceable,
+        },
     },
 };
 

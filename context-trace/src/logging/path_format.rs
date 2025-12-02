@@ -203,8 +203,13 @@ where
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
-        let entry_pos: usize = self.entry_pos.into();
-        write!(f, "ChildState(entry:{}, path:...)", entry_pos)
+        let entry_pos: usize = self.entry_pos.0.into();
+        let exit_pos: usize = self.exit_pos.0.into();
+        write!(
+            f,
+            "ChildState(entry_pos:{}, exit_pos:{}, path:...)",
+            entry_pos, exit_pos,
+        )
     }
 
     fn fmt_indented(
@@ -214,7 +219,9 @@ where
     ) -> fmt::Result {
         writeln!(f, "ChildState {{")?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "entry_pos: {},", usize::from(self.entry_pos))?;
+        writeln!(f, "entry_pos: {},", usize::from(self.entry_pos.0))?;
+        write_indent(f, indent + 1)?;
+        writeln!(f, "exit_pos: {},", usize::from(self.exit_pos.0))?;
         write_indent(f, indent + 1)?;
         write!(f, "path: ")?;
         self.path.fmt_indented(f, indent + 1)?;
@@ -263,8 +270,8 @@ impl CompactFormat for ParentState {
         &self,
         f: &mut fmt::Formatter,
     ) -> fmt::Result {
-        let prev_pos: usize = self.prev_pos.into();
-        let root_pos: usize = self.root_pos.into();
+        let prev_pos: usize = self.prev_pos.0.into();
+        let root_pos: usize = self.root_pos.0.into();
         write!(f, "ParentState(prev:{}, root:{})", prev_pos, root_pos)
     }
 
@@ -276,9 +283,9 @@ impl CompactFormat for ParentState {
         write_indent(f, indent)?;
         writeln!(f, "ParentState {{")?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "prev_pos: {},", usize::from(self.prev_pos))?;
+        writeln!(f, "prev_pos: {},", usize::from(self.prev_pos.0))?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "root_pos: {},", usize::from(self.root_pos))?;
+        writeln!(f, "root_pos: {},", usize::from(self.root_pos.0))?;
         write_indent(f, indent + 1)?;
         writeln!(f, "path:")?;
         self.path.fmt_indented(f, indent + 2)?;

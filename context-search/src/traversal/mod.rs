@@ -46,7 +46,7 @@ impl Traceable for TraceStart<'_> {
             PathCoverage::Postfix(p) => Some(p),
             PathCoverage::Range(p) => Some(PostfixEnd {
                 path: p.path.into_rooted_role_path(),
-                root_pos: p.root_pos,
+                entry_pos: p.entry_pos,
             }),
             _ => None,
         } {

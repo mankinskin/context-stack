@@ -324,14 +324,15 @@ where
 
         // Use entry_pos from checkpoint_child
         let _start_pos = result_child.child_state.start_pos;
-        let root_pos = result_child.child_state.entry_pos;
+        let entry_pos = result_child.child_state.entry_pos;
+        let exit_pos = result_child.child_state.exit_pos;
         // Use checkpoint position for end_pos (confirmed match boundary, not exploratory candidate)
         let end_pos = state.query.checkpoint().atom_position;
 
-        let target = DownKey::new(target_token, root_pos.into());
+        let target = DownKey::new(target_token, exit_pos);
 
         let path_enum = PathCoverage::from_range_path(
-            path, root_pos, target, end_pos, trav,
+            path, entry_pos, exit_pos, target, end_pos, trav,
         );
 
         // Clone and simplify the checkpoint and candidate cursors

@@ -234,7 +234,7 @@ fn find_ancestor2() {
         Response {
             end: MatchResult {
                 path: PathCoverage::Postfix(PostfixEnd {
-                    root_pos: 2.into(),
+                    entry_pos: 2.into(),
                     path: RootedRolePath::new(
                         PatternLocation::new(xabyz, xaby_z_id,),
                         RolePath::new(
@@ -399,7 +399,7 @@ fn find_ancestor3() {
             },
             end: MatchResult {
                 path: PathCoverage::Postfix(PostfixEnd {
-                    root_pos: 2.into(),
+                    entry_pos: 2.into(),
                     path: RootedRolePath::new(
                         PatternLocation::new(xaby, xab_y_id),
                         RolePath::new(

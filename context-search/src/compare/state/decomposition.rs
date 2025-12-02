@@ -109,8 +109,8 @@ impl PrefixStates for ChildState<PositionAnnotated<ChildLocation>> {
             self.path.role_root_child_token::<End, _>(trav)
         };
 
-        // Use entry_pos as the position for appended nodes
-        let position = self.entry_pos;
+        // Use exit_pos as the position for appended nodes
+        let position = self.exit_pos.0;
 
         decompose_token_to_prefixes(leaf, trav, |_sub, child_location| {
             let mut next = self.clone();
@@ -327,7 +327,6 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                                 child: Checkpointed {
                                     checkpoint: self.child.checkpoint().clone(),
                                     candidate: ChildCursor {
-
                                         child_state,
                                         _state: PhantomData,
                                     },

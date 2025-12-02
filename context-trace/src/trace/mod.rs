@@ -1,8 +1,6 @@
 pub mod cache;
 pub mod child;
-pub mod command;
 pub mod has_graph;
-pub mod role;
 pub mod state;
 pub mod traceable;
 
@@ -20,8 +18,11 @@ use crate::{
                 down::DownKey,
             },
         },
-        role::TraceDirection,
-        traceable::Traceable,
+        traceable::{
+            TraceCommand,
+            Traceable,
+            role::TraceDirection,
+        },
     },
 };
 use cache::key::directed::{
@@ -32,7 +33,6 @@ use cache::key::directed::{
         UpPosition,
     },
 };
-use command::TraceCommand;
 use has_graph::HasGraph;
 use std::fmt::Debug;
 

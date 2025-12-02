@@ -46,7 +46,11 @@ impl ComplementBuilder {
     ) -> TraceCache {
         use context_trace::{
             path::mutators::move_path::retract::Retract,
-            trace::{command::PrefixCommand, traceable::Traceable, TraceCtx},
+            trace::{
+                command::PrefixCommand,
+                traceable::Traceable,
+                TraceCtx,
+            },
         };
 
         // Initialize cache with the root
@@ -67,7 +71,6 @@ impl ComplementBuilder {
 
         PrefixCommand {
             path: complement_path,
-            add_edges: true,
         }
         .trace(&mut trace_ctx);
         trace_ctx.cache

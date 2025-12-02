@@ -190,7 +190,7 @@ where
                     .root_parent();
                 trace!(
                     root = %root,
-                    child_pos = ?both_advanced.state.child.current().child_state.target_offset(),
+                    //child_pos = ?both_advanced.state.child.current().child_state.target_offset(),
                     "  → advance_both_cursors_internal: Step 2 complete - child advanced successfully, got <Candidate, Candidate>"
                 );
                 Ok(both_advanced)
@@ -257,8 +257,10 @@ where
                 );
                 // Query ended - create complete match state
                 // Use entry_pos (where we entered the root) for root_pos
-                let root_pos =
+                let entry_pos =
                     matched_state.child.current().child_state.entry_pos;
+                let exit_pos =
+                    matched_state.child.current().child_state.exit_pos;
                 let path =
                     matched_state.child.current().child_state.path.clone();
                 let _start_pos =
@@ -269,8 +271,8 @@ where
                 // end_pos is where matching ended (checkpoint position)
                 let end_pos = matched_state.query.checkpoint().atom_position;
                 tracing::trace!(
-                    "root_cursor advance_query: root_parent={}, root_pos={}, checkpoint.atom_position={}, last_token_width={}, end_pos={}",
-                    root_parent, usize::from(root_pos), *matched_state.query.checkpoint().atom_position,
+                    "root_cursor advance_query: root_parent={}, entry_pos={}, exit_pos={}, checkpoint.atom_position={}, last_token_width={}, end_pos={}",
+                    root_parent, usize::from(entry_pos.0), usize::from(exit_pos.0), *matched_state.query.checkpoint().atom_position,
                     last_token_width_value, usize::from(end_pos)
                 );
 
@@ -290,7 +292,7 @@ where
                     "advance_query: returning checkpoint cursor for exhausted query"
                 );
 
-                let target = DownKey::new(target_index, root_pos.into());
+                let target = DownKey::new(target_index, exit_pos);
 
                 // Wrap cursor in Checkpointed (at checkpoint, no candidate)
                 use crate::cursor::{
@@ -303,7 +305,7 @@ where
                 Err(MatchResult {
                     cursor: CheckpointedCursor::AtCheckpoint(cursor_state),
                     path: PathCoverage::from_range_path(
-                        path, root_pos, target, end_pos, &trav,
+                        path, entry_pos, exit_pos, target, end_pos, &trav,
                     ),
                 })
             },
@@ -371,7 +373,8 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         let mut path = checkpoint_child.child_state.path.clone();
         let _start_pos = checkpoint_child.child_state.start_pos;
         // root_pos is where we entered the root (beginning of the match)
-        let root_pos = checkpoint_child.child_state.entry_pos;
+        let entry_pos = checkpoint_child.child_state.entry_pos;
+        let exit_pos = checkpoint_child.child_state.exit_pos;
 
         // Simplify path to remove redundant segments
         path.child_path_mut::<Start, _>().simplify(&self.trav);
@@ -385,13 +388,13 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
             Checkpointed,
             HasCandidate,
         };
-        
+
         let candidate_converted = PathCursor {
             path: self.state.query.candidate().path.clone(),
             atom_position: self.state.query.candidate().atom_position,
             _state: std::marker::PhantomData::<Matched>,
         };
-        
+
         let cursor_state = Checkpointed::<_, HasCandidate>::with_candidate(
             self.state.query.checkpoint().clone(),
             candidate_converted,
@@ -399,9 +402,9 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
 
         let end_pos = checkpoint.atom_position;
 
-        let target = DownKey::new(target_index, root_pos.into());
+        let target = DownKey::new(target_index, exit_pos);
         let path_enum = PathCoverage::from_range_path(
-            path, root_pos, target, end_pos, &self.trav,
+            path, entry_pos, exit_pos, target, end_pos, &self.trav,
         );
 
         MatchResult {

@@ -288,7 +288,7 @@ fn example_incomplete_postfix() {
     );
     match &response.end.path() {
         PathCoverage::Postfix(postfix) => {
-            assert_eq!(postfix.root_pos, 1.into());
+            assert_eq!(postfix.entry_pos, 1.into());
             assert_eq!(postfix.path.root_pattern_location().parent, abc);
         },
         _ => panic!("Expected Postfix"),

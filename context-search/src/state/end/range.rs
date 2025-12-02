@@ -3,6 +3,10 @@ use context_trace::{
         write_indent,
         CompactFormat,
     },
+    trace::cache::key::directed::{
+        down::DownPosition,
+        up::UpPosition,
+    },
     *,
 };
 use std::fmt;
@@ -11,7 +15,8 @@ use std::fmt;
 pub struct RangeEnd {
     pub(crate) path: IndexRangePath,
     pub(crate) target: DownKey,
-    pub(crate) root_pos: AtomPosition,
+    pub(crate) entry_pos: UpPosition,
+    pub(crate) exit_pos: DownPosition,
     pub(crate) end_pos: AtomPosition,
 }
 impl LeafKey for RangeEnd {
@@ -32,16 +37,12 @@ impl Traceable for &RangeEnd {
 impl From<&RangeEnd> for RangeCommand {
     fn from(value: &RangeEnd) -> Self {
         tracing::trace!(
-            "Creating RangeCommand from RangeEnd: root_pos={}, end_pos={}",
-            usize::from(value.root_pos),
+            "Creating RangeCommand from RangeEnd: entry_pos={}, exit_pos={}, end_pos={}",
+            usize::from(value.entry_pos.0),
+            usize::from(value.exit_pos.0),
             usize::from(value.end_pos)
         );
-        RangeCommand {
-            add_edges: true,
-            path: value.path.clone(),
-            root_pos: value.root_pos.into(),
-            end_pos: value.end_pos,
-        }
+        RangeCommand::new(value.path.clone(), value.entry_pos, value.exit_pos)
     }
 }
 
@@ -52,8 +53,9 @@ impl CompactFormat for RangeEnd {
     ) -> fmt::Result {
         write!(
             f,
-            "RangeEnd(root_pos:{}, end_pos:{})",
-            usize::from(self.root_pos),
+            "RangeEnd(entry_pos:{}, exit_pos:{}, end_pos:{})",
+            usize::from(self.entry_pos.0),
+            usize::from(self.exit_pos.0),
             usize::from(self.end_pos)
         )
     }
@@ -66,7 +68,9 @@ impl CompactFormat for RangeEnd {
         write_indent(f, indent)?;
         writeln!(f, "RangeEnd {{")?;
         write_indent(f, indent + 1)?;
-        writeln!(f, "root_pos: {},", usize::from(self.root_pos))?;
+        writeln!(f, "entry_pos: {},", usize::from(self.entry_pos.0))?;
+        write_indent(f, indent + 1)?;
+        writeln!(f, "exit_pos: {},", usize::from(self.exit_pos.0))?;
         write_indent(f, indent + 1)?;
         writeln!(f, "end_pos: {},", usize::from(self.end_pos))?;
         write_indent(f, indent + 1)?;

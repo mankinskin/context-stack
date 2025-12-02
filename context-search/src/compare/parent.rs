@@ -69,9 +69,10 @@ impl StateAdvance for ParentCompareState {
 
                 // Convert to position-annotated path for both working cursor and checkpoint
                 let annotated_path = simplified_path
-                    .with_positions(next.child_state.entry_pos, trav);
+                    .with_positions(next.child_state.exit_pos.0, trav);
                 let child_state = ChildState {
                     entry_pos: next.child_state.entry_pos,
+                    exit_pos: next.child_state.exit_pos,
                     start_pos: next.child_state.start_pos,
                     path: annotated_path.clone(),
                 };
