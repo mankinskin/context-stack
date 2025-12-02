@@ -95,10 +95,14 @@ impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
             Continue(_) => {
                 trace!("query cursor advance succeeded");
                 // Convert candidate from Matched to Candidate state
-                let advanced_candidate = CursorStateMachine::to_candidate(self.query.candidate());
-                
+                let advanced_candidate =
+                    CursorStateMachine::to_candidate(self.query.candidate());
+
                 QueryAdvanceResult::Advanced(CompareState {
-                    query: Checkpointed::with_candidate(self.query.checkpoint, advanced_candidate),
+                    query: Checkpointed::with_candidate(
+                        self.query.checkpoint,
+                        advanced_candidate,
+                    ),
                     child: self.child,
                     target: self.target,
                     mode: self.mode,
@@ -122,13 +126,20 @@ impl CompareState<Candidate, Matched, PositionAnnotated<ChildLocation>> {
         match child_state_clone.advance_state(trav) {
             Ok(child_state) => {
                 // Successfully advanced - convert to Candidate state
-                let advanced_child = CursorStateMachine::to_candidate(&ChildCursor::<Matched, _> {
-                    child_state,
-                    _state: PhantomData,
-                });
-                
+                let advanced_child =
+                    CursorStateMachine::to_candidate(&ChildCursor::<
+                        Matched,
+                        _,
+                    > {
+                        child_state,
+                        _state: PhantomData,
+                    });
+
                 IndexAdvanceResult::Advanced(CompareState {
-                    child: Checkpointed::with_candidate(self.child.checkpoint, advanced_child),
+                    child: Checkpointed::with_candidate(
+                        self.child.checkpoint,
+                        advanced_child,
+                    ),
                     query: self.query,
                     target: self.target,
                     mode: self.mode,

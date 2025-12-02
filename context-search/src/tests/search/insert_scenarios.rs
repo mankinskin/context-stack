@@ -73,9 +73,9 @@ fn prefix1() {
                     ),
                     target: DownKey {
                         index: l,
-                        pos: DownPosition(1.into()),
+                        pos: DownPosition(2.into()),
                     },
-                    exit_pos: 1.into(),
+                    exit_pos: 2.into(),
                     end_pos: 3.into(),
                 }),
             },

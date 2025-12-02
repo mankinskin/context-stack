@@ -37,7 +37,7 @@ impl<G: GraphKind> Hypergraph<G> {
             panic!("Token not found at location {:#?}", location)
         })
     }
-    pub(crate) fn expect_child_offset(
+    pub fn expect_child_offset(
         &self,
         loc: &ChildLocation,
     ) -> usize {
