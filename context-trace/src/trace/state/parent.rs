@@ -1,58 +1,4 @@
-use crate::{
-    AtomPosition,
-    direction::pattern::PatternDirection,
-    graph::vertex::{
-        location::{
-            child::ChildLocation,
-            pattern::IntoPatternLocation,
-        },
-        pattern::pattern_width,
-    },
-    path::{
-        accessors::{
-            child::root::GraphRootChild,
-            root::{
-                GraphRoot,
-                RootPattern,
-            },
-        },
-        mutators::{
-            move_path::key::AdvanceKey,
-            raise::PathRaise,
-        },
-        structs::rooted::{
-            role_path::IndexStartPath,
-            root::RootedPath,
-        },
-    },
-    trace::{
-        cache::key::{
-            directed::{
-                DirectedKey,
-                up::{
-                    UpKey,
-                    UpPosition,
-                },
-            },
-            props::{
-                RootKey,
-                TargetKey,
-            },
-        },
-        child::state::{
-            ChildState,
-            RootChildState,
-        },
-        has_graph::{
-            HasGraph,
-            TravDir,
-        },
-        state::{
-            BaseState,
-            StateAdvance,
-        },
-    },
-};
+use crate::*;
 use derive_more::{
     Deref,
     DerefMut,
@@ -170,7 +116,7 @@ impl TargetKey for ParentState {
 }
 impl RootKey for ParentState {
     fn root_key(&self) -> UpKey {
-        UpKey::new(self.path.root_parent(), self.root_pos.into())
+        UpKey::new(self.path.root_parent(), self.root_pos)
     }
 }
 

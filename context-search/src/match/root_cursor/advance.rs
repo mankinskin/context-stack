@@ -27,16 +27,7 @@ use crate::{
     },
     traversal::SearchKind,
 };
-use context_trace::{
-    path::{
-        accessors::path_accessor::HasTargetOffset,
-        RolePathUtils,
-    },
-    End,
-    HasRootChildIndex,
-    Start,
-    *,
-};
+use context_trace::*;
 use tracing::{
     debug,
     info,

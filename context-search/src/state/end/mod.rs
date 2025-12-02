@@ -65,8 +65,8 @@ impl RootKey for PathCoverage {
         UpKey::new(
             self.root_parent(),
             match self {
-                PathCoverage::Range(s) => s.entry_pos.into(),
-                PathCoverage::Postfix(p) => p.entry_pos.into(),
+                PathCoverage::Range(s) => s.entry_pos,
+                PathCoverage::Postfix(p) => p.entry_pos,
                 PathCoverage::Prefix(_) => 0.into(),
                 PathCoverage::EntireRoot(_) => 0.into(),
             },
@@ -181,14 +181,14 @@ impl PathCoverage {
         }
     }
 
-    /// Get the start path if it exists (safe version that returns Option)
-    pub(crate) fn try_start_path(&self) -> Option<&StartPath> {
-        match self {
-            PathCoverage::Range(p) => Some(p.path.start_path()),
-            PathCoverage::Postfix(p) => Some(p.path.start_path()),
-            PathCoverage::Prefix(_) | PathCoverage::EntireRoot(_) => None,
-        }
-    }
+    ///// Get the start path if it exists (safe version that returns Option)
+    //pub(crate) fn try_start_path(&self) -> Option<&StartPath> {
+    //    match self {
+    //        PathCoverage::Range(p) => Some(p.path.start_path()),
+    //        PathCoverage::Postfix(p) => Some(p.path.start_path()),
+    //        PathCoverage::Prefix(_) | PathCoverage::EntireRoot(_) => None,
+    //    }
+    //}
 }
 
 impl std::fmt::Display for PathCoverage {

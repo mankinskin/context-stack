@@ -3,47 +3,7 @@
 //! Methods for managing and querying child token patterns, including pattern
 //! access, mutation, iteration, and selection.
 
-use super::core::VertexData;
-use crate::{
-    HashSet,
-    TokenWidth,
-    direction::{
-        Direction,
-        pattern::PatternDirection,
-    },
-    graph::{
-        Hypergraph,
-        getters::ErrorReason,
-        kind::GraphKind,
-        vertex::{
-            ChildPatterns,
-            IndexPosition,
-            has_vertex_index::ToToken,
-            location::{
-                SubLocation,
-                SubRangeLocation,
-                child::ChildLocation,
-                pattern::PatternRangeLocation,
-            },
-            pattern::{
-                self,
-                IntoPattern,
-                Pattern,
-                id::PatternId,
-                pattern_range::PatternRangeIndex,
-                pattern_width,
-            },
-            token::{
-                SubToken,
-                Token,
-            },
-        },
-    },
-    trace::has_graph::{
-        HasGraph,
-        TravDir,
-    },
-};
+use crate::*;
 use itertools::Itertools;
 use std::{
     num::NonZeroUsize,
@@ -130,13 +90,8 @@ impl VertexData {
         id: &PatternId,
         range: R,
     ) -> Result<&<R as SliceIndex<[Token]>>::Output, ErrorReason> {
-        self.get_child_pattern(id).and_then(|p| {
-            pattern::pattern_range::get_child_pattern_range(
-                id,
-                p,
-                range.clone(),
-            )
-        })
+        self.get_child_pattern(id)
+            .and_then(|p| get_child_pattern_range(id, p, range.clone()))
     }
 
     /// Get child pattern range, panicking if not found
@@ -147,8 +102,7 @@ impl VertexData {
         range: R,
     ) -> &<R as SliceIndex<[Token]>>::Output {
         let p = self.expect_child_pattern(id);
-        pattern::pattern_range::get_child_pattern_range(id, p, range.clone())
-            .expect("Range in pattern")
+        get_child_pattern_range(id, p, range.clone()).expect("Range in pattern")
     }
 
     /// Get child token at specific location

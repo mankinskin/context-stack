@@ -1,13 +1,4 @@
-use context_trace::{
-    graph::vertex::location::HasParent,
-    logging::compact_format::{
-        write_indent,
-        CompactFormat,
-    },
-    path::accessors::has_path::IntoRolePath,
-    trace::cache::key::directed::up::UpPosition,
-    *,
-};
+use context_trace::*;
 use derive_more::derive::{
     Deref,
     DerefMut,

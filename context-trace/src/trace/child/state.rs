@@ -238,7 +238,7 @@ impl<EndNode: PathNode> PartialOrd for ChildState<EndNode> {
 }
 impl<EndNode: PathNode> RootKey for ChildState<EndNode> {
     fn root_key(&self) -> UpKey {
-        UpKey::new(self.path.root_parent(), self.entry_pos.into())
+        UpKey::new(self.path.root_parent(), self.entry_pos)
     }
 }
 

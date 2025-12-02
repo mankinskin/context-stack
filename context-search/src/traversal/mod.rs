@@ -7,11 +7,7 @@ use crate::{
         PathCoverage,
     },
 };
-use context_trace::{
-    path::accessors::has_path::HasPath,
-    RootedStartPathAccessor,
-    *,
-};
+use context_trace::*;
 use policy::DirectedTraversalPolicy;
 use std::fmt::Debug;
 

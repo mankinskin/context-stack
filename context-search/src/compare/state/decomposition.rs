@@ -192,7 +192,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
             (*self.query.current()).role_rooted_leaf_token::<End, _>(trav);
 
         let cursor_end_index = HasRootChildIndex::<End>::root_child_index(
-            &(*self.query.current()).path,
+            &self.query.current().path,
         );
         debug!(
             path_leaf = %path_leaf,

@@ -2,7 +2,6 @@ pub mod role;
 pub mod root;
 use crate::{
     trace::{
-        RoleTraceKey,
         cache::key::directed::{
             down::DownPosition,
             up::UpPosition,

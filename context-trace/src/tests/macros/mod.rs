@@ -4,12 +4,6 @@
 //! including pattern insertion, atom management, path construction, and
 //! trace cache building.
 
-#[cfg(test)]
-use crate::{
-    path::accessors::path_accessor::PathAccessor,
-    *,
-};
-
 // Re-export all macros from submodules
 pub mod atoms;
 pub mod paths;

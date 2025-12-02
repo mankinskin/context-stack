@@ -5,18 +5,11 @@ pub mod state;
 pub mod traceable;
 
 use crate::{
-    graph::vertex::location::child::ChildLocation,
-    path::{
-        accessors::role::PathRole,
-        mutators::move_path::key::AtomPosition,
-    },
+    path::accessors::role::PathRole,
     trace::{
         cache::{
             TraceCache,
-            key::directed::{
-                DirectedKey,
-                down::DownKey,
-            },
+            key::directed::DirectedKey,
         },
         traceable::{
             TraceCommand,
@@ -25,14 +18,7 @@ use crate::{
         },
     },
 };
-use cache::key::directed::{
-    HasAtomPosition,
-    down::DownPosition,
-    up::{
-        UpKey,
-        UpPosition,
-    },
-};
+use cache::key::directed::HasAtomPosition;
 use has_graph::HasGraph;
 use std::fmt::Debug;
 

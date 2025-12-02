@@ -15,10 +15,7 @@ use {
             PatternCursor,
         },
     },
-    context_trace::{
-        path::accessors::path_accessor::HasTargetOffset,
-        *,
-    },
+    context_trace::*,
     std::marker::PhantomData,
 };
 

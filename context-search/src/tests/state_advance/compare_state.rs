@@ -1,9 +1,5 @@
 //! Tests for CompareState<Candidate, Candidate> and CompareState<Matched, Matched> advancement
 
-use context_trace::trace::cache::key::directed::{
-    down::DownPosition,
-    up::UpPosition,
-};
 #[cfg(test)]
 use {
     crate::{
@@ -15,10 +11,7 @@ use {
             PatternCursor,
         },
     },
-    context_trace::{
-        path::accessors::path_accessor::HasTargetOffset,
-        *,
-    },
+    context_trace::*,
     std::marker::PhantomData,
 };
 

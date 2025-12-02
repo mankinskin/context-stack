@@ -7,11 +7,7 @@ use {
         search::Find,
         state::end::PathCoverage,
     },
-    context_trace::{
-        logging::format_utils::pretty,
-        path::accessors::root::GraphRootPattern,
-        *,
-    },
+    context_trace::*,
     pretty_assertions::assert_eq,
     tracing::{
         debug,
@@ -162,7 +158,7 @@ fn example_hierarchical_parent_search() {
 
     // Find parent of [a, b]
     let query1 = [a, b];
-    let response1 = graph.find_parent(&query1).unwrap();
+    let response1 = graph.find_parent(query1).unwrap();
     assert!(response1.query_exhausted());
     assert_eq!(
         response1.unwrap_complete().root_pattern_location().parent,
@@ -171,7 +167,7 @@ fn example_hierarchical_parent_search() {
 
     // Find parent of [ab, cd]
     let query2 = [ab, cd];
-    let response2 = graph.find_parent(&query2).unwrap();
+    let response2 = graph.find_parent(query2).unwrap();
     assert!(response2.query_exhausted());
     assert_eq!(
         response2.unwrap_complete().root_pattern_location().parent,
@@ -220,7 +216,7 @@ fn example_hierarchical_ancestor_search() {
     // the query [b, c, d] should match via the [a, bc, d] pattern
     let query = [b, c, d];
     debug!(query = %pretty(&query), "Searching for [b, c, d]");
-    let result = graph.find_ancestor(&query);
+    let result = graph.find_ancestor(query);
 
     debug!(result = ?result, "Search result");
 
@@ -279,7 +275,7 @@ fn example_incomplete_postfix() {
 
     // Search for [b, c] using find_ancestor
     let query = [b, c];
-    let response = graph.find_ancestor(&query).unwrap();
+    let response = graph.find_ancestor(query).unwrap();
 
     // Query is fully exhausted (Complete), but path is Postfix (doesn't start at beginning)
     assert!(
@@ -307,7 +303,7 @@ fn example_incomplete_prefix() {
 
     // Search for [a, b] using find_ancestor
     let query = [a, b];
-    let response = graph.find_ancestor(&query).unwrap();
+    let response = graph.find_ancestor(query).unwrap();
 
     // Query is fully exhausted (Complete), but path is Prefix (doesn't reach end of parent)
     assert!(

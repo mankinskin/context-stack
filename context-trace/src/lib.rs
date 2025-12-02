@@ -58,17 +58,27 @@ pub use tests::{
 };
 
 // Essential public re-exports for context-search
-pub(crate) use crate::path::{
-    accessors::{
-        border::PathBorder,
-        child::root::PatternRootChild,
-        has_path::{
-            HasRolePath,
-            IntoRolePath,
-        },
-        root::GraphRootPattern,
+pub(crate) use crate::{
+    direction::pattern::PatternDirection,
+    graph::vertex::{
+        IndexPosition,
+        location::SubRangeLocation,
+        pattern::pattern_range::get_child_pattern_range,
+        token::SubToken,
     },
-    structs::rooted::root::PathRoot,
+    path::{
+        accessors::{
+            border::PathBorder,
+            child::root::PatternRootChild,
+            has_path::HasRolePath,
+        },
+        mutators::{
+            move_path::key::AdvanceKey,
+            raise::PathRaise,
+        },
+        structs::rooted::root::PathRoot,
+    },
+    trace::has_graph::TravDir,
 };
 pub use crate::{
     direction::{
@@ -135,6 +145,11 @@ pub use crate::{
             wide::Wide,
         },
     },
+    logging::{
+        CompactFormat,
+        format_utils::pretty,
+        write_indent,
+    },
     path::{
         RolePathUtils,
         accessors::{
@@ -150,6 +165,7 @@ pub use crate::{
             },
             has_path::{
                 HasPath,
+                IntoRolePath,
                 IntoRootedPath,
                 IntoRootedRolePath,
             },
@@ -160,6 +176,7 @@ pub use crate::{
             },
             root::{
                 GraphRoot,
+                GraphRootPattern,
                 PatternRoot,
                 RootPattern,
             },
@@ -230,8 +247,14 @@ pub use crate::{
                     DirectedKey,
                     DirectedPosition,
                     HasAtomPosition,
-                    down::DownKey,
-                    up::UpKey,
+                    down::{
+                        DownKey,
+                        DownPosition,
+                    },
+                    up::{
+                        UpKey,
+                        UpPosition,
+                    },
                 },
                 props::{
                     CursorPosition,

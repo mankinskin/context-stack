@@ -99,7 +99,7 @@ fn detect_trait_context(func: &ItemFn) -> TraitContext {
 
     // Check return type for associated types (Self::TypeName pattern)
     if let syn::ReturnType::Type(_, ty) = &func.sig.output {
-        extract_associated_types(&**ty, &mut associated_types);
+        extract_associated_types(ty, &mut associated_types);
     }
 
     TraitContext {
@@ -202,7 +202,7 @@ fn merge_fields_into_args(
 
     while let Some(token) = iter.next() {
         match &token {
-            TokenTree::Ident(ident) if ident.to_string() == "fields" => {
+            TokenTree::Ident(ident) if *ident == "fields" => {
                 // Found fields, add it to result
                 result.push(token.clone());
 
@@ -288,7 +288,6 @@ fn merge_fields_into_args(
 ///
 /// The generated code will include `fn_sig = "fn my_function(x: i32, y: &str) -> Result<bool, Error>"`
 /// as a field in the span.
-
 /// Extract the function signature as a readable string
 fn extract_function_signature(func: &ItemFn) -> String {
     let sig = &func.sig;

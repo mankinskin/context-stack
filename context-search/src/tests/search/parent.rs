@@ -57,7 +57,7 @@ fn find_parent1() {
         _ => panic!("Expected EntireRoot path"),
     }
     let query = ab_c_pattern;
-    let response = graph.find_parent(&query).unwrap();
+    let response = graph.find_parent(query).unwrap();
     assert!(response.query_exhausted(), "Query should be complete");
     match &response.end.path {
         PathCoverage::EntireRoot(ref path) => {

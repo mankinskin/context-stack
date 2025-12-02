@@ -20,16 +20,7 @@ use crate::{
     },
     traversal::SearchKind,
 };
-use context_trace::{
-    impl_display_via_compact,
-    logging::compact_format::{
-        write_indent,
-        CompactFormat,
-    },
-    path::accessors::path_accessor::HasTargetOffset,
-    GraphRoot,
-    PathNode,
-};
+use context_trace::*;
 use std::fmt;
 
 impl CompactFormat for ParentCompareState {

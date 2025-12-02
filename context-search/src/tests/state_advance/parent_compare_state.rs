@@ -1,6 +1,5 @@
 //! Tests for ParentCompareState advancing to CompareRootState
 
-use context_trace::trace::cache::key::directed::up::UpPosition;
 #[cfg(test)]
 use {
     crate::{
@@ -13,10 +12,8 @@ use {
             PatternCursor,
         },
     },
-    context_trace::{
-        path::accessors::path_accessor::HasTargetOffset,
-        *,
-    },
+    context_trace::trace::cache::key::directed::up::UpPosition,
+    context_trace::*,
     std::marker::PhantomData,
 };
 

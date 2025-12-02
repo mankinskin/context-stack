@@ -10,7 +10,6 @@ use crate::{
             },
             new::NewTraceEdge,
         },
-        traceable::IntoRootCommand,
     },
     *,
 };
