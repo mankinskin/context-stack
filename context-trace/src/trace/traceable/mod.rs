@@ -121,7 +121,10 @@ impl IntoRootCommand<End> for PostfixCommand {
             index: start_index,
             pos: start_index.width().0.into(),
         };
-        let sub_path_prev = self.path.trace_role_sub_path(ctx, initial_prev);
+        let mut sub_path_prev =
+            self.path.trace_role_sub_path(ctx, initial_prev);
+        // Update position to match entry_pos after tracing sub-path
+        sub_path_prev.pos = self.entry_pos;
 
         let root_entry = self.path.role_root_child_location::<Start>();
         PostfixRootCommand {
@@ -154,7 +157,10 @@ impl IntoRootCommand<Start> for RangeCommand {
             index: start_index,
             pos: start_index.width().0.into(),
         };
-        let sub_path_prev = self.path.trace_start_sub_path(ctx, initial_prev);
+        let mut sub_path_prev =
+            self.path.trace_start_sub_path(ctx, initial_prev);
+        // Update position to match entry_pos after tracing sub-path
+        sub_path_prev.pos = self.entry_pos;
 
         let root_entry = self.path.role_root_child_location::<Start>();
         PostfixRootCommand {
@@ -189,7 +195,12 @@ impl Traceable for PostfixCommand {
         self,
         ctx: &mut TraceCtx<G>,
     ) {
+        tracing::debug!(
+            "PostfixCommand::trace - entry_pos={:?}",
+            self.entry_pos
+        );
         self.root_command(ctx).trace_root(ctx);
+        tracing::debug!("PostfixCommand::trace - complete");
     }
 }
 impl Traceable for PrefixCommand {
@@ -197,8 +208,11 @@ impl Traceable for PrefixCommand {
         self,
         ctx: &mut TraceCtx<G>,
     ) {
+        tracing::debug!("PrefixCommand::trace - exit_pos={:?}", self.exit_pos);
         let prev = self.root_command(ctx).trace_root(ctx);
+        tracing::debug!("PrefixCommand::trace - after root, prev={:?}", prev);
         self.path.trace_role_sub_path(ctx, prev);
+        tracing::debug!("PrefixCommand::trace - complete");
     }
 }
 
@@ -207,9 +221,19 @@ impl Traceable for RangeCommand {
         self,
         ctx: &mut TraceCtx<G>,
     ) {
+        tracing::debug!(
+            "RangeCommand::trace - entry_pos={:?}, exit_pos={:?}",
+            self.entry_pos,
+            self.exit_pos
+        );
         let exit_key =
             IntoRootCommand::<Range>::root_command(&self, ctx).trace_root(ctx);
+        tracing::debug!(
+            "RangeCommand::trace - after root, exit_key={:?}",
+            exit_key
+        );
         self.path.trace_end_sub_path(ctx, exit_key);
+        tracing::debug!("RangeCommand::trace - complete");
     }
 }
 

@@ -55,8 +55,15 @@ impl TraceRoot for RangeRootCommand {
         &self,
         ctx: &mut TraceCtx<G>,
     ) -> Self::Next {
+        tracing::debug!("RangeRootCommand::trace_root - starting postfix");
         self.postfix_root_command().trace_root(ctx);
-        self.prefix_root_command().trace_root(ctx)
+        tracing::debug!("RangeRootCommand::trace_root - starting prefix");
+        let result = self.prefix_root_command().trace_root(ctx);
+        tracing::debug!(
+            "RangeRootCommand::trace_root - complete, result={:?}",
+            result
+        );
+        result
     }
 }
 impl TraceRoot for PostfixRootCommand {
@@ -70,12 +77,23 @@ impl TraceRoot for PostfixRootCommand {
             index: self.root_entry.parent,
             pos: self.entry_pos,
         };
+        tracing::debug!(
+            "PostfixRootCommand::trace_root - entry_key={:?}, prev={:?}, location={:?}",
+            entry_key,
+            self.prev,
+            self.root_entry
+        );
         let new = NewTraceEdge::<BottomUp> {
             target: entry_key,
             prev: self.prev,
             location: self.root_entry,
         };
-        ctx.cache.add_state(new);
+        let (key, was_new) = ctx.cache.add_state(new);
+        tracing::debug!(
+            "PostfixRootCommand::trace_root - added to cache: key={:?}, was_new={}",
+            key,
+            was_new
+        );
     }
 }
 impl TraceRoot for PrefixRootCommand {
@@ -96,14 +114,26 @@ impl TraceRoot for PrefixRootCommand {
             index: exit_index,
             pos: root_exit_key.pos,
         };
+        tracing::debug!(
+            "PrefixRootCommand::trace_root - root_exit_key={:?}, exit={:?}, location={:?}",
+            root_exit_key,
+            exit,
+            self.root_exit
+        );
         // edit for first trace edge
         let new = NewTraceEdge::<TopDown> {
             target: exit,
             prev: root_exit_key,
             location: self.root_exit,
         };
-        ctx.cache.add_state(new);
-        root_exit_key
+        let (key, was_new) = ctx.cache.add_state(new);
+        tracing::debug!(
+            "PrefixRootCommand::trace_root - added to cache: key={:?}, was_new={}, returning exit={:?}",
+            key,
+            was_new,
+            exit
+        );
+        exit // Changed from root_exit_key to exit
     }
 }
 //impl TraceRoot for TraceCommand {

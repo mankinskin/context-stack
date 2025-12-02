@@ -86,16 +86,26 @@ where
         prev_key: RoleTraceKey<Role>,
     ) -> RoleTraceKey<Role> {
         let graph = ctx.trav.graph();
+        let path_len = self.raw_child_path().len();
+        tracing::debug!("trace_role_sub_path - starting with prev={:?}, path_len={}",
+                       prev_key, path_len);
 
-        self.raw_child_path()
+        let result = self.raw_child_path()
             .iter()
-            .fold(prev_key, |prev, location| {
+            .enumerate()
+            .fold(prev_key, |prev, (i, location)| {
                 let target =
                     Role::Direction::build_key(&graph, *prev.pos(), location);
-                ctx.cache
-                    .add_state(RoleEdit::<Role>::new(target, prev, *location));
+                tracing::debug!("trace_role_sub_path - step {}: prev={:?}, location={:?}, target={:?}",
+                               i, prev, location, target);
+                let (key, was_new) = ctx.cache
+                    .add_state(RoleEdit::<Role>::new(prev, target, *location));
+                tracing::debug!("trace_role_sub_path - step {}: added key={:?}, was_new={}",
+                               i, key, was_new);
                 target
-            })
+            });
+        tracing::debug!("trace_role_sub_path - complete, result={:?}", result);
+        result
     }
 }
 
