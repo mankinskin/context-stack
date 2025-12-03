@@ -8,6 +8,7 @@
 pub mod atoms;
 pub mod paths;
 pub mod patterns;
+pub mod string_repr;
 pub mod test_utils;
 pub mod trace_cache;
 
