@@ -16,7 +16,6 @@ use pretty_assertions::{
     assert_eq,
     assert_matches,
 };
-use std::collections::HashSet;
 use tracing::debug;
 
 #[test]
@@ -112,24 +111,23 @@ fn index_pattern2() {
     assert_eq!(aby.width(), 3);
     
     let ab = graph_ref
-        .find_sequence("ab".chars())
+        .find_ancestor("ab".chars())
         .unwrap()
         .expect_complete("ab")
         .root_parent();
-
-    let graph = graph_ref.graph();
-    let aby_vertex = graph.expect_vertex(aby);
+    let g = graph.graph();
+    let aby_vertex = g.expect_vertex(aby);
     assert_eq!(aby_vertex.parents().len(), 1, "aby");
     assert_eq!(
         aby_vertex
             .child_pattern_set()
             .into_iter()
             .collect::<HashSet<_>>(),
-        hashset![Pattern::from(vec![ab, y]),]
+        HashSet::from_iter([Pattern::from(vec![ab, y]),])
     );
-    drop(graph);
+    drop(g);
     let query = vec![a, b, y];
-    let aby_found = graph_ref.find_ancestor(&query);
+    let aby_found = graph.find_ancestor(&query);
     assert_matches!(
         aby_found,
         Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
@@ -153,24 +151,22 @@ fn index_infix1() {
         assert_all_vertices_unique(&*g);
     }
 
-    let graph_ref = HypergraphRef::from(graph);
-
-    let aby: Token = graph_ref.insert(vec![a, b, y]).expect("Indexing failed");
+    let aby: Token = graph.insert(vec![a, b, y]).expect("Indexing failed");
     
     // Assert the token has the expected string representation and width
     {
-        let g = graph_ref.graph();
+        let g = graph.graph();
         assert_token_string_repr(&*g, aby, "aby");
         assert_all_vertices_unique(&*g);
     }
     
-    let ab = graph_ref
+    let ab = graph
         .find_ancestor(vec![a, b])
         .unwrap()
         .expect_complete("ab")
         .root_parent();
-    let graph = graph_ref.graph();
-    let aby_vertex = graph.expect_vertex(aby);
+    let g = graph.graph();
+    let aby_vertex = g.expect_vertex(aby);
     assert_eq!(aby.width(), 3, "aby");
     assert_eq!(aby_vertex.parents().len(), 1, "aby");
     assert_eq!(aby_vertex.child_patterns().len(), 1, "aby");
@@ -179,39 +175,42 @@ fn index_infix1() {
             .child_pattern_set()
             .into_iter()
             .collect::<HashSet<_>>(),
-        hashset![Pattern::from(vec![ab, y])],
+        HashSet::from_iter([Pattern::from(vec![ab, y])]),
         "aby"
     );
-    drop(graph);
+    drop(g);
     let query = vec![a, b, y];
-    let aby_found = graph_ref.find_ancestor(&query);
+    let aby_found = graph.find_ancestor(&query);
     assert_matches!(
         aby_found,
         Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
         "aby"
     );
-    let abyz = graph_ref
+    let abyz = graph
         .find_ancestor(vec![ab, yz])
         .unwrap()
         .expect_complete("abyz")
         .root_parent();
-    let graph = graph_ref.graph();
-    let abyz_vertex = graph.expect_vertex(abyz);
+    let g = graph.graph();
+    let abyz_vertex = g.expect_vertex(abyz);
     assert_eq!(
         abyz_vertex
             .child_pattern_set()
             .into_iter()
             .collect::<HashSet<_>>(),
-        hashset![Pattern::from(vec![aby, z]), Pattern::from(vec![ab, yz])],
+        HashSet::from_iter([
+            Pattern::from(vec![aby, z]),
+            Pattern::from(vec![ab, yz])
+        ]),
         "abyz"
     );
-    let xxabyzw_vertex = graph.expect_vertex(xxabyzw);
+    let xxabyzw_vertex = g.expect_vertex(xxabyzw);
     assert_eq!(
         xxabyzw_vertex
             .child_pattern_set()
             .into_iter()
             .collect::<HashSet<_>>(),
-        hashset![Pattern::from(vec![x, x, abyz, w])],
+        HashSet::from_iter([Pattern::from(vec![x, x, abyz, w])]),
         "xxabyzw"
     );
 }
@@ -240,20 +239,18 @@ fn index_infix2() {
         assert_all_vertices_unique(&*g);
     }
 
-    let graph_ref = HypergraphRef::from(graph);
-
     let abcd: Token =
-        graph_ref.insert(vec![a, b, c, d]).expect("Indexing failed");
+        graph.insert(vec![a, b, c, d]).expect("Indexing failed");
     
     // Assert the token has the expected string representation and width
     {
-        let g = graph_ref.graph();
+        let g = graph.graph();
         assert_token_string_repr(&*g, abcd, "abcd");
         assert_all_vertices_unique(&*g);
     }
     
-    let graph = graph_ref.graph();
-    let abcd_vertex = graph.expect_vertex(abcd);
+    let g = graph.graph();
+    let abcd_vertex = g.expect_vertex(abcd);
     assert_eq!(abcd.width(), 4, "abcd");
     assert_eq!(abcd_vertex.parents().len(), 1, "abcd");
     assert_eq!(abcd_vertex.child_patterns().len(), 1, "abcd");
@@ -262,18 +259,16 @@ fn index_infix2() {
             .child_pattern_set()
             .into_iter()
             .collect::<HashSet<_>>(),
-        hashset![Pattern::from(vec![a, b, c, d])],
+        HashSet::from_iter([Pattern::from(vec![a, b, c, d])]),
         "abc"
     );
-    drop(graph);
-    let graph = graph_ref.graph();
-    let abcdx_vertex = graph.expect_vertex(abcdx);
+    let abcdx_vertex = g.expect_vertex(abcdx);
     assert_eq!(
         abcdx_vertex
             .child_pattern_set()
             .into_iter()
             .collect::<HashSet<_>>(),
-        hashset![Pattern::from(vec![abcd, x]),],
+        HashSet::from_iter([Pattern::from(vec![abcd, x]),]),
         "abcx"
     );
 }
@@ -287,10 +282,8 @@ fn index_prefix1() {
         (heldld, heldld_id) => [h, e, ld, ld]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
-    let fold_res = Searchable::<InsertTraversal>::search(
-        vec![h, e, l, l],
-        graph.clone().into(),
-    );
+    let fold_res =
+        Searchable::<InsertTraversal>::search(vec![h, e, l, l], graph.clone());
     assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
     let state = fold_res.unwrap();
     let init = InitInterval::from(state);
@@ -343,10 +336,8 @@ fn index_postfix1() {
         (ababcd, ababcd_id) => [ab, ab, c, d]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
-    let fold_res = Searchable::<InsertTraversal>::search(
-        vec![b, c, d, d],
-        graph.clone().into(),
-    );
+    let fold_res =
+        Searchable::<InsertTraversal>::search(vec![b, c, d, d], graph.clone());
 
     assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
     let state = fold_res.unwrap();

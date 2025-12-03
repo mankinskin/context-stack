@@ -56,30 +56,6 @@ pub(crate) type SearchResult = Result<Response, ErrorReason>;
 pub trait Find: HasGraph {
     fn ctx(&self) -> SearchCtx<Self>;
 
-    #[context_trace::instrument_sig(
-        level = "info",
-        skip(self, pattern),
-        fields(pattern_len)
-    )]
-    fn find_sequence(
-        &self,
-        pattern: impl IntoIterator<Item = impl AsAtom<AtomOf<TravKind<Self>>>>,
-    ) -> SearchResult
-    where
-        Self: Clone,
-    {
-        let iter = atomizing_iter(pattern.into_iter());
-        let atoms: Vec<_> = iter.collect();
-        tracing::Span::current().record("pattern_len", atoms.len());
-        debug!(pattern_len = atoms.len(), "finding sequence pattern");
-        trace!(atoms = %pretty(&atoms), "pattern atoms");
-
-        let pattern = self.graph().get_atom_children(atoms.into_iter())?;
-        debug!(pattern = %pretty(&pattern), "created pattern token");
-
-        self.find_ancestor(pattern)
-    }
-
     /// find largest matching parent for pattern
     #[context_trace::instrument_sig(level = "info", skip(self, searchable))]
     fn find_parent(

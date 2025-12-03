@@ -59,7 +59,7 @@ macro_rules! assert_indices {
     ($graph:ident, $($name:ident),*) => {
         $(
         let $name = $graph
-            .find_sequence(stringify!($name).chars())
+            .find_ancestor(stringify!($name).chars())
             .unwrap()
             .expect_complete(stringify!($name))
             .root_parent();
@@ -76,7 +76,7 @@ fn find_sequence() {
         ..
     } = &*Env1::get_expected();
     assert_eq!(
-        graph.find_sequence("a".chars()),
+        graph.find_ancestor("a".chars()),
         Err(ErrorReason::SingleIndex(Box::new(IndexWithPath {
             index: *a,
             path: vec![*a].into(),

@@ -125,7 +125,7 @@ pub trait StartFoldPath:
                         "token has no child patterns - will cause panic"
                     );
                     warn!("typically means searching atoms directly without pattern");
-                    warn!("consider using find_sequence() instead of find_ancestor()");
+                    warn!("atoms can be searched with find_ancestor() via Searchable trait");
                 }
             }
 

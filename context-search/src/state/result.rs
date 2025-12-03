@@ -51,6 +51,21 @@ impl Response {
     }
 
     /// Unwrap a complete response with a custom error message
+    #[track_caller]
+    pub fn expect_entire_root(
+        self,
+        msg: &str,
+    ) -> IndexRangePath {
+        match self.end.path {
+            PathCoverage::EntireRoot(path) => path,
+            _ => panic!(
+                "{}: Complete response has non-EntireRoot path: {:#?}",
+                msg, self.end.path
+            ),
+        }
+    }
+    /// Unwrap a complete response with a custom error message
+    #[track_caller]
     pub fn expect_complete(
         self,
         msg: &str,
@@ -58,10 +73,7 @@ impl Response {
         if !self.end.query_exhausted() {
             panic!("{}", msg);
         }
-        match self.end.path {
-            PathCoverage::EntireRoot(path) => path,
-            _ => panic!("{}: Complete response has non-EntireRoot path", msg),
-        }
+        self.expect_entire_root(msg)
     }
 
     /// Try to get the complete path if the response is complete

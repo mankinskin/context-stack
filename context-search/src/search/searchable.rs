@@ -94,6 +94,42 @@ impl<K: SearchKind> Searchable<K> for PatternCursor {
     }
 }
 
+// Implement Searchable for common atom iterator types
+// Note: We implement for specific iterator types rather than a blanket impl
+// to avoid trait coherence conflicts with Token-based implementations
+
+impl<K: SearchKind> Searchable<K> for std::str::Chars<'_>
+where
+    char: AsAtom<AtomOf<TravKind<K::Trav>>>,
+{
+    fn start_search(
+        self,
+        trav: K::Trav,
+    ) -> Result<SearchState<K>, ErrorState> {
+        // Pass the iterator directly to get_atom_children
+        // char implements AsAtom<char> so this works for char-based graphs
+        let pattern = trav.graph().get_atom_children(self)?;
+
+        pattern.start_search(trav)
+    }
+}
+
+impl<K: SearchKind, I> Searchable<K> for std::iter::Map<I, fn(&str) -> char>
+where
+    I: Iterator<Item = &'static str>,
+    char: AsAtom<AtomOf<TravKind<K::Trav>>>,
+{
+    fn start_search(
+        self,
+        trav: K::Trav,
+    ) -> Result<SearchState<K>, ErrorState> {
+        // Pass the iterator directly to get_atom_children
+        let pattern = trav.graph().get_atom_children(self)?;
+
+        pattern.start_search(trav)
+    }
+}
+
 impl<K: SearchKind, T: Searchable<K> + Clone> Searchable<K> for &T {
     fn start_search(
         self,
