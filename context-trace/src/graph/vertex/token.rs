@@ -163,6 +163,24 @@ impl Borrow<TokenWidth> for Token {
     }
 }
 
+impl crate::logging::compact_format::CompactFormat for TokenWidth {
+    fn fmt_compact(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut std::fmt::Formatter,
+        _indent: usize,
+    ) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SubToken {
     pub(crate) token: Token,
@@ -390,5 +408,28 @@ impl Display for Token {
             }
         }
         write!(f, "T{}w{}", self.index, self.width.0)
+    }
+}
+
+impl crate::logging::compact_format::CompactFormat for Token {
+    fn fmt_compact(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        #[cfg(any(test, feature = "test-api"))]
+        {
+            if let Some(s) = self.get_string_repr() {
+                return write!(f, "\"{}\"({})", s, self.index);
+            }
+        }
+        write!(f, "T{}w{}", self.index, self.width.0)
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut std::fmt::Formatter,
+        _indent: usize,
+    ) -> std::fmt::Result {
+        self.fmt_compact(f)
     }
 }

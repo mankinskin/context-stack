@@ -276,6 +276,28 @@ impl<T: Atomize + Display> Display for Atom<T> {
     }
 }
 
+impl<T: Atomize + Display> crate::logging::compact_format::CompactFormat for Atom<T> {
+    fn fmt_compact(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        match self {
+            Atom::Element(t) => write!(f, "{}", t),
+            Atom::Start => write!(f, "START"),
+            Atom::End => write!(f, "END"),
+        }
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut fmt::Formatter,
+        _indent: usize,
+    ) -> fmt::Result {
+        self.fmt_compact(f)
+    }
+}
+
+
 impl<T: Atomize> Wide for Atom<T> {
     fn width(&self) -> TokenWidth {
         match self {

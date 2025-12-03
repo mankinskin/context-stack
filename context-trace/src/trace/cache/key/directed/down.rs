@@ -57,6 +57,33 @@ impl Add<usize> for DownPosition {
     }
 }
 
+impl std::fmt::Display for DownPosition {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        write!(f, "↓{}", self.0)
+    }
+}
+
+impl crate::logging::compact_format::CompactFormat for DownPosition {
+    fn fmt_compact(
+        &self,
+        f: &mut std::fmt::Formatter,
+    ) -> std::fmt::Result {
+        write!(f, "↓{}", self.0)
+    }
+
+    fn fmt_indented(
+        &self,
+        f: &mut std::fmt::Formatter,
+        _indent: usize,
+    ) -> std::fmt::Result {
+        write!(f, "↓{}", self.0)
+    }
+}
+
+
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy, new)]
 pub struct DownKey {
     pub index: Token,
