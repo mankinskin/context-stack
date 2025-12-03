@@ -119,9 +119,9 @@ macro_rules! assert_patterns {
 
         let g = $graph.graph();
         $(
-            let pats: HashSet<_> =
+            let pats: $crate::HashSet<_> =
                 $crate::HasVertexData::vertex(&$name, &g).child_pattern_set().into_iter().collect();
-            assert_eq!(pats, hashset![$($crate::Pattern::from(vec![$($pat),*])),*]);
+            assert_eq!(pats, ::std::iter::FromIterator::from_iter([$($crate::Pattern::from(vec![$($pat),*])),*]));
         )*
         #[allow(dropping_references)]
         drop(g);
