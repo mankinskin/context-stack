@@ -71,7 +71,7 @@ impl crate::logging::compact_format::CompactFormat for DownPosition {
         &self,
         f: &mut std::fmt::Formatter,
     ) -> std::fmt::Result {
-        write!(f, "↓{}", self.0)
+        std::fmt::Display::fmt(self, f)
     }
 
     fn fmt_indented(
@@ -79,7 +79,7 @@ impl crate::logging::compact_format::CompactFormat for DownPosition {
         f: &mut std::fmt::Formatter,
         _indent: usize,
     ) -> std::fmt::Result {
-        write!(f, "↓{}", self.0)
+        std::fmt::Display::fmt(self, f)
     }
 }
 
