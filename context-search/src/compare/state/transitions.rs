@@ -13,6 +13,11 @@ use crate::cursor::{
     Mismatched,
 };
 use context_trace::{
+    graph::vertex::location::SubRangeLocation,
+    path::accessors::role::{
+        End,
+        Start,
+    },
     trace::state::StateAdvance,
     HasRootChildIndex,
     *,
@@ -123,8 +128,65 @@ impl CompareState<Candidate, Matched, PositionAnnotated<ChildLocation>> {
     ) -> IndexAdvanceResult<PositionAnnotated<ChildLocation>> {
         // Advance the child cursor's candidate using its child_state
         let child_state_clone = self.child.candidate().child_state.clone();
+
         match child_state_clone.advance_state(trav) {
-            Ok(child_state) => {
+            Ok(mut child_state) => {
+                // If the end path became empty after advancing, we completed matching a root child
+                // and should advance exit_pos by the width of that entire child
+                if child_state.path.end_path().is_empty() {
+                    // Get the current root_exit index (just advanced)
+                    let current_end_index =
+                        child_state.path.role_root_child_index::<End>();
+                    let prev_root_child_token = self
+                        .child
+                        .candidate()
+                        .child_state
+                        .path
+                        .role_root_child_token::<End, _>(trav);
+
+                    tracing::trace!(
+                        current_end_index = current_end_index,
+                        prev_root_child_token = %prev_root_child_token,
+                        old_exit_pos = ?child_state.exit_pos,
+                        "end path became empty, updating exit_pos"
+                    );
+
+                    let pattern_location =
+                        child_state.path.root_pattern_location();
+                    let token_width = prev_root_child_token.width();
+
+                    // Advance exit_pos by the width of the matched child
+                    child_state.exit_pos = DownPosition(
+                        (*child_state.exit_pos.0 + token_width.0).into(),
+                    );
+
+                    tracing::trace!(
+                        new_exit_pos = ?child_state.exit_pos,
+                        token_width = token_width.0,
+                        "updated exit_pos after completing root child"
+                    );
+
+                    // Debug assert: exit_pos should equal entry_pos + width of children between start and current
+                    #[cfg(debug_assertions)]
+                    {
+                        let entry_index =
+                            child_state.path.role_root_child_index::<Start>();
+                        let full_sub_range = SubRangeLocation::new(
+                            pattern_location.pattern_id,
+                            entry_index + 1..current_end_index,
+                        );
+                        let inner_width = trav
+                            .graph()
+                            .expect_vertex(pattern_location.parent)
+                            .expect_child_range_offset(&full_sub_range);
+                        debug_assert_eq!(
+                            child_state.exit_pos.0,
+                            (*child_state.entry_pos.0 + inner_width.0).into(),
+                            "exit_pos should equal entry_pos + width of inner children"
+                        );
+                    }
+                }
+
                 // Successfully advanced - convert to Candidate state
                 let advanced_child =
                     CursorStateMachine::to_candidate(&ChildCursor::<

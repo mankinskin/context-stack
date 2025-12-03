@@ -1,21 +1,10 @@
 #[cfg(test)]
 use {
-    crate::search::Find,
-    crate::state::end::PathCoverage,
-    context_trace::tests::env::Env1,
-    context_trace::GraphRoot,
-    context_trace::Pattern,
-    context_trace::PatternPrefixPath,
-    context_trace::{
-        graph::vertex::token::Token,
-
-        tests::env::TestEnv,
+    crate::{
+        search::Find,
+        state::end::PathCoverage,
     },
-    context_trace::{
-        End,
-        HasRootChildIndex,
-        Start,
-    },
+    context_trace::*,
 };
 
 #[test]
@@ -53,38 +42,39 @@ fn find_consecutive1() {
     let checkpoint_pos = *cursor.atom_position.as_ref();
 
     // Verify cursor path range
-    let start_index =
-        HasRootChildIndex::<Start>::root_child_index(&cursor.path);
-    let end_index = HasRootChildIndex::<End>::root_child_index(&cursor.path);
+    let start_index = cursor.path.role_root_child_index::<Start>();
+    let end_index = cursor.path.role_root_child_index::<End>();
 
     tracing::debug!(%checkpoint_pos, %start_index, %end_index, "After first search");
     tracing::debug!(%cursor.path, "Cursor path");
 
     // Check the internal Checkpointed structure
     tracing::debug!(?fin1.end.cursor, "Full Checkpointed cursor state");
-    
+
     // Test checkpoint state
     let checkpoint = fin1.end.cursor.checkpoint();
-    let checkpoint_end = HasRootChildIndex::<End>::root_child_index(&checkpoint.path);
+    let checkpoint_end = checkpoint.path.role_root_child_index::<End>();
     assert_eq!(
-        *checkpoint.atom_position.as_ref(), 3,
+        *checkpoint.atom_position.as_ref(),
+        3,
         "Checkpoint atom_position should be 3 after matching ghi"
     );
     assert_eq!(
         checkpoint_end, 2,
         "Checkpoint end_index should be 2 (last matched token 'i')"
     );
-    
+
     // Test candidate state - THIS IS THE KEY ASSERTION
     assert!(
         fin1.end.cursor.has_candidate(),
         "Cursor should have a candidate (advanced position) after parent exploration"
     );
-    
+
     let candidate = fin1.end.cursor.cursor();
-    let candidate_end = HasRootChildIndex::<End>::root_child_index(&candidate.path);
+    let candidate_end = candidate.path.role_root_child_index::<End>();
     assert_eq!(
-        *candidate.atom_position.as_ref(), 4,
+        *candidate.atom_position.as_ref(),
+        4,
         "Candidate atom_position should be 4 (advanced beyond checkpoint)"
     );
     assert_eq!(
@@ -111,9 +101,8 @@ fn find_consecutive1() {
     let checkpoint_pos = *cursor.atom_position.as_ref();
 
     // Verify cursor path range
-    let start_index =
-        HasRootChildIndex::<Start>::root_child_index(&cursor.path);
-    let end_index = HasRootChildIndex::<End>::root_child_index(&cursor.path);
+    let start_index = cursor.path.role_root_child_index::<Start>();
+    let end_index = cursor.path.role_root_child_index::<End>();
 
     tracing::debug!(%checkpoint_pos, %start_index, %end_index, "After second search");
     tracing::debug!(%cursor.path, "Cursor path");

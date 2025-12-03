@@ -18,6 +18,7 @@ use crate::{
         Matched,
         PathCursor,
     },
+    policy::SearchKind,
     state::{
         end::PathCoverage,
         matched::{
@@ -25,7 +26,6 @@ use crate::{
             MatchResult,
         },
     },
-    traversal::SearchKind,
 };
 use context_trace::*;
 use tracing::{

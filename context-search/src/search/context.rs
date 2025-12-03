@@ -1,6 +1,6 @@
 use crate::{
-    traversal::{
-        policy::DirectedTraversalPolicy,
+    policy::{
+        DirectedTraversalPolicy,
         SearchKind,
     },
     BftQueue,

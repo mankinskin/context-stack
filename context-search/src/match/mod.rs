@@ -14,8 +14,8 @@ use crate::{
         },
     },
     cursor::Candidate,
-    traversal::{
-        policy::DirectedTraversalPolicy,
+    policy::{
+        DirectedTraversalPolicy,
         SearchKind,
     },
 };

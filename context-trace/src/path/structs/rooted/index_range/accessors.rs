@@ -164,7 +164,9 @@ impl LeafKey for IndexRangePath {
     }
 }
 
-impl HasRootChildIndex<Start> for IndexRangePath {
+impl<EndNode> HasRootChildIndex<Start>
+    for IndexRangePath<ChildLocation, EndNode>
+{
     fn root_child_index(&self) -> usize {
         HasRootChildIndex::<Start>::root_child_index(&self.start)
     }

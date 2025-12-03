@@ -4,12 +4,12 @@ use crate::{
         PathCursor,
         PatternCursor,
     },
+    policy::DirectedTraversalPolicy,
     r#match::{
         iterator::SearchIterator,
         root_cursor::CompareParentBatch,
     },
     search::SearchState,
-    traversal::policy::DirectedTraversalPolicy,
     ErrorState,
     SearchKind,
 };

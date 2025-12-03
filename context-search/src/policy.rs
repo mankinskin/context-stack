@@ -1,12 +1,26 @@
 use itertools::Itertools;
 use std::fmt::Debug;
 
-use crate::container::order::TraversalOrder;
+use crate::container::{
+    order::TraversalOrder,
+    StateContainer,
+};
 use context_trace::{
     graph::vertex::parent::HasPatternId,
     path::mutators::raise::PathRaise,
     *,
 };
+
+pub trait SearchKind: TraceKind {
+    type Container: StateContainer;
+    type Policy: DirectedTraversalPolicy<Trav = Self::Trav>;
+    type EndNode: PathNode;
+}
+impl<'a, K: SearchKind> SearchKind for &'a K {
+    type Container = K::Container;
+    type Policy = &'a K::Policy;
+    type EndNode = K::EndNode;
+}
 
 pub trait DirectedTraversalPolicy: Sized + Debug {
     type Trav: HasGraph;

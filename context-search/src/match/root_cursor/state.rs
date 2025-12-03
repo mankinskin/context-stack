@@ -15,13 +15,13 @@ use crate::{
         Matched,
         PathCursor,
     },
+    policy::{
+        policy::DirectedTraversalPolicy,
+        SearchKind,
+    },
     state::{
         end::PathCoverage,
         matched::MatchResult,
-    },
-    traversal::{
-        policy::DirectedTraversalPolicy,
-        SearchKind,
     },
 };
 use context_trace::{

@@ -1,6 +1,7 @@
 use crate::{
     compare::state::CompareState,
     cursor::Matched,
+    policy::SearchKind,
     r#match::{
         root_cursor::CompareParentBatch,
         NodeConsumer,
@@ -13,7 +14,6 @@ use crate::{
         },
         SearchQueue,
     },
-    traversal::SearchKind,
 };
 use context_trace::*;
 use tracing::{

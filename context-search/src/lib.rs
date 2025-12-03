@@ -16,9 +16,9 @@ pub(crate) mod compare;
 pub(crate) mod container;
 pub(crate) mod cursor;
 pub(crate) mod r#match;
+pub(crate) mod policy;
 pub(crate) mod search;
 pub(crate) mod state;
-pub(crate) mod traversal;
 
 /// Compact formatting for logging
 pub mod logging;
@@ -28,6 +28,7 @@ pub(crate) mod tests;
 
 pub use crate::{
     container::bft::BftQueue,
+    policy::SearchKind,
     search::{
         context::AncestorPolicy,
         searchable::{
@@ -37,5 +38,4 @@ pub use crate::{
         Find,
     },
     state::result::Response,
-    traversal::SearchKind,
 };

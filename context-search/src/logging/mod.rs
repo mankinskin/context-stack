@@ -18,7 +18,7 @@ use crate::{
         SearchNode,
         SearchQueue,
     },
-    traversal::SearchKind,
+    policy::SearchKind,
 };
 use context_trace::*;
 use std::fmt;

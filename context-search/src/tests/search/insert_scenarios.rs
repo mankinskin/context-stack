@@ -37,14 +37,14 @@ use {
 
 #[test]
 fn prefix1() {
-    let mut graph = Hypergraph::default();
+    let mut graph = HypergraphRef::default();
     insert_atoms!(graph, {h, e, l, d});
     insert_patterns!(graph,
         (ld, ld_id) => [l, d],
         (heldld, heldld_id) => [h, e, ld, ld]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
-    let res = Searchable::<AncestorSearchTraversal>::search(
+    let res = Searchable::<AncestorSearchTraversal<_>>::search(
         vec![h, e, l, l],
         graph.into(),
     );
@@ -574,11 +574,11 @@ fn search_infix1_a_b_y() {
                         VertexCache {
                             bottom_up: Default::default(),
                             top_down: FromIterator::from_iter([(
-                                1.into(),
+                                2.into(),
                                 PositionCache::new(
                                     Default::default(),
                                     HashMap::from_iter([(
-                                        DirectedKey::down(y, 1),
+                                        DirectedKey::down(y, 2),
                                         SubLocation::new(yz_pat_id, 0),
                                     )]),
                                 )
@@ -600,11 +600,11 @@ fn search_infix1_a_b_y() {
                                 )
                             )]),
                             top_down: FromIterator::from_iter([(
-                                1.into(),
+                                2.into(),
                                 PositionCache::new(
                                     Default::default(),
                                     HashMap::from_iter([(
-                                        DirectedKey::down(yz, 1),
+                                        DirectedKey::down(yz, 2),
                                         SubLocation::new(xxabyzw_pat_id, 4),
                                     )]),
                                 )
@@ -617,7 +617,7 @@ fn search_infix1_a_b_y() {
                         VertexCache {
                             bottom_up: Default::default(),
                             top_down: FromIterator::from_iter([(
-                                1.into(),
+                                2.into(),
                                 PositionCache::default()
                             )]),
                             index: y,
@@ -637,10 +637,10 @@ fn search_infix1_a_b_y() {
                     ),
                     target: DownKey {
                         index: y,
-                        pos: DownPosition(1.into()),
+                        pos: DownPosition(2.into()),
                     },
                     entry_pos: 1.into(),
-                    exit_pos: 1.into(),
+                    exit_pos: 2.into(),
                     end_pos: 3.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
@@ -801,11 +801,11 @@ fn search_infix2_a_b_c_d() {
                         VertexCache {
                             bottom_up: Default::default(),
                             top_down: FromIterator::from_iter([(
-                                1.into(),
+                                3.into(),
                                 PositionCache::new(
                                     Default::default(),
                                     HashMap::from_iter([(
-                                        DirectedKey::down(d, 1),
+                                        DirectedKey::down(d, 3),
                                         SubLocation::new(abcdx_pat_id, 3),
                                     )]),
                                 )
@@ -818,7 +818,7 @@ fn search_infix2_a_b_c_d() {
                         VertexCache {
                             bottom_up: Default::default(),
                             top_down: FromIterator::from_iter([(
-                                1.into(),
+                                3.into(),
                                 PositionCache::new(
                                     Default::default(),
                                     Default::default(),
@@ -845,9 +845,9 @@ fn search_infix2_a_b_c_d() {
                     ),
                     target: DownKey {
                         index: d,
-                        pos: DownPosition(1.into()),
+                        pos: DownPosition(3.into()),
                     },
-                    exit_pos: 1.into(),
+                    exit_pos: 3.into(),
                     end_pos: 4.into(),
                 }),
                 cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(

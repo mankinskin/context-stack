@@ -1,6 +1,6 @@
-use crate::traversal::{
+use crate::policy::{
     container::ExtendStates,
-    state::traversal::TraversalState,
+    state::policy::TraversalState,
 };
 
 use crate::StateContainer;
