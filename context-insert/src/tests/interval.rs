@@ -218,7 +218,7 @@ fn interval_graph1() {
     } = env;
     let query = vec![*a, *bc, *d, *e];
     let res = graph.find_ancestor(query).unwrap();
-    assert!(!res.query_exhausted());
+    assert!(res.query_exhausted());
     let init = InitInterval::from(res);
     let interval = IntervalGraph::from((&mut *graph, init));
     assert_eq!(
@@ -257,7 +257,7 @@ fn interval_graph2() {
     let _tracing = context_trace::init_test_tracing!(&graph);
     let query = vec![d, e, f, g, h];
     let res = graph.find_ancestor(query).unwrap();
-    assert!(!res.query_exhausted());
+    assert!(res.query_exhausted());
     let init = InitInterval::from(res);
 
     assert_eq!(
@@ -279,7 +279,7 @@ fn interval_graph2() {
                 hi => (
                     BU {},
                     TD {
-                        1 => h -> (hi_id, 0)
+                        4 => h -> (hi_id, 0)
                     }
                 ),
                 cdefg => (
