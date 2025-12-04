@@ -260,20 +260,89 @@ fn interval_graph2() {
     assert!(res.query_exhausted());
     let init = InitInterval::from(res);
 
-    // Verify key properties
-    assert_eq!(init.root, cdefghi, "Expected root to be cdefghi");
-    assert_eq!(init.end_bound, 5.into(), "Expected end_bound to be 5");
-    
-    // Note: The cache structure depends on implementation details of how the search
-    // traces through the hierarchy. The important part is that the root and end_bound
-    // are correct. Detailed cache comparison is omitted as it's implementation-dependent.
-
+    assert_eq!(
+        init,
+        InitInterval {
+            root: cdefghi,
+            end_bound: 5.into(),
+            cache: build_trace_cache!(
+                d => (
+                    BU {},
+                    TD {}
+                ),
+                cd => (
+                    BU {
+                        1 => d -> (cd_id, 1)
+                    },
+                    TD {}
+                ),
+                hi => (
+                    BU {},
+                    TD {
+                        1 => h -> (hi_id, 0)
+                    }
+                ),
+                cdefg => (
+                    BU {
+                        1 => cd -> (cdefg_id, 0)
+                    },
+                    TD {}
+                ),
+                h => (
+                    BU {},
+                    TD {}
+                ),
+                cdefghi => (
+                    BU {
+                        4 => cdefg -> (cdefghi_ids[0], 0)
+                    },
+                    TD {
+                        4 => hi -> (cdefghi_ids[0], 1)
+                    }
+                ),
+            )
+        }
+    );
     let interval = IntervalGraph::from((&mut *graph.graph_mut(), init));
-    
-    // Verify key properties of the interval graph
-    assert_eq!(interval.root, cdefghi, "Expected interval root to be cdefghi");
-    
-    // Note: The detailed states and cache structure depend on implementation details
-    // of how splits are computed. The important part is that the root is correct.
-    // Detailed structure comparison is omitted as it's implementation-dependent.
+    assert_eq!(
+        interval,
+        IntervalGraph {
+            root: cdefghi,
+            states: SplitStates {
+                leaves: vec![PosKey::new(cd, 1)].into(),
+                queue: VecDeque::default(),
+            },
+            cache: build_split_cache!(
+                RootMode::Infix,
+                cd => {
+                    { cdefg: 2 } -> 1 => {
+                        cd_id => (1, None)
+                    }
+                },
+                hi => {
+                    { efghi: 4 } -> 5 => {
+                        hi_id => (1, None)
+                    }
+                },
+                cdefg => {
+                    { cdefghi: 1 } -> 1 => {
+                        cdefg_id => (0, Some(nz!(1))),
+                    }
+                },
+                efghi => {
+                    { cdefghi: 2 } -> 4 => {
+                        efghi_id => (1, Some(nz!(1))),
+                    }
+                },
+                cdefghi => {
+                    { } -> 1 => {
+                        cdefghi_ids[1] => (0, Some(nz!(1))),
+                    },
+                    {} -> 6 => {
+                        cdefghi_ids[0] => (1, Some(nz!(1))),
+                    },
+                },
+            )
+        }
+    );
 }
