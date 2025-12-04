@@ -41,7 +41,6 @@ fn index_pattern1() {
         assert_all_vertices_unique(&*g);
     }
     
-    let graph = HypergraphRef::from(graph);
     let query = vec![by, z];
     let byz: Token = graph.insert(query.clone()).expect("Indexing failed");
     
@@ -96,8 +95,6 @@ fn index_pattern2() {
         let g = graph.graph();
         assert_all_vertices_unique(&*g);
     }
-
-    let graph = HypergraphRef::from(graph);
 
     let query = vec![a, b, y, x];
     let aby: Token = graph.insert(query.clone()).expect("Indexing failed");
