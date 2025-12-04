@@ -12,6 +12,7 @@ use crate::graph::{
 };
 use std::sync::{
     Arc,
+    OnceLock,
     RwLock,
     RwLockReadGuard,
     RwLockWriteGuard,
@@ -235,21 +236,29 @@ impl TestEnv for Env1 {
             ababababcdefghi,
         }
     }
+    
     fn get_expected<'a>() -> RwLockReadGuard<'a, Self> {
-        CONTEXT.read().unwrap()
+        get_context().read().unwrap()
     }
     fn get_expected_mut<'a>() -> RwLockWriteGuard<'a, Self> {
-        CONTEXT.write().unwrap()
+        get_context().write().unwrap()
     }
 }
-lazy_static::lazy_static! {
-    pub(crate) static ref
-        CONTEXT: Arc<RwLock<Env1>> = Arc::new(RwLock::new(Env1::initialize_expected()));
+
+fn get_context() -> &'static Arc<RwLock<Env1>> {
+    CONTEXT.with(|cell| {
+        // SAFETY: OnceLock::get_or_init returns &T which is tied to the OnceLock's lifetime
+        // We extend this to 'static because thread_local storage persists for thread lifetime
+        unsafe {
+            let ptr = cell.get_or_init(|| Arc::new(RwLock::new(Env1::initialize_expected())));
+            &*(ptr as *const Arc<RwLock<Env1>>)
+        }
+    })
 }
-//pub(crate) fn context() -> RwLockReadGuard<'static, Ctx> {
-//    CONTEXT.read().unwrap()
-//}
-//
-//pub(crate) fn context_mut() -> RwLockWriteGuard<'static, Ctx> {
-//    CONTEXT.write().unwrap()
-//}
+
+thread_local! {
+    /// Thread-local test environment
+    /// Each test thread maintains its own Env1 instance, allowing parallel test execution
+    /// without lock contention or poisoning issues between tests
+    static CONTEXT: OnceLock<Arc<RwLock<Env1>>> = OnceLock::new();
+}
