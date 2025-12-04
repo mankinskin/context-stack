@@ -97,20 +97,20 @@ fn index_pattern2() {
         assert_all_vertices_unique(&*g);
     }
 
-    let graph_ref = HypergraphRef::from(graph);
+    let graph = HypergraphRef::from(graph);
 
     let query = vec![a, b, y, x];
-    let aby: Token = graph_ref.insert(query.clone()).expect("Indexing failed");
+    let aby: Token = graph.insert(query.clone()).expect("Indexing failed");
     
     // Assert the token has the expected string representation and width
     {
-        let g = graph_ref.graph();
+        let g = graph.graph();
         assert_token_string_repr(&*g, aby, "aby");
         assert_all_vertices_unique(&*g);
     }
     assert_eq!(aby.width(), 3);
     
-    let ab = graph_ref
+    let ab = graph
         .find_ancestor("ab".chars())
         .unwrap()
         .expect_complete("ab")
