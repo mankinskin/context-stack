@@ -279,18 +279,22 @@ fn interval_graph2() {
                 hi => (
                     BU {},
                     TD {
-                        4 => h -> (hi_id, 0)
+                        1 => h -> (hi_id, 0)
                     }
+                ),
+                cdefg => (
+                    BU {
+                        1 => cd -> (cdefg_id, 0)
+                    },
+                    TD {}
                 ),
                 h => (
                     BU {},
-                    TD {
-                        4
-                    }
+                    TD {}
                 ),
                 cdefghi => (
                     BU {
-                        4 => cd -> (cdefghi_ids[0], 0)
+                        4 => cdefg -> (cdefghi_ids[0], 0)
                     },
                     TD {
                         4 => hi -> (cdefghi_ids[0], 1)
@@ -299,13 +303,46 @@ fn interval_graph2() {
             )
         }
     );
-    
-    // TODO: Update full cache expectations to match actual correct behavior
-    // The actual cache correctly has:
-    // - hi at position 4 (not 1)
-    // - cdefghi at position 4 (not separate cdefg entry)
-    // For now, just verify root and end_bound are correct
-    
     let interval = IntervalGraph::from((&mut *graph.graph_mut(), init));
-    assert_eq!(interval.root, cdefghi);
+    assert_eq!(
+        interval,
+        IntervalGraph {
+            root: cdefghi,
+            states: SplitStates {
+                leaves: vec![PosKey::new(cd, 1)].into(),
+                queue: VecDeque::default(),
+            },
+            cache: build_split_cache!(
+                RootMode::Infix,
+                cd => {
+                    { cdefg: 2 } -> 1 => {
+                        cd_id => (1, None)
+                    }
+                },
+                hi => {
+                    { efghi: 4 } -> 5 => {
+                        hi_id => (1, None)
+                    }
+                },
+                cdefg => {
+                    { cdefghi: 1 } -> 1 => {
+                        cdefg_id => (0, Some(nz!(1))),
+                    }
+                },
+                efghi => {
+                    { cdefghi: 2 } -> 4 => {
+                        efghi_id => (1, Some(nz!(1))),
+                    }
+                },
+                cdefghi => {
+                    { } -> 1 => {
+                        cdefghi_ids[1] => (0, Some(nz!(1))),
+                    },
+                    {} -> 6 => {
+                        cdefghi_ids[0] => (1, Some(nz!(1))),
+                    },
+                },
+            )
+        }
+    );
 }
