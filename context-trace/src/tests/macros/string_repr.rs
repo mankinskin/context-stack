@@ -5,11 +5,13 @@
 
 use crate::{
     Hypergraph,
-    HypergraphRef,
     graph::{
-        kind::GraphKind,
-        vertex::{VertexIndex, token::Token},
         getters::vertex::VertexSet,
+        kind::GraphKind,
+        vertex::{
+            VertexIndex,
+            token::Token,
+        },
     },
 };
 use std::collections::HashMap;
@@ -55,8 +57,7 @@ pub fn assert_token_string_repr<G: GraphKind>(
     graph: &Hypergraph<G>,
     token: Token,
     expected_str: &str,
-)
-where
+) where
     G::Atom: std::fmt::Display,
 {
     let actual_str = Hypergraph::<G>::index_string(graph, token.index);
@@ -85,31 +86,33 @@ where
 /// assert!(is_unique, "Found duplicate string representations: {:?}", duplicates);
 /// ```
 pub fn check_all_vertices_unique<G: GraphKind>(
-    graph: &Hypergraph<G>,
+    graph: &Hypergraph<G>
 ) -> (bool, Vec<(String, Vec<VertexIndex>)>)
 where
     G::Atom: std::fmt::Display,
 {
-    let mut string_to_indices: HashMap<String, Vec<VertexIndex>> = HashMap::new();
-    
+    let mut string_to_indices: HashMap<String, Vec<VertexIndex>> =
+        HashMap::new();
+
     // Collect all vertices and their string representations
     for index in 0..graph.vertex_count() {
         let vertex_index = VertexIndex::from(index);
         if graph.get_vertex(vertex_index).is_ok() {
-            let string_repr = Hypergraph::<G>::index_string(graph, vertex_index);
+            let string_repr =
+                Hypergraph::<G>::index_string(graph, vertex_index);
             string_to_indices
                 .entry(string_repr)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(vertex_index);
         }
     }
-    
+
     // Find duplicates
     let duplicates: Vec<(String, Vec<VertexIndex>)> = string_to_indices
         .into_iter()
         .filter(|(_, indices)| indices.len() > 1)
         .collect();
-    
+
     let is_unique = duplicates.is_empty();
     (is_unique, duplicates)
 }
@@ -176,20 +179,17 @@ where
     G::Atom: std::fmt::Display,
 {
     let mut string_to_tokens: HashMap<String, Vec<Token>> = HashMap::new();
-    
+
     for &token in tokens {
         let string_repr = Hypergraph::<G>::index_string(graph, token.index);
-        string_to_tokens
-            .entry(string_repr)
-            .or_insert_with(Vec::new)
-            .push(token);
+        string_to_tokens.entry(string_repr).or_default().push(token);
     }
-    
+
     let duplicates: Vec<(String, Vec<Token>)> = string_to_tokens
         .into_iter()
         .filter(|(_, tokens)| tokens.len() > 1)
         .collect();
-    
+
     let is_unique = duplicates.is_empty();
     (is_unique, duplicates)
 }
@@ -208,8 +208,7 @@ where
 pub fn assert_tokens_unique<G: GraphKind>(
     graph: &Hypergraph<G>,
     tokens: &[Token],
-)
-where
+) where
     G::Atom: std::fmt::Display,
 {
     let (is_unique, duplicates) = check_tokens_unique(graph, tokens);
@@ -225,11 +224,7 @@ fn format_token_duplicates(duplicates: &[(String, Vec<Token>)]) -> String {
     duplicates
         .iter()
         .map(|(string, tokens)| {
-            format!(
-                "  '{}' appears in tokens: {:?}",
-                string,
-                tokens
-            )
+            format!("  '{}' appears in tokens: {:?}", string, tokens)
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -284,6 +279,7 @@ macro_rules! assert_unique_tokens {
 mod tests {
     use super::*;
     use crate::{
+        HypergraphRef,
         insert_atoms,
         insert_patterns,
         trace::has_graph::HasGraph,
@@ -293,13 +289,13 @@ mod tests {
     fn test_check_token_string_repr() {
         let mut graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
-        
+
         let g = graph.graph();
         assert!(check_token_string_repr(&*g, a, "a"));
         assert!(check_token_string_repr(&*g, b, "b"));
         assert!(!check_token_string_repr(&*g, a, "b"));
         drop(g);
-        
+
         insert_patterns!(graph, abc => [a, b, c]);
         let g = graph.graph();
         assert!(check_token_string_repr(&*g, abc, "abc"));
@@ -310,7 +306,7 @@ mod tests {
         let mut graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
         insert_patterns!(graph, abc => [a, b, c]);
-        
+
         let g = graph.graph();
         assert_token_string_repr(&*g, a, "a");
         assert_token_string_repr(&*g, abc, "abc");
@@ -318,10 +314,11 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Token string representation mismatch")]
+    #[allow(unused)]
     fn test_assert_token_string_repr_fails() {
         let mut graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b});
-        
+
         let g = graph.graph();
         assert_token_string_repr(&*g, a, "b");
     }
@@ -331,21 +328,25 @@ mod tests {
         let mut graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c, d});
         insert_patterns!(graph,
-            ab => [a, b],
-            cd => [c, d]
+            _ab => [a, b],
+            _cd => [c, d]
         );
-        
+
         let g = graph.graph();
         let (is_unique, duplicates) = check_all_vertices_unique(&*g);
-        assert!(is_unique, "Expected unique string reprs, got duplicates: {:?}", duplicates);
+        assert!(
+            is_unique,
+            "Expected unique string reprs, got duplicates: {:?}",
+            duplicates
+        );
     }
 
     #[test]
     fn test_assert_all_vertices_unique() {
         let mut graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
-        insert_patterns!(graph, abc => [a, b, c]);
-        
+        insert_patterns!(graph, _abc => [a, b, c]);
+
         let g = graph.graph();
         assert_all_vertices_unique(&*g);
     }
@@ -358,9 +359,13 @@ mod tests {
             ab => [a, b],
             cd => [c, d]
         );
-        
+
         let g = graph.graph();
         let (is_unique, duplicates) = check_tokens_unique(&*g, &[ab, cd]);
-        assert!(is_unique, "Expected unique tokens, got duplicates: {:?}", duplicates);
+        assert!(
+            is_unique,
+            "Expected unique tokens, got duplicates: {:?}",
+            duplicates
+        );
     }
 }
