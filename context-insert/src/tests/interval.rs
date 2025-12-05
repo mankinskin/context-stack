@@ -1,6 +1,8 @@
 use std::{
     collections::{
         BTreeMap,
+        HashMap,
+        HashSet,
         VecDeque,
     },
     iter::FromIterator,
@@ -10,7 +12,14 @@ use pretty_assertions::assert_eq;
 
 use crate::*;
 use context_search::*;
-use context_trace::*;
+use context_trace::{
+    tests::env::{
+        Env1,
+        Env2,
+        TestEnv,
+    },
+    *,
+};
 fn build_split_cache1(env: &Env1) -> SplitCache {
     let Env1 {
         def,
@@ -29,26 +38,34 @@ fn build_split_cache1(env: &Env1) -> SplitCache {
     build_split_cache!(
         RootMode::Prefix,
         ef => {
-            { abcdef: 5, def: 2, cdef: 3 } -> 1 => {
-                e_f_id => (1, None)
+            1 => {
+                top: [abcdef: 5, def: 2, cdef: 3],
+                splits: [e_f_id => (1, None)]
             }
         },
         def => {
-            { abcdef: 5, cdef: 3 } -> 2 => {
-                d_ef_id => (1, Some(nz!(1)))
+            2 => {
+                top: [abcdef: 5, cdef: 3],
+                splits: [d_ef_id => (1, Some(nz!(1)))]
             }
         },
         cdef => {
-            { abcdef: 5 } -> 3 => {
-                c_def_id => (1, Some(nz!(2))),
-                cd_ef_id => (1, Some(nz!(1)))
+            3 => {
+                top: [abcdef: 5],
+                splits: [
+                    c_def_id => (1, Some(nz!(2))),
+                    cd_ef_id => (1, Some(nz!(1)))
+                ]
             }
         },
         abcdef => {
-            {} -> 5 => {
-                abcd_ef_id => (1, Some(nz!(1))),
-                abc_def_id => (1, Some(nz!(2))),
-                ab_cdef_id => (1, Some(nz!(3))),
+            5 => {
+                top: [],
+                splits: [
+                    abcd_ef_id => (1, Some(nz!(1))),
+                    abc_def_id => (1, Some(nz!(2))),
+                    ab_cdef_id => (1, Some(nz!(3))),
+                ]
             }
         }
     )
@@ -236,113 +253,127 @@ fn interval_graph1() {
 
 #[test]
 fn interval_graph2() {
-    let mut graph = HypergraphRef::default();
-    insert_atoms!(graph, {a, b, c, d, e, f, g, h, i, j, k});
-    insert_patterns!(graph,
-        (cd, cd_id) => [c, d],
-        (hi, hi_id) => [h, i],
-        (efg, _efg_id) => [e, f, g],
-        (cdefg, cdefg_id) => [cd, efg],
-        (efghi, efghi_id) => [efg, hi],
-    );
-    insert_patterns!(graph,
-        (cdefghi, cdefghi_ids) => [
-            [cdefg, hi],
-            [cd, efghi],
-        ],
-    );
-    insert_patterns!(graph,
-        (_abcdefghijk, _abcdefghijk_id) => [a, b, cdefghi, j, k],
-    );
-    let _tracing = context_trace::init_test_tracing!(&graph);
-    let query = vec![d, e, f, g, h];
-    let res = graph.find_ancestor(query).unwrap();
-    assert!(res.query_exhausted());
-    let init = InitInterval::from(res);
+    // Use test environment and trace cache test case from context-search
+    let mut trace_test =
+        context_search::tests::search::trace_cache::CdefghiTraceCase::new();
+    let _tracing = context_trace::init_test_tracing!(&trace_test.env.graph);
 
+    // Build InitInterval directly from test case expected values (no search needed)
+    let init = InitInterval {
+        root: trace_test.expected_root,
+        cache: trace_test.expected_cache.clone(),
+        end_bound: trace_test.expected_end_bound.into(),
+    };
+
+    // Extract tokens and pattern IDs from environment
+    let Env2 {
+        cd,
+        hi,
+        cdefg,
+        efghi,
+        cdefghi,
+        c_d_id,
+        h_i_id,
+        cd_efg_id,
+        efg_hi_id,
+        cdefghi_ids,
+        ..
+    } = &trace_test.env;
+
+    // Dereference for use in macros and assertions
+    let (cd, hi, cdefg, efghi, cdefghi) = (*cd, *hi, *cdefg, *efghi, *cdefghi);
+    let (c_d_id, h_i_id, cd_efg_id, efg_hi_id) =
+        (*c_d_id, *h_i_id, *cd_efg_id, *efg_hi_id);
+
+    let cdefg_hi_id = cdefghi_ids[0];
+    let cd_efghi_id = cdefghi_ids[1];
+
+    let interval =
+        IntervalGraph::from((&mut *trace_test.env.graph.graph_mut(), init));
+
+    // Check root and states
+    assert_eq!(interval.root, cdefghi);
     assert_eq!(
-        init,
-        InitInterval {
-            root: cdefghi,
-            end_bound: 5.into(),
-            cache: build_trace_cache!(
-                d => (
-                    BU {},
-                    TD {}
-                ),
-                cd => (
-                    BU {
-                        1 => d -> (cd_id, 1)
-                    },
-                    TD {}
-                ),
-                hi => (
-                    BU {},
-                    TD {
-                        1 => h -> (hi_id, 0)
-                    }
-                ),
-                cdefg => (
-                    BU {
-                        1 => cd -> (cdefg_id, 0)
-                    },
-                    TD {}
-                ),
-                h => (
-                    BU {},
-                    TD {}
-                ),
-                cdefghi => (
-                    BU {
-                        4 => cdefg -> (cdefghi_ids[0], 0)
-                    },
-                    TD {
-                        4 => hi -> (cdefghi_ids[0], 1)
-                    }
-                ),
-            )
+        interval.states,
+        SplitStates {
+            leaves: vec![PosKey::new(cd, 1)].into(),
+            queue: VecDeque::default(),
         }
     );
-    let interval = IntervalGraph::from((&mut *graph.graph_mut(), init));
-    assert_eq!(
-        interval,
-        IntervalGraph {
-            root: cdefghi,
-            states: SplitStates {
-                leaves: vec![PosKey::new(cd, 1)].into(),
-                queue: VecDeque::default(),
+
+    // Build expected split cache
+    let expected_cache = build_split_cache!(
+        RootMode::Infix,
+        cd => {
+            1 => {
+                top: [cdefg: 2],
+                splits: [c_d_id => (1, None)]
+            }
+        },
+        hi => {
+            5 => {
+                top: [efghi: 4],
+                splits: [h_i_id => (1, None)]
+            }
+        },
+        cdefg => {
+            1 => {
+                top: [cdefghi: 1],
+                splits: [cd_efg_id => (0, Some(nz!(1)))]
+            }
+        },
+        efghi => {
+            4 => {
+                top: [cdefghi: 2],
+                splits: [efg_hi_id => (1, Some(nz!(1)))]
+            }
+        },
+        cdefghi => {
+            1 => {
+                top: [],
+                splits: [cd_efghi_id => (0, Some(nz!(1)))]
             },
-            cache: build_split_cache!(
-                RootMode::Infix,
-                cd => {
-                    { cdefg: 2 } -> 1 => {
-                        cd_id => (1, None)
-                    }
-                },
-                hi => {
-                    { efghi: 4 } -> 5 => {
-                        hi_id => (1, None)
-                    }
-                },
-                cdefg => {
-                    { cdefghi: 1 } -> 1 => {
-                        cdefg_id => (0, Some(nz!(1))),
-                    }
-                },
-                efghi => {
-                    { cdefghi: 2 } -> 4 => {
-                        efghi_id => (1, Some(nz!(1))),
-                    }
-                },
-                cdefghi => {
-                    { } -> 1 => {
-                        cdefghi_ids[1] => (0, Some(nz!(1))),
-                    },
-                    {} -> 6 => {
-                        cdefghi_ids[0] => (1, Some(nz!(1))),
-                    },
-                },
-            )
-        }
+            6 => {
+                top: [],
+                splits: [cdefg_hi_id => (1, Some(nz!(1)))]
+            },
+        },
+    );
+
+    // Check cache root mode
+    assert_eq!(interval.cache.root_mode, expected_cache.root_mode);
+
+    // Verify number of entries
+    assert_eq!(
+        interval.cache.entries.len(),
+        expected_cache.entries.len(),
+        "Expected 5 split cache entries: cd, hi, cdefg, efghi, cdefghi"
+    );
+
+    // Check each entry individually
+    assert_eq!(
+        interval.cache.entries.get(&cd.index).unwrap(),
+        expected_cache.entries.get(&cd.index).unwrap(),
+        "cd entry mismatch"
+    );
+    assert_eq!(
+        interval.cache.entries.get(&hi.index).unwrap(),
+        expected_cache.entries.get(&hi.index).unwrap(),
+        "hi entry mismatch"
+    );
+    assert_eq!(
+        interval.cache.entries.get(&cdefg.index).unwrap(),
+        expected_cache.entries.get(&cdefg.index).unwrap(),
+        "cdefg entry mismatch"
+    );
+    assert_eq!(
+        interval.cache.entries.get(&efghi.index).unwrap(),
+        expected_cache.entries.get(&efghi.index).unwrap(),
+        "efghi entry mismatch"
+    );
+    assert_eq!(
+        interval.cache.entries.get(&cdefghi.index).unwrap(),
+        expected_cache.entries.get(&cdefghi.index).unwrap(),
+        "cdefghi entry mismatch"
     );
 }

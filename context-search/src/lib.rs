@@ -24,7 +24,7 @@ pub(crate) mod state;
 pub mod logging;
 
 #[cfg(any(test, feature = "test-api"))]
-pub(crate) mod tests;
+pub mod tests;
 
 pub use crate::{
     container::bft::BftQueue,

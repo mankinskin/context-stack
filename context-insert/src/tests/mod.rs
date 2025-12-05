@@ -96,10 +96,9 @@ macro_rules! build_split_cache {
         $(
             $entry_root:ident => {
                 $(
-                    {
-                        $($top:ident: $top_pos:expr),*$(,)?
-                    } -> $pos:expr => {
-                        $($pid:expr => ($sub:expr, $inner:expr)),*$(,)?
+                    $pos:expr => {
+                        top: [$($top:ident: $top_pos:expr),*$(,)?],
+                        splits: [$($pid:expr => ($sub:expr, $inner:expr)),*$(,)?]
                     }
                 ),*$(,)?
             }
