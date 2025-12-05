@@ -58,7 +58,11 @@ let init = InitInterval::from(incomplete_response);
 **What does it mean?**
 - **root**: The pattern that partially matched
 - **cache**: Trace information from the search
-- **end_bound**: Position in the query where we need to extend
+- **end_bound**: Position in root token where we need to extend (uses checkpoint_position!)
+
+**Critical:** `end_bound` comes from `checkpoint_position()`, not `cursor_position()`:
+- `checkpoint_position()` - Confirmed match extent (for insertion boundaries) ✓
+- `cursor_position()` - Advanced exploration position (for consecutive searches) ✗
 
 ### 3. Split-Join Architecture
 
@@ -471,19 +475,36 @@ if !response.query_exhausted() {
 }
 ```
 
-### 2. Wrong end_bound Expectations
+### 2. Position Semantics (Critical Understanding)
 
-**Current issue:** `cursor_position()` might not match expected `end_bound`
+**Two position types in Response:**
 
 ```rust
-// Implementation in init.rs
-let end_bound = response.cursor_position();
+// For insertion boundaries (confirmed match extent)
+response.checkpoint_position() -> AtomPosition  // ✓ Use this!
 
-// But tests might expect:
-// end_bound = cursor_position() + 1?  // Or something else?
+// For consecutive searches (advanced exploration)
+response.cursor_position() -> AtomPosition      // ✗ Not for insertion!
 ```
 
-*See QUESTIONS_FOR_AUTHOR.md for clarification needed*
+**Why the distinction?**
+- Search can advance query cursor speculatively (exploring parents)
+- If parent exploration needed, cursor advances but checkpoint doesn't
+- Insertion must use **confirmed boundary** (checkpoint)
+- Consecutive searches use **exploration position** (cursor)
+
+**Current implementation:**
+```rust
+// In init.rs - CORRECT implementation
+impl From<Response> for InitInterval {
+    fn from(state: Response) -> Self {
+        let end_bound = state.checkpoint_position();  // ✓ Correct!
+        // ...
+    }
+}
+```
+
+*See agents/analysis/20251204_CONTEXT_INSERT_ARCHITECTURE.md for detailed analysis*
 
 ### 3. Forgetting to Handle Insertion Failure
 
@@ -515,6 +536,119 @@ graph.insert_atom("something");     // Dangerous!
 {
     let mut graph = graph_ref.write();
     graph.insert_atom("something");
+}
+```
+
+---
+
+## Search-Insert Interoperability
+
+### How Search Results Flow Into Insertion
+
+**The Bridge: Response → InitInterval**
+
+```rust
+// 1. Search first
+let query = vec![a, b, c, d];
+let response = graph.find_ancestor(query)?;
+
+// 2. Check if insertion needed
+if !response.query_exhausted() {
+    // 3. Convert Response to InitInterval
+    let init = InitInterval::from(response);
+    
+    // 4. Perform insertion
+    let token = graph.insert_init((), init)?;
+}
+```
+
+**What gets transferred:**
+
+| From Response | To InitInterval | Purpose |
+|--------------|-----------------|---------|
+| `root_token()` | `root` | Pattern that partially matched |
+| `cache` | `cache` | Parent-child relationships discovered during search |
+| `checkpoint_position()` | `end_bound` | Confirmed match extent (not cursor!) |
+
+### Trace Cache Reuse
+
+The `TraceCache` from search encodes bidirectional parent-child relationships:
+
+```rust
+TraceCache {
+    entries: HashMap<Token, VertexCache>
+}
+
+VertexCache {
+    bottom_up: DirectedPositions,    // Parents containing this token
+    top_down: DirectedPositions,     // Children this token contains
+    index: Token,
+}
+```
+
+**Semantic Content:**
+- **Bottom-Up (BU):** "At position X in this token, child Y belongs to pattern Z"
+- **Top-Down (TD):** "This token appears at position X in parent pattern Y"
+
+**Why reuse?**
+- Split-join uses cache to navigate pattern hierarchies
+- No need to re-discover relationships
+- Efficient position calculations
+- Consistent with search findings
+
+### Position Calculation Flow
+
+```
+Search Phase:
+  Query: [h, e, l, l]
+  Graph: heldld = [h, e, ld, ld]  where ld = [l, d]
+  Matches: [h, e, l] (within first ld)
+  
+  Response:
+    checkpoint_position = 3    (confirmed: matched 'h', 'e', 'l')
+    cursor_position = 3        (no advancement - query exhausted within token)
+    root_token = heldld
+
+Conversion to InitInterval:
+  root = heldld
+  end_bound = 3                (from checkpoint_position!)
+  cache = { heldld => TD{2 => ld}, ld => TD{2 => l}, ... }
+
+Split Phase:
+  Uses cache to find split point at position 3 in heldld
+  Identifies that position 3 is within 'ld' pattern
+  Splits ld to access 'l' atom
+
+Join Phase:
+  Creates 'hel' pattern from [h, e, l]
+  Updates parent patterns accordingly
+```
+
+### PathCoverage and Insertion
+
+Different search outcomes require different insertion strategies:
+
+| PathCoverage | query_exhausted | Insertion Action |
+|--------------|-----------------|------------------|
+| EntireRoot | true | None - use existing token |
+| Range | false | Infix insertion |
+| Prefix | false | Postfix insertion |
+| Postfix | false | Prefix insertion |
+
+**Example:**
+```rust
+match response.end.path {
+    PathCoverage::EntireRoot(_) if response.query_exhausted() => {
+        // Perfect match - no insertion
+    },
+    PathCoverage::Postfix(_) if !response.query_exhausted() => {
+        // Matched postfix, need prefix
+        let init = InitInterval::from(response);
+        // end_bound indicates where prefix should extend
+    },
+    _ => {
+        // Handle other cases
+    }
 }
 ```
 
