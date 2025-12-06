@@ -73,7 +73,9 @@ impl CdefghiTraceCase {
             ),
             h => (
                 BU {},
-                TD {}
+                TD {
+                    4
+                }
             ),
             cdefghi => (
                 BU {
