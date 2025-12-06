@@ -7,7 +7,6 @@ use derive_more::{
     DerefMut,
 };
 use derive_new::new;
-use tracing::instrument;
 
 #[derive(Debug, Clone, Deref, DerefMut, new)]
 pub struct RootManager {
@@ -34,9 +33,9 @@ impl RootManager {
             _ => {
                 if let Some(root) = &mut self.root {
                     let mut graph = self.graph.graph_mut();
-                    let vertex = (*root).vertex_mut(&mut graph);
-                    *root = if vertex.tokens.len() == 1
-                        && vertex.parents.is_empty()
+                    let vertex = (*root).vertex(&graph);
+                    *root = if vertex.child_patterns().len() == 1
+                        && vertex.parents().is_empty()
                     {
                         let (&pid, _) = vertex.expect_any_child_pattern();
                         graph.append_to_pattern(*root, pid, new)
@@ -61,10 +60,10 @@ impl RootManager {
         let index = index.to_child();
         if let Some(root) = &mut self.root {
             let mut graph = self.graph.graph_mut();
-            let vertex = (*root).vertex_mut(&mut graph);
+            let vertex = (*root).vertex(&graph);
             *root = if index.vertex_index() != root.vertex_index()
-                && vertex.tokens.len() == 1
-                && vertex.parents.is_empty()
+                && vertex.child_patterns().len() == 1
+                && vertex.parents().is_empty()
             {
                 let (&pid, _) = vertex.expect_any_child_pattern();
                 graph.append_to_pattern(*root, pid, index)

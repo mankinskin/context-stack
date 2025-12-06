@@ -28,7 +28,7 @@ pub(crate) trait BandExpandingPolicy<G: HasGraph> {
     }
 }
 #[derive(Debug)]
-pub(crate) struct PostfixExpandingPolicy<D: PatternDirection> {
+pub struct PostfixExpandingPolicy<D: PatternDirection> {
     _ty: std::marker::PhantomData<D>,
 }
 impl<G: HasGraph, D: PatternDirection> BandExpandingPolicy<G>
@@ -55,7 +55,7 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) struct PrefixExpandingPolicy<D: Direction> {
+pub struct PrefixExpandingPolicy<D: Direction> {
     _ty: std::marker::PhantomData<D>,
 }
 impl<G: HasGraph, D: Direction> BandExpandingPolicy<G>

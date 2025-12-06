@@ -1,4 +1,7 @@
-use context_trace::*;
+use context_trace::{
+    *,
+    graph::vertex::atom::{NewAtomIndex, NewAtomIndices},
+};
 use derive_more::{
     Deref,
     DerefMut,
@@ -9,7 +12,7 @@ use std::fmt::Debug;
 
 #[derive(Debug, Deref, DerefMut, Clone)]
 pub struct BlockIter {
-    iter: std::iter::Peekable<std::vec::IntoIter<NewAtomndex>>,
+    iter: std::iter::Peekable<std::vec::IntoIter<NewAtomIndex>>,
 }
 
 #[derive(Debug, Clone)]

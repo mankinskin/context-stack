@@ -73,7 +73,7 @@ impl<G: GraphKind> Hypergraph<G> {
         self.insert_atom_data(atom, data)
     }
 
-    pub(crate) fn new_atom_indices(
+    pub fn new_atom_indices(
         &mut self,
         sequence: impl IntoIterator<Item = G::Atom>,
     ) -> NewAtomIndices {

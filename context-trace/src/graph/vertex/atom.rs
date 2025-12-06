@@ -83,17 +83,17 @@ impl Wide for NoAtom {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub(crate) enum NewAtomIndex {
+pub enum NewAtomIndex {
     New(crate::graph::vertex::VertexIndex),
     Known(crate::graph::vertex::VertexIndex),
 }
 
 #[allow(dead_code)]
 impl NewAtomIndex {
-    pub(crate) fn is_known(&self) -> bool {
+    pub fn is_known(&self) -> bool {
         matches!(self, Self::Known(_))
     }
-    pub(crate) fn is_new(&self) -> bool {
+    pub fn is_new(&self) -> bool {
         matches!(self, Self::New(_))
     }
 }
@@ -131,7 +131,7 @@ impl Borrow<crate::graph::vertex::VertexIndex> for &'_ mut NewAtomIndex {
     }
 }
 
-pub(crate) type NewAtomIndices = Vec<NewAtomIndex>;
+pub type NewAtomIndices = Vec<NewAtomIndex>;
 
 pub trait AsAtom<T: Atomize> {
     fn as_atom(&self) -> Atom<T>;
@@ -276,7 +276,9 @@ impl<T: Atomize + Display> Display for Atom<T> {
     }
 }
 
-impl<T: Atomize + Display> crate::logging::compact_format::CompactFormat for Atom<T> {
+impl<T: Atomize + Display> crate::logging::compact_format::CompactFormat
+    for Atom<T>
+{
     fn fmt_compact(
         &self,
         f: &mut fmt::Formatter,
@@ -296,7 +298,6 @@ impl<T: Atomize + Display> crate::logging::compact_format::CompactFormat for Ato
         self.fmt_compact(f)
     }
 }
-
 
 impl<T: Atomize> Wide for Atom<T> {
     fn width(&self) -> TokenWidth {

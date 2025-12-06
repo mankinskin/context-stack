@@ -67,9 +67,13 @@ impl<'a> ExpansionCtx<'a> {
                 Ok(Ok(root)) => root,
                 Ok(Err(root)) => root,
                 Err(ErrorReason::SingleIndex(c)) => *c,
-                Err(_) => IndexWithPath {
-                    index: cursor.start_index(&trav),
-                    path: cursor.clone(),
+                Err(_) => {
+                    // Get the first token from cursor's root pattern
+                    let first = cursor.path_root()[0];
+                    IndexWithPath {
+                        index: first,
+                        path: cursor.clone(),
+                    }
                 },
             };
         *cursor = path;
@@ -138,7 +142,8 @@ impl<'a> ExpansionCtx<'a> {
         } = exp;
         let start_bound = (*start_bound).into();
         let overlap = postfix_path.role_leaf_token::<End, _>(&self.cursor.ctx);
-        let prefix_path = expansion.prefix_path(&self.cursor.ctx, overlap);
+        use context_trace::trace::child::bands::HasTokenRoleIters;
+        let prefix_path = expansion.prefix_path(&self.cursor.ctx, overlap.expect("overlap token"));
 
         ExpansionLink {
             start_bound,

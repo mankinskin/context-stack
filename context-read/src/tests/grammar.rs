@@ -58,7 +58,7 @@ impl BuilderNode {
 }
 
 struct GraphBuilder {
-    range_map: HashMap<BuildKey, usize>,
+    range_map: HashMap<BuildKey, VertexIndex>,
     queue: VecDeque<BuilderNode>,
     graph: Hypergraph,
     N: usize,
@@ -79,7 +79,7 @@ impl GraphBuilder {
     ) {
         self.graph.insert_vertex_data(VertexData::new(
             node.index.vertex_index(),
-            node.range.clone().count(),
+            TokenWidth(node.range.clone().count()),
         ));
         self.queue.push_back(node);
     }
@@ -99,14 +99,13 @@ impl GraphBuilder {
                 .enumerate()
                 .map(|(sub_index, key)| {
                     let loc = ChildLocation::new(node.index, pid, sub_index);
-                    if let Some(v) = self.range_map.get(key) {
+                    if let Some(&v) = self.range_map.get(key) {
                         self.graph.expect_vertex_mut(v).add_parent(loc);
-                        Token::new(*v, key.clone().count())
+                        Token::new(v, TokenWidth(key.clone().count()))
                     } else {
-                        self.range_map
-                            .insert(key.clone(), self.range_map.len());
                         let vid = self.graph.next_vertex_index();
-                        let c = Token::new(vid, key.clone().count());
+                        self.range_map.insert(key.clone(), vid);
+                        let c = Token::new(vid, TokenWidth(key.clone().count()));
                         self.queue_node(BuilderNode::new(c, key.clone()));
                         c
                     }
@@ -120,7 +119,7 @@ impl GraphBuilder {
     pub fn fill_grammar(&mut self) {
         let vid = self.graph.next_vertex_index();
         self.queue_node(BuilderNode::new(
-            Token::new(vid, self.N),
+            Token::new(vid, TokenWidth(self.N)),
             0..=self.N - 1,
         ));
         while let Some(node) = self.queue.pop_front() {

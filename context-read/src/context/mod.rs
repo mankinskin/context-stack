@@ -12,7 +12,6 @@ use tracing::debug;
 
 use crate::{
     context::root::RootManager,
-    expansion::ExpansionCtx,
     sequence::{
         block_iter::{
             BlockIter,
@@ -44,7 +43,7 @@ impl ReadCtx {
         seq: impl ToNewAtomIndices,
     ) -> Self {
         debug!("New ReadCtx");
-        let new_indices = seq.to_new_atom_indices(&mut graph.graph_mut());
+        let new_indices = seq.to_new_Atom_indices(&mut graph.graph_mut());
         Self {
             blocks: BlockIter::new(new_indices),
             root: RootManager::new(graph),
@@ -58,26 +57,10 @@ impl ReadCtx {
         &mut self,
         known: Pattern,
     ) {
-        let minified =
-            match PatternEndPath::new_directed::<Right>(known.clone()) {
-                Ok(path) => {
-                    let mut cursor = path.into_range(0);
-                    let expansion =
-                        ExpansionCtx::new(self.clone(), &mut cursor)
-                            .find_largest_bundle();
-                    assert!(cursor.end_path().is_empty());
-                    [
-                        &[expansion],
-                        &cursor.path_root()
-                            [cursor.role_root_child_index::<End>() + 1..],
-                    ]
-                    .concat()
-                },
-                Err((err, _)) => match err {
-                    ErrorReason::SingleIndex(c) => vec![c.index],
-                    _ => known.into(),
-                },
-            };
+        // TODO: This needs to be reimplemented with the current path construction API
+        // The old new_directed API no longer exists
+        // For now, just append the pattern directly
+        let minified = known.into();
         self.append_pattern(minified);
     }
     fn read_block(

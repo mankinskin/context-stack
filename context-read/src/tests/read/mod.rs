@@ -1,12 +1,9 @@
-use std::collections::HashSet;
-
 use crate::context::has_read_context::HasReadCtx;
 use context_search::*;
 use context_trace::{
     graph::vertex::parent::PatternIndex,
     *,
 };
-use maplit::hashset;
 use pretty_assertions::{
     assert_eq,
     assert_matches,

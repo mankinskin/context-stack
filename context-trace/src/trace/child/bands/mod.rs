@@ -4,7 +4,6 @@ use crate::{
         pattern::PatternDirection,
     },
     graph::{
-        kind::DirectionOf,
         vertex::{
             has_vertex_index::ToToken,
             location::{
@@ -65,7 +64,7 @@ pub(crate) trait BandIterator<'a, G: HasGraph + 'a>:
     }
 }
 use crate::trace::has_graph::TravDir;
-pub(crate) trait HasTokenRoleIters: ToToken {
+pub trait HasTokenRoleIters: ToToken {
     fn postfix_iter<'a, G: HasGraph + 'a>(
         &self,
         trav: G,
@@ -98,7 +97,7 @@ pub(crate) trait HasTokenRoleIters: ToToken {
         prefix_iter
             .fold_while(
                 RootedRolePath::new_location(entry),
-                |mut acc, (prefix_location, pre)| {
+                |mut acc: IndexStartPath, (prefix_location, pre)| {
                     acc.path_append(prefix_location);
                     if pre == prefix {
                         FoldWhile::Done(acc)
@@ -112,20 +111,20 @@ pub(crate) trait HasTokenRoleIters: ToToken {
 }
 impl<T: ToToken> HasTokenRoleIters for T {}
 
-pub(crate) type PostfixIterator<'a, G> = BandExpandingIterator<
+pub type PostfixIterator<'a, G> = BandExpandingIterator<
     'a,
     G,
-    PostfixExpandingPolicy<DirectionOf<<G as HasGraph>::Kind>>,
+    PostfixExpandingPolicy<TravDir<G>>,
 >;
 
-pub(crate) type PrefixIterator<'a, G> = BandExpandingIterator<
+pub type PrefixIterator<'a, G> = BandExpandingIterator<
     'a,
     G,
-    PrefixExpandingPolicy<DirectionOf<<G as HasGraph>::Kind>>,
+    PrefixExpandingPolicy<TravDir<G>>,
 >;
 
 #[derive(Debug)]
-pub(crate) struct BandExpandingIterator<'a, G, P>
+pub struct BandExpandingIterator<'a, G, P>
 where
     G: HasGraph + 'a,
     P: BandExpandingPolicy<G>,

@@ -12,7 +12,10 @@ use crate::{
     },
 };
 use context_insert::*;
-use context_trace::*;
+use context_trace::{
+    *,
+    trace::child::bands::{HasTokenRoleIters, PostfixIterator},
+};
 use tracing::debug;
 
 #[derive(Debug)]
@@ -43,21 +46,21 @@ impl Iterator for ExpandCtx<'_> {
         debug!("ExpandCtx::next");
         self.postfix_iter.next().map(|(postfix_location, postfix)| {
             let last_end_bound = self.ctx.last().end_bound;
-            let start_bound = last_end_bound - postfix.width();
+            let start_bound = *last_end_bound - *postfix.width();
             self.postfix_path.path_append(postfix_location);
             match ToInsertCtx::<IndexWithPath>::insert(
                 &self.ctx.ctx.graph,
                 self.ctx.cursor.cursor.clone(),
             ) {
                 Ok(expansion) => ChainOp::Expansion(BandExpansion {
-                    start_bound,
+                    start_bound: start_bound.into(),
                     expansion,
                     postfix_path: self.postfix_path.clone(),
                 }),
                 Err(_) => ChainOp::Cap(BandCap {
                     postfix_path: self.postfix_path.clone(),
                     expansion: postfix,
-                    start_bound,
+                    start_bound: start_bound.into(),
                 }),
             }
         })

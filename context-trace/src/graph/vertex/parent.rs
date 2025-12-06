@@ -33,7 +33,7 @@ impl HasSubIndex for PatternIndex {
     }
 }
 impl PatternIndex {
-    pub(crate) fn new(
+    pub fn new(
         pattern_id: PatternId,
         sub_index: usize,
     ) -> Self {
