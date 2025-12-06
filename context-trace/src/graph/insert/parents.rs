@@ -3,6 +3,7 @@
 use crate::{
     HashSet,
     Hypergraph,
+    Wide,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
@@ -18,6 +19,7 @@ use crate::{
                 pattern_width,
             },
             token::Token,
+            wide::WideMut,
         },
     },
 };
@@ -33,7 +35,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .into_iter()
             .map(|index| {
                 let index = index.vertex_index();
-                let w = self.expect_vertex(index.vertex_index()).width;
+                let w = self.expect_vertex(index.vertex_index()).width();
                 width += w.0;
                 (index, Token::new(index, w))
             })
@@ -109,8 +111,8 @@ impl<G: GraphKind> Hypergraph<G> {
             let pattern = vertex.expect_child_pattern_mut(&pattern_id);
             let offset = pattern.len();
             pattern.extend(new.iter());
-            vertex.width += width;
-            (offset, vertex.width)
+            *vertex.width_mut() += width.0;
+            (offset, vertex.width())
         };
         let parent = Token::new(parent.vertex_index(), width);
         self.add_pattern_parent(parent, new, pattern_id, offset);

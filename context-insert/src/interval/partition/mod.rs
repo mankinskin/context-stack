@@ -125,6 +125,7 @@ impl<M: PostVisitMode, A: ToVertexSplits> ToPartition<Post<M>> for Postfix<A> {
     }
 }
 
+#[allow(dead_code)]
 pub fn to_non_zero_range(
     l: usize,
     r: usize,

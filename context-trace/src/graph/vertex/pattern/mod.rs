@@ -30,7 +30,16 @@ pub(crate) mod id;
 pub(crate) mod pattern_range;
 
 #[derive(
-    Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+    Default,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
 )]
 pub struct Pattern(Vec<Token>);
 

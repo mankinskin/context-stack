@@ -18,7 +18,6 @@ use pretty_assertions::{
     assert_eq,
     assert_matches,
 };
-use tracing::debug;
 
 #[test]
 fn index_pattern1() {
@@ -285,8 +284,6 @@ fn index_prefix1() {
     assert_matches!(fold_res, Ok(ref response) if !response.query_exhausted());
     let state = fold_res.unwrap();
     let init = InitInterval::from(state);
-
-    debug!("end_bound = {:?}", init.end_bound);
 
     assert_eq!(
         init,

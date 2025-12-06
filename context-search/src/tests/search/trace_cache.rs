@@ -1,4 +1,3 @@
-use crate::*;
 use context_trace::{
     tests::env::{
         Env2,
@@ -18,8 +17,8 @@ pub struct CdefghiTraceCase {
     pub expected_cache: TraceCache,
 }
 
-impl CdefghiTraceCase {
-    pub fn new() -> Self {
+impl Default for CdefghiTraceCase {
+    fn default() -> Self {
         let env = Env2::initialize_expected();
 
         let Env2 {
@@ -95,7 +94,8 @@ impl CdefghiTraceCase {
             env,
         }
     }
-
+}
+impl CdefghiTraceCase {
     pub fn verify_trace_cache(
         &self,
         actual_cache: &TraceCache,
@@ -156,9 +156,12 @@ impl CdefghiTraceCase {
     }
 }
 
+#[cfg(test)]
+use crate::Find;
+
 #[test]
 fn test_cdefghi_trace_cache() {
-    let test_case = CdefghiTraceCase::new();
+    let test_case = CdefghiTraceCase::default();
     let _tracing = context_trace::init_test_tracing!(&test_case.env.graph);
 
     let res = test_case

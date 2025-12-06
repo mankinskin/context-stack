@@ -60,7 +60,7 @@ impl ReadCtx {
         // TODO: This needs to be reimplemented with the current path construction API
         // The old new_directed API no longer exists
         // For now, just append the pattern directly
-        let minified = known.into();
+        let minified = known;
         self.append_pattern(minified);
     }
     fn read_block(

@@ -1,5 +1,6 @@
 use context_trace::*;
 
+#[allow(dead_code)]
 pub trait InsertDirection: Direction + Clone + PartialEq + Eq {
     fn context_then_inner(
         context: Pattern,

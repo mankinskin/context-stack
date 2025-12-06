@@ -8,6 +8,7 @@ pub(crate) mod vertex;
 use std::borrow::Borrow;
 
 use crate::{
+    Wide,
     graph::{
         Hypergraph,
         kind::GraphKind,
@@ -71,6 +72,6 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         index: &impl HasVertexIndex,
     ) -> usize {
-        self.expect_vertex(index.vertex_index()).width.0
+        self.expect_vertex(index.vertex_index()).width().0
     }
 }

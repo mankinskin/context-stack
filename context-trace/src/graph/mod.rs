@@ -6,6 +6,7 @@ use std::sync::{
 use crate::{
     HashMap,
     TokenWidth,
+    Wide,
     graph::{
         child_strings::TokenStrings,
         getters::vertex::VertexSet,

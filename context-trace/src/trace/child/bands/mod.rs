@@ -3,15 +3,13 @@ use crate::{
         Direction,
         pattern::PatternDirection,
     },
-    graph::{
-        vertex::{
-            has_vertex_index::ToToken,
-            location::{
-                child::ChildLocation,
-                pattern::PatternLocation,
-            },
-            token::Token,
+    graph::vertex::{
+        has_vertex_index::ToToken,
+        location::{
+            child::ChildLocation,
+            pattern::PatternLocation,
         },
+        token::Token,
     },
     path::{
         mutators::append::PathAppend,
@@ -111,17 +109,11 @@ pub trait HasTokenRoleIters: ToToken {
 }
 impl<T: ToToken> HasTokenRoleIters for T {}
 
-pub type PostfixIterator<'a, G> = BandExpandingIterator<
-    'a,
-    G,
-    PostfixExpandingPolicy<TravDir<G>>,
->;
+pub type PostfixIterator<'a, G> =
+    BandExpandingIterator<'a, G, PostfixExpandingPolicy<TravDir<G>>>;
 
-pub type PrefixIterator<'a, G> = BandExpandingIterator<
-    'a,
-    G,
-    PrefixExpandingPolicy<TravDir<G>>,
->;
+pub type PrefixIterator<'a, G> =
+    BandExpandingIterator<'a, G, PrefixExpandingPolicy<TravDir<G>>>;
 
 #[derive(Debug)]
 pub struct BandExpandingIterator<'a, G, P>

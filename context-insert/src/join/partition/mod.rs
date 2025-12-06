@@ -45,7 +45,7 @@ where
     {
         match self.info_partition(ctx) {
             Ok(info) =>
-                Ok(JoinPartitionInfo::new(info).to_joined_partition(ctx)),
+                Ok(JoinPartitionInfo::new(info).into_joined_partition(ctx)),
             Err(c) => Err(c),
         }
     }

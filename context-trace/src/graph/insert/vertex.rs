@@ -1,7 +1,9 @@
 //! Basic vertex insertion operations
 
 use crate::{
+    HasVertexIndex,
     Hypergraph,
+    Wide,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
@@ -30,7 +32,12 @@ impl<G: GraphKind> Hypergraph<G> {
         &mut self,
         builder: VertexDataBuilder,
     ) -> VertexData {
-        builder.index(self.next_vertex_index()).build().unwrap()
+        // Extract width from builder (defaults to TokenWidth(1) if not set)
+        let width = builder.width.unwrap_or(crate::TokenWidth(1));
+        let index = self.next_vertex_index();
+        let token = Token::new(index, width);
+
+        builder.build(token)
     }
 
     /// Insert raw vertex data
@@ -38,7 +45,7 @@ impl<G: GraphKind> Hypergraph<G> {
         &mut self,
         data: VertexData,
     ) -> Token {
-        let c = Token::new(data.vertex_index(), data.width);
+        let c = Token::new(data.vertex_index(), data.width());
         self.graph.insert(data.key, data);
         c
     }

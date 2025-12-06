@@ -47,7 +47,7 @@ impl<G: GraphKind> Hypergraph<G> {
         let indices = pattern.into_pattern();
         let (width, indices, tokens) = self.to_width_indices_children(indices);
         let index = self.next_vertex_index();
-        let mut new_data = VertexData::new(index, width.into());
+        let mut new_data = VertexData::new(Token::new(index, width));
         let pattern_id = PatternId::default();
         new_data.add_pattern_no_update(pattern_id, Pattern::from(tokens));
         let index = self.insert_vertex_data(new_data);

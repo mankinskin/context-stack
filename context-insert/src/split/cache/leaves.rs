@@ -5,9 +5,10 @@ use derive_more::{
     DerefMut,
     From,
 };
+use linked_hash_set::LinkedHashSet;
 
 #[derive(Default, Debug, Deref, DerefMut, From, Clone, PartialEq, Eq)]
-pub struct Leaves(Vec<PosKey>);
+pub struct Leaves(LinkedHashSet<PosKey>);
 
 impl Leaves {
     pub fn collect_leaves(
@@ -20,7 +21,7 @@ impl Leaves {
             .filter_map(|(parent_offset, res)| match res {
                 Ok(locs) => Some((parent_offset, locs)),
                 Err(_) => {
-                    self.push(PosKey::new(*index, parent_offset));
+                    self.insert(PosKey::new(*index, parent_offset));
                     None
                 },
             })

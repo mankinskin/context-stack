@@ -1,7 +1,7 @@
 use crate::graph::vertex::{
     VertexIndex,
-    token::Token,
     data::VertexData,
+    token::Token,
     wide::Wide,
 };
 use std::fmt::Debug;
@@ -30,7 +30,7 @@ impl HasVertexIndex for VertexIndex {
 
 impl HasVertexIndex for VertexData {
     fn vertex_index(&self) -> VertexIndex {
-        self.index
+        self.token.vertex_index()
     }
 }
 impl HasVertexIndex for Token {

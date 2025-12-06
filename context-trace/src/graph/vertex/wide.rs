@@ -60,7 +60,12 @@ impl<T: Wide> Wide for &'_ mut T {
 //}
 impl Wide for VertexData {
     fn width(&self) -> TokenWidth {
-        self.width
+        self.token.width()
+    }
+}
+impl WideMut for VertexData {
+    fn width_mut(&mut self) -> &mut TokenWidth {
+        self.token.width_mut()
     }
 }
 

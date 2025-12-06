@@ -30,7 +30,8 @@ impl ComplementBuilder {
         }
 
         // Build the trace cache for the complement path
-        let complement_cache = self.build_complement_trace_cache(trav, root, intersection_start);
+        let complement_cache =
+            self.build_complement_trace_cache(trav, root, intersection_start);
 
         // Create InitInterval for the complement range
         let init_interval = InitInterval {
@@ -50,12 +51,11 @@ impl ComplementBuilder {
         // Initialize cache with the root
         // The complement range is from the start to the intersection point
         // We use checkpointing approach: build a trace cache up to end_bound
-        let cache = TraceCache::new(root);
-        
+        TraceCache::new(root)
+
         // TODO: Use search/checkpoint API to build trace cache up to end_bound
         // For now, return minimal cache - this may need expansion based on
         // how complement tracing should work with checkpointing
-        cache
     }
 }
 

@@ -9,8 +9,8 @@ use derive_more::Deref;
 use derive_new::new;
 
 use crate::{
-    TokenWidth,
     HashMap,
+    TokenWidth,
     graph::{
         getters::vertex::VertexSet,
         vertex::{
@@ -97,10 +97,10 @@ impl GraphBuilder {
         &mut self,
         node: BuilderNode,
     ) {
-        self.graph.insert_vertex_data(VertexData::new(
+        self.graph.insert_vertex_data(VertexData::new(Token::new(
             node.index.vertex_index(),
             TokenWidth(node.range.clone().count()),
-        ));
+        )));
         self.queue.push_back(node);
     }
 

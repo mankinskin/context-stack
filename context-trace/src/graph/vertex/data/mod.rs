@@ -36,9 +36,8 @@ impl CompactFormat for VertexData {
     ) -> std::fmt::Result {
         write!(
             f,
-            "Vertex({}, w:{}, {}p, {}c)",
-            self.index,
-            self.width,
+            "Vertex({}, {}p, {}c)",
+            self.token,
             self.parents.len(),
             self.children.len()
         )
@@ -51,10 +50,7 @@ impl CompactFormat for VertexData {
     ) -> std::fmt::Result {
         writeln!(f)?;
         write_indent(f, indent)?;
-        writeln!(f, "Vertex {} {{", self.index)?;
-
-        write_indent(f, indent + 1)?;
-        writeln!(f, "width: {},", self.width)?;
+        writeln!(f, "Vertex {} {{", self.token)?;
 
         write_indent(f, indent + 1)?;
         writeln!(f, "parents: {} entries,", self.parents.len())?;

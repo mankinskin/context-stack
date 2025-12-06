@@ -46,7 +46,10 @@ impl<G: GraphKind> Hypergraph<G> {
         &mut self,
         atom: Atom<G::Atom>,
     ) -> Token {
-        let data = VertexData::new(self.next_vertex_index(), TokenWidth(1));
+        let data = VertexData::new(Token::new(
+            self.next_vertex_index(),
+            TokenWidth(1),
+        ));
         self.insert_atom_data(atom, data)
     }
 

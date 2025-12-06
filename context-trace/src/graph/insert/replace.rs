@@ -3,6 +3,7 @@
 use itertools::Itertools;
 
 use crate::{
+    Wide,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
@@ -37,7 +38,7 @@ where
         let pat = location.pattern_id;
         let (replaced, width, start, new_end, rem) = {
             let vertex = self.expect_vertex_mut(parent);
-            let width = vertex.width;
+            let width = vertex.width();
             let pattern = vertex.expect_child_pattern_mut(&pat);
             let start = range.clone().next().unwrap();
             let new_end = start + replace.len();

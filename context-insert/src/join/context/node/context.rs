@@ -309,7 +309,7 @@ impl NodeJoinCtx<'_> {
                     .info_partition(self)
                     .unwrap();
                 let wrap_patterns =
-                    JoinPartitionInfo::from(info).to_joined_patterns(self);
+                    JoinPartitionInfo::from(info).into_joined_patterns(self);
                 let wrap_pre = match Infix::new(wrap_offset, loffset)
                     .join_partition(self)
                 {
@@ -364,7 +364,7 @@ impl NodeJoinCtx<'_> {
                     .info_partition(self)
                     .unwrap();
                 let wrap_patterns =
-                    JoinPartitionInfo::from(info).to_joined_patterns(self);
+                    JoinPartitionInfo::from(info).into_joined_patterns(self);
                 let wrap_post = match Infix::new(roffset, wrap_offset)
                     .join_partition(self)
                 {

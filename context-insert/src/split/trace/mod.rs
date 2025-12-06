@@ -47,9 +47,7 @@ impl<G: HasGraph> SplitTraceCtx<G> {
         index: &Token,
     ) -> N::CompleteSplitOutput {
         self.get_node::<N>(index)
-            .map(|ctx| {
-                ctx.complete_splits::<_, N>(&self.trav, self.end_bound.into())
-            })
+            .map(|ctx| ctx.complete_splits::<_, N>(&self.trav, self.end_bound))
             .unwrap_or_default()
     }
 }

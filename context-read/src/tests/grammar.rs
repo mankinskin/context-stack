@@ -77,10 +77,10 @@ impl GraphBuilder {
         &mut self,
         node: BuilderNode,
     ) {
-        self.graph.insert_vertex_data(VertexData::new(
+        self.graph.insert_vertex_data(VertexData::new(Token::new(
             node.index.vertex_index(),
             TokenWidth(node.range.clone().count()),
-        ));
+        )));
         self.queue.push_back(node);
     }
 
@@ -105,7 +105,8 @@ impl GraphBuilder {
                     } else {
                         let vid = self.graph.next_vertex_index();
                         self.range_map.insert(key.clone(), vid);
-                        let c = Token::new(vid, TokenWidth(key.clone().count()));
+                        let c =
+                            Token::new(vid, TokenWidth(key.clone().count()));
                         self.queue_node(BuilderNode::new(c, key.clone()));
                         c
                     }

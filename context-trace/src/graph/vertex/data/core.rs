@@ -4,16 +4,14 @@
 //! and basic accessor methods for vertex properties.
 
 use crate::{
+    TokenWidth,
     graph::vertex::{
+        ChildPatterns,
+        VertexParents,
         key::VertexKey,
         token::Token,
-        ChildPatterns,
-        VertexIndex,
-        VertexParents,
     },
-    TokenWidth,
 };
-use derive_builder::Builder;
 use serde::{
     Deserialize,
     Serialize,
@@ -22,32 +20,24 @@ use serde::{
 /// Central vertex data structure for hypergraph.
 ///
 /// Contains vertex metadata, parent relationships, and child token patterns.
-#[derive(Debug, Builder, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(not(any(test, feature = "test-api")), derive(PartialEq, Eq, Clone))]
-#[builder(pattern = "owned")]
 pub struct VertexData {
     /// Total token width of this vertex
-    pub(crate) width: TokenWidth,
-
-    /// Unique identifier for this vertex
-    pub(crate) index: VertexIndex,
+    pub(crate) token: Token,
 
     /// Vertex key (optional metadata)
-    #[builder(default)]
     pub(crate) key: VertexKey,
 
     /// Parent vertices and their pattern indices
-    #[builder(default)]
     pub(crate) parents: VertexParents,
 
     /// Child token patterns by PatternId
-    #[builder(default)]
     pub(crate) children: ChildPatterns,
 
     /// Cached string representation (test-only)
     #[cfg(any(test, feature = "test-api"))]
     #[serde(skip)]
-    #[builder(setter(skip), default = "std::sync::RwLock::new(None)")]
     pub(crate) cached_string: std::sync::RwLock<Option<String>>,
 }
 
@@ -58,8 +48,8 @@ impl PartialEq for VertexData {
         &self,
         other: &Self,
     ) -> bool {
-        self.width == other.width
-            && self.index == other.index
+        self.token.width == other.token.width
+            && self.token.index == other.token.index
             && self.key == other.key
             && self.parents == other.parents
             && self.children == other.children
@@ -75,8 +65,7 @@ impl Eq for VertexData {}
 impl Clone for VertexData {
     fn clone(&self) -> Self {
         Self {
-            width: self.width,
-            index: self.index,
+            token: self.token,
             key: self.key,
             parents: self.parents.clone(),
             children: self.children.clone(),
@@ -87,14 +76,10 @@ impl Clone for VertexData {
 
 impl VertexData {
     /// Create a new VertexData with the given index and width
-    pub fn new(
-        index: VertexIndex,
-        width: TokenWidth,
-    ) -> Self {
+    pub fn new(token: Token) -> Self {
         Self {
-            width,
+            token,
             key: VertexKey::default(),
-            index,
             parents: VertexParents::default(),
             children: ChildPatterns::default(),
             #[cfg(any(test, feature = "test-api"))]
@@ -102,19 +87,9 @@ impl VertexData {
         }
     }
 
-    /// Get this vertex's index
-    pub fn vertex_index(&self) -> VertexIndex {
-        self.index
-    }
-
-    /// Get this vertex's width
-    pub fn width(&self) -> TokenWidth {
-        self.width
-    }
-
     /// Convert to ChildLocation for this vertex
     pub(crate) fn to_child(&self) -> Token {
-        Token::new(self.index, self.width)
+        self.token
     }
 
     /// Get immutable reference to parent relationships
@@ -171,25 +146,111 @@ impl VertexData {
             Vec::new(),
             |mut acc: Vec<Vec<usize>>, (pid, p)| {
                 let mut offset = 0;
-                assert!(!p.is_empty(), "Empty pattern in index {:#?}", self.index);
+                assert!(
+                    !p.is_empty(),
+                    "Empty pattern in index {:#?}",
+                    self.token
+                );
                 let pattern_width = pattern_width(p);
-                assert_eq!(pattern_width, self.width, "Pattern width mismatch in index {:#?} token pattern:\n {:#?}", self.index, (pid, self.children.get(pid)));
+                assert_eq!(
+                    pattern_width,
+                    self.token.width,
+                    "Pattern width mismatch in index {} token pattern:\n {:#?}",
+                    self.token,
+                    (pid, format!("{}", self.children.get(pid).unwrap()))
+                );
                 let mut p = p.iter().fold(Vec::new(), |mut pa, c| {
                     offset += c.width.0;
                     assert!(
                     !acc.iter().any(|pr| pr.contains(&offset)),
                     "Duplicate border in index {:#?} token patterns:\n {:#?}",
-                        self.index,
+                        self.token,
                         self.children
                     );
                     pa.push(offset);
                     pa
                 });
                 p.pop().unwrap();
-                assert!(!p.is_empty(), "Single index pattern in index {:#?}:\n {:#?}", self.index, (pid, self.children.get(pid)));
+                assert!(
+                    !p.is_empty(),
+                    "Single index pattern in index {:#?}:\n {:#?}",
+                    self.token,
+                    (pid, self.children.get(pid))
+                );
                 acc.push(p);
                 acc
             },
         );
+    }
+}
+
+/// Builder for VertexData that defers token index assignment
+#[derive(Debug, Default)]
+pub struct VertexDataBuilder {
+    /// Token width (to be combined with index later)
+    pub(crate) width: Option<TokenWidth>,
+    /// Vertex key
+    pub(crate) key: Option<VertexKey>,
+    /// Parent vertices
+    pub(crate) parents: Option<VertexParents>,
+    /// Child patterns
+    pub(crate) children: Option<ChildPatterns>,
+}
+
+impl VertexDataBuilder {
+    /// Create a new builder
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the token width
+    pub fn width(
+        mut self,
+        width: impl Into<TokenWidth>,
+    ) -> Self {
+        self.width = Some(width.into());
+        self
+    }
+
+    /// Set the vertex key
+    pub fn key(
+        mut self,
+        key: VertexKey,
+    ) -> Self {
+        self.key = Some(key);
+        self
+    }
+
+    /// Set the parents
+    pub fn parents(
+        mut self,
+        parents: VertexParents,
+    ) -> Self {
+        self.parents = Some(parents);
+        self
+    }
+
+    /// Set the children
+    pub fn children(
+        mut self,
+        children: ChildPatterns,
+    ) -> Self {
+        self.children = Some(children);
+        self
+    }
+
+    /// Build VertexData with the given token (index + width)
+    pub fn build(
+        self,
+        token: Token,
+    ) -> VertexData {
+        VertexData {
+            token,
+            key: self.key.unwrap_or_default(),
+            parents: self.parents.unwrap_or_default(),
+            children: self.children.unwrap_or_default(),
+            #[cfg(any(test, feature = "test-api"))]
+            cached_string: std::sync::RwLock::new(None),
+        }
     }
 }

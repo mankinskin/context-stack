@@ -8,10 +8,14 @@ use std::{
     iter::FromIterator,
 };
 
+use linked_hash_set::LinkedHashSet;
 use pretty_assertions::assert_eq;
 
 use crate::*;
-use context_search::*;
+use context_search::{
+    tests::search::trace_cache::CdefghiTraceCase,
+    *,
+};
 use context_trace::{
     tests::env::{
         Env1,
@@ -243,7 +247,7 @@ fn interval_graph1() {
         IntervalGraph {
             root: *abcdef,
             states: SplitStates {
-                leaves: vec![PosKey::new(*ef, 1)].into(),
+                leaves: LinkedHashSet::from_iter([PosKey::new(*ef, 1)]).into(),
                 queue: VecDeque::default(),
             },
             cache: build_split_cache1(env)
@@ -254,8 +258,7 @@ fn interval_graph1() {
 #[test]
 fn interval_graph2() {
     // Use test environment and trace cache test case from context-search
-    let mut trace_test =
-        context_search::tests::search::trace_cache::CdefghiTraceCase::new();
+    let mut trace_test = CdefghiTraceCase::default();
     let _tracing = context_trace::init_test_tracing!(&trace_test.env.graph);
 
     // Build InitInterval directly from test case expected values (no search needed)
@@ -296,7 +299,11 @@ fn interval_graph2() {
     assert_eq!(
         interval.states,
         SplitStates {
-            leaves: vec![PosKey::new(cd, 1)].into(),
+            leaves: LinkedHashSet::from_iter([
+                PosKey::new(cd, 1),
+                PosKey::new(hi, 1)
+            ])
+            .into(),
             queue: VecDeque::default(),
         }
     );
@@ -306,13 +313,13 @@ fn interval_graph2() {
         RootMode::Infix,
         cd => {
             1 => {
-                top: [cdefg: 2],
+                top: [cdefg: 1, cdefghi: 1],
                 splits: [c_d_id => (1, None)]
             }
         },
         hi => {
-            5 => {
-                top: [efghi: 4],
+            1 => {
+                top: [efghi: 4, cdefghi: 6],
                 splits: [h_i_id => (1, None)]
             }
         },
@@ -324,18 +331,24 @@ fn interval_graph2() {
         },
         efghi => {
             4 => {
-                top: [cdefghi: 2],
+                top: [cdefghi: 6],
                 splits: [efg_hi_id => (1, Some(nz!(1)))]
             }
         },
         cdefghi => {
             1 => {
                 top: [],
-                splits: [cd_efghi_id => (0, Some(nz!(1)))]
+                splits: [
+                    cd_efghi_id => (0, Some(nz!(1))),
+                    cdefg_hi_id => (0, Some(nz!(1))),
+                ]
             },
             6 => {
                 top: [],
-                splits: [cdefg_hi_id => (1, Some(nz!(1)))]
+                splits: [
+                    cdefg_hi_id => (1, Some(nz!(1))),
+                    cd_efghi_id => (1, Some(nz!(4))),
+                ]
             },
         },
     );

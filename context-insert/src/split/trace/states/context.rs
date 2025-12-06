@@ -87,7 +87,7 @@ impl<G: HasGraph> SplitTraceStatesCtx<G> {
                 SplitPositionCache::new(prev, subs)
             },
             Err(location) => {
-                self.states.leaves.push(PosKey::new(index, offset));
+                self.states.leaves.insert(PosKey::new(index, offset));
                 SplitPositionCache::new(
                     prev,
                     vec![SubSplitLocation::new(location, None)],

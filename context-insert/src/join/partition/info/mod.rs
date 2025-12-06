@@ -36,13 +36,13 @@ where
     R::Borders: JoinBorders<R>,
     Self: 'a,
 {
-    pub fn to_joined_patterns(
+    pub fn into_joined_patterns(
         self,
         ctx: &'c mut ModeNodeCtxOf<'a, 'b, R>,
     ) -> JoinedPatterns<R> {
         JoinedPatterns::from_partition_info(self, ctx)
     }
-    pub fn to_joined_partition(
+    pub fn into_joined_partition(
         self,
         ctx: &'c mut ModeNodeCtxOf<'a, 'b, R>,
     ) -> JoinedPartition<R> {

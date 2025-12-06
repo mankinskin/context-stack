@@ -23,7 +23,7 @@ pub enum InfixChildren {
 }
 
 impl InfixChildren {
-    pub fn to_joined_pattern(self) -> Result<Pattern, Token> {
+    pub fn into_joined_pattern(self) -> Result<Pattern, Token> {
         match self {
             InfixChildren::Both(l, r) => Ok([l, r].into_pattern()),
             InfixChildren::Left(c) | InfixChildren::Right(c) => Err(c),
@@ -83,7 +83,7 @@ impl<M: InVisitMode> RangeChildren<In<M>> for InfixChildren {
                 Self::Right(r) => [inner, r].into_pattern(),
             })
         } else {
-            self.to_joined_pattern()
+            self.into_joined_pattern()
         }
     }
     fn to_token(self) -> Option<Token> {

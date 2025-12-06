@@ -24,7 +24,7 @@ impl<'p> NodeTraceCtx<'p> {
         index: Token,
     ) -> Self {
         Self {
-            patterns: &graph.expect_vertex(index).child_patterns(),
+            patterns: graph.expect_vertex(index).child_patterns(),
             index,
         }
     }
