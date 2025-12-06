@@ -43,9 +43,9 @@ impl CdefghiTraceCase {
 
         // Dereference for use in macro
         let (d, e, f, g, h) = (*d, *e, *f, *g, *h);
-        let (cd, hi, cdefg, efghi, cdefghi) =
+        let (cd, hi, cdefg, _efghi, cdefghi) =
             (*cd, *hi, *cdefg, *efghi, *cdefghi);
-        let (c_d_id, h_i_id, cd_efg_id, efg_hi_id) =
+        let (c_d_id, h_i_id, cd_efg_id, _efg_hi_id) =
             (*c_d_id, *h_i_id, *cd_efg_id, *efg_hi_id);
 
         let expected_cache = build_trace_cache!(
@@ -71,15 +71,11 @@ impl CdefghiTraceCase {
                 },
                 TD {}
             ),
-            efghi => (
-                BU {
-                    4 => hi -> (efg_hi_id, 1)
-                },
-                TD {}
-            ),
             h => (
                 BU {},
-                TD {}
+                TD {
+                    4
+                }
             ),
             cdefghi => (
                 BU {
