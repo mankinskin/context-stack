@@ -388,3 +388,446 @@ fn get_context2() -> &'static Arc<RwLock<Env2>> {
 thread_local! {
     static CONTEXT2: OnceLock<Arc<RwLock<Env2>>> = OnceLock::new();
 }
+
+/// Test environment for index_prefix1 test
+/// Graph: heldld with patterns ld and heldld
+pub struct EnvIndexPrefix1 {
+    pub graph: HypergraphRef,
+    pub h: Token,
+    pub e: Token,
+    pub l: Token,
+    pub d: Token,
+    pub ld: Token,
+    pub ld_id: PatternId,
+    pub heldld: Token,
+    pub heldld_id: PatternId,
+}
+
+impl TestEnv for EnvIndexPrefix1 {
+    fn initialize_expected() -> Self {
+        let mut graph = Hypergraph::default();
+        let [h, e, l, d] = graph.insert_atoms([
+            Atom::Element('h'),
+            Atom::Element('e'),
+            Atom::Element('l'),
+            Atom::Element('d'),
+        ])[..] else {
+            panic!()
+        };
+        
+        let (ld, ld_id) = graph.insert_pattern_with_id(vec![l, d]);
+        let (heldld, heldld_id) = graph.insert_pattern_with_id(vec![h, e, ld, ld]);
+        
+        #[cfg(any(test, feature = "test-api"))]
+        crate::graph::test_graph::register_test_graph(&graph);
+        
+        Self {
+            graph: HypergraphRef::from(graph),
+            h,
+            e,
+            l,
+            d,
+            ld,
+            ld_id: ld_id.unwrap(),
+            heldld,
+            heldld_id: heldld_id.unwrap(),
+        }
+    }
+    
+    fn get_expected<'a>() -> RwLockReadGuard<'a, Self> {
+        get_context_index_prefix1().read().unwrap()
+    }
+    fn get_expected_mut<'a>() -> RwLockWriteGuard<'a, Self> {
+        get_context_index_prefix1().write().unwrap()
+    }
+}
+
+fn get_context_index_prefix1() -> &'static Arc<RwLock<EnvIndexPrefix1>> {
+    CONTEXT_INDEX_PREFIX1.with(|cell| {
+        unsafe {
+            let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvIndexPrefix1::initialize_expected())));
+            &*(ptr as *const Arc<RwLock<EnvIndexPrefix1>>)
+        }
+    })
+}
+
+thread_local! {
+    static CONTEXT_INDEX_PREFIX1: OnceLock<Arc<RwLock<EnvIndexPrefix1>>> = OnceLock::new();
+}
+
+/// Test environment for index_postfix1 test
+/// Graph: ababcd with patterns ab and ababcd
+pub struct EnvIndexPostfix1 {
+    pub graph: HypergraphRef,
+    pub a: Token,
+    pub b: Token,
+    pub c: Token,
+    pub d: Token,
+    pub ab: Token,
+    pub ab_id: PatternId,
+    pub ababcd: Token,
+    pub ababcd_id: PatternId,
+}
+
+impl TestEnv for EnvIndexPostfix1 {
+    fn initialize_expected() -> Self {
+        let mut graph = Hypergraph::default();
+        let [a, b, c, d] = graph.insert_atoms([
+            Atom::Element('a'),
+            Atom::Element('b'),
+            Atom::Element('c'),
+            Atom::Element('d'),
+        ])[..] else {
+            panic!()
+        };
+        
+        let (ab, ab_id) = graph.insert_pattern_with_id(vec![a, b]);
+        let (ababcd, ababcd_id) = graph.insert_pattern_with_id(vec![ab, ab, c, d]);
+        
+        #[cfg(any(test, feature = "test-api"))]
+        crate::graph::test_graph::register_test_graph(&graph);
+        
+        Self {
+            graph: HypergraphRef::from(graph),
+            a,
+            b,
+            c,
+            d,
+            ab,
+            ab_id: ab_id.unwrap(),
+            ababcd,
+            ababcd_id: ababcd_id.unwrap(),
+        }
+    }
+    
+    fn get_expected<'a>() -> RwLockReadGuard<'a, Self> {
+        get_context_index_postfix1().read().unwrap()
+    }
+    fn get_expected_mut<'a>() -> RwLockWriteGuard<'a, Self> {
+        get_context_index_postfix1().write().unwrap()
+    }
+}
+
+fn get_context_index_postfix1() -> &'static Arc<RwLock<EnvIndexPostfix1>> {
+    CONTEXT_INDEX_POSTFIX1.with(|cell| {
+        unsafe {
+            let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvIndexPostfix1::initialize_expected())));
+            &*(ptr as *const Arc<RwLock<EnvIndexPostfix1>>)
+        }
+    })
+}
+
+thread_local! {
+    static CONTEXT_INDEX_POSTFIX1: OnceLock<Arc<RwLock<EnvIndexPostfix1>>> = OnceLock::new();
+}
+
+/// Test environment for index_pattern1 test
+/// Graph with patterns: ab, by, yz, xa, xab, xaby, xabyz
+pub struct EnvIndexPattern1 {
+    pub graph: HypergraphRef,
+    pub a: Token,
+    pub b: Token,
+    pub x: Token,
+    pub y: Token,
+    pub z: Token,
+    pub ab: Token,
+    pub by: Token,
+    pub yz: Token,
+    pub xa: Token,
+    pub xab: Token,
+    pub xaby: Token,
+    pub xabyz: Token,
+}
+
+impl TestEnv for EnvIndexPattern1 {
+    fn initialize_expected() -> Self {
+        let mut graph = Hypergraph::default();
+        let [a, b, x, y, z] = graph.insert_atoms([
+            Atom::Element('a'),
+            Atom::Element('b'),
+            Atom::Element('x'),
+            Atom::Element('y'),
+            Atom::Element('z'),
+        ])[..] else {
+            panic!()
+        };
+        
+        let ab = graph.insert_pattern(vec![a, b]);
+        let by = graph.insert_pattern(vec![b, y]);
+        let yz = graph.insert_pattern(vec![y, z]);
+        let xa = graph.insert_pattern(vec![x, a]);
+        let xab = graph.insert_patterns([vec![x, ab], vec![xa, b]]);
+        let xaby = graph.insert_patterns([vec![xab, y], vec![xa, by]]);
+        let xabyz = graph.insert_patterns([vec![xaby, z], vec![xab, yz]]);
+        
+        #[cfg(any(test, feature = "test-api"))]
+        crate::graph::test_graph::register_test_graph(&graph);
+        
+        Self {
+            graph: HypergraphRef::from(graph),
+            a,
+            b,
+            x,
+            y,
+            z,
+            ab,
+            by,
+            yz,
+            xa,
+            xab,
+            xaby,
+            xabyz,
+        }
+    }
+    
+    fn get_expected<'a>() -> RwLockReadGuard<'a, Self> {
+        get_context_index_pattern1().read().unwrap()
+    }
+    fn get_expected_mut<'a>() -> RwLockWriteGuard<'a, Self> {
+        get_context_index_pattern1().write().unwrap()
+    }
+}
+
+fn get_context_index_pattern1() -> &'static Arc<RwLock<EnvIndexPattern1>> {
+    CONTEXT_INDEX_PATTERN1.with(|cell| {
+        unsafe {
+            let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvIndexPattern1::initialize_expected())));
+            &*(ptr as *const Arc<RwLock<EnvIndexPattern1>>)
+        }
+    })
+}
+
+thread_local! {
+    static CONTEXT_INDEX_PATTERN1: OnceLock<Arc<RwLock<EnvIndexPattern1>>> = OnceLock::new();
+}
+
+/// Test environment for index_pattern2 test
+/// Graph with patterns: yz, xab, xyz, xabz, xabyz
+pub struct EnvIndexPattern2 {
+    pub graph: HypergraphRef,
+    pub a: Token,
+    pub b: Token,
+    pub x: Token,
+    pub y: Token,
+    pub z: Token,
+    pub yz: Token,
+    pub xab: Token,
+    pub xyz: Token,
+    pub xabz: Token,
+    pub xabyz: Token,
+}
+
+impl TestEnv for EnvIndexPattern2 {
+    fn initialize_expected() -> Self {
+        let mut graph = Hypergraph::default();
+        let [a, b, x, y, z] = graph.insert_atoms([
+            Atom::Element('a'),
+            Atom::Element('b'),
+            Atom::Element('x'),
+            Atom::Element('y'),
+            Atom::Element('z'),
+        ])[..] else {
+            panic!()
+        };
+        
+        let yz = graph.insert_pattern(vec![y, z]);
+        let xab = graph.insert_pattern(vec![x, a, b]);
+        let xyz = graph.insert_pattern(vec![x, yz]);
+        let xabz = graph.insert_pattern(vec![xab, z]);
+        let xabyz = graph.insert_pattern(vec![xab, yz]);
+        
+        #[cfg(any(test, feature = "test-api"))]
+        crate::graph::test_graph::register_test_graph(&graph);
+        
+        Self {
+            graph: HypergraphRef::from(graph),
+            a,
+            b,
+            x,
+            y,
+            z,
+            yz,
+            xab,
+            xyz,
+            xabz,
+            xabyz,
+        }
+    }
+    
+    fn get_expected<'a>() -> RwLockReadGuard<'a, Self> {
+        get_context_index_pattern2().read().unwrap()
+    }
+    fn get_expected_mut<'a>() -> RwLockWriteGuard<'a, Self> {
+        get_context_index_pattern2().write().unwrap()
+    }
+}
+
+fn get_context_index_pattern2() -> &'static Arc<RwLock<EnvIndexPattern2>> {
+    CONTEXT_INDEX_PATTERN2.with(|cell| {
+        unsafe {
+            let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvIndexPattern2::initialize_expected())));
+            &*(ptr as *const Arc<RwLock<EnvIndexPattern2>>)
+        }
+    })
+}
+
+thread_local! {
+    static CONTEXT_INDEX_PATTERN2: OnceLock<Arc<RwLock<EnvIndexPattern2>>> = OnceLock::new();
+}
+
+/// Test environment for index_infix1 test
+/// Graph with patterns: yz, xxabyzw
+pub struct EnvIndexInfix1 {
+    pub graph: HypergraphRef,
+    pub a: Token,
+    pub b: Token,
+    pub w: Token,
+    pub x: Token,
+    pub y: Token,
+    pub z: Token,
+    pub yz: Token,
+    pub xxabyzw: Token,
+}
+
+impl TestEnv for EnvIndexInfix1 {
+    fn initialize_expected() -> Self {
+        let mut graph = Hypergraph::default();
+        let [a, b, w, x, y, z] = graph.insert_atoms([
+            Atom::Element('a'),
+            Atom::Element('b'),
+            Atom::Element('w'),
+            Atom::Element('x'),
+            Atom::Element('y'),
+            Atom::Element('z'),
+        ])[..] else {
+            panic!()
+        };
+        
+        let yz = graph.insert_pattern(vec![y, z]);
+        let xxabyzw = graph.insert_pattern(vec![x, x, a, b, yz, w]);
+        
+        #[cfg(any(test, feature = "test-api"))]
+        crate::graph::test_graph::register_test_graph(&graph);
+        
+        Self {
+            graph: HypergraphRef::from(graph),
+            a,
+            b,
+            w,
+            x,
+            y,
+            z,
+            yz,
+            xxabyzw,
+        }
+    }
+    
+    fn get_expected<'a>() -> RwLockReadGuard<'a, Self> {
+        get_context_index_infix1().read().unwrap()
+    }
+    fn get_expected_mut<'a>() -> RwLockWriteGuard<'a, Self> {
+        get_context_index_infix1().write().unwrap()
+    }
+}
+
+fn get_context_index_infix1() -> &'static Arc<RwLock<EnvIndexInfix1>> {
+    CONTEXT_INDEX_INFIX1.with(|cell| {
+        unsafe {
+            let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvIndexInfix1::initialize_expected())));
+            &*(ptr as *const Arc<RwLock<EnvIndexInfix1>>)
+        }
+    })
+}
+
+thread_local! {
+    static CONTEXT_INDEX_INFIX1: OnceLock<Arc<RwLock<EnvIndexInfix1>>> = OnceLock::new();
+}
+
+/// Test environment for index_infix2 test
+/// Graph with patterns: yy, xx, xy, abcdx, yabcdx, abcdxx, xxy, xxyyabcdxxyy
+pub struct EnvIndexInfix2 {
+    pub graph: HypergraphRef,
+    pub a: Token,
+    pub b: Token,
+    pub c: Token,
+    pub d: Token,
+    pub x: Token,
+    pub y: Token,
+    pub yy: Token,
+    pub xx: Token,
+    pub xy: Token,
+    pub abcdx: Token,
+    pub yabcdx: Token,
+    pub abcdxx: Token,
+    pub xxy: Token,
+    pub xxyyabcdxxyy: Token,
+}
+
+impl TestEnv for EnvIndexInfix2 {
+    fn initialize_expected() -> Self {
+        let mut graph = Hypergraph::default();
+        let [a, b, c, d, x, y] = graph.insert_atoms([
+            Atom::Element('a'),
+            Atom::Element('b'),
+            Atom::Element('c'),
+            Atom::Element('d'),
+            Atom::Element('x'),
+            Atom::Element('y'),
+        ])[..] else {
+            panic!()
+        };
+        
+        let yy = graph.insert_pattern(vec![y, y]);
+        let xx = graph.insert_pattern(vec![x, x]);
+        let xy = graph.insert_pattern(vec![x, y]);
+        let abcdx = graph.insert_pattern(vec![a, b, c, d, x]);
+        let yabcdx = graph.insert_pattern(vec![y, abcdx]);
+        let abcdxx = graph.insert_pattern(vec![abcdx, x]);
+        let xxy = graph.insert_patterns([vec![xx, y], vec![x, xy]]);
+        let xxyyabcdxxyy = graph.insert_patterns([
+            vec![xx, yy, abcdxx, yy],
+            vec![xxy, yabcdx, xy, y],
+        ]);
+        
+        #[cfg(any(test, feature = "test-api"))]
+        crate::graph::test_graph::register_test_graph(&graph);
+        
+        Self {
+            graph: HypergraphRef::from(graph),
+            a,
+            b,
+            c,
+            d,
+            x,
+            y,
+            yy,
+            xx,
+            xy,
+            abcdx,
+            yabcdx,
+            abcdxx,
+            xxy,
+            xxyyabcdxxyy,
+        }
+    }
+    
+    fn get_expected<'a>() -> RwLockReadGuard<'a, Self> {
+        get_context_index_infix2().read().unwrap()
+    }
+    fn get_expected_mut<'a>() -> RwLockWriteGuard<'a, Self> {
+        get_context_index_infix2().write().unwrap()
+    }
+}
+
+fn get_context_index_infix2() -> &'static Arc<RwLock<EnvIndexInfix2>> {
+    CONTEXT_INDEX_INFIX2.with(|cell| {
+        unsafe {
+            let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvIndexInfix2::initialize_expected())));
+            &*(ptr as *const Arc<RwLock<EnvIndexInfix2>>)
+        }
+    })
+}
+
+thread_local! {
+    static CONTEXT_INDEX_INFIX2: OnceLock<Arc<RwLock<EnvIndexInfix2>>> = OnceLock::new();
+}

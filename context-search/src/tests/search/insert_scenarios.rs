@@ -1076,3 +1076,159 @@ fn search_complete_token_a_bc() {
         }
     );
 }
+
+// New organized tests using test case structures
+
+#[test]
+fn test_index_prefix1_hell() {
+    use context_trace::tests::env::{
+        EnvIndexPrefix1,
+        TestEnv,
+    };
+
+    let EnvIndexPrefix1 {
+        graph,
+        h,
+        e,
+        l,
+        d,
+        ld,
+        ld_id,
+        heldld,
+        heldld_id,
+    } = EnvIndexPrefix1::initialize_expected();
+
+    let _tracing = context_trace::init_test_tracing!(&graph);
+
+    let query = vec![h, e, l, l];
+    let res = Searchable::<AncestorSearchTraversal<_>>::search(
+        query.clone(),
+        graph.into(),
+    );
+
+    let expected = Response {
+        end: MatchResult {
+            cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::new(
+                PatternCursor {
+                    path: RootedRangePath::new(
+                        query.clone(),
+                        RolePath::new_empty(0),
+                        RolePath::new_empty(2),
+                    ),
+                    atom_position: 3.into(),
+                    _state: Default::default(),
+                },
+            )),
+            path: PathCoverage::Prefix(PrefixEnd {
+                path: RootedRolePath::new(
+                    PatternLocation::new(heldld, heldld_id),
+                    RolePath::new(2, vec![ChildLocation::new(ld, ld_id, 0)]),
+                ),
+                target: DownKey {
+                    index: l,
+                    pos: 2.into(),
+                },
+                exit_pos: 2.into(),
+                end_pos: 3.into(),
+            }),
+        },
+        cache: build_trace_cache!(
+            heldld => (
+                BU {},
+                TD { 2 => ld -> (heldld_id, 2) },
+            ),
+            ld => (
+                BU {},
+                TD { 2 => l -> (ld_id, 0) },
+            ),
+            h => (
+                BU {},
+                TD {},
+            ),
+            l => (
+                BU {},
+                TD { 2 },
+            ),
+        ),
+    };
+
+    assert_eq!(res, Ok(expected));
+}
+
+#[test]
+fn test_index_postfix1_bcdd() {
+    use context_trace::tests::env::{
+        EnvIndexPostfix1,
+        TestEnv,
+    };
+
+    let EnvIndexPostfix1 {
+        graph,
+        a: _a,
+        b,
+        c,
+        d,
+        ab,
+        ab_id,
+        ababcd,
+        ababcd_id,
+    } = EnvIndexPostfix1::initialize_expected();
+
+    let _tracing = context_trace::init_test_tracing!(&graph);
+
+    let query = vec![b, c, d, d];
+    let res = Searchable::<AncestorSearchTraversal<_>>::search(
+        query.clone(),
+        graph.into(),
+    );
+
+    let expected = Response {
+        end: MatchResult {
+            cursor: CheckpointedCursor::HasCandidate(
+                Checkpointed::with_candidate(
+                    PatternCursor {
+                        path: RootedRangePath::new(
+                            query.clone(),
+                            RolePath::new_empty(0),
+                            RolePath::new_empty(2),
+                        ),
+                        atom_position: 3.into(),
+                        _state: Default::default(),
+                    },
+                    PatternCursor {
+                        path: RootedRangePath::new(
+                            query.clone(),
+                            RolePath::new_empty(0),
+                            RolePath::new_empty(3),
+                        ),
+                        atom_position: 4.into(),
+                        _state: Default::default(),
+                    },
+                ),
+            ),
+            path: PathCoverage::Postfix(PostfixEnd {
+                path: RootedRolePath::new(
+                    PatternLocation::new(ababcd, ababcd_id),
+                    RolePath::new(1, vec![ChildLocation::new(ab, ab_id, 1)]),
+                ),
+                entry_pos: 1.into(),
+            }),
+        },
+        cache: build_trace_cache!(
+            ababcd => (
+                BU { 1 => ab -> (ababcd_id, 1) },
+                TD {},
+            ),
+            ab => (
+                BU { 1 => b -> (ab_id, 1) },
+                TD {},
+            ),
+            b => (
+                BU {},
+                TD {},
+            ),
+        ),
+    };
+
+    assert_eq!(res, Ok(expected));
+}
