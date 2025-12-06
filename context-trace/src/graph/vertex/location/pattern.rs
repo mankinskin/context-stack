@@ -68,7 +68,7 @@ impl PatternLocation {
 }
 #[allow(dead_code)]
 impl PatternLocation {
-    pub(crate) fn to_child_location(
+    pub fn to_child_location(
         self,
         sub_index: usize,
     ) -> ChildLocation {

@@ -142,8 +142,9 @@ impl<'a> ExpansionCtx<'a> {
         } = exp;
         let start_bound = (*start_bound).into();
         let overlap = postfix_path.role_leaf_token::<End, _>(&self.cursor.ctx);
-        use context_trace::trace::child::bands::HasTokenRoleIters;
-        let prefix_path = expansion.prefix_path(&self.cursor.ctx, overlap.expect("overlap token"));
+        use crate::bands::HasTokenRoleIters;
+        let prefix_path = expansion
+            .prefix_path(&self.cursor.ctx, overlap.expect("overlap token"));
 
         ExpansionLink {
             start_bound,

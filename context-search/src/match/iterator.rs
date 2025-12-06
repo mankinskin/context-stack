@@ -78,7 +78,7 @@ where
                 },
                 Some(NodeResult::FoundMatch(matched_state)) => {
                     // Found a root match
-                    return Some(matched_state);
+                    return Some(*matched_state);
                 },
                 Some(Skip) => continue,
                 None => {

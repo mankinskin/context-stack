@@ -1,8 +1,8 @@
 //! Insert test case trait and supporting types
 
 use context_trace::{
-    PatternId,
     Token,
+    graph::vertex::data::VertexData,
     tests::test_case::{
         TestCase,
         TestEnv,
@@ -29,34 +29,6 @@ pub trait InsertTestCase: TestCase {
     /// Expected string representation of the token
     fn expected_string(&self) -> &str;
 
-    /// Expected pattern structures
-    fn expected_patterns(&self) -> Vec<ExpectedPattern>;
-}
-
-/// Expected pattern structure for validation
-#[derive(Debug, Clone, PartialEq)]
-pub struct ExpectedPattern {
-    /// The token this pattern produces
-    pub token: Token,
-
-    /// The structure of the pattern (sequence of tokens)
-    pub structure: Vec<Token>,
-
-    /// Pattern IDs associated with this structure
-    pub pattern_ids: Vec<PatternId>,
-}
-
-impl ExpectedPattern {
-    /// Create a new expected pattern
-    pub fn new(
-        token: Token,
-        structure: Vec<Token>,
-        pattern_ids: Vec<PatternId>,
-    ) -> Self {
-        Self {
-            token,
-            structure,
-            pattern_ids,
-        }
-    }
+    /// Expected vertex data after insertion
+    fn expected_vertex_data(&self) -> VertexData;
 }

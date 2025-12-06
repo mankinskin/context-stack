@@ -1,24 +1,7 @@
-use crate::{
-    direction::{
-        Direction,
-        pattern::PatternDirection,
-    },
-    graph::vertex::{
-        has_vertex_index::ToToken,
-        location::{
-            child::ChildLocation,
-            pattern::PatternLocation,
-        },
-        token::Token,
-    },
-    path::{
-        mutators::append::PathAppend,
-        structs::rooted::role_path::{
-            IndexStartPath,
-            RootedRolePath,
-        },
-    },
-    trace::has_graph::HasGraph,
+use context_trace::{
+    direction::pattern::PatternDirection,
+    trace::has_graph::TravDir,
+    *,
 };
 use itertools::{
     FoldWhile,
@@ -42,7 +25,6 @@ pub(crate) trait BandIterator<'a, G: HasGraph + 'a>:
         root: Token,
     ) -> Self;
     fn trav(&self) -> &G;
-    fn trav_mut(&mut self) -> &mut G;
 
     /// get all postfixes of index with their locations
     fn next_children(
@@ -61,7 +43,6 @@ pub(crate) trait BandIterator<'a, G: HasGraph + 'a>:
         )
     }
 }
-use crate::trace::has_graph::TravDir;
 pub trait HasTokenRoleIters: ToToken {
     fn postfix_iter<'a, G: HasGraph + 'a>(
         &self,
@@ -146,9 +127,6 @@ where
     }
     fn trav(&self) -> &G {
         &self.trav
-    }
-    fn trav_mut(&mut self) -> &mut G {
-        &mut self.trav
     }
 }
 

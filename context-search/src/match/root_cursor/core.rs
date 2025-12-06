@@ -30,7 +30,7 @@ use std::collections::VecDeque;
 /// - `Finished`: Reached an end condition (conclusive or inconclusive)
 pub(crate) enum RootAdvanceResult<K: SearchKind> {
     /// Successfully advanced to next matched state
-    Advanced(RootCursor<K, Matched, Matched>),
+    Advanced(Box<RootCursor<K, Matched, Matched>>),
     /// Reached an end condition - either conclusive (found maximum match) or inconclusive (needs parent exploration)
     Finished(RootEndResult<K>),
 }
@@ -43,17 +43,32 @@ pub(crate) enum RootEndResult<K: SearchKind> {
     /// Conclusive end - this is the maximum match for this root
     Conclusive(ConclusiveEnd<K>),
     /// Inconclusive end - needs parent exploration to potentially find longer match
-    Inconclusive(RootCursor<K, Candidate, Matched>),
+    Inconclusive(Box<RootCursor<K, Candidate, Matched>>),
 }
 
 /// Conclusive end states - no further matching possible on this root
 pub(crate) enum ConclusiveEnd<K: SearchKind> {
     /// Found a mismatch after some progress - this is the maximum match
     /// Returns the mismatched candidate cursor for creating the final MatchResult
-    Mismatch(RootCursor<K, Candidate, Candidate>),
+    Mismatch(Box<RootCursor<K, Candidate, Candidate>>),
     /// Query pattern fully exhausted - complete match found
     /// No cursor returned as there's no next state to advance to
     Exhausted,
+}
+
+/// Result of advancing both query and child cursors internally
+///
+/// Represents the outcome when trying to advance both cursors to reach Candidate state:
+/// - `BothAdvanced`: Both cursors successfully advanced to Candidate
+/// - `QueryExhausted`: Query cursor exhausted (complete match)
+/// - `ChildExhausted`: Child cursor exhausted but query continues (needs parent exploration)
+pub(crate) enum BothCursorsAdvanceResult<K: SearchKind> {
+    /// Both cursors advanced successfully - reached Candidate state
+    BothAdvanced(Box<CandidateRootCursor<K>>),
+    /// Query cursor exhausted - complete match found
+    QueryExhausted,
+    /// Child cursor exhausted but query continues - need parent exploration
+    ChildExhausted(Box<RootCursor<K, Candidate, Matched>>),
 }
 
 #[derive(Debug)]
@@ -65,6 +80,7 @@ pub(crate) struct RootCursor<
     pub(crate) state: CompareState<Q, I>,
     pub(crate) trav: K::Trav,
 }
+pub(crate) type CandidateRootCursor<K> = RootCursor<K, Candidate, Candidate>;
 
 #[derive(Debug, Clone, Deref, DerefMut)]
 pub(crate) struct CompareParentBatch {

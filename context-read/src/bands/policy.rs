@@ -1,22 +1,19 @@
-use crate::{
+use context_trace::{
     direction::{
-        Direction,
         pattern::PatternDirection,
+        Direction,
     },
     graph::vertex::{
-        location::{
-            child::ChildLocation,
-            pattern::PatternLocation,
-        },
         pattern::Pattern,
         token::Token,
         wide::Wide,
     },
     trace::has_graph::HasGraph,
+    *,
 };
 use itertools::Itertools;
 
-pub(crate) trait BandExpandingPolicy<G: HasGraph> {
+pub trait BandExpandingPolicy<G: HasGraph> {
     fn map_band(
         location: PatternLocation,
         pattern: &Pattern,

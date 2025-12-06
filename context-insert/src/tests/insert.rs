@@ -1,13 +1,18 @@
 use crate::{
-    insert::{
-        ToInsertCtx,
-    },
+    insert::ToInsertCtx,
     interval::init::InitInterval,
-    tests::env::{
-        EnvIndexInfix1,
-        EnvIndexInfix2,
-        EnvIndexPattern1,
-        EnvIndexPattern2,
+    tests::{
+        cases::pattern1::{
+            Pattern1Aby,
+            Pattern1Byz,
+        },
+        env::{
+            EnvIndexInfix1,
+            EnvIndexInfix2,
+            EnvIndexPattern1,
+            EnvIndexPattern2,
+        },
+        test_case::InsertTestCase,
     },
 };
 use context_search::{
@@ -23,7 +28,10 @@ use context_trace::{
             assert_all_vertices_unique,
             assert_token_string_repr,
         },
-        test_case::TestEnv,
+        test_case::{
+            TestCase,
+            TestEnv,
+        },
     },
     trace::has_graph::HasGraph,
     *,
@@ -35,65 +43,57 @@ use pretty_assertions::{
 
 #[test]
 fn index_pattern1() {
-    // Create independent test environment
-    let EnvIndexPattern1 {
-        graph,
-        a,
-        b: _b,
-        x: _x,
-        y,
-        z,
-        ab,
-        by,
-        yz: _yz,
-        xa: _xa,
-        xab: _xab,
-        xaby: _xaby,
-        xabyz,
-    } = EnvIndexPattern1::initialize();
-
-    let _tracing = context_trace::init_test_tracing!(&graph);
-    print!("{:#?}", xabyz);
-    // todo: split sub patterns not caught by query search
+    // Test case 1: Insert "byz"
+    let case = Pattern1Byz;
+    let env = case.environment();
+    let _tracing = context_trace::init_test_tracing!(env.graph());
 
     // Verify all vertices have unique string representations before insertion
     {
-        let g = graph.graph();
+        let g = env.graph.graph();
         assert_all_vertices_unique(&*g);
     }
 
-    let query = vec![by, z];
-    let byz: Token = graph.insert(query.clone()).expect("Indexing failed");
+    let query = case.input_tokens();
+    let result_token: Token =
+        env.graph.insert(query.clone()).expect("Indexing failed");
 
-    // Assert the token has the expected string representation and width
+    // Assert the token has the expected string representation
     {
-        let g = graph.graph();
-        assert_token_string_repr(&*g, byz, "byz");
+        let g = env.graph.graph();
+        assert_token_string_repr(&*g, result_token, case.expected_string());
         assert_all_vertices_unique(&*g);
     }
-    assert_eq!(byz.width(), 3, "byz should have width 3");
+    assert_eq!(
+        result_token.width(),
+        case.expected_token().width(),
+        "byz should have expected width"
+    );
 
-    let byz_found = graph.find_ancestor(&query);
+    let found = env.graph.find_ancestor(&query);
     assert_matches!(
-        byz_found,
-        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == byz,
+        found,
+        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == result_token,
         "byz"
     );
 
-    let query = vec![ab, y];
-    let aby: Token = graph.insert(query.clone()).expect("Indexing failed");
+    // Test case 2: Insert "aby"
+    let case2 = Pattern1Aby;
+    let query2 = case2.input_tokens();
+    let result_token2: Token =
+        env.graph.insert(query2.clone()).expect("Indexing failed");
 
     // Assert aby has the expected string representation
     {
-        let g = graph.graph();
-        assert_token_string_repr(&*g, aby, "aby");
+        let g = env.graph.graph();
+        assert_token_string_repr(&*g, result_token2, case2.expected_string());
         assert_all_vertices_unique(&*g);
     }
 
-    let aby_found = graph.find_parent(&query);
+    let found2 = env.graph.find_parent(&query2);
     assert_matches!(
-        aby_found,
-        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
+        found2,
+        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == result_token2,
         "aby"
     );
 }

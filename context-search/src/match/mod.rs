@@ -36,7 +36,7 @@ pub(crate) struct SearchQueue {
 #[derive(Debug)]
 pub(crate) enum NodeResult {
     QueueMore(Vec<SearchNode>),
-    FoundMatch(MatchedCompareState),
+    FoundMatch(Box<MatchedCompareState>),
     Skip,
 }
 use NodeResult::*;
@@ -110,7 +110,7 @@ where
             Finished(CompareEndResult::FoundMatch(matched_state)) => {
                 // Return the matched state directly without conversion
                 // RootCursor will handle the conversion to Candidate with checkpoint update
-                Some(NodeResult::FoundMatch(matched_state))
+                Some(NodeResult::FoundMatch(Box::new(matched_state)))
             },
             Finished(CompareEndResult::Mismatch(_)) => Some(Skip),
             Prefixes(next) => {

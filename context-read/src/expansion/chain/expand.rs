@@ -1,4 +1,8 @@
 use crate::{
+    bands::{
+        HasTokenRoleIters,
+        PostfixIterator,
+    },
     context::ReadCtx,
     expansion::{
         chain::{
@@ -12,10 +16,7 @@ use crate::{
     },
 };
 use context_insert::*;
-use context_trace::{
-    *,
-    trace::child::bands::{HasTokenRoleIters, PostfixIterator},
-};
+use context_trace::*;
 use tracing::debug;
 
 #[derive(Debug)]

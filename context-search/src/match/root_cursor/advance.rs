@@ -1,4 +1,5 @@
 use super::core::{
+    BothCursorsAdvanceResult,
     ConclusiveEnd,
     RootAdvanceResult,
     RootCursor,
@@ -19,6 +20,7 @@ use crate::{
         PathCursor,
     },
     policy::SearchKind,
+    r#match::root_cursor::core::CandidateRootCursor,
     state::{
         end::PathCoverage,
         matched::{
@@ -59,11 +61,11 @@ where
 
         // Step 1: Try to advance both cursors to get Candidate state
         let candidate_cursor = match self.advance_both_cursors_internal() {
-            Ok(candidate) => {
+            BothCursorsAdvanceResult::BothAdvanced(candidate) => {
                 info!("→ advance_to_next_match: both cursors advanced to Candidate");
-                candidate
+                *candidate
             },
-            Err(Ok(())) => {
+            BothCursorsAdvanceResult::QueryExhausted => {
                 // Query exhausted - complete match found
                 debug!(
                     "→ advance_to_next_match: query exhausted - complete match"
@@ -72,7 +74,7 @@ where
                     ConclusiveEnd::Exhausted,
                 ));
             },
-            Err(Err(need_parent)) => {
+            BothCursorsAdvanceResult::ChildExhausted(need_parent) => {
                 // Child exhausted but query continues - need parent exploration
                 debug!("→ advance_to_next_match: child exhausted - needs parent exploration");
                 return RootAdvanceResult::Finished(
@@ -98,10 +100,10 @@ where
                     "→ advance_to_next_match: match found - returning Advanced"
                 );
 
-                RootAdvanceResult::Advanced(RootCursor {
+                RootAdvanceResult::Advanced(Box::new(RootCursor {
                     state: matched_state,
                     trav,
-                })
+                }))
             },
             CompareEndResult::Mismatch(_) => {
                 // Found mismatch - check if we made progress
@@ -112,10 +114,10 @@ where
                     info!("→ advance_to_next_match: immediate mismatch after match - this is unexpected");
                     return RootAdvanceResult::Finished(
                         RootEndResult::Conclusive(ConclusiveEnd::Mismatch(
-                            RootCursor {
+                            Box::new(RootCursor {
                                 state: prev_candidate,
                                 trav: trav.clone(),
-                            },
+                            }),
                         )),
                     );
                 }
@@ -126,25 +128,20 @@ where
                     "→ advance_to_next_match: mismatch after progress - maximum match reached"
                 );
                 RootAdvanceResult::Finished(RootEndResult::Conclusive(
-                    ConclusiveEnd::Mismatch(RootCursor {
+                    ConclusiveEnd::Mismatch(Box::new(RootCursor {
                         state: prev_candidate,
                         trav,
-                    }),
+                    })),
                 ))
             },
         }
     }
 
     /// Internal method to advance both cursors
-    /// Returns Ok(Candidate) if both advanced
-    /// Returns Err(Ok(())) if query exhausted
-    /// Returns Err(Err(Candidate, Matched)) if child exhausted
-    fn advance_both_cursors_internal(
-        self
-    ) -> Result<
-        RootCursor<K, Candidate, Candidate>,
-        Result<(), RootCursor<K, Candidate, Matched>>,
-    > {
+    /// Returns BothAdvanced if both cursors advanced to Candidate
+    /// Returns QueryExhausted if query exhausted (complete match)
+    /// Returns ChildExhausted if child exhausted (needs parent exploration)
+    fn advance_both_cursors_internal(self) -> BothCursorsAdvanceResult<K> {
         trace!(
             "  → advance_both_cursors_internal: Step 1 - calling advance_query"
         );
@@ -162,7 +159,7 @@ where
             },
             Err(_matched_result) => {
                 debug!("  → advance_both_cursors_internal: Step 1 - query ended (QueryExhausted)");
-                return Err(Ok(()));
+                return BothCursorsAdvanceResult::QueryExhausted;
             },
         };
 
@@ -184,7 +181,7 @@ where
                     //child_pos = ?both_advanced.state.child.current().child_state.target_offset(),
                     "  → advance_both_cursors_internal: Step 2 complete - child advanced successfully, got <Candidate, Candidate>"
                 );
-                Ok(both_advanced)
+                BothCursorsAdvanceResult::BothAdvanced(Box::new(both_advanced))
             },
             Err(need_parent) => {
                 let root = need_parent
@@ -198,7 +195,7 @@ where
                     root = %root,
                     "  → advance_both_cursors_internal: Step 2 - child ended (need parent exploration)"
                 );
-                Err(Err(need_parent))
+                BothCursorsAdvanceResult::ChildExhausted(need_parent)
             },
         }
     }
@@ -209,7 +206,7 @@ where
     #[context_trace::instrument_sig(level = "trace", skip(self))]
     fn advance_query(
         self
-    ) -> Result<RootCursor<K, Candidate, Matched>, MatchResult> {
+    ) -> Result<RootCursor<K, Candidate, Matched>, Box<MatchResult>> {
         let root_parent =
             self.state.child.current().child_state.path.root_parent();
         let query_pos_before =
@@ -293,12 +290,12 @@ where
                 let cursor_state =
                     Checkpointed::<PathCursor<_>>::new(checkpoint_cursor);
 
-                Err(MatchResult {
+                Err(Box::new(MatchResult {
                     cursor: CheckpointedCursor::AtCheckpoint(cursor_state),
                     path: PathCoverage::from_range_path(
                         path, entry_pos, exit_pos, target, end_pos, &trav,
                     ),
-                })
+                }))
             },
         }
     }
@@ -311,10 +308,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
     #[context_trace::instrument_sig(level = "trace", skip(self))]
     fn advance_child(
         self
-    ) -> Result<
-        RootCursor<K, Candidate, Candidate>,
-        RootCursor<K, Candidate, Matched>,
-    > {
+    ) -> Result<CandidateRootCursor<K>, Box<RootCursor<K, Candidate>>> {
         let state = self.state;
         let trav = self.trav;
 
@@ -343,10 +337,10 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
                     "    → advance_child: CHILD ENDED - need parent exploration"
                 );
                 // Index ended but query continues - need parent exploration
-                Err(RootCursor {
+                Err(Box::new(RootCursor {
                     state: query_only_advanced,
                     trav,
-                })
+                }))
             },
         }
     }

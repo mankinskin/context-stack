@@ -12,6 +12,7 @@
 extern crate test;
 
 //pub mod bundle;
+pub mod bands;
 pub mod complement;
 pub mod context;
 pub mod expansion;
