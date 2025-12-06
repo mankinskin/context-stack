@@ -68,6 +68,7 @@ use crate::{
     Deref,
     Sum,
     Display,
+    Default,
 )]
 pub struct TokenWidth(pub usize);
 

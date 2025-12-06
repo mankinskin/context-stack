@@ -26,7 +26,7 @@ use crate::{
 
 use crate::graph::vertex::token::Token;
 
-pub(crate) mod id;
+pub mod id;
 pub(crate) mod pattern_range;
 
 #[derive(

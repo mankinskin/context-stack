@@ -88,7 +88,7 @@ impl VertexData {
     }
 
     /// Convert to ChildLocation for this vertex
-    pub(crate) fn to_child(&self) -> Token {
+    pub fn to_child(&self) -> Token {
         self.token
     }
 

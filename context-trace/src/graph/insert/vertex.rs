@@ -19,7 +19,7 @@ use crate::{
 
 impl<G: GraphKind> Hypergraph<G> {
     #[allow(dead_code)]
-    pub(crate) fn insert_vertex_builder(
+    pub fn insert_vertex_builder(
         &mut self,
         builder: VertexDataBuilder,
     ) -> Token {
@@ -28,7 +28,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn finish_vertex_builder(
+    pub fn finish_vertex_builder(
         &mut self,
         builder: VertexDataBuilder,
     ) -> VertexData {

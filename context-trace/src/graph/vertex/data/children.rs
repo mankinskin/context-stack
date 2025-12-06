@@ -180,7 +180,7 @@ impl VertexData {
     }
 
     /// Get top-down containment nodes
-    pub(crate) fn top_down_containment_nodes(&self) -> Vec<(usize, Token)> {
+    pub fn top_down_containment_nodes(&self) -> Vec<(usize, Token)> {
         self.children
             .iter()
             .flat_map(|(_, pat)| {
@@ -231,7 +231,7 @@ impl VertexData {
     }
 
     /// Convert patterns to string representation for display
-    pub(crate) fn to_pattern_strings<G: GraphKind>(
+    pub fn to_pattern_strings<G: GraphKind>(
         &self,
         g: &Hypergraph<G>,
     ) -> Vec<Vec<String>>
@@ -285,7 +285,7 @@ impl VertexData {
     }
 
     /// Get mutable child token at location, panicking if not found
-    pub(crate) fn expect_child_mut_at(
+    pub fn expect_child_mut_at(
         &mut self,
         location: &SubLocation,
     ) -> &mut Token {
@@ -347,7 +347,7 @@ impl VertexData {
     }
 
     /// Iterator over all localized child tokens
-    pub(crate) fn all_localized_children_iter(
+    pub fn all_localized_children_iter(
         &self
     ) -> impl IntoIterator<Item = (ChildLocation, &Token)> {
         localized_children_iter_for_index(self.to_child(), &self.children)

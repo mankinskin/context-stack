@@ -80,7 +80,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
     /// get sub-vertex at range relative to index
     /// FIXME: can crash if range does not have an exact match in the root vertex
-    pub(crate) fn get_vertex_subrange(
+    pub fn get_vertex_subrange(
         &self,
         vertex: impl HasVertexData,
         range: Range<usize>,

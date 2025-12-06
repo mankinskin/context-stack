@@ -12,8 +12,8 @@ use crate::{
     Token,
 };
 
-pub(crate) mod child;
-pub(crate) mod pattern;
+pub mod child;
+pub mod pattern;
 
 pub trait HasParent {
     fn parent(&self) -> &Token;

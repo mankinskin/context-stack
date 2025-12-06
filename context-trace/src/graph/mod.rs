@@ -336,13 +336,13 @@ where
             .expect("Key does not belong to an atom!")
     }
     #[allow(dead_code)]
-    pub(crate) fn vertex_key_string(
+    pub fn vertex_key_string(
         &self,
         key: &VertexKey,
     ) -> String {
         self.vertex_data_string(self.expect_vertex(key))
     }
-    pub(crate) fn vertex_data_string(
+    pub fn vertex_data_string(
         &self,
         data: &VertexData,
     ) -> String {
@@ -374,7 +374,7 @@ where
 
         s
     }
-    pub(crate) fn index_string(
+    pub fn index_string(
         &self,
         index: impl HasVertexIndex,
     ) -> String {

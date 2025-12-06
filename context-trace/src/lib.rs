@@ -113,6 +113,8 @@ pub use crate::{
                 HasVertexIndex,
                 ToToken,
             },
+            has_vertex_key::HasVertexKey,
+            key::VertexKey,
             location::{
                 SubLocation,
                 child::{

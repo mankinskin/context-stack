@@ -63,7 +63,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .ok_or(ErrorReason::NoTokenPatterns) // todo: better error
     }
     #[allow(dead_code)]
-    pub(crate) fn expect_child_mut_at(
+    pub fn expect_child_mut_at(
         &mut self,
         location: impl IntoChildLocation,
     ) -> &mut Token {

@@ -45,7 +45,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Adds a parent to all nodes in a pattern
     #[track_caller]
-    pub(super) fn add_parents_to_pattern_nodes<
+    pub fn add_parents_to_pattern_nodes<
         I: HasVertexIndex,
         P: ToToken,
     >(

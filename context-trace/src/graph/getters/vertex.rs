@@ -263,7 +263,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .ok_or(ErrorReason::UnknownKey)
     }
     #[track_caller]
-    pub(crate) fn expect_index_for_key(
+    pub fn expect_index_for_key(
         &self,
         key: &VertexKey,
     ) -> VertexIndex {
@@ -279,7 +279,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .ok_or(ErrorReason::UnknownKey)
     }
     #[track_caller]
-    pub(crate) fn expect_key_for_index(
+    pub fn expect_key_for_index(
         &self,
         index: impl HasVertexIndex,
     ) -> VertexKey {
