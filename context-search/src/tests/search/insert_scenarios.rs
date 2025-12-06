@@ -1081,7 +1081,7 @@ fn search_complete_token_a_bc() {
 
 #[test]
 fn test_index_prefix1_hell() {
-    use context_trace::tests::env::EnvIndexPrefix1;
+    use crate::tests::env::EnvIndexPrefix1;
     use context_trace::tests::test_case::TestEnv;
 
     let EnvIndexPrefix1 {
@@ -1155,7 +1155,7 @@ fn test_index_prefix1_hell() {
 
 #[test]
 fn test_index_postfix1_bcdd() {
-    use context_trace::tests::env::EnvIndexPostfix1;
+    use crate::tests::env::EnvIndexPostfix1;
     use context_trace::tests::test_case::TestEnv;
 
     let EnvIndexPostfix1 {

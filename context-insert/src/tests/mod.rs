@@ -8,6 +8,7 @@ use context_trace::*;
 
 use pretty_assertions::assert_eq;
 
+pub mod env;
 pub mod insert;
 pub mod interval;
 pub mod test_case;

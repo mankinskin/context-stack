@@ -3,18 +3,22 @@ use crate::{
         ToInsertCtx,
     },
     interval::init::InitInterval,
+    tests::env::{
+        EnvIndexInfix1,
+        EnvIndexInfix2,
+        EnvIndexPattern1,
+        EnvIndexPattern2,
+    },
 };
-use context_search::*;
+use context_search::{
+    tests::env::{
+        EnvIndexPostfix1,
+        EnvIndexPrefix1,
+    },
+    *,
+};
 use context_trace::{
     tests::{
-        env::{
-            EnvIndexInfix1,
-            EnvIndexInfix2,
-            EnvIndexPattern1,
-            EnvIndexPattern2,
-            EnvIndexPostfix1,
-            EnvIndexPrefix1,
-        },
         macros::string_repr::{
             assert_all_vertices_unique,
             assert_token_string_repr,

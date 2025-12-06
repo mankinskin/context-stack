@@ -1,9 +1,9 @@
-//! Test environment for index_pattern2 test
+//! Test environment for index_infix1 test
 //!
-//! Graph with patterns: yz, xab, xyz, xabz, xabyz
-//! Tests pattern matching with different compositions
+//! Graph with patterns: yz, xxabyzw
+//! Tests infix/range matching behavior
 
-use crate::{
+use context_trace::{
     graph::{
         Hypergraph,
         HypergraphRef,
@@ -23,26 +23,25 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvIndexPattern2 {
+pub struct EnvIndexInfix1 {
     pub graph: HypergraphRef,
     pub a: Token,
     pub b: Token,
+    pub w: Token,
     pub x: Token,
     pub y: Token,
     pub z: Token,
     pub yz: Token,
-    pub xab: Token,
-    pub xyz: Token,
-    pub xabz: Token,
-    pub xabyz: Token,
+    pub xxabyzw: Token,
 }
 
-impl TestEnv for EnvIndexPattern2 {
+impl TestEnv for EnvIndexInfix1 {
     fn initialize() -> Self {
         let mut graph = Hypergraph::default();
-        let [a, b, x, y, z] = graph.insert_atoms([
+        let [a, b, w, x, y, z] = graph.insert_atoms([
             Atom::Element('a'),
             Atom::Element('b'),
+            Atom::Element('w'),
             Atom::Element('x'),
             Atom::Element('y'),
             Atom::Element('z'),
@@ -51,34 +50,29 @@ impl TestEnv for EnvIndexPattern2 {
         };
 
         let yz = graph.insert_pattern(vec![y, z]);
-        let xab = graph.insert_pattern(vec![x, a, b]);
-        let xyz = graph.insert_pattern(vec![x, yz]);
-        let xabz = graph.insert_pattern(vec![xab, z]);
-        let xabyz = graph.insert_pattern(vec![xab, yz]);
+        let xxabyzw = graph.insert_pattern(vec![x, x, a, b, yz, w]);
 
         #[cfg(any(test, feature = "test-api"))]
-        crate::graph::test_graph::register_test_graph(&graph);
+        context_trace::graph::test_graph::register_test_graph(&graph);
 
         Self {
             graph: HypergraphRef::from(graph),
             a,
             b,
+            w,
             x,
             y,
             z,
             yz,
-            xab,
-            xyz,
-            xabz,
-            xabyz,
+            xxabyzw,
         }
     }
 
     fn get<'a>() -> RwLockReadGuard<'a, Self> {
-        get_context_index_pattern2().read().unwrap()
+        get_context_index_infix1().read().unwrap()
     }
     fn get_mut<'a>() -> RwLockWriteGuard<'a, Self> {
-        get_context_index_pattern2().write().unwrap()
+        get_context_index_infix1().write().unwrap()
     }
 
     fn graph(&self) -> &HypergraphRef {
@@ -86,15 +80,15 @@ impl TestEnv for EnvIndexPattern2 {
     }
 }
 
-fn get_context_index_pattern2() -> &'static Arc<RwLock<EnvIndexPattern2>> {
-    CONTEXT_INDEX_PATTERN2.with(|cell| unsafe {
+fn get_context_index_infix1() -> &'static Arc<RwLock<EnvIndexInfix1>> {
+    CONTEXT_INDEX_INFIX1.with(|cell| unsafe {
         let ptr = cell.get_or_init(|| {
-            Arc::new(RwLock::new(EnvIndexPattern2::initialize()))
+            Arc::new(RwLock::new(EnvIndexInfix1::initialize()))
         });
-        &*(ptr as *const Arc<RwLock<EnvIndexPattern2>>)
+        &*(ptr as *const Arc<RwLock<EnvIndexInfix1>>)
     })
 }
 
 thread_local! {
-    static CONTEXT_INDEX_PATTERN2: OnceLock<Arc<RwLock<EnvIndexPattern2>>> = const { OnceLock::new() };
+    static CONTEXT_INDEX_INFIX1: OnceLock<Arc<RwLock<EnvIndexInfix1>>> = const { OnceLock::new() };
 }

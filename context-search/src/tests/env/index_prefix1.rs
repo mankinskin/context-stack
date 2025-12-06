@@ -3,17 +3,17 @@
 //! Graph: heldld with patterns ld and heldld
 //! Tests prefix matching behavior
 
-use crate::{
+use context_trace::{
     graph::{
         Hypergraph,
         HypergraphRef,
         vertex::{
             atom::Atom,
-            pattern::id::PatternId,
             token::Token,
         },
     },
     tests::test_case::TestEnv,
+    PatternId,
 };
 use std::sync::{
     Arc,
@@ -53,7 +53,7 @@ impl TestEnv for EnvIndexPrefix1 {
             graph.insert_pattern_with_id(vec![h, e, ld, ld]);
 
         #[cfg(any(test, feature = "test-api"))]
-        crate::graph::test_graph::register_test_graph(&graph);
+        context_trace::graph::test_graph::register_test_graph(&graph);
 
         Self {
             graph: HypergraphRef::from(graph),

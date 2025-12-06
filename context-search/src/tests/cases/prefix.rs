@@ -17,15 +17,18 @@ use crate::{
             MatchResult,
         },
     },
-    tests::test_case::SearchTestCase,
+    tests::{
+        env::EnvIndexPrefix1,
+        test_case::SearchTestCase,
+    },
     Response,
 };
 use context_trace::{
     build_trace_cache,
     graph::vertex::token::Token,
-    tests::{
-        env::EnvIndexPrefix1,
-        test_case::{TestCase, TestEnv},
+    tests::test_case::{
+        TestCase,
+        TestEnv,
     },
     *,
 };
