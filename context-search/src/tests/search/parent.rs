@@ -2,10 +2,12 @@
 use {
     crate::search::Find,
     crate::state::end::PathCoverage,
-    context_trace::tests::env::Env1,
-    context_trace::GraphRoot,
-
     context_trace::{
+        tests::{
+            env::Env1,
+            test_case::TestEnv,
+        },
+        GraphRoot,
         graph::{
             getters::{
                 ErrorReason,
@@ -13,8 +15,6 @@ use {
             },
             vertex::token::Token,
         },
-
-        tests::env::TestEnv,
     },
     pretty_assertions::assert_eq,
 };
@@ -29,7 +29,7 @@ fn find_parent1() {
         bc,
         abc,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     //let a_bc_pattern = [Token::new(a, 1), Token::new(bc, 2)];
     let ab_c_pattern = [Token::new(ab, 2), Token::new(c, 1)];
     //let a_bc_d_pattern =

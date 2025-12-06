@@ -1,7 +1,6 @@
 use crate::{
     insert::{
         ToInsertCtx,
-        context::InsertTraversal,
     },
     interval::init::InitInterval,
 };
@@ -15,12 +14,12 @@ use context_trace::{
             EnvIndexPattern2,
             EnvIndexPostfix1,
             EnvIndexPrefix1,
-            TestEnv,
         },
         macros::string_repr::{
             assert_all_vertices_unique,
             assert_token_string_repr,
         },
+        test_case::TestEnv,
     },
     trace::has_graph::HasGraph,
     *,
@@ -35,9 +34,9 @@ fn index_pattern1() {
     // Create independent test environment
     let EnvIndexPattern1 {
         graph,
-        a: _a,
-        b,
-        x,
+        a,
+        b: _b,
+        x: _x,
         y,
         z,
         ab,
@@ -47,7 +46,7 @@ fn index_pattern1() {
         xab: _xab,
         xaby: _xaby,
         xabyz,
-    } = EnvIndexPattern1::initialize_expected();
+    } = EnvIndexPattern1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
     print!("{:#?}", xabyz);
@@ -99,18 +98,18 @@ fn index_pattern1() {
 fn index_pattern2() {
     // Create independent test environment
     let EnvIndexPattern2 {
-        mut graph,
+        graph,
         a,
         b,
         x,
         y,
-        z: _z,
-        yz,
-        xab,
+        z,
+        yz: _yz,
+        xab: _xab,
         xyz: _xyz,
         xabz: _xabz,
         xabyz: _xabyz,
-    } = EnvIndexPattern2::initialize_expected();
+    } = EnvIndexPattern2::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -169,7 +168,7 @@ fn index_infix1() {
         z,
         yz,
         xxabyzw,
-    } = EnvIndexInfix1::initialize_expected();
+    } = EnvIndexInfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -262,7 +261,7 @@ fn index_infix2() {
         abcdxx: _abcdxx,
         xxy: _xxy,
         xxyyabcdxxyy: _xxyyabcdxxyy,
-    } = EnvIndexInfix2::initialize_expected();
+    } = EnvIndexInfix2::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -318,7 +317,7 @@ fn index_prefix1() {
         ld_id,
         heldld,
         heldld_id,
-    } = EnvIndexPrefix1::initialize_expected();
+    } = EnvIndexPrefix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -370,7 +369,7 @@ fn index_postfix1() {
         ab_id,
         ababcd,
         ababcd_id,
-    } = EnvIndexPostfix1::initialize_expected();
+    } = EnvIndexPostfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 

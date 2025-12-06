@@ -10,6 +10,7 @@ use pretty_assertions::assert_eq;
 
 pub mod insert;
 pub mod interval;
+pub mod test_case;
 
 pub(crate) fn pattern_from_widths(
     widths: impl IntoIterator<Item = usize>

@@ -20,7 +20,7 @@ fn find_consecutive1() {
         abc,
         ghi,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = context_trace::init_test_tracing!(graph);
 
     //let a_bc_pattern = [Token::new(a, 1), Token::new(bc, 2)];

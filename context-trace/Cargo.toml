@@ -48,6 +48,8 @@ version = "^1.4"
 #git = "https://github.com/mankinskin/petgraph"
 path = "../deps/petgraph"
 
+[dev-dependencies]
+
 [dependencies.serde]
 features = ["derive"]
 version = "^1"

@@ -11,6 +11,8 @@ pub mod env;
 
 pub mod macros;
 
+pub mod test_case;
+
 #[cfg(test)]
 pub mod grammar;
 

@@ -51,10 +51,8 @@ pub type HashMap<K, V> =
 #[cfg(any(test, feature = "test-api"))]
 pub use tests::{
     assert_parents,
-    env::{
-        Env1,
-        TestEnv,
-    },
+    env::Env1,
+    test_case::TestEnv,
 };
 
 // Essential public re-exports for context-search

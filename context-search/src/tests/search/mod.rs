@@ -75,7 +75,7 @@ fn find_sequence() {
         ababababcdefghi,
         a,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     assert_eq!(
         graph.find_ancestor("a".chars()),
         Err(ErrorReason::SingleIndex(Box::new(IndexWithPath {

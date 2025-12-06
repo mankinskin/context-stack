@@ -17,10 +17,12 @@ use context_search::{
     *,
 };
 use context_trace::{
-    tests::env::{
-        Env1,
-        Env2,
-        TestEnv,
+    tests::{
+        env::{
+            Env1,
+            Env2,
+        },
+        test_case::TestEnv,
     },
     *,
 };
@@ -89,7 +91,7 @@ fn test_split_cache1() {
         ef,
         e_f_id,
         ..
-    } = &*Env1::get_expected_mut();
+    } = &*Env1::get_mut();
     let _tracing = context_trace::init_test_tracing!(&env.graph);
     assert_eq!(
         build_split_cache1(env),
@@ -225,7 +227,7 @@ fn test_split_cache1() {
 
 #[test]
 fn interval_graph1() {
-    let env = &mut *Env1::get_expected_mut();
+    let env = &mut *Env1::get_mut();
     let _tracing = context_trace::init_test_tracing!(&env.graph);
     let graph = &mut env.graph;
     let Env1 {

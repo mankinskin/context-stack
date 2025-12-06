@@ -1,7 +1,7 @@
 use context_trace::{
-    tests::env::{
-        Env2,
-        TestEnv,
+    tests::{
+        env::Env2,
+        test_case::TestEnv,
     },
     *,
 };
@@ -19,7 +19,7 @@ pub struct CdefghiTraceCase {
 
 impl Default for CdefghiTraceCase {
     fn default() -> Self {
-        let env = Env2::initialize_expected();
+        let env = Env2::initialize();
 
         let Env2 {
             d,

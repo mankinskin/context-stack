@@ -1081,22 +1081,20 @@ fn search_complete_token_a_bc() {
 
 #[test]
 fn test_index_prefix1_hell() {
-    use context_trace::tests::env::{
-        EnvIndexPrefix1,
-        TestEnv,
-    };
+    use context_trace::tests::env::EnvIndexPrefix1;
+    use context_trace::tests::test_case::TestEnv;
 
     let EnvIndexPrefix1 {
         graph,
         h,
         e,
         l,
-        d,
+        d: _d,
         ld,
         ld_id,
         heldld,
         heldld_id,
-    } = EnvIndexPrefix1::initialize_expected();
+    } = EnvIndexPrefix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -1157,10 +1155,8 @@ fn test_index_prefix1_hell() {
 
 #[test]
 fn test_index_postfix1_bcdd() {
-    use context_trace::tests::env::{
-        EnvIndexPostfix1,
-        TestEnv,
-    };
+    use context_trace::tests::env::EnvIndexPostfix1;
+    use context_trace::tests::test_case::TestEnv;
 
     let EnvIndexPostfix1 {
         graph,
@@ -1172,7 +1168,7 @@ fn test_index_postfix1_bcdd() {
         ab_id,
         ababcd,
         ababcd_id,
-    } = EnvIndexPostfix1::initialize_expected();
+    } = EnvIndexPostfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 

@@ -64,7 +64,7 @@ fn prefix1() {
         ef,
         e_f_id,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![*a, *bc, *d, *e];
@@ -74,11 +74,15 @@ fn prefix1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<PathCursor<_>>::new(PathCursor {
-                    atom_position: 5.into(),
-                    path: res.end.cursor().path.clone(),
-                    _state: PhantomData,
-                })),
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<
+                    PathCursor<_>,
+                >::new(
+                    PathCursor {
+                        atom_position: 5.into(),
+                        path: res.end.cursor().path.clone(),
+                        _state: PhantomData,
+                    }
+                )),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {
@@ -167,7 +171,7 @@ fn postfix1() {
         abcd_efghi_id,
         abcdef_ghi_id,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![*c, *d, *ef, *ghi];
@@ -177,11 +181,15 @@ fn postfix1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<PathCursor<_>>::new(PathCursor {
-                    atom_position: 7.into(),
-                    path: res.end.cursor().path.clone(),
-                    _state: PhantomData,
-                })),
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<
+                    PathCursor<_>,
+                >::new(
+                    PathCursor {
+                        atom_position: 7.into(),
+                        path: res.end.cursor().path.clone(),
+                        _state: PhantomData,
+                    }
+                )),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {
@@ -263,7 +271,7 @@ fn range1() {
         abcd_efghi_id,
         abcdef_ghi_id,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![*bc, *d, *e];
@@ -273,11 +281,15 @@ fn range1() {
         res.clone(),
         Response {
             end: MatchResult {
-                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<PathCursor<_>>::new(PathCursor {
-                    atom_position: 4.into(),
-                    path: res.end.cursor().path.clone(),
-                    _state: PhantomData,
-                })),
+                cursor: CheckpointedCursor::AtCheckpoint(Checkpointed::<
+                    PathCursor<_>,
+                >::new(
+                    PathCursor {
+                        atom_position: 4.into(),
+                        path: res.end.cursor().path.clone(),
+                        _state: PhantomData,
+                    }
+                )),
                 path: res.end.path().clone(),
             },
             cache: TraceCache {

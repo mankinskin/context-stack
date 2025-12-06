@@ -29,7 +29,7 @@ use {
 // Test: Single token bc should return error (not a pattern)
 #[test]
 fn find_ancestor1_single_token() {
-    let Env1 { graph, bc, .. } = &*Env1::get_expected();
+    let Env1 { graph, bc, .. } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![Token::new(bc, 2)];
@@ -48,7 +48,7 @@ fn find_ancestor1_single_token() {
 fn find_ancestor1_b_c() {
     let Env1 {
         graph, b, c, bc, ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![Token::new(b, 1), Token::new(c, 1)];
@@ -66,7 +66,7 @@ fn find_ancestor1_b_c() {
 fn find_ancestor1_a_bc() {
     let Env1 {
         graph, a, bc, abc, ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![Token::new(a, 1), Token::new(bc, 2)];
@@ -84,7 +84,7 @@ fn find_ancestor1_a_bc() {
 fn find_ancestor1_ab_c() {
     let Env1 {
         graph, ab, c, abc, ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![Token::new(ab, 2), Token::new(c, 1)];
@@ -107,7 +107,7 @@ fn find_ancestor1_a_bc_d() {
         d,
         abcd,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![Token::new(a, 1), Token::new(bc, 2), Token::new(d, 1)];
@@ -130,7 +130,7 @@ fn find_ancestor1_a_b_c() {
         c,
         abc,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![Token::new(a, 1), Token::new(b, 1), Token::new(c, 1)];
@@ -152,7 +152,7 @@ fn find_ancestor1_a_b_c_c() {
         c,
         abc,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query = vec![
@@ -186,7 +186,7 @@ fn find_ancestor1_long_pattern() {
         i,
         ababababcdefghi,
         ..
-    } = &*Env1::get_expected();
+    } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
 
     let query: Vec<_> = [a, b, a, b, a, b, a, b, c, d, e, f, g, h, i]

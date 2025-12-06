@@ -1,0 +1,115 @@
+//! Test environment for index_infix2 test
+//!
+//! Graph with patterns: yy, xx, xy, abcdx, yabcdx, abcdxx, xxy, xxyyabcdxxyy
+//! Tests complex infix matching with repetitions
+
+use crate::{
+    graph::{
+        Hypergraph,
+        HypergraphRef,
+        vertex::{
+            atom::Atom,
+            token::Token,
+        },
+    },
+    tests::test_case::TestEnv,
+};
+use std::sync::{
+    Arc,
+    OnceLock,
+    RwLock,
+    RwLockReadGuard,
+    RwLockWriteGuard,
+};
+
+#[derive(Debug)]
+pub struct EnvIndexInfix2 {
+    pub graph: HypergraphRef,
+    pub a: Token,
+    pub b: Token,
+    pub c: Token,
+    pub d: Token,
+    pub x: Token,
+    pub y: Token,
+    pub yy: Token,
+    pub xx: Token,
+    pub xy: Token,
+    pub abcdx: Token,
+    pub yabcdx: Token,
+    pub abcdxx: Token,
+    pub xxy: Token,
+    pub xxyyabcdxxyy: Token,
+}
+
+impl TestEnv for EnvIndexInfix2 {
+    fn initialize() -> Self {
+        let mut graph = Hypergraph::default();
+        let [a, b, c, d, x, y] = graph.insert_atoms([
+            Atom::Element('a'),
+            Atom::Element('b'),
+            Atom::Element('c'),
+            Atom::Element('d'),
+            Atom::Element('x'),
+            Atom::Element('y'),
+        ])[..] else {
+            panic!()
+        };
+
+        let yy = graph.insert_pattern(vec![y, y]);
+        let xx = graph.insert_pattern(vec![x, x]);
+        let xy = graph.insert_pattern(vec![x, y]);
+        let abcdx = graph.insert_pattern(vec![a, b, c, d, x]);
+        let yabcdx = graph.insert_pattern(vec![y, abcdx]);
+        let abcdxx = graph.insert_pattern(vec![abcdx, x]);
+        let xxy = graph.insert_patterns([vec![xx, y], vec![x, xy]]);
+        let xxyyabcdxxyy = graph.insert_patterns([
+            vec![xx, yy, abcdxx, yy],
+            vec![xxy, yabcdx, xy, y],
+        ]);
+
+        #[cfg(any(test, feature = "test-api"))]
+        crate::graph::test_graph::register_test_graph(&graph);
+
+        Self {
+            graph: HypergraphRef::from(graph),
+            a,
+            b,
+            c,
+            d,
+            x,
+            y,
+            yy,
+            xx,
+            xy,
+            abcdx,
+            yabcdx,
+            abcdxx,
+            xxy,
+            xxyyabcdxxyy,
+        }
+    }
+
+    fn get<'a>() -> RwLockReadGuard<'a, Self> {
+        get_context_index_infix2().read().unwrap()
+    }
+    fn get_mut<'a>() -> RwLockWriteGuard<'a, Self> {
+        get_context_index_infix2().write().unwrap()
+    }
+
+    fn graph(&self) -> &HypergraphRef {
+        &self.graph
+    }
+}
+
+fn get_context_index_infix2() -> &'static Arc<RwLock<EnvIndexInfix2>> {
+    CONTEXT_INDEX_INFIX2.with(|cell| unsafe {
+        let ptr = cell.get_or_init(|| {
+            Arc::new(RwLock::new(EnvIndexInfix2::initialize()))
+        });
+        &*(ptr as *const Arc<RwLock<EnvIndexInfix2>>)
+    })
+}
+
+thread_local! {
+    static CONTEXT_INDEX_INFIX2: OnceLock<Arc<RwLock<EnvIndexInfix2>>> = const { OnceLock::new() };
+}
