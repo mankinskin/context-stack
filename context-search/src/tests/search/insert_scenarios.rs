@@ -1081,10 +1081,10 @@ fn search_complete_token_a_bc() {
 
 #[test]
 fn test_index_prefix1_hell() {
-    use crate::tests::env::EnvIndexPrefix1;
+    use crate::tests::env::EnvInsertPrefix1;
     use context_trace::tests::test_case::TestEnv;
 
-    let EnvIndexPrefix1 {
+    let EnvInsertPrefix1 {
         graph,
         h,
         e,
@@ -1094,7 +1094,7 @@ fn test_index_prefix1_hell() {
         ld_id,
         heldld,
         heldld_id,
-    } = EnvIndexPrefix1::initialize();
+    } = EnvInsertPrefix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -1155,10 +1155,10 @@ fn test_index_prefix1_hell() {
 
 #[test]
 fn test_index_postfix1_bcdd() {
-    use crate::tests::env::EnvIndexPostfix1;
+    use crate::tests::env::EnvInsertPostfix1;
     use context_trace::tests::test_case::TestEnv;
 
-    let EnvIndexPostfix1 {
+    let EnvInsertPostfix1 {
         graph,
         a: _a,
         b,
@@ -1168,7 +1168,7 @@ fn test_index_postfix1_bcdd() {
         ab_id,
         ababcd,
         ababcd_id,
-    } = EnvIndexPostfix1::initialize();
+    } = EnvInsertPostfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 

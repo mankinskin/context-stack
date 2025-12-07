@@ -34,7 +34,7 @@ impl<R: RangeRole<Mode = Join>> JoinInnerRangeInfo<R>
 where
     R::Borders: JoinBorders<R>,
 {
-    pub fn index_pattern_inner<'a: 'b, 'b: 'c, 'c>(
+    pub fn insert_pattern_inner<'a: 'b, 'b: 'c, 'c>(
         &self,
         ctx: &'c mut NodeJoinCtx<'a>,
     ) -> Token

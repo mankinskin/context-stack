@@ -1,4 +1,4 @@
-//! Test environment for index_infix1 test
+//! Test environment for insert_infix1 test
 //!
 //! Graph with patterns: yz, xxabyzw
 //! Tests infix/range matching behavior
@@ -23,7 +23,7 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvIndexInfix1 {
+pub struct EnvInsertInfix1 {
     pub graph: HypergraphRef,
     pub a: Token,
     pub b: Token,
@@ -35,7 +35,7 @@ pub struct EnvIndexInfix1 {
     pub xxabyzw: Token,
 }
 
-impl TestEnv for EnvIndexInfix1 {
+impl TestEnv for EnvInsertInfix1 {
     fn initialize() -> Self {
         let mut graph = Hypergraph::default();
         let [a, b, w, x, y, z] = graph.insert_atoms([
@@ -80,15 +80,15 @@ impl TestEnv for EnvIndexInfix1 {
     }
 }
 
-fn get_context_index_infix1() -> &'static Arc<RwLock<EnvIndexInfix1>> {
+fn get_context_index_infix1() -> &'static Arc<RwLock<EnvInsertInfix1>> {
     CONTEXT_INDEX_INFIX1.with(|cell| unsafe {
         let ptr = cell.get_or_init(|| {
-            Arc::new(RwLock::new(EnvIndexInfix1::initialize()))
+            Arc::new(RwLock::new(EnvInsertInfix1::initialize()))
         });
-        &*(ptr as *const Arc<RwLock<EnvIndexInfix1>>)
+        &*(ptr as *const Arc<RwLock<EnvInsertInfix1>>)
     })
 }
 
 thread_local! {
-    static CONTEXT_INDEX_INFIX1: OnceLock<Arc<RwLock<EnvIndexInfix1>>> = const { OnceLock::new() };
+    static CONTEXT_INDEX_INFIX1: OnceLock<Arc<RwLock<EnvInsertInfix1>>> = const { OnceLock::new() };
 }

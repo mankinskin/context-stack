@@ -2,9 +2,9 @@
 //!
 //! Each environment is defined in its own module for clarity and maintainability.
 
-mod index_postfix1;
-mod index_prefix1;
+mod insert_postfix1;
+mod insert_prefix1;
 
 // Re-export all environments
-pub use index_postfix1::EnvIndexPostfix1;
-pub use index_prefix1::EnvIndexPrefix1;
+pub use insert_postfix1::EnvInsertPostfix1;
+pub use insert_prefix1::EnvInsertPrefix1;

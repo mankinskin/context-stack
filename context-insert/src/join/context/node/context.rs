@@ -159,7 +159,7 @@ impl NodeJoinCtx<'_> {
         self.interval.cache.get(&self.index.vertex_index()).unwrap()
     }
     pub fn join_partitions(&mut self) -> LinkedHashMap<PosKey, Split> {
-        let partitions = self.index_partitions();
+        let partitions = self.insert_partitions();
         assert_eq!(
             *self.index.width(),
             partitions.iter().map(|t| *t.width()).sum::<usize>()
@@ -168,7 +168,7 @@ impl NodeJoinCtx<'_> {
         assert_eq!(partitions.len(), pos_splits.len() + 1,);
         NodeMergeCtx::new(self).merge_node(&partitions)
     }
-    pub fn index_partitions(&mut self) -> Vec<Token> {
+    pub fn insert_partitions(&mut self) -> Vec<Token> {
         let pos_splits = self.vertex_cache().clone();
         let len = pos_splits.len();
         assert!(len > 0);

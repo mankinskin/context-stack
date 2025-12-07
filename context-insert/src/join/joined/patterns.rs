@@ -15,7 +15,6 @@ use crate::{
             node::context::NodeJoinCtx,
             pattern::borders::JoinBorders,
         },
-        joined::partition::JoinedPartition,
         partition::{
             Join,
             info::{
@@ -35,17 +34,14 @@ pub struct JoinedPatterns<R: RangeRole> {
     pub delta: PatternSubDeltas,
 }
 
-impl<'a: 'b, 'b, R: RangeRole<Mode = Join> + 'a> JoinedPatterns<R>
+impl<'a, R: RangeRole<Mode = Join> + 'a> JoinedPatterns<R>
 where
     R::Borders: JoinBorders<R>,
 {
-    pub fn from_partition_info<'c>(
+    pub fn from_partition_info<'b>(
         info: JoinPartitionInfo<R>,
-        ctx: &'c mut NodeJoinCtx<'a>,
-    ) -> Self
-    where
-        'b: 'c,
-    {
+        ctx: &'b mut NodeJoinCtx<'a>,
+    ) -> Self {
         // assert: no complete perfect token
         // todo: index inner ranges and get token splits
         //
@@ -76,12 +72,12 @@ where
             delta,
         }
     }
-    pub fn to_joined_partition(
-        self,
-        ctx: &'b mut NodeJoinCtx<'a>,
-    ) -> JoinedPartition<R> {
-        JoinedPartition::from_joined_patterns(self, ctx)
-    }
+    //pub fn to_joined_partition(
+    //    self,
+    //    ctx: &'b mut NodeJoinCtx<'a>,
+    //) -> JoinedPartition<R> {
+    //    JoinedPartition::from_joined_patterns(self, ctx)
+    //}
 }
 //#[derive(Debug)]
 //pub enum JoinedPattern {

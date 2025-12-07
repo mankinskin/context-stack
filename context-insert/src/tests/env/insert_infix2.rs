@@ -23,7 +23,7 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvIndexInfix2 {
+pub struct EnvInsertInfix2 {
     pub graph: HypergraphRef,
     pub a: Token,
     pub b: Token,
@@ -41,7 +41,7 @@ pub struct EnvIndexInfix2 {
     pub xxyyabcdxxyy: Token,
 }
 
-impl TestEnv for EnvIndexInfix2 {
+impl TestEnv for EnvInsertInfix2 {
     fn initialize() -> Self {
         let mut graph = Hypergraph::default();
         let [a, b, c, d, x, y] = graph.insert_atoms([
@@ -101,15 +101,15 @@ impl TestEnv for EnvIndexInfix2 {
     }
 }
 
-fn get_context_index_infix2() -> &'static Arc<RwLock<EnvIndexInfix2>> {
+fn get_context_index_infix2() -> &'static Arc<RwLock<EnvInsertInfix2>> {
     CONTEXT_INDEX_INFIX2.with(|cell| unsafe {
         let ptr = cell.get_or_init(|| {
-            Arc::new(RwLock::new(EnvIndexInfix2::initialize()))
+            Arc::new(RwLock::new(EnvInsertInfix2::initialize()))
         });
-        &*(ptr as *const Arc<RwLock<EnvIndexInfix2>>)
+        &*(ptr as *const Arc<RwLock<EnvInsertInfix2>>)
     })
 }
 
 thread_local! {
-    static CONTEXT_INDEX_INFIX2: OnceLock<Arc<RwLock<EnvIndexInfix2>>> = const { OnceLock::new() };
+    static CONTEXT_INDEX_INFIX2: OnceLock<Arc<RwLock<EnvInsertInfix2>>> = const { OnceLock::new() };
 }

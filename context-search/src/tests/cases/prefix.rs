@@ -1,4 +1,4 @@
-//! Search test cases for EnvIndexPrefix1
+//! Search test cases for EnvInsertPrefix1
 //!
 //! Concrete implementations of SearchTestCase trait with expected Response values.
 
@@ -18,7 +18,7 @@ use crate::{
         },
     },
     tests::{
-        env::EnvIndexPrefix1,
+        env::EnvInsertPrefix1,
         test_case::SearchTestCase,
     },
     Response,
@@ -37,7 +37,7 @@ use context_trace::{
 pub struct Prefix1;
 
 impl TestCase for Prefix1 {
-    type Env = EnvIndexPrefix1;
+    type Env = EnvInsertPrefix1;
 
     fn name(&self) -> &'static str {
         "index_prefix1_search_1"
@@ -46,8 +46,8 @@ impl TestCase for Prefix1 {
 
 impl SearchTestCase for Prefix1 {
     fn query(&self) -> Vec<Token> {
-        let env = <Self as TestCase>::Env::get();
-        vec![env.h, env.e, env.l, env.l]
+        let EnvInsertPrefix1 { h, e, l, .. } = *<Self as TestCase>::Env::get();
+        vec![h, e, l, l]
     }
 
     fn expected_response(&self) -> Response {

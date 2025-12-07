@@ -161,7 +161,7 @@ impl<G: GraphKind> Hypergraph<G> {
     //    let seq = seq.into_iter();
     //    let atoms = T::atomize(seq);
     //    let pattern = self.to_atom_children(atoms);
-    //    self.index_pattern(&pattern[..])
+    //    self.insert_pattern(&pattern[..])
     //}
     //pub(crate) fn insert_atom_indices(
     //    &self,

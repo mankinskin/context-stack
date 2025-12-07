@@ -1,16 +1,16 @@
-//! Test environment for index_prefix1 test
+//! Test environment for insert_prefix1 test
 //!
 //! Graph: heldld with patterns ld and heldld
 //! Tests prefix matching behavior
 
 use context_trace::{
     graph::{
-        Hypergraph,
-        HypergraphRef,
         vertex::{
             atom::Atom,
             token::Token,
         },
+        Hypergraph,
+        HypergraphRef,
     },
     tests::test_case::TestEnv,
     PatternId,
@@ -24,7 +24,7 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvIndexPrefix1 {
+pub struct EnvInsertPrefix1 {
     pub graph: HypergraphRef,
     pub h: Token,
     pub e: Token,
@@ -36,7 +36,7 @@ pub struct EnvIndexPrefix1 {
     pub heldld_id: PatternId,
 }
 
-impl TestEnv for EnvIndexPrefix1 {
+impl TestEnv for EnvInsertPrefix1 {
     fn initialize() -> Self {
         let mut graph = Hypergraph::default();
         let [h, e, l, d] = graph.insert_atoms([
@@ -80,15 +80,15 @@ impl TestEnv for EnvIndexPrefix1 {
     }
 }
 
-fn get_context_index_prefix1() -> &'static Arc<RwLock<EnvIndexPrefix1>> {
+fn get_context_index_prefix1() -> &'static Arc<RwLock<EnvInsertPrefix1>> {
     CONTEXT_INDEX_PREFIX1.with(|cell| unsafe {
         let ptr = cell.get_or_init(|| {
-            Arc::new(RwLock::new(EnvIndexPrefix1::initialize()))
+            Arc::new(RwLock::new(EnvInsertPrefix1::initialize()))
         });
-        &*(ptr as *const Arc<RwLock<EnvIndexPrefix1>>)
+        &*(ptr as *const Arc<RwLock<EnvInsertPrefix1>>)
     })
 }
 
 thread_local! {
-    static CONTEXT_INDEX_PREFIX1: OnceLock<Arc<RwLock<EnvIndexPrefix1>>> = const { OnceLock::new() };
+    static CONTEXT_INDEX_PREFIX1: OnceLock<Arc<RwLock<EnvInsertPrefix1>>> = const { OnceLock::new() };
 }

@@ -57,7 +57,7 @@ where
         let index = ctx.index;
         let inner = self
             .inner_range
-            .map(|r| JoinInnerRangeInfo::new(r).index_pattern_inner(ctx));
+            .map(|r| JoinInnerRangeInfo::new(r).insert_pattern_inner(ctx));
         match (inner, self.children) {
             (inner, Some(children)) => children.insert_inner(inner).unwrap(),
             (None, None) => ctx

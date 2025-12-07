@@ -7,18 +7,17 @@ use crate::{
             Pattern1Byz,
         },
         env::{
-            EnvIndexInfix1,
-            EnvIndexInfix2,
-            EnvIndexPattern1,
-            EnvIndexPattern2,
+            EnvInsertInfix1,
+            EnvInsertInfix2,
+            EnvInsertPattern2,
         },
         test_case::InsertTestCase,
     },
 };
 use context_search::{
     tests::env::{
-        EnvIndexPostfix1,
-        EnvIndexPrefix1,
+        EnvInsertPostfix1,
+        EnvInsertPrefix1,
     },
     *,
 };
@@ -28,10 +27,7 @@ use context_trace::{
             assert_all_vertices_unique,
             assert_token_string_repr,
         },
-        test_case::{
-            TestCase,
-            TestEnv,
-        },
+        test_case::TestEnv,
     },
     trace::has_graph::HasGraph,
     *,
@@ -42,7 +38,7 @@ use pretty_assertions::{
 };
 
 #[test]
-fn index_pattern1() {
+fn insert_pattern1() {
     // Test case 1: Insert "byz"
     let case = Pattern1Byz;
     let env = case.environment();
@@ -99,21 +95,11 @@ fn index_pattern1() {
 }
 
 #[test]
-fn index_pattern2() {
+fn insert_pattern2() {
     // Create independent test environment
-    let EnvIndexPattern2 {
-        graph,
-        a,
-        b,
-        x,
-        y,
-        z,
-        yz: _yz,
-        xab: _xab,
-        xyz: _xyz,
-        xabz: _xabz,
-        xabyz: _xabyz,
-    } = EnvIndexPattern2::initialize();
+    let EnvInsertPattern2 {
+        graph, a, b, x, y, ..
+    } = EnvInsertPattern2::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -160,9 +146,9 @@ fn index_pattern2() {
 }
 
 #[test]
-fn index_infix1() {
+fn insert_infix1() {
     // Create independent test environment
-    let EnvIndexInfix1 {
+    let EnvInsertInfix1 {
         graph,
         a,
         b,
@@ -172,7 +158,7 @@ fn index_infix1() {
         z,
         yz,
         xxabyzw,
-    } = EnvIndexInfix1::initialize();
+    } = EnvInsertInfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -247,9 +233,9 @@ fn index_infix1() {
 }
 
 #[test]
-fn index_infix2() {
+fn insert_infix2() {
     // Create independent test environment
-    let EnvIndexInfix2 {
+    let EnvInsertInfix2 {
         graph,
         a,
         b,
@@ -265,7 +251,7 @@ fn index_infix2() {
         abcdxx: _abcdxx,
         xxy: _xxy,
         xxyyabcdxxyy: _xxyyabcdxxyy,
-    } = EnvIndexInfix2::initialize();
+    } = EnvInsertInfix2::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -309,9 +295,9 @@ fn index_infix2() {
 }
 
 #[test]
-fn index_prefix1() {
+fn insert_prefix1() {
     // Create independent test environment
-    let EnvIndexPrefix1 {
+    let EnvInsertPrefix1 {
         graph,
         h,
         e,
@@ -321,7 +307,7 @@ fn index_prefix1() {
         ld_id,
         heldld,
         heldld_id,
-    } = EnvIndexPrefix1::initialize();
+    } = EnvInsertPrefix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
@@ -361,9 +347,9 @@ fn index_prefix1() {
 }
 
 #[test]
-fn index_postfix1() {
+fn insert_postfix1() {
     // Create independent test environment
-    let EnvIndexPostfix1 {
+    let EnvInsertPostfix1 {
         graph,
         a,
         b,
@@ -373,7 +359,7 @@ fn index_postfix1() {
         ab_id,
         ababcd,
         ababcd_id,
-    } = EnvIndexPostfix1::initialize();
+    } = EnvInsertPostfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 

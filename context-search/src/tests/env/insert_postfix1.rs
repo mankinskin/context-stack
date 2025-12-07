@@ -5,12 +5,12 @@
 
 use context_trace::{
     graph::{
-        Hypergraph,
-        HypergraphRef,
         vertex::{
             atom::Atom,
             token::Token,
         },
+        Hypergraph,
+        HypergraphRef,
     },
     tests::test_case::TestEnv,
     PatternId,
@@ -24,7 +24,7 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvIndexPostfix1 {
+pub struct EnvInsertPostfix1 {
     pub graph: HypergraphRef,
     pub a: Token,
     pub b: Token,
@@ -36,7 +36,7 @@ pub struct EnvIndexPostfix1 {
     pub ababcd_id: PatternId,
 }
 
-impl TestEnv for EnvIndexPostfix1 {
+impl TestEnv for EnvInsertPostfix1 {
     fn initialize() -> Self {
         let mut graph = Hypergraph::default();
         let [a, b, c, d] = graph.insert_atoms([
@@ -80,15 +80,15 @@ impl TestEnv for EnvIndexPostfix1 {
     }
 }
 
-fn get_context_index_postfix1() -> &'static Arc<RwLock<EnvIndexPostfix1>> {
+fn get_context_index_postfix1() -> &'static Arc<RwLock<EnvInsertPostfix1>> {
     CONTEXT_INDEX_POSTFIX1.with(|cell| unsafe {
         let ptr = cell.get_or_init(|| {
-            Arc::new(RwLock::new(EnvIndexPostfix1::initialize()))
+            Arc::new(RwLock::new(EnvInsertPostfix1::initialize()))
         });
-        &*(ptr as *const Arc<RwLock<EnvIndexPostfix1>>)
+        &*(ptr as *const Arc<RwLock<EnvInsertPostfix1>>)
     })
 }
 
 thread_local! {
-    static CONTEXT_INDEX_POSTFIX1: OnceLock<Arc<RwLock<EnvIndexPostfix1>>> = const { OnceLock::new() };
+    static CONTEXT_INDEX_POSTFIX1: OnceLock<Arc<RwLock<EnvInsertPostfix1>>> = const { OnceLock::new() };
 }
