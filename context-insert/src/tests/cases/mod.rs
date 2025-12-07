@@ -2,4 +2,4 @@
 //!
 //! Concrete implementations of InsertTestCase trait for different insertion scenarios.
 
-pub mod pattern1;
+pub mod insert;
