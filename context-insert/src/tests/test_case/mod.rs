@@ -2,7 +2,6 @@
 
 use context_trace::{
     Token,
-    graph::vertex::data::VertexData,
     tests::test_case::{
         TestCase,
         TestEnv,
@@ -29,6 +28,6 @@ pub trait InsertTestCase: TestCase {
     /// Expected string representation of the token
     fn expected_string(&self) -> &str;
 
-    /// Expected vertex data after insertion
-    fn expected_vertex_data(&self) -> VertexData;
+    ///// Expected vertex data after insertion
+    //fn expected_vertex_data(&self) -> VertexData;
 }

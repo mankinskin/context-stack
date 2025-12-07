@@ -17,13 +17,11 @@ use context_trace::{
     GraphRoot,
     HasGraph,
     HashSet,
-    PatternId,
     Token,
     VertexSet,
     Wide,
     graph::vertex::{
         VertexIndex,
-        data::VertexData,
         pattern::Pattern,
     },
     tests::{
@@ -64,18 +62,18 @@ impl InsertTestCase for Pattern1Byz {
         "byz"
     }
 
-    fn expected_vertex_data(&self) -> VertexData {
-        let env = Self::Env::get();
-        let token = self.expected_token();
-        let mut vertex = VertexData::new(token);
+    //fn expected_vertex_data(&self) -> VertexData {
+    //    let env = Self::Env::get();
+    //    let token = self.expected_token();
+    //    let mut vertex = VertexData::new(token);
 
-        // Add expected child pattern
-        let pattern = Pattern::from(vec![env.by, env.z]);
-        let pattern_id = PatternId::default();
-        vertex.child_patterns_mut().insert(pattern_id, pattern);
+    //    // Add expected child pattern
+    //    let pattern = Pattern::from(vec![env.by, env.z]);
+    //    let pattern_id = PatternId::default();
+    //    vertex.child_patterns_mut().insert(pattern_id, pattern);
 
-        vertex
-    }
+    //    vertex
+    //}
 }
 
 /// Test case: Insert "aby" into pattern1 environment
@@ -102,18 +100,18 @@ impl InsertTestCase for Pattern1Aby {
         "aby"
     }
 
-    fn expected_vertex_data(&self) -> VertexData {
-        let env = Self::Env::get();
-        let token = self.expected_token();
-        let mut vertex = VertexData::new(token);
+    //fn expected_vertex_data(&self) -> VertexData {
+    //    let env = Self::Env::get();
+    //    let token = self.expected_token();
+    //    let mut vertex = VertexData::new(token);
 
-        // Add expected child pattern
-        let pattern = Pattern::from(vec![env.ab, env.y]);
-        let pattern_id = PatternId::default();
-        vertex.child_patterns_mut().insert(pattern_id, pattern);
+    //    // Add expected child pattern
+    //    let pattern = Pattern::from(vec![env.ab, env.y]);
+    //    let pattern_id = PatternId::default();
+    //    vertex.child_patterns_mut().insert(pattern_id, pattern);
 
-        vertex
-    }
+    //    vertex
+    //}
 }
 
 #[test]
