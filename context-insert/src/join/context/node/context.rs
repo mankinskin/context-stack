@@ -33,7 +33,10 @@ use crate::{
             node::merge::NodeMergeCtx,
             pattern::PatternJoinCtx,
         },
-        joined::partition::JoinedPartition,
+        joined::{
+            partition::JoinedPartition,
+            patterns::JoinedPatterns,
+        },
         partition::{
             Join,
             JoinPartition,
@@ -198,35 +201,16 @@ impl NodeJoinCtx<'_> {
         match root_mode {
             RootMode::Prefix => Prefix::new(offset)
                 .join_partition(self)
-                .inspect(|part| {
-                    if part.perfect.is_none() {
-                        let post = Postfix::new(offset)
-                            .join_partition(self)
-                            .map(|part| part.index)
-                            .unwrap_or_else(|full| full);
-                        self.ctx.trav.add_pattern_with_update(
-                            index,
-                            Pattern::from(vec![part.index, post]),
-                        );
-                    }
+                .map(|part| {
+                    self.join_incomplete_prefix(part, offset, index)
                 })
-                .map(|part| part.index),
+                .unwrap_or_else(|c| c),
             RootMode::Postfix => Postfix::new(offset)
                 .join_partition(self)
-                .inspect(|part| {
-                    if part.perfect.is_none() {
-                        let pre = match Prefix::new(offset).join_partition(self)
-                        {
-                            Ok(pre) => pre.index,
-                            Err(c) => c,
-                        };
-                        self.ctx.trav.add_pattern_with_update(
-                            index,
-                            Pattern::from(vec![pre, part.index]),
-                        );
-                    }
+                .map(|part| {
+                    self.join_incomplete_postfix(part, offset, index)
                 })
-                .map(|part| part.index),
+                .unwrap_or_else(|c| c),
             RootMode::Infix => {
                 let loffset = offset;
                 let roffset = offset_iter.next().unwrap();
@@ -237,9 +221,9 @@ impl NodeJoinCtx<'_> {
                             part, loffset, roffset, index,
                         )
                     })
+                    .unwrap_or_else(|c| c)
             },
         }
-        .unwrap_or_else(|c| c)
     }
 
     pub fn join_incomplete_infix<'c>(
@@ -379,6 +363,146 @@ impl NodeJoinCtx<'_> {
                 let loc = index.to_pattern_location(lp);
                 self.trav.replace_in_pattern(loc, li..ri + 1, vec![wrapper]);
             }
+        }
+        part.index
+    }
+
+    pub fn join_incomplete_postfix<'c>(
+        &mut self,
+        part: JoinedPartition<Post<Join>>,
+        offset: PosSplitCtx<'c>,
+        index: Token,
+    ) -> Token {
+        // For root postfix, we always need to create wrappers
+        let offset_copy = (*offset.pos, offset.split.clone());
+        let offset_ref = (offset_copy.0, &offset_copy.1);
+        
+        // Get the borders for this postfix partition
+        let post_brds: PartitionBorders<Post<Join>> =
+            Postfix::new(offset_ref).partition_borders(self);
+        
+        // For each pattern, find the wrapper range
+        for (pid, border) in post_brds.borders.iter() {
+            let li = border.sub_index;
+            
+            // The wrapper starts at the beginning of child li
+            let wrapper_start_offset = border.start_offset.unwrap();
+            
+            // Calculate where child li ends (this will be used for creating wrapper patterns)
+            let lc = self.trav.expect_child_at(
+                self.index.to_child_location(SubLocation::new(*pid, li)),
+            );
+            let child_end_offset = NonZeroUsize::new(
+                wrapper_start_offset.get() + *lc.width(),
+            )
+            .unwrap();
+            
+            // Find the right index for this pattern (end of pattern)
+            let pattern = &self.patterns()[pid];
+            let ri = pattern.len();
+            
+            // Create splits for the wrapper start
+            let wrapper_start_splits = position_splits(self.patterns(), wrapper_start_offset);
+            
+            // Get patterns for the wrapper infix (from wrapper start to offset)
+            // This represents child li up to the split point
+            let wrap_patterns = match Infix::new(&wrapper_start_splits, offset_ref)
+                .info_partition(self) {
+                Ok(info) => JoinPartitionInfo::from(info).into_joined_patterns(self),
+                Err(_c) => {
+                    // The infix already exists as a complete child
+                    JoinedPatterns {
+                        patterns: std::iter::empty().collect(),
+                        perfect: Default::default(),
+                        delta: Default::default(),
+                        range: None,
+                    }
+                }
+            };
+            
+            // Join the prefix part (from wrapper start to offset)
+            let wrap_pre = match Infix::new(&wrapper_start_splits, offset_ref).join_partition(self) {
+                Ok(p) => p.index,
+                Err(c) => c,
+            };
+
+            // Create wrapper vertex with [wrap_pre, target]
+            let wrapper = self.trav.insert_patterns(
+                std::iter::once(Pattern::from(vec![wrap_pre, part.index]))
+                    .chain(wrap_patterns.patterns),
+            );
+            
+            // Replace the range in the pattern with the wrapper
+            let loc = index.to_pattern_location(*pid);
+            self.trav.replace_in_pattern(loc, li..ri, vec![wrapper]);
+        }
+        
+        part.index
+    }
+
+    pub fn join_incomplete_prefix<'c>(
+        &mut self,
+        part: JoinedPartition<Pre<Join>>,
+        offset: PosSplitCtx<'c>,
+        index: Token,
+    ) -> Token {
+        let offset_copy = (*offset.pos, offset.split.clone());
+        
+        if part.perfect.is_none() {
+            // no perfect border - just add prefix and postfix partitions
+            let post = Postfix::new(offset)
+                .join_partition(self)
+                .map(|part| part.index)
+                .unwrap_or_else(|full| full);
+            self.ctx.trav.add_pattern_with_update(
+                index,
+                Pattern::from(vec![part.index, post]),
+            );
+        } else {
+            // perfect right border - need to create wrapper
+            let rp = part.perfect.0.unwrap();
+            let offset_ref = (offset_copy.0, &offset_copy.1);
+            
+            // find wrapping offsets
+            let (wrap_offset, li) = {
+                let pre_brds: PartitionBorders<Pre<Join>> =
+                    Prefix::new(offset_ref).partition_borders(self);
+                let rp_brd = &pre_brds.borders[&rp];
+                let li = rp_brd.sub_index;
+                let lc = self.trav.expect_child_at(
+                    self.index.to_child_location(SubLocation::new(rp, li)),
+                );
+                let outer_offset = NonZeroUsize::new(
+                    rp_brd.start_offset.unwrap().get() + *lc.width(),
+                )
+                .unwrap();
+                (position_splits(self.patterns(), outer_offset), li)
+            };
+
+            let ri = offset_ref.1.pattern_splits[&rp].sub_index();
+
+            // Create wrapper patterns for the infix between wrapper offset and postfix
+            let info = Infix::new(&wrap_offset, offset_ref)
+                .info_partition(self)
+                .unwrap();
+            let wrap_patterns =
+                JoinPartitionInfo::from(info).into_joined_patterns(self);
+            
+            // Join the postfix part
+            let wrap_post = match Postfix::new(offset_ref).join_partition(self) {
+                Ok(p) => p.index,
+                Err(c) => c,
+            };
+
+            // Create wrapper vertex with [wrap_pre, target]
+            let wrapper = self.trav.insert_patterns(
+                std::iter::once(Pattern::from(vec![part.index, wrap_post]))
+                    .chain(wrap_patterns.patterns),
+            );
+            
+            // Replace the range in the pattern with the wrapper
+            let loc = index.to_pattern_location(rp);
+            self.trav.replace_in_pattern(loc, li..ri, vec![wrapper]);
         }
         part.index
     }
