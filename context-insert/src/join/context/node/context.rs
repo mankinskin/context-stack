@@ -382,24 +382,35 @@ impl NodeJoinCtx<'_> {
         
         // For root postfix, create wrappers for each pattern
         for (pid, border) in post_brds.borders.iter() {
-            // Find where the postfix starts in this pattern
-            let li = offset_ref.1.pattern_splits.get(pid)
-                .map(|pos| pos.sub_index())
-                .unwrap_or(border.sub_index);
+            let pattern = &self.patterns()[pid];
             
-            // For postfix, we replace from li to the end of the pattern
-            let ri = self.patterns()[pid].len();
+            // Get the child at the border
+            let border_child = pattern[border.sub_index];
             
-            // Calculate wrapper start (beginning of child at border.sub_index)
+            // Check if the offset position splits this child
+            let wrap_pre = if let Some(inner_offset) = border.inner_offset {
+                // Child is split at offset - get left half from split cache
+                self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
+                    .unwrap()
+                    .left
+            } else {
+                // Border is at child boundary - use entire child
+                border_child
+            };
+            
+            // Find where to start and end the replacement
+            let li = border.sub_index;
+            let ri = pattern.len();
+            
+            // Get additional wrapper patterns from info_partition
             let wrapper_start_offset = border.start_offset.unwrap();
             let wrap_start = position_splits(self.patterns(), wrapper_start_offset);
-
-            // Get patterns for the wrapper complement (from wrapper_start to offset)
+            
             let wrap_patterns = match Infix::new(&wrap_start, offset_ref)
                 .info_partition(self) {
                 Ok(info) => JoinPartitionInfo::from(info).into_joined_patterns(self),
                 Err(_) => {
-                    // Infix already exists
+                    // Infix already exists, no additional patterns needed
                     JoinedPatterns {
                         patterns: std::iter::empty().collect(),
                         perfect: Default::default(),
@@ -409,13 +420,7 @@ impl NodeJoinCtx<'_> {
                 }
             };
             
-            // Join the complement part (from wrapper start to offset)
-            let wrap_pre = match Infix::new(&wrap_start, offset_ref).join_partition(self) {
-                Ok(p) => p.index,
-                Err(c) => c,
-            };
-
-            // Create wrapper vertex with [wrap_pre, target]
+            // Create wrapper vertex with [wrap_pre, target] plus additional patterns
             let wrapper = self.trav.insert_patterns(
                 std::iter::once(Pattern::from(vec![wrap_pre, part.index]))
                     .chain(wrap_patterns.patterns),
@@ -436,63 +441,44 @@ impl NodeJoinCtx<'_> {
         index: Token,
     ) -> Token {
         let offset_copy = (*offset.pos, offset.split.clone());
+        let offset_ref = (offset_copy.0, &offset_copy.1);
         
-        if part.perfect.is_none() {
-            // no perfect border - just add prefix and postfix partitions
-            let post = Postfix::new(offset)
-                .join_partition(self)
-                .map(|part| part.index)
-                .unwrap_or_else(|full| full);
-            self.ctx.trav.add_pattern_with_update(
-                index,
-                Pattern::from(vec![part.index, post]),
-            );
-        } else {
-            // perfect right border - need to create wrapper
-            let rp = part.perfect.0.unwrap();
-            let offset_ref = (offset_copy.0, &offset_copy.1);
+        // Get borders for all patterns that contain the prefix
+        let pre_brds: PartitionBorders<Pre<Join>> =
+            Prefix::new(offset_ref).partition_borders(self);
+        
+        // For root prefix, create wrappers for each pattern
+        for (pid, border) in pre_brds.borders.iter() {
+            let pattern = &self.patterns()[pid];
             
-            // find wrapping offsets
-            let (wrap_offset, li) = {
-                let pre_brds: PartitionBorders<Pre<Join>> =
-                    Prefix::new(offset_ref).partition_borders(self);
-                let rp_brd = &pre_brds.borders[&rp];
-                let li = rp_brd.sub_index;
-                let lc = self.trav.expect_child_at(
-                    self.index.to_child_location(SubLocation::new(rp, li)),
-                );
-                let outer_offset = NonZeroUsize::new(
-                    rp_brd.start_offset.unwrap().get() + *lc.width(),
-                )
-                .unwrap();
-                (position_splits(self.patterns(), outer_offset), li)
-            };
-
-            let ri = offset_ref.1.pattern_splits[&rp].sub_index();
-
-            // Create wrapper patterns for the infix between wrapper offset and postfix
-            let info = Infix::new(&wrap_offset, offset_ref)
-                .info_partition(self)
-                .unwrap();
-            let wrap_patterns =
-                JoinPartitionInfo::from(info).into_joined_patterns(self);
+            // Get the child at the border
+            let border_child = pattern[border.sub_index];
             
-            // Join the postfix part
-            let wrap_post = match Postfix::new(offset_ref).join_partition(self) {
-                Ok(p) => p.index,
-                Err(c) => c,
+            // Check if the offset position splits this child
+            let wrap_post = if let Some(inner_offset) = border.inner_offset {
+                // Child is split at offset - get right half from split cache
+                self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
+                    .unwrap()
+                    .right
+            } else {
+                // Border is at child boundary - use entire child
+                border_child
             };
-
-            // Create wrapper vertex with [wrap_pre, target]
+            
+            // Find where to start and end the replacement
+            let li = 0; // For prefix, we start from the beginning
+            let ri = border.sub_index + 1; // Include the border child
+            
+            // Create wrapper vertex with [target, wrap_post]
             let wrapper = self.trav.insert_patterns(
-                std::iter::once(Pattern::from(vec![part.index, wrap_post]))
-                    .chain(wrap_patterns.patterns),
+                vec![Pattern::from(vec![part.index, wrap_post])]
             );
             
             // Replace the range in the pattern with the wrapper
-            let loc = index.to_pattern_location(rp);
+            let loc = index.to_pattern_location(*pid);
             self.trav.replace_in_pattern(loc, li..ri, vec![wrapper]);
         }
+        
         part.index
     }
 }
