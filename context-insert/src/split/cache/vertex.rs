@@ -79,6 +79,7 @@ impl SplitVertexCache {
         ctx: NodeTraceCtx,
         root_mode: RootMode,
     ) -> Vec<SplitTraceState> {
+        // First add inner offsets for the target partition
         let (splits, next) = match root_mode {
             RootMode::Infix => Self::add_inner_offsets(
                 ctx,
@@ -94,6 +95,15 @@ impl SplitVertexCache {
             ),
         };
         self.positions.extend(splits);
+        
+        // Then add wrapper offsets for Prefix/Postfix modes
+        let wrapper_splits = match root_mode {
+            RootMode::Prefix => self.add_wrapper_offsets_prefix(ctx),
+            RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx),
+            RootMode::Infix => BTreeMap::new(), // Infix handles wrappers differently
+        };
+        self.positions.extend(wrapper_splits);
+        
         next
     }
     pub fn pos_mut(
@@ -181,5 +191,103 @@ impl SplitVertexCache {
             })
             .collect();
         (splits, states)
+    }
+    
+    /// Add wrapper offsets for Postfix mode
+    /// For each child pattern, find the wrapper range (indices intersected by target partition)
+    /// and add split positions at wrapper boundaries
+    fn add_wrapper_offsets_postfix(
+        &self,
+        ctx: NodeTraceCtx,
+    ) -> BTreeMap<NonZeroUsize, SplitPositionCache> {
+        // Get the first (and only) split position for postfix
+        let split_pos = self.positions.keys().next().copied();
+        
+        if let Some(pos) = split_pos {
+            let split_cache = &self.positions[&pos];
+            let mut wrapper_splits = BTreeMap::new();
+            
+            // For each child pattern, find wrapper start position
+            for (pid, pattern) in ctx.patterns.iter() {
+                if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                    // The wrapper starts at the beginning of the child that contains the split
+                    let child_index = trace_pos.sub_index;
+                    
+                    // Calculate the wrapper start offset (start of this child in root)
+                    let mut wrapper_start_offset = 0;
+                    for i in 0..child_index {
+                        wrapper_start_offset += *pattern[i].width;
+                    }
+                    
+                    // Add wrapper start position if not already present and not at root start
+                    if wrapper_start_offset > 0 {
+                        if let Some(wrapper_pos) = NonZeroUsize::new(wrapper_start_offset) {
+                            if !self.positions.contains_key(&wrapper_pos) {
+                                wrapper_splits.insert(
+                                    wrapper_pos,
+                                    SplitPositionCache::root(position_splits(
+                                        ctx.patterns,
+                                        wrapper_pos,
+                                    )),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
+            wrapper_splits
+        } else {
+            BTreeMap::new()
+        }
+    }
+    
+    /// Add wrapper offsets for Prefix mode
+    /// For each child pattern, find the wrapper range and add split positions at wrapper boundaries
+    fn add_wrapper_offsets_prefix(
+        &self,
+        ctx: NodeTraceCtx,
+    ) -> BTreeMap<NonZeroUsize, SplitPositionCache> {
+        // Get the first (and only) split position for prefix
+        let split_pos = self.positions.keys().next().copied();
+        
+        if let Some(pos) = split_pos {
+            let split_cache = &self.positions[&pos];
+            let mut wrapper_splits = BTreeMap::new();
+            
+            // For each child pattern, find wrapper end position
+            for (pid, pattern) in ctx.patterns.iter() {
+                if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                    // The wrapper ends after the child that contains the split
+                    let child_index = trace_pos.sub_index;
+                    
+                    // Calculate the wrapper end offset (end of this child in root)
+                    let mut wrapper_end_offset = 0;
+                    for i in 0..=child_index {
+                        wrapper_end_offset += *pattern[i].width;
+                    }
+                    
+                    // Add wrapper end position if not at root end
+                    let root_width: usize = pattern.iter().map(|c| *c.width).sum();
+                    if wrapper_end_offset < root_width {
+                        if let Some(wrapper_pos) = NonZeroUsize::new(wrapper_end_offset) {
+                            if !self.positions.contains_key(&wrapper_pos) {
+                                wrapper_splits.insert(
+                                    wrapper_pos,
+                                    SplitPositionCache::root(position_splits(
+                                        ctx.patterns,
+                                        wrapper_pos,
+                                    )),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
+            wrapper_splits
+        } else {
+            BTreeMap::new()
+        }
     }
 }
