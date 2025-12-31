@@ -1,5 +1,6 @@
 use std::{
     borrow::Borrow,
+    collections::HashMap,
     num::NonZeroUsize,
 };
 
@@ -380,54 +381,93 @@ impl NodeJoinCtx<'_> {
         let post_brds: PartitionBorders<Post<Join>> =
             Postfix::new(offset_ref).partition_borders(self);
         
-        // For root postfix, we need to:
-        // 1. Join inner partitions (already done by prior join steps)
-        // 2. Target partition is already joined (part.index)
-        // 3. Create wrapper for each pattern and replace in root
+        // Step 1: Join inner partitions and create working patterns
+        // Collect patterns first to avoid borrow checker issues
+        let patterns_vec: Vec<(PatternId, Vec<Token>)> = self.patterns().iter()
+            .map(|(pid, pat)| (*pid, pat.to_vec()))
+            .collect();
         
+        let mut working_patterns: HashMap<PatternId, Vec<Token>> = HashMap::new();
+        
+        for (pid, pattern) in patterns_vec.iter() {
+            let mut working_pattern = Vec::new();
+            
+            if let Some(border) = post_brds.borders.get(pid) {
+                let li = border.sub_index;
+                let ri = pattern.len();
+                
+                // Add children before the wrapper range unchanged
+                for i in 0..li {
+                    working_pattern.push(pattern[i]);
+                }
+                
+                // Add the border child
+                working_pattern.push(pattern[li]);
+                
+                // Check if there are multiple children after the border that form inner partitions
+                if li + 2 < ri {
+                    // Join consecutive children [li+1 .. ri-1] as inner partitions
+                    let mut inner_children = Vec::new();
+                    for i in (li + 1)..ri {
+                        inner_children.push(pattern[i]);
+                    }
+                    
+                    // If there are 2 or more children, join them as an inner partition
+                    if inner_children.len() >= 2 {
+                        let inner_token = self.trav.insert_patterns(vec![Pattern::from(inner_children)]);
+                        working_pattern.push(inner_token);
+                    } else if inner_children.len() == 1 {
+                        working_pattern.push(inner_children[0]);
+                    }
+                } else {
+                    // No inner partitions, just add remaining children
+                    for i in (li + 1)..ri {
+                        working_pattern.push(pattern[i]);
+                    }
+                }
+            } else {
+                // Pattern not affected by postfix, keep original
+                working_pattern = pattern.clone();
+            }
+            
+            working_patterns.insert(*pid, working_pattern);
+        }
+        
+        // Step 2: Build wrapper for each pattern using working patterns
         for (pid, border) in post_brds.borders.iter() {
-            // Get the original child pattern from root
             let pattern = &self.patterns()[pid];
+            let working_pattern = &working_patterns[pid];
             
-            // Determine wrapper range: from border child to end of pattern
-            let li = border.sub_index; // First child in wrapper
-            let ri = pattern.len(); // End of pattern
+            // Determine wrapper range
+            let li = border.sub_index;
+            let ri = pattern.len();
             
-            // Build wrapper pattern from original root child pattern
-            // The wrapper contains: [complement, target]
-            // where complement is the part from wrapper start to target start
-            
-            // Get the complement (left part of wrapper before target)
+            // Get the complement (left part before target)
             let border_child = pattern[li];
             let wrap_pre = if let Some(inner_offset) = border.inner_offset {
-                // Child is split - get left half from split cache
                 self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
                     .unwrap()
                     .left
             } else {
-                // Border at child boundary - use entire child
                 border_child
             };
             
-            // Build wrapper child patterns from original pattern
-            // We need to create patterns for wrapper that match structure of replaced range
+            // Build wrapper patterns
             let mut wrapper_patterns = Vec::new();
             
             // Primary pattern: [wrap_pre, target]
             wrapper_patterns.push(Pattern::from(vec![wrap_pre, part.index]));
             
-            // Additional patterns from the original root pattern structure
-            // For each original pattern in root, create corresponding wrapper pattern
-            // by taking the subrange [li..ri] and substituting splits
+            // Secondary pattern from working pattern subrange
+            // Map original pattern indices to working pattern indices
+            // (working pattern may be shorter due to joined inner partitions)
+            let working_li = li; // For now, assume same index (may need adjustment)
+            let working_ri = working_pattern.len();
             
-            // For now, let's try to get additional patterns from split children
-            // This creates the second pattern needed (e.g., [ab, cd] from [ab, c, d])
-            if li + 1 < ri {
-                // There are more children between wrapper start and end
-                // Build pattern from middle+end children using split halves
+            if working_li + 1 < working_ri {
                 let mut alt_pattern = Vec::new();
                 
-                // First child: if split, use right half; otherwise use entire child
+                // First child: right half if split
                 if let Some(inner_offset) = border.inner_offset {
                     let right_half = self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
                         .unwrap()
@@ -437,20 +477,18 @@ impl NodeJoinCtx<'_> {
                     alt_pattern.push(border_child);
                 }
                 
-                // Add remaining children
-                for i in (li + 1)..ri {
-                    alt_pattern.push(pattern[i]);
+                // Remaining children from working pattern (with inner partitions joined)
+                for i in (working_li + 1)..working_ri {
+                    alt_pattern.push(working_pattern[i]);
                 }
                 
-                if alt_pattern.len() > 1 || (alt_pattern.len() == 1 && alt_pattern[0] != part.index) {
+                if alt_pattern.len() > 1 {
                     wrapper_patterns.push(Pattern::from(alt_pattern));
                 }
             }
             
-            // Create wrapper vertex with all patterns
             let wrapper = self.trav.insert_patterns(wrapper_patterns);
             
-            // Replace the wrapper range in root pattern
             let loc = index.to_pattern_location(*pid);
             self.trav.replace_in_pattern(loc, li..ri, vec![wrapper]);
         }
