@@ -1,6 +1,5 @@
 use std::{
     borrow::Borrow,
-    collections::HashMap,
     num::NonZeroUsize,
 };
 
@@ -34,10 +33,7 @@ use crate::{
             node::merge::NodeMergeCtx,
             pattern::PatternJoinCtx,
         },
-        joined::{
-            partition::JoinedPartition,
-            patterns::JoinedPatterns,
-        },
+        joined::partition::JoinedPartition,
         partition::{
             Join,
             JoinPartition,
@@ -142,13 +138,9 @@ impl GetPatternCtx for NodeJoinCtx<'_> {
         Self: 'c,
     {
         let ctx = self.get_pattern_trace_context(pattern_id);
-        //let pos_splits = self.vertex_cache().pos_splits();
         PatternJoinCtx {
             ctx,
-            splits: self.splits, //pos_splits
-                                 //    .iter()
-                                 //    .map(|pos| PosSplitCtx::from(pos).fetch_split(&self.ctx.interval))
-                                 //    .collect(),
+            splits: self.splits,
         }
     }
 }
@@ -163,7 +155,25 @@ impl NodeJoinCtx<'_> {
         self.interval.cache.get(&self.index.vertex_index()).unwrap()
     }
     pub fn join_partitions(&mut self) -> LinkedHashMap<PosKey, Split> {
-        let partitions = self.insert_partitions();
+        // insert partitions between all offsets
+        let pos_splits = self.vertex_cache().clone();
+        let len = pos_splits.len();
+        assert!(len > 0);
+
+        let mut iter = pos_splits.iter().map(|(&pos, splits)| VertexSplits {
+            pos,
+            splits: (splits.borrow() as &TokenTracePositions).clone(),
+        });
+
+        let mut prev = iter.next().unwrap();
+        let mut partitions = Vec::<Token>::with_capacity(1 + len);
+        partitions.push(Prefix::new(&prev).join_partition(self).into());
+        for offset in iter {
+            partitions
+                .push(Infix::new(&prev, &offset).join_partition(self).into());
+            prev = offset;
+        }
+        partitions.push(Postfix::new(prev).join_partition(self).into());
         assert_eq!(
             *self.index.width(),
             partitions.iter().map(|t| *t.width()).sum::<usize>()
@@ -172,29 +182,8 @@ impl NodeJoinCtx<'_> {
         assert_eq!(partitions.len(), pos_splits.len() + 1,);
         NodeMergeCtx::new(self).merge_node(&partitions)
     }
-    pub fn insert_partitions(&mut self) -> Vec<Token> {
-        let pos_splits = self.vertex_cache().clone();
-        let len = pos_splits.len();
-        assert!(len > 0);
-        let mut iter = pos_splits.iter().map(|(&pos, splits)| VertexSplits {
-            pos,
-            splits: (splits.borrow() as &TokenTracePositions).clone(),
-        });
-
-        let mut prev = iter.next().unwrap();
-        let mut parts = Vec::with_capacity(1 + len);
-        parts.push(Prefix::new(&prev).join_partition(self).into());
-        for offset in iter {
-            parts.push(Infix::new(&prev, &offset).join_partition(self).into());
-            prev = offset;
-        }
-        parts.push(Postfix::new(prev).join_partition(self).into());
-        //println!("{:#?}", parts);
-        parts
-    }
     pub fn join_root_partitions(&mut self) -> Token {
         let root_mode = self.interval.cache.root_mode;
-        let index = self.index;
         let offsets = self.vertex_cache().clone();
         let mut offset_iter = offsets.iter().map(PosSplitCtx::from);
         let offset = offset_iter.next().unwrap();
@@ -202,15 +191,11 @@ impl NodeJoinCtx<'_> {
         match root_mode {
             RootMode::Prefix => Prefix::new(offset)
                 .join_partition(self)
-                .map(|part| {
-                    self.join_incomplete_prefix(part, offset, index)
-                })
+                .map(|part| self.join_incomplete_prefix(part, offset))
                 .unwrap_or_else(|c| c),
             RootMode::Postfix => Postfix::new(offset)
                 .join_partition(self)
-                .map(|part| {
-                    self.join_incomplete_postfix(part, offset, index)
-                })
+                .map(|part| self.join_incomplete_postfix(part, offset))
                 .unwrap_or_else(|c| c),
             RootMode::Infix => {
                 let loffset = offset;
@@ -218,9 +203,7 @@ impl NodeJoinCtx<'_> {
                 Infix::new(loffset, roffset)
                     .join_partition(self)
                     .map(|part| {
-                        self.join_incomplete_infix(
-                            part, loffset, roffset, index,
-                        )
+                        self.join_incomplete_infix(part, loffset, roffset)
                     })
                     .unwrap_or_else(|c| c)
             },
@@ -232,11 +215,10 @@ impl NodeJoinCtx<'_> {
         part: JoinedPartition<In<Join>>,
         loffset: PosSplitCtx<'c>,
         roffset: PosSplitCtx<'c>,
-        index: Token,
     ) -> Token {
         let loffset = (*loffset.pos, loffset.split.clone());
         let roffset = (*roffset.pos, roffset.split.clone() - part.delta);
-
+        let root_index = self.index;
         if (None, None) == part.perfect.into() {
             // no perfect border
             //        [               ]
@@ -249,7 +231,7 @@ impl NodeJoinCtx<'_> {
             };
             let post: Token = Postfix::new(offset).join_partition(self).into();
             self.trav.add_pattern_with_update(
-                index,
+                root_index,
                 Pattern::from(vec![pre, part.index, post]),
             );
         } else if part.perfect.0 == part.perfect.1 {
@@ -260,7 +242,7 @@ impl NodeJoinCtx<'_> {
             let lpos = loffset.1.pattern_splits[&ll].sub_index();
             let rpos = roffset.1.pattern_splits[&rl].sub_index();
             self.ctx.trav.replace_in_pattern(
-                index.to_pattern_location(ll),
+                self.index.to_pattern_location(ll),
                 lpos..rpos,
                 vec![part.index],
             )
@@ -305,7 +287,7 @@ impl NodeJoinCtx<'_> {
                     std::iter::once(Pattern::from(vec![wrap_pre, part.index]))
                         .chain(wrap_patterns.patterns),
                 );
-                let loc = index.to_pattern_location(rp);
+                let loc = self.index.to_pattern_location(rp);
                 self.trav.replace_in_pattern(loc, li..ri, vec![wrapper]);
 
                 //let patterns = wrap_patterns.patterns.clone();
@@ -361,7 +343,7 @@ impl NodeJoinCtx<'_> {
                     std::iter::once(Pattern::from(vec![part.index, wrap_post]))
                         .chain(wrap_patterns.patterns),
                 );
-                let loc = index.to_pattern_location(lp);
+                let loc = self.index.to_pattern_location(lp);
                 self.trav.replace_in_pattern(loc, li..ri + 1, vec![wrapper]);
             }
         }
@@ -372,127 +354,110 @@ impl NodeJoinCtx<'_> {
         &mut self,
         part: JoinedPartition<Post<Join>>,
         offset: PosSplitCtx<'c>,
-        index: Token,
     ) -> Token {
         let offset_copy = (*offset.pos, offset.split.clone());
         let offset_ref = (offset_copy.0, &offset_copy.1);
-        
-        // Get borders for all patterns that contain the postfix
+
+        // Get borders in all patterns
         let post_brds: PartitionBorders<Post<Join>> =
             Postfix::new(offset_ref).partition_borders(self);
-        
+
         // Step 1: Join inner partitions and create working patterns
         // Collect patterns first to avoid borrow checker issues
-        let patterns_vec: Vec<(PatternId, Vec<Token>)> = self.patterns().iter()
-            .map(|(pid, pat)| (*pid, pat.to_vec()))
-            .collect();
-        
-        let mut working_patterns: HashMap<PatternId, Vec<Token>> = HashMap::new();
-        
-        for (pid, pattern) in patterns_vec.iter() {
+        let working_patterns: HashMap<PatternId, Pattern> =
+            self.patterns().clone();
+
+        for (pid, pattern) in working_patterns.iter() {
             let mut working_pattern = Vec::new();
-            
-            if let Some(border) = post_brds.borders.get(pid) {
-                let li = border.sub_index;
-                let ri = pattern.len();
-                
-                // Add children before the wrapper range unchanged
-                for i in 0..li {
-                    working_pattern.push(pattern[i]);
+
+            // determine inner range for postfix
+            let border = post_brds
+                .borders
+                .get(pid)
+                .expect("Pattern must have border");
+            let li = border.sub_index;
+            let ri = pattern.len();
+            let inner_range = li + 1..ri;
+
+            // Check if there are multiple children after the border that form inner partition
+            if inner_range.len() >= 2 {
+                // Join consecutive children [li+1 .. ri] as inner partition
+                let mut inner_children = Vec::new();
+                for i in inner_range {
+                    inner_children.push(pattern[i]);
                 }
-                
-                // Add the border child
-                working_pattern.push(pattern[li]);
-                
-                // Check if there are multiple children after the border that form inner partitions
-                if li + 2 < ri {
-                    // Join consecutive children [li+1 .. ri-1] as inner partitions
-                    let mut inner_children = Vec::new();
-                    for i in (li + 1)..ri {
-                        inner_children.push(pattern[i]);
-                    }
-                    
-                    // If there are 2 or more children, join them as an inner partition
-                    if inner_children.len() >= 2 {
-                        let inner_token = self.trav.insert_patterns(vec![Pattern::from(inner_children)]);
-                        working_pattern.push(inner_token);
-                    } else if inner_children.len() == 1 {
-                        working_pattern.push(inner_children[0]);
-                    }
-                } else {
-                    // No inner partitions, just add remaining children
-                    for i in (li + 1)..ri {
-                        working_pattern.push(pattern[i]);
-                    }
-                }
-            } else {
-                // Pattern not affected by postfix, keep original
-                working_pattern = pattern.clone();
+
+                let inner_token =
+                    self.trav.insert_pattern(Pattern::from(inner_children));
+                working_pattern.push(inner_token);
             }
-            
-            working_patterns.insert(*pid, working_pattern);
         }
-        
+
         // Step 2: Build wrapper for each pattern using working patterns
         for (pid, border) in post_brds.borders.iter() {
             let pattern = &self.patterns()[pid];
             let working_pattern = &working_patterns[pid];
-            
+
             // Determine wrapper range
             let li = border.sub_index;
             let ri = pattern.len();
-            
+
             // Get the complement (left part before target)
             let border_child = pattern[li];
             let wrap_pre = if let Some(inner_offset) = border.inner_offset {
-                self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
+                self.ctx
+                    .splits
+                    .get(&PosKey::new(border_child, inner_offset))
                     .unwrap()
                     .left
             } else {
                 border_child
             };
-            
+
             // Build wrapper patterns
             let mut wrapper_patterns = Vec::new();
-            
+
             // Primary pattern: [wrap_pre, target]
             wrapper_patterns.push(Pattern::from(vec![wrap_pre, part.index]));
-            
+
             // Secondary pattern from working pattern subrange
             // Map original pattern indices to working pattern indices
             // (working pattern may be shorter due to joined inner partitions)
             let working_li = li; // For now, assume same index (may need adjustment)
             let working_ri = working_pattern.len();
-            
+
             if working_li + 1 < working_ri {
                 let mut alt_pattern = Vec::new();
-                
+
                 // First child: right half if split
                 if let Some(inner_offset) = border.inner_offset {
-                    let right_half = self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
+                    let right_half = self
+                        .ctx
+                        .splits
+                        .get(&PosKey::new(border_child, inner_offset))
                         .unwrap()
                         .right;
                     alt_pattern.push(right_half);
                 } else {
                     alt_pattern.push(border_child);
                 }
-                
+
                 // Remaining children from working pattern (with inner partitions joined)
                 for i in (working_li + 1)..working_ri {
                     alt_pattern.push(working_pattern[i]);
                 }
-                
+
                 if alt_pattern.len() > 1 {
                     wrapper_patterns.push(Pattern::from(alt_pattern));
                 }
             }
-            
+
             let wrapper = self.trav.insert_patterns(wrapper_patterns);
-            
-            let loc = index.to_pattern_location(*pid);
+
+            let loc = self.index.to_pattern_location(*pid);
             self.trav.replace_in_pattern(loc, li..ri, vec![wrapper]);
         }
-        
+
         part.index
     }
 
@@ -500,80 +465,86 @@ impl NodeJoinCtx<'_> {
         &mut self,
         part: JoinedPartition<Pre<Join>>,
         offset: PosSplitCtx<'c>,
-        index: Token,
     ) -> Token {
         let offset_copy = (*offset.pos, offset.split.clone());
         let offset_ref = (offset_copy.0, &offset_copy.1);
-        
+
         // Get borders for all patterns that contain the prefix
         let pre_brds: PartitionBorders<Pre<Join>> =
             Prefix::new(offset_ref).partition_borders(self);
-        
+
         // For root prefix, create wrappers for each pattern
         for (pid, border) in pre_brds.borders.iter() {
             // Get the original child pattern from root
             let pattern = &self.patterns()[pid];
-            
+
             // Determine wrapper range: from start of pattern to border child (inclusive)
             let li = 0; // Start of pattern
             let ri = border.sub_index + 1; // After border child
-            
+
             // Build wrapper pattern from original root child pattern
             // The wrapper contains: [target, complement]
             // where complement is the part from target end to wrapper end
-            
+
             // Get the complement (right part of wrapper after target)
             let border_child = pattern[border.sub_index];
             let wrap_post = if let Some(inner_offset) = border.inner_offset {
                 // Child is split - get right half from split cache
-                self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
+                self.ctx
+                    .splits
+                    .get(&PosKey::new(border_child, inner_offset))
                     .unwrap()
                     .right
             } else {
                 // Border at child boundary - use entire child
                 border_child
             };
-            
+
             // Build wrapper child patterns from original pattern
             let mut wrapper_patterns = Vec::new();
-            
+
             // Primary pattern: [target, wrap_post]
             wrapper_patterns.push(Pattern::from(vec![part.index, wrap_post]));
-            
+
             // Additional patterns from the original root pattern structure
             // For prefix, build pattern from start+middle children
             if ri > 1 {
                 // There are more children between wrapper start and end
                 let mut alt_pattern = Vec::new();
-                
+
                 // Add children before border child
                 for i in 0..(ri - 1) {
                     alt_pattern.push(pattern[i]);
                 }
-                
+
                 // Last child: if split, use left half; otherwise use entire child
                 if let Some(inner_offset) = border.inner_offset {
-                    let left_half = self.ctx.splits.get(&PosKey::new(border_child, inner_offset))
+                    let left_half = self
+                        .ctx
+                        .splits
+                        .get(&PosKey::new(border_child, inner_offset))
                         .unwrap()
                         .left;
                     alt_pattern.push(left_half);
                 } else {
                     alt_pattern.push(border_child);
                 }
-                
-                if alt_pattern.len() > 1 || (alt_pattern.len() == 1 && alt_pattern[0] != part.index) {
+
+                if alt_pattern.len() > 1
+                    || (alt_pattern.len() == 1 && alt_pattern[0] != part.index)
+                {
                     wrapper_patterns.push(Pattern::from(alt_pattern));
                 }
             }
-            
+
             // Create wrapper vertex with all patterns
             let wrapper = self.trav.insert_patterns(wrapper_patterns);
-            
+
             // Replace the wrapper range in root pattern
-            let loc = index.to_pattern_location(*pid);
+            let loc = self.index.to_pattern_location(*pid);
             self.trav.replace_in_pattern(loc, li..ri, vec![wrapper]);
         }
-        
+
         part.index
     }
 }
