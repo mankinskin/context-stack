@@ -56,8 +56,12 @@ pub trait InfoPartition<R: RangeRole>: Sized + Clone + ToPartition<R> {
         // todo detect if prev offset is in same index (to use inner partition as result)
         let pctx = ctx.pattern_trace_context();
         let splits = part.offsets.get(&pctx.loc.pattern_id).unwrap();
+        // Get atom position for recalculating sub_index from current pattern
+        // For Pre/Post: single position; for In: pair of positions
+        let atom_pos = part.offsets.atom_pos();
+        let atom_pos_pair = part.offsets.atom_pos_pair();
 
-        R::Borders::info_border(pctx.pattern, &splits)
+        R::Borders::info_border_with_pos(pctx.pattern, &splits, atom_pos, atom_pos_pair)
     }
 
     fn pattern_ctxs<'a: 'b, 'b>(

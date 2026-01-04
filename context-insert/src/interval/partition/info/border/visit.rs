@@ -23,15 +23,33 @@ use crate::{
             },
         },
     },
+    split::vertex::position::HasInnerOffset,
 };
 use context_trace::*;
 
 pub trait VisitBorders<R: RangeRole>: Sized + PartitionBorder<R> {
     type Splits;
+    /// Create border info from pattern and splits.
+    /// The atom_pos parameter allows recalculating sub_index from the current pattern,
+    /// which is necessary when the pattern may have been modified after tracing.
     fn info_border(
         pattern: &Pattern,
         splits: &Self::Splits,
+        atom_pos: Option<NonZeroUsize>,
     ) -> Self;
+    
+    /// Create border info with both single and pair atom positions.
+    /// Used by info_borders to pass all available position info.
+    fn info_border_with_pos(
+        pattern: &Pattern,
+        splits: &Self::Splits,
+        atom_pos: Option<NonZeroUsize>,
+        _atom_pos_pair: Option<(NonZeroUsize, NonZeroUsize)>,
+    ) -> Self {
+        // Default implementation uses single atom_pos
+        Self::info_border(pattern, splits, atom_pos)
+    }
+    
     fn inner_range_offsets(
         &self,
         pattern: &Pattern,
@@ -45,8 +63,13 @@ impl<M: PostVisitMode> VisitBorders<Post<M>> for BorderInfo {
     fn info_border(
         pattern: &Pattern,
         splits: &Self::Splits,
+        atom_pos: Option<NonZeroUsize>,
     ) -> Self {
-        Self::new(pattern, splits)
+        if let Some(pos) = atom_pos {
+            Self::new_from_atom_pos(pattern, pos, splits.inner_offset())
+        } else {
+            Self::new(pattern, splits)
+        }
     }
     fn inner_range_offsets(
         &self,
@@ -72,8 +95,13 @@ impl<M: PreVisitMode> VisitBorders<Pre<M>> for BorderInfo {
     fn info_border(
         pattern: &Pattern,
         splits: &Self::Splits,
+        atom_pos: Option<NonZeroUsize>,
     ) -> Self {
-        Self::new(pattern, splits)
+        if let Some(pos) = atom_pos {
+            Self::new_from_atom_pos(pattern, pos, splits.inner_offset())
+        } else {
+            Self::new(pattern, splits)
+        }
     }
     fn inner_range_offsets(
         &self,
@@ -99,12 +127,36 @@ impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
     fn info_border(
         pattern: &Pattern,
         splits: &Self::Splits,
+        _atom_pos: Option<NonZeroUsize>,
     ) -> Self {
+        // For Infix without position info, fall back to original behavior
         (
             BorderInfo::new(pattern, &splits.0),
             BorderInfo::new(pattern, &splits.1),
         )
     }
+    
+    fn info_border_with_pos(
+        pattern: &Pattern,
+        splits: &Self::Splits,
+        _atom_pos: Option<NonZeroUsize>,
+        atom_pos_pair: Option<(NonZeroUsize, NonZeroUsize)>,
+    ) -> Self {
+        // Use the pair of atom positions if available
+        if let Some((left_pos, right_pos)) = atom_pos_pair {
+            (
+                BorderInfo::new_from_atom_pos(pattern, left_pos, splits.0.inner_offset()),
+                BorderInfo::new_from_atom_pos(pattern, right_pos, splits.1.inner_offset()),
+            )
+        } else {
+            // Fall back to original behavior
+            (
+                BorderInfo::new(pattern, &splits.0),
+                BorderInfo::new(pattern, &splits.1),
+            )
+        }
+    }
+    
     fn inner_range_offsets(
         &self,
         pattern: &Pattern,

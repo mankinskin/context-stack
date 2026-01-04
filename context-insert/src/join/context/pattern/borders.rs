@@ -7,13 +7,13 @@ use crate::{
         range::{
             children::InfixChildren,
             role::{
+                ChildrenOf,
                 In,
-                ModePatternCtxOf,
                 ModeChildrenOf,
+                ModePatternCtxOf,
                 Post,
                 Pre,
                 RangeRole,
-                ChildrenOf,
             },
         },
     },
@@ -64,6 +64,12 @@ impl JoinBorders<In<Join>> for (BorderInfo, BorderInfo) {
         &self,
         ctx: &PatternJoinCtx<'_>,
     ) -> Option<ChildrenOf<In<Join>>> {
+        tracing::debug!(
+            pattern_len = ctx.pattern.len(),
+            left_sub_index = self.0.sub_index,
+            right_sub_index = self.1.sub_index,
+            "JoinBorders<In<Join>>::get_child_splits"
+        );
         let (lc, rc) =
             (ctx.pattern[self.0.sub_index], ctx.pattern[self.1.sub_index]);
         match (self.0.inner_offset, self.1.inner_offset) {

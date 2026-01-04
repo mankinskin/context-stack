@@ -28,6 +28,27 @@ impl BorderInfo {
             start_offset: NonZeroUsize::new(offset),
         }
     }
+    
+    /// Create a BorderInfo by recalculating sub_index from atom position.
+    /// This is more robust when the pattern may have been modified after the
+    /// original trace was recorded.
+    pub fn new_from_atom_pos(
+        pattern: &Pattern,
+        atom_pos: NonZeroUsize,
+        inner_offset: Option<NonZeroUsize>,
+    ) -> Self {
+        use crate::TraceBack;
+        // Recalculate sub_index from atom position using current pattern
+        let trace_pos = TraceBack::trace_child_pos(pattern, atom_pos)
+            .expect("atom_pos should be valid within pattern");
+        let sub_index = trace_pos.sub_index();
+        let offset = End::inner_ctx_width(pattern, sub_index);
+        BorderInfo {
+            sub_index,
+            inner_offset,
+            start_offset: NonZeroUsize::new(offset),
+        }
+    }
 }
 impl HasInnerOffset for BorderInfo {
     fn inner_offset(&self) -> Option<NonZeroUsize> {

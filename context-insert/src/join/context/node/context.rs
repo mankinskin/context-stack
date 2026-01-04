@@ -183,6 +183,13 @@ impl NodeJoinCtx<'_> {
         NodeMergeCtx::new(self).merge_node(&partitions)
     }
     pub fn join_root_partitions(&mut self) -> Token {
+        // Use the new clean implementation
+        super::root::join_root_partitions(self)
+    }
+
+    // Legacy functions below - to be removed after testing
+    #[allow(dead_code)]
+    pub fn join_root_partitions_legacy(&mut self) -> Token {
         let root_mode = self.interval.cache.root_mode;
         let offsets = self.vertex_cache().clone();
         let mut offset_iter = offsets.iter().map(PosSplitCtx::from);
@@ -210,6 +217,7 @@ impl NodeJoinCtx<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn join_incomplete_infix<'c>(
         &mut self,
         part: JoinedPartition<In<Join>>,
@@ -350,6 +358,7 @@ impl NodeJoinCtx<'_> {
         part.index
     }
 
+    #[allow(dead_code)]
     pub fn join_incomplete_postfix<'c>(
         &mut self,
         part: JoinedPartition<Post<Join>>,
@@ -461,6 +470,7 @@ impl NodeJoinCtx<'_> {
         part.index
     }
 
+    #[allow(dead_code)]
     pub fn join_incomplete_prefix<'c>(
         &mut self,
         part: JoinedPartition<Pre<Join>>,
