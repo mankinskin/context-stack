@@ -16,10 +16,7 @@ use crate::graph::{
     },
 };
 use itertools::Itertools;
-use std::{
-    ops::Range,
-    slice::SliceIndex,
-};
+use std::ops::Range;
 
 #[allow(dead_code)]
 impl<G: GraphKind> Hypergraph<G> {
@@ -63,7 +60,7 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         id: impl IntoPatternLocation,
         range: R,
-    ) -> Result<&<R as SliceIndex<[Token]>>::Output, ErrorReason> {
+    ) -> Result<&[Token], ErrorReason> {
         let loc = id.into_pattern_location();
         self.get_vertex(loc.parent)?
             .get_child_pattern_range(&loc.pattern_id, range)
@@ -73,7 +70,7 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         id: impl IntoPatternLocation,
         range: R,
-    ) -> &<R as SliceIndex<[Token]>>::Output {
+    ) -> &[Token] {
         let loc = id.into_pattern_location();
         self.expect_vertex(loc.parent)
             .expect_child_pattern_range(&loc.pattern_id, range)

@@ -1,7 +1,9 @@
 use std::{
     fmt::Debug,
-    ops::RangeBounds,
-    slice::SliceIndex,
+    ops::{
+        Range,
+        RangeBounds,
+    },
 };
 
 use crate::{
@@ -17,8 +19,8 @@ pub(crate) fn get_child_pattern_range<'a, R: PatternRangeIndex>(
     id: &PatternId,
     p: &'a Pattern,
     range: R,
-) -> Result<&'a <R as SliceIndex<[Token]>>::Output, ErrorReason> {
-    p.get(range.clone()).ok_or_else(|| {
+) -> Result<&'a [Token], ErrorReason> {
+    p.get(range.clone().into()).ok_or_else(|| {
         ErrorReason::InvalidPatternRange(
             *id,
             p.clone(),
@@ -27,26 +29,28 @@ pub(crate) fn get_child_pattern_range<'a, R: PatternRangeIndex>(
     })
 }
 
+pub trait RangeIndex<T = Token>:
+    RangeBounds<usize> + Debug + Clone + Send + Sync
+{
+}
+impl<T, R: RangeBounds<usize> + Debug + Clone + Send + Sync> RangeIndex<T>
+    for R
+{
+}
 pub trait PatternRangeIndex<T = Token>:
-    SliceIndex<[T], Output = [T]>
-    + RangeBounds<usize>
+    RangeIndex<usize>
+    + Into<Range<usize>>
     + Iterator<Item = usize>
-    + Debug
-    + Clone
-    + Send
-    + Sync
+    + ExactSizeIterator
 {
 }
 
 impl<
     T,
-    R: SliceIndex<[T], Output = [T]>
-        + RangeBounds<usize>
+    R: RangeIndex<usize>
+        + Into<Range<usize>>
         + Iterator<Item = usize>
-        + Debug
-        + Clone
-        + Send
-        + Sync,
+        + ExactSizeIterator,
 > PatternRangeIndex<T> for R
 {
 }

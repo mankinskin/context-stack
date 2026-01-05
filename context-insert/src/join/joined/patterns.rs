@@ -30,7 +30,7 @@ use context_trace::*;
 pub struct JoinedPatterns<R: RangeRole> {
     pub patterns: Vec<Pattern>,
     pub perfect: R::Perfect,
-    pub range: Option<R::Range>,
+    pub range: Option<R::PatternRange>,
     pub delta: PatternSubDeltas,
 }
 

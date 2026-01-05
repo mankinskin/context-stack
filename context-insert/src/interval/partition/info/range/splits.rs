@@ -3,7 +3,9 @@ use std::{
     num::NonZeroUsize,
     ops::{
         Range,
+        RangeBounds,
         RangeFrom,
+        RangeTo,
     },
 };
 
@@ -33,8 +35,15 @@ use crate::{
     },
 };
 use context_trace::*;
+use derivative::Derivative;
+use derive_more::{
+    Deref,
+    DerefMut,
+    From,
+    Into,
+};
 
-pub trait OffsetIndexRange<R: RangeRole>: PatternRangeIndex {
+pub trait OffsetIndexRange<R: RangeRole>: RangeIndex {
     fn get_splits(
         &self,
         vertex: &SplitVertexCache,
@@ -62,7 +71,7 @@ impl<M: InVisitMode> OffsetIndexRange<In<M>> for Range<usize> {
     }
 }
 
-impl<M: PreVisitMode> OffsetIndexRange<Pre<M>> for Range<usize> {
+impl<M: PreVisitMode> OffsetIndexRange<Pre<M>> for RangeTo<usize> {
     fn get_splits(
         &self,
         vertex: &SplitVertexCache,
@@ -74,6 +83,38 @@ impl<M: PreVisitMode> OffsetIndexRange<Pre<M>> for Range<usize> {
             .nth(self.end)
             .unwrap();
         ro.to_vertex_splits()
+    }
+}
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, Derivative, Deref, DerefMut, From, Into,
+)]
+pub struct PostfixRangeFrom {
+    range: Range<usize>, // end must be initialized from pattern
+}
+impl PostfixRangeFrom {
+    pub fn new(
+        start: usize,
+        pattern_len: usize,
+    ) -> Self {
+        Self {
+            range: start..pattern_len,
+        }
+    }
+}
+impl ExactSizeIterator for PostfixRangeFrom {}
+impl RangeBounds<usize> for PostfixRangeFrom {
+    fn start_bound(&self) -> std::ops::Bound<&usize> {
+        self.range.start_bound()
+    }
+    fn end_bound(&self) -> std::ops::Bound<&usize> {
+        self.range.end_bound()
+    }
+}
+impl Iterator for PostfixRangeFrom {
+    type Item = usize;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.range.next()
     }
 }
 

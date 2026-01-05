@@ -16,11 +16,12 @@ use crate::{
             role::{
                 In,
                 OffsetsOf,
+                PatternRangeOf,
                 Post,
                 Pre,
-                RangeOf,
                 RangeRole,
             },
+            splits::PostfixRangeFrom,
         },
     },
     split::vertex::position::HasInnerOffset,
@@ -37,7 +38,7 @@ pub trait VisitBorders<R: RangeRole>: Sized + PartitionBorder<R> {
         splits: &Self::Splits,
         atom_pos: Option<NonZeroUsize>,
     ) -> Self;
-    
+
     /// Create border info with both single and pair atom positions.
     /// Used by info_borders to pass all available position info.
     fn info_border_with_pos(
@@ -49,13 +50,13 @@ pub trait VisitBorders<R: RangeRole>: Sized + PartitionBorder<R> {
         // Default implementation uses single atom_pos
         Self::info_border(pattern, splits, atom_pos)
     }
-    
+
     fn inner_range_offsets(
         &self,
         pattern: &Pattern,
     ) -> Option<OffsetsOf<R>>;
-    fn inner_range(&self) -> RangeOf<R>;
-    fn outer_range(&self) -> RangeOf<R>;
+    fn inner_range(&self) -> PatternRangeOf<R>;
+    fn outer_range(&self) -> PatternRangeOf<R>;
 }
 
 impl<M: PostVisitMode> VisitBorders<Post<M>> for BorderInfo {
@@ -82,11 +83,14 @@ impl<M: PostVisitMode> VisitBorders<Post<M>> for BorderInfo {
             })
             .and_then(NonZeroUsize::new)
     }
-    fn inner_range(&self) -> RangeOf<Post<M>> {
-        self.sub_index + self.inner_offset.is_some() as usize..
+    fn inner_range(&self) -> PatternRangeOf<Post<M>> {
+        PostfixRangeFrom::new(
+            self.sub_index + self.inner_offset.is_some() as usize,
+            self.pattern_len,
+        )
     }
-    fn outer_range(&self) -> RangeOf<Post<M>> {
-        self.sub_index..
+    fn outer_range(&self) -> PatternRangeOf<Post<M>> {
+        PostfixRangeFrom::new(self.sub_index, self.pattern_len)
     }
 }
 
@@ -111,10 +115,10 @@ impl<M: PreVisitMode> VisitBorders<Pre<M>> for BorderInfo {
             .then_some(self.start_offset)
             .flatten()
     }
-    fn inner_range(&self) -> RangeOf<Pre<M>> {
+    fn inner_range(&self) -> PatternRangeOf<Pre<M>> {
         0..self.sub_index
     }
-    fn outer_range(&self) -> RangeOf<Pre<M>> {
+    fn outer_range(&self) -> PatternRangeOf<Pre<M>> {
         0..self.sub_index + self.inner_offset.is_some() as usize
     }
 }
@@ -135,7 +139,7 @@ impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
             BorderInfo::new(pattern, &splits.1),
         )
     }
-    
+
     fn info_border_with_pos(
         pattern: &Pattern,
         splits: &Self::Splits,
@@ -145,8 +149,16 @@ impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
         // Use the pair of atom positions if available
         if let Some((left_pos, right_pos)) = atom_pos_pair {
             (
-                BorderInfo::new_from_atom_pos(pattern, left_pos, splits.0.inner_offset()),
-                BorderInfo::new_from_atom_pos(pattern, right_pos, splits.1.inner_offset()),
+                BorderInfo::new_from_atom_pos(
+                    pattern,
+                    left_pos,
+                    splits.0.inner_offset(),
+                ),
+                BorderInfo::new_from_atom_pos(
+                    pattern,
+                    right_pos,
+                    splits.1.inner_offset(),
+                ),
             )
         } else {
             // Fall back to original behavior
@@ -156,7 +168,7 @@ impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
             )
         }
     }
-    
+
     fn inner_range_offsets(
         &self,
         pattern: &Pattern,
@@ -175,10 +187,10 @@ impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
         };
         r.filter(|(l, r)| l != r)
     }
-    fn inner_range(&self) -> RangeOf<In<M>> {
+    fn inner_range(&self) -> PatternRangeOf<In<M>> {
         self.0.sub_index..self.1.sub_index
     }
-    fn outer_range(&self) -> RangeOf<In<M>> {
+    fn outer_range(&self) -> PatternRangeOf<In<M>> {
         self.0.sub_index
             ..self.1.sub_index + self.1.inner_offset.is_some() as usize
     }

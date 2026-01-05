@@ -29,11 +29,14 @@ use crate::{
         info::{
             InfoPartition,
             PartitionInfo,
-            range::role::{
-                In,
-                Post,
-                Pre,
-                RangeRole,
+            range::{
+                role::{
+                    In,
+                    Post,
+                    Pre,
+                    RangeRole,
+                },
+                splits::PostfixRangeFrom,
             },
         },
     },
@@ -383,9 +386,13 @@ fn merge_root_partitions(
     let full_range = 0..num_offsets;
     if let Some(&final_token) = range_map.get(&full_range) {
         // Replace children in all root patterns with the final merged result
-        for (pattern_id, _) in ctx.patterns().clone().iter() {
+        for (pattern_id, pat) in ctx.patterns().clone().iter() {
             let loc = root_index.to_pattern_location(*pattern_id);
-            ctx.trav.replace_in_pattern(loc, 0.., vec![final_token]);
+            ctx.trav.replace_in_pattern(
+                loc,
+                PostfixRangeFrom::from(0..pat.len()),
+                vec![final_token],
+            );
         }
     }
 

@@ -1,3 +1,5 @@
+#![feature(slice_index_methods)]
+
 pub(crate) mod insert;
 pub(crate) mod interval;
 pub(crate) mod join;

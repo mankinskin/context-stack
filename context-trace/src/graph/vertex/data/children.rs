@@ -5,10 +5,7 @@
 
 use crate::*;
 use itertools::Itertools;
-use std::{
-    num::NonZeroUsize,
-    slice::SliceIndex,
-};
+use std::num::NonZeroUsize;
 
 /// Helper function to clone child patterns into iterator
 pub(crate) fn clone_child_patterns(
@@ -89,7 +86,7 @@ impl VertexData {
         &self,
         id: &PatternId,
         range: R,
-    ) -> Result<&<R as SliceIndex<[Token]>>::Output, ErrorReason> {
+    ) -> Result<&[Token], ErrorReason> {
         self.get_child_pattern(id)
             .and_then(|p| get_child_pattern_range(id, p, range.clone()))
     }
@@ -100,7 +97,7 @@ impl VertexData {
         &self,
         id: &PatternId,
         range: R,
-    ) -> &<R as SliceIndex<[Token]>>::Output {
+    ) -> &[Token] {
         let p = self.expect_child_pattern(id);
         get_child_pattern_range(id, p, range.clone()).expect("Range in pattern")
     }

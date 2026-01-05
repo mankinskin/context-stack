@@ -134,7 +134,10 @@ pub use crate::{
                 IntoPattern,
                 Pattern,
                 id::PatternId,
-                pattern_range::PatternRangeIndex,
+                pattern_range::{
+                    PatternRangeIndex,
+                    RangeIndex,
+                },
                 pattern_width,
             },
             token::{

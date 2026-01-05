@@ -54,7 +54,7 @@ impl<R: RangeRole<Mode = Trace>> ModeRangeInfo<R> for TraceRangeInfo<R> {
         let inner = borders.inner_info(ctx);
         let (pat, pid) = {
             let ctx = ctx.pattern_trace_context();
-            let pat = ctx.pattern.get(range.clone()).unwrap();
+            let pat = ctx.pattern.get(range.clone().into()).unwrap();
             (pat, ctx.loc.pattern_id())
         };
         if pat.len() != 1 {
@@ -70,8 +70,13 @@ impl<R: RangeRole<Mode = Trace>> ModeRangeInfo<R> for TraceRangeInfo<R> {
 
 #[derive(Debug, Clone)]
 pub struct InnerRangeInfo<R: RangeRole> {
-    pub range: R::Range,
+    pub range: R::PatternRange,
     pub offsets: R::Offsets,
+}
+impl<R: RangeRole> InnerRangeInfo<R> {
+    pub fn delta(&self) -> usize {
+        self.range.clone().into().len().saturating_sub(1)
+    }
 }
 
 #[derive(Debug, Clone)]

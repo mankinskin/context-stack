@@ -68,9 +68,8 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
                     .iter()
                     .find(|(_, s)| s.inner_offset.is_none())
                 {
-                    self.ctx.trav.replace_in_pattern(
+                    self.ctx.trav.replace_pattern(
                         index.to_pattern_location(pid),
-                        0..,
                         vec![left, right],
                     );
                 } else {
