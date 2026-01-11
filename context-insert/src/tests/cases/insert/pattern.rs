@@ -121,12 +121,6 @@ fn insert_pattern1() {
     let env = case.environment();
     let _tracing = context_trace::init_test_tracing!(env.graph());
 
-    // Verify all vertices have unique string representations before insertion
-    {
-        let g = env.graph.graph();
-        assert_all_vertices_unique(&*g);
-    }
-
     let query = case.input_tokens();
     let result_token: Token =
         env.graph.insert(query.clone()).expect("Indexing failed");

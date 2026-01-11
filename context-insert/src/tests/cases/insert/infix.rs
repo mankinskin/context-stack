@@ -39,12 +39,6 @@ fn insert_infix1() {
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
-    // Verify all vertices have unique string representations before insertion
-    {
-        let g = graph.graph();
-        assert_all_vertices_unique(&*g);
-    }
-
     let aby: Token = graph.insert(vec![a, b, y]).expect("Indexing failed");
 
     // Assert the token has the expected string representation and width
@@ -131,12 +125,6 @@ fn insert_infix2() {
     } = EnvInsertInfix2::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
-
-    // Verify all vertices have unique string representations before insertion
-    {
-        let g = graph.graph();
-        assert_all_vertices_unique(&*g);
-    }
 
     let abcd: Token = graph.insert(vec![a, b, c, d]).expect("Indexing failed");
 

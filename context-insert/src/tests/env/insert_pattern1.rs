@@ -4,6 +4,7 @@
 //! Tests complex pattern matching with overlapping structures
 
 use context_trace::{
+    HasGraph,
     graph::{
         Hypergraph,
         HypergraphRef,
@@ -12,7 +13,10 @@ use context_trace::{
             token::Token,
         },
     },
-    tests::test_case::TestEnv,
+    tests::{
+        macros::string_repr::assert_all_vertices_unique,
+        test_case::TestEnv,
+    },
 };
 use std::sync::{
     Arc,
@@ -64,8 +68,14 @@ impl TestEnv for EnvInsertPattern1 {
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
 
+        let graph = HypergraphRef::from(graph);
+        // Verify all vertices have unique string representations before insertion
+        {
+            let g = graph.graph();
+            assert_all_vertices_unique(&*g);
+        }
         Self {
-            graph: HypergraphRef::from(graph),
+            graph,
             a,
             b,
             x,
