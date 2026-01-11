@@ -262,18 +262,14 @@ fn merge_root_partitions(
     }
 
     // Merge from smallest to largest (by offset count, not atom size)
-    // Note: len is number of offsets SPANNED, not number of children
-    // The loop goes from 1 to num_offsets-1 (exclusive) because:
-    // - len=1 merges partitions spanning 1 offset
-    // - len=num_offsets-1 is the largest merge before the full partition
-    // - The full partition (spanning all offsets) is handled separately after the loop
-    //
-    // The inner loop bound is num_offsets - len (not +1) because:
-    // - For range start..start+len, we need offsets at indices start and start+len
-    // - The maximum valid index is num_offsets-1
-    // - So start+len <= num_offsets-1, meaning start <= num_offsets-1-len < num_offsets-len
+    // Note: len is the SPAN of the range (end - start), not number of offsets spanned
+    // The loop follows the same pattern as intermediary node merging in merge.rs:
+    // - len ranges from 1 to num_offsets-1 to create all partition ranges
+    // - For each len, start ranges to create all valid ranges of that length
+    // - Inner loop: 0..num_offsets - len + 1 ensures we create all ranges
+    //   Example: num_offsets=2, len=1 → start in 0..2 → ranges 0..1 and 1..2
     for len in 1..num_offsets {
-        for start in 0..num_offsets - len {
+        for start in 0..num_offsets - len + 1 {
             let range = start..start + len;
 
             // Skip if this is a single partition (already in range_map from initialization)
@@ -281,28 +277,109 @@ fn merge_root_partitions(
                 continue;
             }
 
-            // Get the left and right offset contexts
+            // Get the left offset context
             let lo = offsets.iter().map(PosSplitCtx::from).nth(start).unwrap();
-            let ro = offsets
-                .iter()
-                .map(PosSplitCtx::from)
-                .nth(start + len)
-                .unwrap();
+            
+            // Get the right offset context
+            // Special case: if range extends to the end (start + len == num_offsets),
+            // the right boundary is the end of the root, not an offset
+            let infix = if start + len == num_offsets {
+                // Right boundary is at root end - use Postfix
+                // Actually, we can't directly use Postfix here because info_partition expects Infix
+                // Instead, we need to handle this as a special case
+                // For now, combine the last two partitions manually
+                trace!(?range, "Partition extends to root end - creating from range_map");
+                
+                // Get the two partitions to merge
+                let left_range = start..start + len - 1;
+                let right_range = start + len - 1..start + len;
+                
+                let left_token = range_map.get(&left_range).copied();
+                let right_token = range_map.get(&right_range).copied();
+                
+                match (left_token, right_token) {
+                    (Some(left), Some(right)) => {
+                        // Create pattern and insert
+                        let pattern = Pattern::from(vec![left, right]);
+                        let index = ctx.trav.insert_patterns(vec![pattern]);
+                        range_map.insert(range.clone(), index);
+                        debug!(?index, ?range, "Merged partition (end boundary)");
+                        
+                        // Classify and handle
+                        let partition_type = classify_partition(
+                            &range,
+                            &target_offset_range,
+                            &inner_bounds,
+                            &wrapper_bounds,
+                        );
+                        
+                        match partition_type {
+                            PartitionType::Inner { owner_pattern } => {
+                                debug!(
+                                    ?range,
+                                    ?owner_pattern,
+                                    "Inner partition - replacing in pattern"
+                                );
+                                replace_in_pattern(
+                                    ctx,
+                                    owner_pattern,
+                                    index,
+                                    &range,
+                                    offsets,
+                                );
+                            },
+                            PartitionType::Target => {
+                                info!(?range, ?index, "Target partition found");
+                                target_token = Some(index);
+                            },
+                            PartitionType::Wrapper { owner_pattern } => {
+                                debug!(
+                                    ?range,
+                                    ?owner_pattern,
+                                    "Wrapper partition - replacing in pattern"
+                                );
+                                replace_in_pattern(
+                                    ctx,
+                                    owner_pattern,
+                                    index,
+                                    &range,
+                                    offsets,
+                                );
+                            },
+                            PartitionType::Intermediate => {
+                                trace!(?range, "Intermediate partition - cached only");
+                            },
+                        }
+                        
+                        continue;
+                    },
+                    _ => {
+                        trace!(?range, "Could not merge partition at end boundary - skipping");
+                        continue;
+                    },
+                }
+            } else {
+                let ro = offsets
+                    .iter()
+                    .map(PosSplitCtx::from)
+                    .nth(start + len)
+                    .unwrap();
+                Infix::new(lo, ro)
+            };
 
-            trace!(?range, lo_pos = ?lo.pos, ro_pos = ?ro.pos, "Processing partition range");
+            trace!(?range, lo_pos = ?lo.pos, "Processing partition range");
 
             // Use Infix::info_partition following NodeMergeCtx pattern
-            let infix = Infix::new(lo, ro);
             let res: Result<PartitionInfo<In<Join>>, _> =
                 infix.info_partition(ctx);
 
             let index = match res {
                 Ok(info) => {
                     // Get all 2-way merge combinations for this range
-                    let merges = range_map.range_sub_merges(range.clone());
+                    let merges: Vec<Pattern> = range_map.range_sub_merges(range.clone()).into_iter().collect();
 
                     // Get patterns from info (perfect boundaries)
-                    let joined =
+                    let joined: Vec<Pattern> =
                         info.patterns.into_iter().map(|(pid, pinfo)| {
                             Pattern::from(
                                 (pinfo.join_pattern(ctx, &pid).borrow()
@@ -311,7 +388,16 @@ fn merge_root_partitions(
                                     .cloned()
                                     .collect_vec(),
                             )
-                        });
+                        }).collect();
+
+                    debug!(
+                        ?range,
+                        num_merges = merges.len(),
+                        num_joined = joined.len(),
+                        ?merges,
+                        ?joined,
+                        "Merging partition - patterns from range_sub_merges and info_partition"
+                    );
 
                     let patterns: Vec<Pattern> =
                         merges.into_iter().chain(joined).collect_vec();
