@@ -102,7 +102,6 @@ impl PostfixRangeFrom {
         }
     }
 }
-impl ExactSizeIterator for PostfixRangeFrom {}
 impl RangeBounds<usize> for PostfixRangeFrom {
     fn start_bound(&self) -> std::ops::Bound<&usize> {
         self.range.start_bound()
@@ -115,6 +114,14 @@ impl Iterator for PostfixRangeFrom {
     type Item = usize;
     fn next(&mut self) -> Option<Self::Item> {
         self.range.next()
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.range.size_hint()
+    }
+}
+impl ExactSizeIterator for PostfixRangeFrom {
+    fn len(&self) -> usize {
+        self.range.len()
     }
 }
 
