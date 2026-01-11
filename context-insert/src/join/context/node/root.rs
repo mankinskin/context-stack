@@ -357,20 +357,13 @@ fn merge_root_partitions(
                         "Wrapper partition - replacing in pattern"
                     );
 
-                    // Add complement patterns if needed
-                    let final_token = add_wrapper_complement_patterns(
-                        ctx,
-                        index,
-                        &range,
-                        &target_offset_range,
-                        target_token,
-                        &range_map,
-                    );
-
+                    // The wrapper token already has all needed patterns from the merge
+                    // (both 2-way splits from range_sub_merges and patterns from perfect boundaries)
+                    // No need to add complement patterns separately
                     replace_in_pattern(
                         ctx,
                         owner_pattern,
-                        final_token,
+                        index,
                         &range,
                         offsets,
                     );
