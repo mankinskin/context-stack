@@ -68,9 +68,9 @@ impl RangeMap {
         range: Range<usize>,
     ) -> impl IntoIterator<Item = Pattern> + '_ {
         let (start, end) = (range.start, range.end);
-        // Note: merge.rs uses range.into_iter() which iterates start..end (not start+1..end)
-        // This gives split points at each interior position
-        range.into_iter().map(move |ri| {
+        // Iterate over interior split points only (not boundaries)
+        // For range 0..2, we want split point at 1, giving (0..1) + (1..2)
+        (start + 1..end).map(move |ri| {
             let &left = self.map.get(&(start..ri)).unwrap();
             let &right = self.map.get(&(ri..end)).unwrap();
             Pattern::from(vec![left, right])
@@ -132,9 +132,9 @@ pub fn join_root_partitions(ctx: &mut NodeJoinCtx) -> Token {
 
     // Extract target token based on mode
     // Target offset index identifies which partition contains the target
-    let target_offset_idx = match root_mode {
+    let target_partition_idx = match root_mode {
         RootMode::Prefix => 0,          // Partition before first offset (index 0)
-        RootMode::Postfix => num_offsets, // Partition after last offset (index num_offsets)
+        RootMode::Postfix => partitions.len() - 1, // Last partition (postfix after last offset)
         RootMode::Infix => {
             // Target is between first two offsets - will be merged to range 0..1
             // But we need to get it from the final merge, not from initial partitions
@@ -144,7 +144,7 @@ pub fn join_root_partitions(ctx: &mut NodeJoinCtx) -> Token {
     };
 
     // For Prefix/Postfix: target is a single partition (i..i range notation)
-    let target_range = target_offset_idx..target_offset_idx;
+    let target_range = target_partition_idx..target_partition_idx;
     let target_token = range_map.get(&target_range).copied().expect("Target token not found in range_map");
 
     info!(?target_token, "Root join complete - returning target token");
@@ -170,44 +170,102 @@ fn merge_partitions(
         for start in 0..num_offsets - len + 1 {
             let range = start..start + len;
 
-            // Get offset contexts at positions start and start+len
-            let lo = offsets
-                .iter()
-                .map(PosSplitCtx::from)
-                .nth(start)
-                .unwrap();
-            let ro = offsets
-                .iter()
-                .map(PosSplitCtx::from)
-                .nth(start + len)
-                .unwrap();
+            // Check if this range includes prefix or postfix boundaries
+            let has_prefix = start == 0 && partitions.len() > num_offsets - 1; // prefix exists
+            let has_postfix = start + len == num_offsets && partitions.len() > num_offsets - 1; // postfix exists
 
-            // Use Infix::info_partition - same as intermediary
-            let infix = Infix::new(lo, ro);
-            let res: Result<PartitionInfo<In<Join>>, _> =
-                infix.info_partition(ctx);
+            let index = if has_prefix && start == 0 && start + len < num_offsets {
+                // Merging prefix with infix partitions: use Prefix partition type
+                let ro = offsets
+                    .iter()
+                    .map(PosSplitCtx::from)
+                    .nth(start + len)
+                    .unwrap();
+                let prefix_end = crate::interval::partition::Prefix::new(ro);
+                let res: Result<PartitionInfo<Pre<Join>>, _> = prefix_end.info_partition(ctx);
+                
+                match res {
+                    Ok(info) => {
+                        let merges = range_map.range_sub_merges(range.clone());
+                        let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
+                            Pattern::from(
+                                (pinfo.join_pattern(ctx, &pid).borrow()
+                                    as &'_ Pattern)
+                                    .iter()
+                                    .cloned()
+                                    .collect_vec(),
+                            )
+                        });
+                        let patterns: Vec<_> = merges.into_iter().chain(joined).collect();
+                        ctx.trav.insert_patterns(patterns)
+                    },
+                    Err(existing) => existing,
+                }
+            } else if has_postfix && start + len == num_offsets {
+                // Merging infix with postfix partitions: use Postfix partition type  
+                let lo = offsets
+                    .iter()
+                    .map(PosSplitCtx::from)
+                    .nth(start)
+                    .unwrap();
+                let postfix_start = crate::interval::partition::Postfix::new(lo);
+                let res: Result<PartitionInfo<Post<Join>>, _> = postfix_start.info_partition(ctx);
+                
+                match res {
+                    Ok(info) => {
+                        let merges = range_map.range_sub_merges(range.clone());
+                        let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
+                            Pattern::from(
+                                (pinfo.join_pattern(ctx, &pid).borrow()
+                                    as &'_ Pattern)
+                                    .iter()
+                                    .cloned()
+                                    .collect_vec(),
+                            )
+                        });
+                        let patterns: Vec<_> = merges.into_iter().chain(joined).collect();
+                        ctx.trav.insert_patterns(patterns)
+                    },
+                    Err(existing) => existing,
+                }
+            } else {
+                // Normal infix merge between two offsets
+                let lo = offsets
+                    .iter()
+                    .map(PosSplitCtx::from)
+                    .nth(start)
+                    .unwrap();
+                let ro = offsets
+                    .iter()
+                    .map(PosSplitCtx::from)
+                    .nth(start + len)
+                    .unwrap();
+                
+                let infix = Infix::new(lo, ro);
+                let res: Result<PartitionInfo<In<Join>>, _> = infix.info_partition(ctx);
 
-            let index = match res {
-                Ok(info) => {
-                    // Get 2-way merges from range_map - same as intermediary
-                    let merges = range_map.range_sub_merges(range.clone());
+                match res {
+                    Ok(info) => {
+                        // Get 2-way merges from range_map - same as intermediary
+                        let merges = range_map.range_sub_merges(range.clone());
 
-                    // Get patterns from perfect boundaries - same as intermediary
-                    let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                        Pattern::from(
-                            (pinfo.join_pattern(ctx, &pid).borrow()
-                                as &'_ Pattern)
-                                .iter()
-                                .cloned()
-                                .collect_vec(),
-                        )
-                    });
+                        // Get patterns from perfect boundaries - same as intermediary
+                        let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
+                            Pattern::from(
+                                (pinfo.join_pattern(ctx, &pid).borrow()
+                                    as &'_ Pattern)
+                                    .iter()
+                                    .cloned()
+                                    .collect_vec(),
+                            )
+                        });
 
-                    // Combine and insert - same as intermediary
-                    let patterns = merges.into_iter().chain(joined).collect_vec();
-                    ctx.trav.insert_patterns(patterns)
-                },
-                Err(existing) => existing,
+                        // Combine and insert - same as intermediary
+                        let patterns = merges.into_iter().chain(joined).collect_vec();
+                        ctx.trav.insert_patterns(patterns)
+                    },
+                    Err(existing) => existing,
+                }
             };
 
             range_map.insert(range, index);
