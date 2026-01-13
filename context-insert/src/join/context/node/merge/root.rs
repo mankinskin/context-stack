@@ -5,7 +5,6 @@
 
 use std::{
     borrow::Borrow,
-    collections::HashMap,
     ops::Range,
 };
 
@@ -22,7 +21,10 @@ use crate::{
         },
     },
     join::{
-        context::node::context::NodeJoinCtx,
+        context::node::{
+            context::NodeJoinCtx,
+            merge::RangeMap,
+        },
         partition::Join,
     },
     split::{
@@ -38,49 +40,6 @@ use tracing::{
     debug,
     info,
 };
-
-/// RangeMap for tracking merged partitions by offset index range.
-/// Exactly matches `NodeMergeCtx::RangeMap` - range is offset INDEX, not atom position.
-#[derive(Debug, Default)]
-struct RangeMap {
-    map: HashMap<Range<usize>, Token>,
-}
-
-impl RangeMap {
-    /// Initialize with single-element partitions.
-    /// Matches the `From<I>` impl in intermediary.rs - uses i..i range notation.
-    fn from_partitions(partitions: &[Token]) -> Self {
-        let mut map = HashMap::default();
-        for (i, &part) in partitions.iter().enumerate() {
-            map.insert(i..i, part);
-        }
-        Self { map }
-    }
-
-    /// Get all 2-way merge combinations for a range.
-    /// Exactly matches `range_sub_merges` in intermediary.rs.
-    fn range_sub_merges(
-        &self,
-        range: Range<usize>,
-    ) -> impl IntoIterator<Item = Pattern> + '_ {
-        let (start, end) = (range.start, range.end);
-        // Iterate over interior split points only (not boundaries)
-        // For range 0..2, we want split point at 1, giving (0..1) + (1..2)
-        (start + 1..end).map(move |ri| {
-            let &left = self.map.get(&(start..ri)).unwrap();
-            let &right = self.map.get(&(ri..end)).unwrap();
-            Pattern::from(vec![left, right])
-        })
-    }
-
-    fn insert(&mut self, range: Range<usize>, token: Token) {
-        self.map.insert(range, token);
-    }
-
-    fn get(&self, range: &Range<usize>) -> Option<&Token> {
-        self.map.get(range)
-    }
-}
 
 /// Root merge context - follows same pattern as NodeMergeCtx but extracts target token.
 #[derive(Debug, new)]
@@ -172,7 +131,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         num_offsets: usize,
         target_offset_range: Range<usize>,
     ) -> (RangeMap, Token) {
-        let mut range_map = RangeMap::from_partitions(partitions);
+        let mut range_map = RangeMap::from(partitions);
         let mut target_token = None;
 
         // Determine the maximum merge length based on how many partitions we have

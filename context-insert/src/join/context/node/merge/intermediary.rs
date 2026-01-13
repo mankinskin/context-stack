@@ -1,13 +1,4 @@
-use std::{
-    borrow::Borrow,
-    fmt::Debug,
-    ops::Range,
-};
-
-use derive_more::{
-    Deref,
-    DerefMut,
-};
+use std::borrow::Borrow;
 
 use derive_new::new;
 use itertools::Itertools;
@@ -23,7 +14,10 @@ use crate::{
         },
     },
     join::{
-        context::node::context::NodeJoinCtx,
+        context::node::{
+            context::NodeJoinCtx,
+            merge::RangeMap,
+        },
         partition::Join,
     },
     split::{
@@ -137,34 +131,4 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
     }
 }
 
-#[derive(Debug, Deref, DerefMut, Default)]
-pub struct RangeMap<R = Range<usize>> {
-    #[deref]
-    map: HashMap<R, Token>,
-}
-
-impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I>
-    for RangeMap<Range<usize>>
-{
-    fn from(iter: I) -> Self {
-        let mut map = HashMap::default();
-        for (i, part) in iter.into_iter().enumerate() {
-            map.insert(i..i, *part.borrow());
-        }
-        Self { map }
-    }
-}
-
-impl RangeMap<Range<usize>> {
-    pub fn range_sub_merges(
-        &self,
-        range: Range<usize>,
-    ) -> impl IntoIterator<Item = Pattern> + '_ {
-        let (start, end) = (range.start, range.end);
-        range.into_iter().map(move |ri| {
-            let &left = self.map.get(&(start..ri)).unwrap();
-            let &right = self.map.get(&(ri..end)).unwrap();
-            Pattern::from(vec![left, right])
-        })
-    }
-}
+// RangeMap is now imported from the shared merge::RangeMap module
