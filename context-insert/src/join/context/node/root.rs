@@ -127,25 +127,39 @@ pub fn join_root_partitions(ctx: &mut NodeJoinCtx) -> Token {
         "Initial partitions created"
     );
 
-    // Run the merge algorithm - exactly like intermediary
-    let range_map = merge_partitions(ctx, &offsets, &partitions);
-
-    // Extract target token based on mode
-    // Target offset index identifies which partition contains the target
-    let target_partition_idx = match root_mode {
-        RootMode::Prefix => 0,          // Partition before first offset (index 0)
-        RootMode::Postfix => partitions.len() - 1, // Last partition (postfix after last offset)
-        RootMode::Infix => {
-            // Target is between first two offsets - will be merged to range 0..1
-            // But we need to get it from the final merge, not from initial partitions
-            // For now, use the merged range
-            return *range_map.get(&(0..1)).expect("Target token not found at range 0..1");
+    // Define target offset range based on mode
+    // Target partition is defined by a range of offsets (in offset index space)
+    // For Postfix with num_offsets=2, we have offsets at positions 0 and 1 in the offset array
+    // The target is the POSTFIX partition which starts at the LAST offset
+    let target_offset_range = match root_mode {
+        RootMode::Prefix => 0..1,       // Prefix: from start (0) to first offset (1)
+        RootMode::Postfix => {
+            // Postfix: from last offset to end
+            // With num_offsets, the postfix starts at offset index num_offsets-1
+            // But in partition space with no prefix, this maps differently
+            // The postfix partition IS the last initial partition
+            // We need to identify when it gets merged
+            if num_offsets == 0 {
+                0..1
+            } else {
+                // Target is the entire postfix range - all partitions from first offset to end
+                0..(partitions.len() - 1)
+            }
         }
+        RootMode::Infix => 0..2,        // Infix: between first two offsets
     };
 
-    // For Prefix/Postfix: target is a single partition (i..i range notation)
-    let target_range = target_partition_idx..target_partition_idx;
-    let target_token = range_map.get(&target_range).copied().expect("Target token not found in range_map");
+    debug!(?target_offset_range, num_partitions = partitions.len(), "Target partition offset range");
+
+    // Run the merge algorithm - exactly like intermediary
+    // Extract target when we complete the merge of target_offset_range
+    let (range_map, target_token) = merge_partitions(
+        ctx,
+        &offsets,
+        &partitions,
+        num_offsets,
+        target_offset_range.clone(),
+    );
 
     info!(?target_token, "Root join complete - returning target token");
 
@@ -159,20 +173,33 @@ fn merge_partitions(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     partitions: &[Token],
-) -> RangeMap {
-    let num_offsets = offsets.len();
-
+    num_offsets: usize,
+    target_offset_range: Range<usize>,
+) -> (RangeMap, Token) {
     let mut range_map = RangeMap::from_partitions(partitions);
+    let mut target_token = None;
+
+    // Determine the maximum merge length based on how many partitions we have
+    // For Prefix/Postfix modes: partitions.len() = num_offsets (no prefix) or num_offsets (no postfix)
+    // We need to merge all the way to cover all participating partitions
+    let max_len = partitions.len();
+
+    debug!(
+        num_partitions = partitions.len(),
+        num_offsets,
+        max_len,
+        "Merge loop bounds"
+    );
 
     // Same loop structure as intermediary merge in merge.rs
-    // Merges partitions from smallest to largest
-    for len in 1..num_offsets {
-        for start in 0..num_offsets - len + 1 {
+    // Merges partitions from smallest to largest, but up to max_len instead of num_offsets
+    for len in 1..max_len {
+        for start in 0..(max_len - len) {
             let range = start..start + len;
 
             // Check if this range includes prefix or postfix boundaries
-            let has_prefix = start == 0 && partitions.len() > num_offsets - 1; // prefix exists
-            let has_postfix = start + len == num_offsets && partitions.len() > num_offsets - 1; // postfix exists
+            let has_prefix = start == 0 && partitions.len() > num_offsets; // prefix exists
+            let has_postfix = start + len == partitions.len() - 1 && partitions.len() > num_offsets; // postfix exists at end
 
             let index = if has_prefix && start == 0 && start + len < num_offsets {
                 // Merging prefix with infix partitions: use Prefix partition type
@@ -268,11 +295,18 @@ fn merge_partitions(
                 }
             };
 
-            range_map.insert(range, index);
+            range_map.insert(range.clone(), index);
+
+            // Check if we just merged the target partition
+            if range == target_offset_range {
+                debug!(?range, ?index, "Extracted target token from merge");
+                target_token = Some(index);
+            }
         }
     }
 
-    range_map
+    let target_token = target_token.expect("Target token was never extracted during merge");
+    (range_map, target_token)
 }
 
 /// Get initial partitions with protection of non-participating ranges.
