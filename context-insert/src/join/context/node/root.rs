@@ -22,7 +22,7 @@ use crate::{
         info::{
             InfoPartition,
             PartitionInfo,
-            range::role::In,
+            range::role::{In, Post, Pre},
         },
     },
     join::{
@@ -102,65 +102,49 @@ pub fn join_root_partitions(ctx: &mut NodeJoinCtx) -> Token {
         "Starting root join (reusing intermediary algorithm)"
     );
 
-    // Determine which partitions to create based on mode
-    let (start_idx, end_idx) = match root_mode {
-        RootMode::Prefix => {
-            // Prefix: target is BEFORE all offsets
-            // Create partitions from 0 to num_offsets (protect last postfix)
-            // Target will be at partition 0
-            (0, num_offsets)
-        }
-        RootMode::Postfix => {
-            // Postfix: target is AFTER all offsets
-            // Create partitions from 1 to num_offsets+1 (protect first prefix)
-            // Target will be at partition num_offsets
-            (1, num_offsets + 1)
-        }
-        RootMode::Infix => {
-            // Infix: target is in the middle
-            // Create all partitions 0 to num_offsets+1 (may protect some based on wrapper analysis)
-            // Target will be merged from partitions containing target offsets
-            (0, num_offsets + 1)
-        }
+    // Create initial partitions with protection
+    // - Prefix: Don't create postfix partition (protect range after last offset)
+    // - Postfix: Don't create prefix partition (protect range before first offset)
+    // - Infix: Don't create either end unless needed for wrappers
+    let (create_prefix, create_postfix) = match root_mode {
+        RootMode::Prefix => (true, false),  // Target IS the prefix
+        RootMode::Postfix => (false, true), // Target IS the postfix
+        RootMode::Infix => (false, false),  // Target is between offsets, protect both ends
     };
 
     debug!(
-        start_idx,
-        end_idx,
-        "Creating initial partitions in index range"
+        create_prefix,
+        create_postfix,
+        "Protection strategy for initial partitions"
     );
 
-    // Get initial partitions - same as intermediary
-    let mut all_partitions = get_initial_partitions(ctx, &offsets);
-
-    // For Prefix/Postfix, we only use a subset of partitions
-    let partitions: Vec<Token> = all_partitions
-        .drain(start_idx..end_idx)
-        .collect();
+    // Get initial partitions with protection
+    let partitions = get_initial_partitions(ctx, &offsets, create_prefix, create_postfix);
 
     debug!(
         num_partitions = partitions.len(),
-        ?partitions,
-        "Initial partitions (protected ranges excluded)"
+        expected = if create_prefix && create_postfix { num_offsets + 1 } else { num_offsets },
+        "Initial partitions created"
     );
 
     // Run the merge algorithm - exactly like intermediary
-    let range_map = merge_partitions(ctx, &offsets, &partitions, start_idx);
+    let range_map = merge_partitions(ctx, &offsets, &partitions);
 
     // Extract target token based on mode
-    let target_range = match root_mode {
-        RootMode::Prefix => 0..0, // First partition at adjusted index 0
-        RootMode::Postfix => {
-            let adjusted_last = num_offsets - start_idx;
-            adjusted_last..adjusted_last
-        }
+    // Target offset index identifies which partition contains the target
+    let target_offset_idx = match root_mode {
+        RootMode::Prefix => 0,          // Partition before first offset (index 0)
+        RootMode::Postfix => num_offsets, // Partition after last offset (index num_offsets)
         RootMode::Infix => {
-            // Target is between first two offsets
-            // After merge, this is at range 0..1
-            0..1
+            // Target is between first two offsets - will be merged to range 0..1
+            // But we need to get it from the final merge, not from initial partitions
+            // For now, use the merged range
+            return *range_map.get(&(0..1)).expect("Target token not found at range 0..1");
         }
     };
 
+    // For Prefix/Postfix: target is a single partition (i..i range notation)
+    let target_range = target_offset_idx..target_offset_idx;
     let target_token = range_map.get(&target_range).copied().expect("Target token not found in range_map");
 
     info!(?target_token, "Root join complete - returning target token");
@@ -175,31 +159,27 @@ fn merge_partitions(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     partitions: &[Token],
-    start_idx: usize, // Offset for partition indices (0 for Infix/Prefix, 1 for Postfix)
 ) -> RangeMap {
     let num_offsets = offsets.len();
-    let adjusted_offsets = num_offsets - start_idx;
 
     let mut range_map = RangeMap::from_partitions(partitions);
 
     // Same loop structure as intermediary merge in merge.rs
-    for len in 1..adjusted_offsets {
-        for start in 0..adjusted_offsets - len + 1 {
+    // Merges partitions from smallest to largest
+    for len in 1..num_offsets {
+        for start in 0..num_offsets - len + 1 {
             let range = start..start + len;
 
-            // Get offset contexts - adjust indices back to actual offset positions
-            let actual_start = start + start_idx;
-            let actual_end = start + len + start_idx;
-
+            // Get offset contexts at positions start and start+len
             let lo = offsets
                 .iter()
                 .map(PosSplitCtx::from)
-                .nth(actual_start)
+                .nth(start)
                 .unwrap();
             let ro = offsets
                 .iter()
                 .map(PosSplitCtx::from)
-                .nth(actual_end)
+                .nth(start + len)
                 .unwrap();
 
             // Use Infix::info_partition - same as intermediary
@@ -237,120 +217,106 @@ fn merge_partitions(
     range_map
 }
 
-/// Get initial partitions - same approach as intermediary nodes.
+/// Get initial partitions with protection of non-participating ranges.
+///
+/// Creates partitions between consecutive offsets, with optional prefix/postfix.
 fn get_initial_partitions(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
+    create_prefix: bool,
+    create_postfix: bool,
 ) -> Vec<Token> {
     let num_offsets = offsets.len();
     let mut partitions = Vec::<Token>::with_capacity(num_offsets + 1);
 
-    // Get split positions
-    let mut positions: Vec<_> = offsets.iter().collect();
-    positions.sort_by_key(|(pos, _)| *pos);
+    // Get split positions in order
+    let mut offset_ctxs: Vec<_> = offsets
+        .iter()
+        .map(PosSplitCtx::from)
+        .collect();
+    offset_ctxs.sort_by_key(|ctx| ctx.pos);
 
-    // Helper to join a partition and return the token
-    let join_part = |ctx: &mut NodeJoinCtx, lo: Option<&PosSplitCtx>, ro: Option<&PosSplitCtx>| -> Token {
-        match (lo, ro) {
-            (Some(l), Some(r)) => {
-                // Infix
-                let infix = Infix::new(l, r);
-                match infix.info_partition(ctx) {
-                    Ok(info) => {
-                        let patterns: Vec<Pattern> = info
-                            .patterns
-                            .into_iter()
-                            .map(|(pid, pinfo)| {
-                                Pattern::from(
-                                    (pinfo.join_pattern(ctx, &pid).borrow()
-                                        as &'_ Pattern)
-                                        .iter()
-                                        .cloned()
-                                        .collect_vec(),
-                                )
-                            })
-                            .collect();
-                        ctx.trav.insert_patterns(patterns)
-                    },
-                    Err(existing) => existing,
-                }
+    // Create prefix partition (before first offset) if requested
+    if create_prefix {
+        let first_offset = offset_ctxs[0];
+        let prefix = crate::interval::partition::Prefix::new(first_offset);
+        let res: Result<PartitionInfo<Pre<Join>>, _> = prefix.info_partition(ctx);
+        let prefix_token = match res {
+            Ok(part_info) => {
+                let patterns: Vec<Pattern> = part_info
+                    .patterns
+                    .into_iter()
+                    .map(|(pid, pat_info)| {
+                        Pattern::from(
+                            (pat_info.join_pattern(ctx, &pid).borrow()
+                                as &'_ Pattern)
+                                .iter()
+                                .cloned()
+                                .collect_vec(),
+                        )
+                    })
+                    .collect();
+                ctx.trav.insert_patterns(patterns)
             },
-            (None, Some(r)) => {
-                // Prefix (before first offset)
-                let prefix = crate::interval::partition::Prefix::new(r);
-                match prefix.info_partition(ctx) {
-                    Ok(info) => {
-                        let patterns: Vec<Pattern> = info
-                            .patterns
-                            .into_iter()
-                            .map(|(pid, pinfo)| {
-                                Pattern::from(
-                                    (pinfo.join_pattern(ctx, &pid).borrow()
-                                        as &'_ Pattern)
-                                        .iter()
-                                        .cloned()
-                                        .collect_vec(),
-                                )
-                            })
-                            .collect();
-                        ctx.trav.insert_patterns(patterns)
-                    },
-                    Err(existing) => existing,
-                }
-            },
-            (Some(l), None) => {
-                // Postfix (after last offset)
-                let postfix = crate::interval::partition::Postfix::new(*l);
-                match postfix.info_partition(ctx) {
-                    Ok(info) => {
-                        let patterns: Vec<Pattern> = info
-                            .patterns
-                            .into_iter()
-                            .map(|(pid, pinfo)| {
-                                Pattern::from(
-                                    (pinfo.join_pattern(ctx, &pid).borrow()
-                                        as &'_ Pattern)
-                                        .iter()
-                                        .cloned()
-                                        .collect_vec(),
-                                )
-                            })
-                            .collect();
-                        ctx.trav.insert_patterns(patterns)
-                    },
-                    Err(existing) => existing,
-                }
-            },
-            (None, None) => unreachable!("Need at least one offset"),
-        }
-    };
-
-    // Prefix partition (before first offset)
-    let first_split = positions.first().map(|(pos, splits)| PosSplitCtx {
-        pos: **pos,
-        splits: (*splits.borrow() as &crate::TokenTracePositions).clone(),
-    });
-    partitions.push(join_part(ctx, None, first_split.as_ref()));
-
-    // Infix partitions (between consecutive offsets)
-    for i in 0..num_offsets - 1 {
-        let lo = positions.get(i).map(|(pos, splits)| PosSplitCtx {
-            pos: **pos,
-            splits: (*splits.borrow() as &crate::TokenTracePositions).clone(),
-        });
-        let ro = positions.get(i + 1).map(|(pos, splits)| PosSplitCtx {
-            pos: **pos,
-            splits: (*splits.borrow() as &crate::TokenTracePositions).clone(),
-        });
-        partitions.push(join_part(ctx, lo.as_ref(), ro.as_ref()));
+            Err(existing) => existing,
+        };
+        partitions.push(prefix_token);
     }
 
-    // Postfix partition (after last offset)
-    let last_split = positions.last().map(|(pos, splits)| PosSplitCtx {
-        pos: **pos,
-        splits: (*splits.borrow() as &crate::TokenTracePositions).clone(),
-    });
-    partitions.push(join_part(ctx, last_split.as_ref(), None));
+    // Create infix partitions between consecutive offsets
+    for i in 0..num_offsets - 1 {
+        let lo = offset_ctxs[i];
+        let ro = offset_ctxs[i + 1];
+        let infix = Infix::new(lo, ro);
+        let res: Result<PartitionInfo<In<Join>>, _> = infix.info_partition(ctx);
+        let infix_token = match res {
+            Ok(part_info) => {
+                let patterns: Vec<Pattern> = part_info
+                    .patterns
+                    .into_iter()
+                    .map(|(pid, pat_info)| {
+                        Pattern::from(
+                            (pat_info.join_pattern(ctx, &pid).borrow()
+                                as &'_ Pattern)
+                                .iter()
+                                .cloned()
+                                .collect_vec(),
+                        )
+                    })
+                    .collect();
+                ctx.trav.insert_patterns(patterns)
+            },
+            Err(existing) => existing,
+        };
+        partitions.push(infix_token);
+    }
+
+    // Create postfix partition (after last offset) if requested
+    if create_postfix {
+        let last_offset = offset_ctxs[num_offsets - 1];
+        let postfix = crate::interval::partition::Postfix::new(last_offset);
+        let res: Result<PartitionInfo<Post<Join>>, _> = postfix.info_partition(ctx);
+        let postfix_token = match res {
+            Ok(part_info) => {
+                let patterns: Vec<Pattern> = part_info
+                    .patterns
+                    .into_iter()
+                    .map(|(pid, pat_info)| {
+                        Pattern::from(
+                            (pat_info.join_pattern(ctx, &pid).borrow()
+                                as &'_ Pattern)
+                                .iter()
+                                .cloned()
+                                .collect_vec(),
+                        )
+                    })
+                    .collect();
+                ctx.trav.insert_patterns(patterns)
+            },
+            Err(existing) => existing,
+        };
+        partitions.push(postfix_token);
+    }
 
     partitions
 }
