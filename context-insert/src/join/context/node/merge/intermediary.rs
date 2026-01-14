@@ -80,6 +80,7 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
             0..num_offsets + 1,
             num_offsets,
             &mut range_map,
+            Some(self.ctx.index),  // Pass node index for pattern updates
         );
 
         range_map

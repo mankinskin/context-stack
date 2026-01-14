@@ -130,6 +130,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             partition_range,
             num_offsets,
             &mut range_map,
+            Some(self.ctx.index),  // Pass node index for pattern updates
         );
 
         // Extract target token from range_map

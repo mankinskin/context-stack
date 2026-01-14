@@ -191,6 +191,7 @@ pub fn create_initial_partitions(
 /// - `partition_range`: Range of partition indices to merge (e.g., 0..num_offsets+1)
 /// - `num_offsets`: Total number of offsets (for boundary detection)
 /// - `range_map`: Mutable range map to store merged tokens
+/// - `node_index`: The node being merged (for pattern updates), or None to skip updates
 ///
 /// # Returns
 ///
@@ -202,6 +203,7 @@ pub fn merge_partitions_in_range(
     partition_range: Range<usize>,
     num_offsets: usize,
     range_map: &mut RangeMap,
+    node_index: Option<Token>,
 ) {
     let max_len = partition_range.len();
     
@@ -218,17 +220,46 @@ pub fn merge_partitions_in_range(
 
             let index = if has_prefix && start == 0 && end < num_offsets {
                 // Merging prefix with infix partitions
-                merge_prefix_partition(ctx, offsets, range_map, &range, end)
+                merge_prefix_partition(ctx, offsets, range_map, &range, end, node_index)
             } else if has_postfix && end == num_offsets {
                 // Merging infix with postfix partitions
-                merge_postfix_partition(ctx, offsets, range_map, &range, start)
+                merge_postfix_partition(ctx, offsets, range_map, &range, start, node_index)
             } else {
                 // Normal infix merge between two offsets
-                merge_infix_partition(ctx, offsets, range_map, &range, start, end)
+                merge_infix_partition(ctx, offsets, range_map, &range, start, end, node_index)
             };
 
-            range_map.insert(range, index);
+            range_map.insert(range.clone(), index);
+            
+            // Update node patterns incrementally so subsequent info_partition calls can find them
+            if let Some(node_idx) = node_index {
+                // Check if this merge creates a partition at a perfect boundary in the node's child patterns
+                // If so, update the node's patterns to include this newly merged token
+                update_node_patterns_if_perfect(ctx, node_idx, &range, index, range_map);
+            }
         }
+    }
+}
+
+/// Update node patterns if the merged partition is at a perfect boundary.
+fn update_node_patterns_if_perfect(
+    ctx: &mut NodeJoinCtx,
+    node_index: Token,
+    range: &Range<usize>,
+    _merged_token: Token,
+    range_map: &RangeMap,
+) {
+    // Get the tokens in this range to build the pattern
+    let pattern_tokens: Vec<Token> = (range.start..range.end)
+        .filter_map(|i| range_map.get(&(i..i+1)).copied())
+        .collect();
+    
+    if pattern_tokens.len() > 1 {
+        // This is a merged partition - add or replace pattern in the node
+        ctx.trav.add_pattern_with_update(
+            node_index,
+            Pattern::from(pattern_tokens),
+        );
     }
 }
 
@@ -239,6 +270,7 @@ fn merge_prefix_partition(
     range_map: &RangeMap,
     range: &Range<usize>,
     end: usize,
+    _node_index: Option<Token>,
 ) -> Token {
     let ro = offsets
         .iter()
@@ -274,6 +306,7 @@ fn merge_postfix_partition(
     range_map: &RangeMap,
     range: &Range<usize>,
     start: usize,
+    _node_index: Option<Token>,
 ) -> Token {
     let lo = offsets
         .iter()
@@ -310,6 +343,7 @@ fn merge_infix_partition(
     range: &Range<usize>,
     start: usize,
     end: usize,
+    _node_index: Option<Token>,
 ) -> Token {
     let lo = offsets
         .iter()
@@ -328,6 +362,7 @@ fn merge_infix_partition(
     match res {
         Ok(info) => {
             let merges = range_map.range_sub_merges(range.clone());
+            let num_info_patterns = info.patterns.len();
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
                 Pattern::from(
                     (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
@@ -336,7 +371,13 @@ fn merge_infix_partition(
                         .collect_vec(),
                 )
             });
-            let patterns = merges.into_iter().chain(joined).collect_vec();
+            let patterns = merges.clone().into_iter().chain(joined).collect_vec();
+            debug!(
+                num_merges = merges.len(),
+                num_info_patterns,
+                total_patterns = patterns.len(),
+                "Merging infix partition - pattern counts"
+            );
             ctx.trav.insert_patterns(patterns)
         },
         Err(existing) => existing,
