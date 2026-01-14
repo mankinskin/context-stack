@@ -101,6 +101,9 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         // This replaces sequences of merged tokens in the root's child patterns
         self.update_root_patterns_after_merge(&offsets, &range_map);
 
+        // Print actual VertexData child patterns to diagnose pattern issues
+        self.print_token_vertex_patterns(target_token);
+
         info!(?target_token, "Root join complete - returning target token");
 
         target_token
@@ -168,41 +171,34 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
     ///
     /// This shows what patterns each vertex ACTUALLY contains in its VertexData,
     /// not what we find it through (search cursor patterns).
-    fn print_token_vertex_patterns(&self) {
+    fn print_token_vertex_patterns(&mut self, target: Token) {
         info!("=== VERTEX DATA PATTERNS (actual token child patterns) ===");
         
-        // Print patterns for all tokens by width
-        for width in &[2, 3, 4, 6] {
-            let tokens: Vec<_> = self.ctx.trav.graph()
-                .tokens()
-                .filter(|t| self.ctx.trav.token_width(**t) == *width)
-                .collect();
-            
-            if tokens.is_empty() {
-                debug!(width, "No tokens found with this width");
-                continue;
-            }
-            
-            for token in tokens {
-                let vertex_data = self.ctx.trav.graph().expect_vertex_data(*token);
-                let patterns: Vec<String> = vertex_data.patterns()
-                    .iter()
-                    .map(|p| {
-                        let tokens: Vec<String> = p.iter()
-                            .map(|t| format!("{:?}", t))
-                            .collect();
-                        format!("[{}]", tokens.join(", "))
-                    })
-                    .collect();
-                
-                info!(
-                    token = ?token,
-                    width,
-                    num_patterns = patterns.len(),
-                    patterns = ?patterns,
-                    "Token VertexData patterns"
-                );
-            }
+        // Print root patterns
+        let root = self.ctx.index;
+        let vertex = self.ctx.trav.expect_vertex(root);
+        let patterns = vertex.child_patterns();
+        info!(
+            node = ?root,
+            num_patterns = patterns.len(),
+            "Root (ababcd) has {} child pattern(s)", patterns.len()
+        );
+        for (i, (_pattern_id, pattern)) in patterns.iter().enumerate() {
+            let tokens_str: Vec<String> = pattern.iter().map(|t| format!("{:?}", t)).collect();
+            info!("  Child Pattern {}: [{}]", i, tokens_str.join(", "));
+        }
+        
+        // Print target token patterns
+        let vertex = self.ctx.trav.expect_vertex(target);
+        let patterns = vertex.child_patterns();
+        info!(
+            token = ?target,
+            num_patterns = patterns.len(),
+            "Target token has {} child pattern(s)", patterns.len()
+        );
+        for (i, (_pattern_id, pattern)) in patterns.iter().enumerate() {
+            let tokens_str: Vec<String> = pattern.iter().map(|t| format!("{:?}", t)).collect();
+            info!("  Child Pattern {}: [{}]", i, tokens_str.join(", "));
         }
         
         info!("=== END VERTEX DATA PATTERNS ===");
@@ -250,9 +246,6 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             ));
 
         info!(?target_token, "Target token extracted from range_map");
-        
-        // Print actual vertex patterns after merge
-        self.print_token_vertex_patterns();
 
         (range_map, target_token)
     }
