@@ -99,7 +99,15 @@ pub fn create_initial_partitions(
                     .collect();
                 ctx.trav.insert_patterns(patterns)
             },
-            Err(existing) => existing,
+            Err(existing) => {
+                // Token already exists - need to add patterns to it!
+                // Re-call info_partition to try to get patterns from node structure
+                // Even though it returns Err(existing), we should still try to build
+                // patterns from the node's child patterns at this location
+                debug!(?existing, "PREFIX partition token already exists in create_initial_partitions");
+                // For now, just return existing - patterns will be added during merge
+                existing
+            },
         };
         partitions.push(prefix_token);
         debug!(?prefix_token, "Created prefix partition");
@@ -332,27 +340,25 @@ fn merge_prefix_partition(
         Err(existing) => {
             debug!(
                 ?existing,
-                "PREFIX: Token already exists, checking if we should add patterns"
+                "PREFIX: Token already exists, adding patterns from range_sub_merges"
             );
             
-            // Only add patterns if range spans multiple partitions
-            // Single-partition ranges have no interior split points, so no sub-merge patterns exist
-            if range.end - range.start > 1 {
-                let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
-                
-                // Add the range_sub_merges patterns to the existing token
-                if !merges.is_empty() {
-                    debug!(
-                        ?existing,
-                        num_patterns = merges.len(),
-                        "PREFIX: Adding sub-merge patterns to existing token"
-                    );
-                    ctx.trav.add_patterns_with_update(existing, merges);
-                }
+            // For existing tokens, we need to add patterns from range_sub_merges
+            // Note: We can't get info.patterns because info_partition returned Err(existing)
+            // Those patterns (from node's child patterns) will need to be added elsewhere
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            if !merges.is_empty() {
+                debug!(
+                    ?existing,
+                    num_patterns = merges.len(),
+                    "PREFIX: Adding sub-merge patterns to existing token"
+                );
+                ctx.trav.add_patterns_with_update(existing, merges);
             } else {
                 debug!(
                     ?existing,
-                    "PREFIX: Single-partition range, skipping pattern addition"
+                    "PREFIX: No sub-merge patterns to add (likely single-partition or empty range)"
                 );
             }
             
@@ -443,27 +449,23 @@ fn merge_postfix_partition(
         Err(existing) => {
             debug!(
                 ?existing,
-                "POSTFIX: Token already exists, checking if we should add patterns"
+                "POSTFIX: Token already exists, adding patterns from range_sub_merges"
             );
             
-            // Only add patterns if range spans multiple partitions
-            // Single-partition ranges have no interior split points, so no sub-merge patterns exist
-            if range.end - range.start > 1 {
-                let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
-                
-                // Add the range_sub_merges patterns to the existing token
-                if !merges.is_empty() {
-                    debug!(
-                        ?existing,
-                        num_patterns = merges.len(),
-                        "POSTFIX: Adding sub-merge patterns to existing token"
-                    );
-                    ctx.trav.add_patterns_with_update(existing, merges);
-                }
+            // For existing tokens, we need to add patterns from range_sub_merges
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            if !merges.is_empty() {
+                debug!(
+                    ?existing,
+                    num_patterns = merges.len(),
+                    "POSTFIX: Adding sub-merge patterns to existing token"
+                );
+                ctx.trav.add_patterns_with_update(existing, merges);
             } else {
                 debug!(
                     ?existing,
-                    "POSTFIX: Single-partition range, skipping pattern addition"
+                    "POSTFIX: No sub-merge patterns to add"
                 );
             }
             
@@ -550,27 +552,23 @@ fn merge_infix_partition(
         Err(existing) => {
             debug!(
                 ?existing,
-                "INFIX: Token already exists, checking if we should add patterns"
+                "INFIX: Token already exists, adding patterns from range_sub_merges"
             );
             
-            // Only add patterns if range spans multiple partitions
-            // Single-partition ranges have no interior split points, so no sub-merge patterns exist
-            if range.end - range.start > 1 {
-                let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
-                
-                // Add the range_sub_merges patterns to the existing token
-                if !merges.is_empty() {
-                    debug!(
-                        ?existing,
-                        num_patterns = merges.len(),
-                        "INFIX: Adding sub-merge patterns to existing token"
-                    );
-                    ctx.trav.add_patterns_with_update(existing, merges);
-                }
+            // For existing tokens, we need to add patterns from range_sub_merges
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            if !merges.is_empty() {
+                debug!(
+                    ?existing,
+                    num_patterns = merges.len(),
+                    "INFIX: Adding sub-merge patterns to existing token"
+                );
+                ctx.trav.add_patterns_with_update(existing, merges);
             } else {
                 debug!(
                     ?existing,
-                    "INFIX: Single-partition range, skipping pattern addition"
+                    "INFIX: No sub-merge patterns to add"
                 );
             }
             

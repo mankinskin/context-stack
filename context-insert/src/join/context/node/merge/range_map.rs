@@ -47,7 +47,12 @@ impl RangeMap<Range<usize>> {
         range: Range<usize>,
     ) -> impl IntoIterator<Item = Pattern> + '_ {
         let (start, end) = (range.start, range.end);
-        range.into_iter().map(move |ri| {
+        // Iterate interior split points only (start+1..end)
+        // For range 0..3, this gives [1, 2] producing splits:
+        // - (0..1) + (1..3)
+        // - (0..2) + (2..3)
+        // For single-partition ranges like 0..1, this gives [] (empty)
+        (start + 1..end).map(move |ri| {
             let &left = self.map.get(&(start..ri)).unwrap();
             let &right = self.map.get(&(ri..end)).unwrap();
             Pattern::from(vec![left, right])
