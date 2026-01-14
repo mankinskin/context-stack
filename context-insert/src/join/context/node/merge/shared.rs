@@ -302,14 +302,19 @@ fn merge_prefix_partition(
             
             // Replace pattern if right boundary is perfect in a pattern
             if let (Some(pid), Some(node_idx)) = (perfect_pattern_id, _node_index) {
-                let pattern_tokens: Vec<Token> = (range.start..range.end)
-                    .filter_map(|i| range_map.get(&(i..i+1)).copied())
-                    .collect();
-                
-                if !pattern_tokens.is_empty() {
-                    let pattern_loc = node_idx.to_pattern_location(pid);
-                    ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
-                }
+                // Build pattern replacement: should be the newly merged token at this range
+                let pattern_tokens = vec![token];
+                let pattern_loc = node_idx.to_pattern_location(pid);
+                debug!(
+                    ?node_idx,
+                    ?pid,
+                    ?pattern_loc,
+                    ?token,
+                    range_start = range.start,
+                    range_end = range.end,
+                    "PREFIX: Replacing pattern with merged token"
+                );
+                ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
             }
             
             token
@@ -357,14 +362,19 @@ fn merge_postfix_partition(
             
             // Replace pattern if left boundary is perfect in a pattern
             if let (Some(pid), Some(node_idx)) = (perfect_pattern_id, _node_index) {
-                let pattern_tokens: Vec<Token> = (range.start..range.end)
-                    .filter_map(|i| range_map.get(&(i..i+1)).copied())
-                    .collect();
-                
-                if !pattern_tokens.is_empty() {
-                    let pattern_loc = node_idx.to_pattern_location(pid);
-                    ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
-                }
+                // Build pattern replacement: should be the newly merged token at this range
+                let pattern_tokens = vec![token];
+                let pattern_loc = node_idx.to_pattern_location(pid);
+                debug!(
+                    ?node_idx,
+                    ?pid,
+                    ?pattern_loc,
+                    ?token,
+                    range_start = range.start,
+                    range_end = range.end,
+                    "POSTFIX: Replacing pattern with merged token"
+                );
+                ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
             }
             
             token
@@ -431,15 +441,19 @@ fn merge_infix_partition(
             
             // Only replace pattern if BOTH offsets are perfect in the SAME pattern
             if let (Some(pid), Some(node_idx)) = (perfect_pattern_id, _node_index) {
-                // Build the pattern from individual partitions in range_map
-                let pattern_tokens: Vec<Token> = (range.start..range.end)
-                    .filter_map(|i| range_map.get(&(i..i+1)).copied())
-                    .collect();
-                
-                if !pattern_tokens.is_empty() {
-                    let pattern_loc = node_idx.to_pattern_location(pid);
-                    ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
-                }
+                // Build pattern replacement: should be the newly merged token at this range
+                let pattern_tokens = vec![token];
+                let pattern_loc = node_idx.to_pattern_location(pid);
+                debug!(
+                    ?node_idx,
+                    ?pid,
+                    ?pattern_loc,
+                    ?token,
+                    range_start = range.start,
+                    range_end = range.end,
+                    "INFIX: Replacing pattern with merged token"
+                );
+                ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
             }
             
             token
