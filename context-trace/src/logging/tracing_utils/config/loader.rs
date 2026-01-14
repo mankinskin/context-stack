@@ -46,7 +46,9 @@ impl FormatConfig {
     ///
     /// # Optional: override environment variables
     /// log_to_stdout = true
-    /// log_filter = "debug"
+    /// log_filter = "debug"           # Applies to both stdout and file (fallback)
+    /// stdout_log_filter = "info"     # Specific filter for stdout output
+    /// file_log_filter = "trace"      # Specific filter for file output
     /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let contents = fs::read_to_string(path.as_ref())
@@ -285,9 +287,19 @@ impl Default for TracingConfig {
             .or(format.log_to_stdout)
             .unwrap_or(false);
 
-        // Check for log filter: env var takes precedence over config file
-        let filter_directives = env::var("LOG_FILTER")
+        // Check for log filter: specific env vars and config values take precedence over general ones
+        // Priority for stdout: LOG_STDOUT_FILTER > config.stdout_log_filter > LOG_FILTER > config.log_filter
+        let stdout_filter_directives = env::var("LOG_STDOUT_FILTER")
             .ok()
+            .or_else(|| format.stdout_log_filter.clone())
+            .or_else(|| env::var("LOG_FILTER").ok())
+            .or_else(|| format.log_filter.clone());
+
+        // Priority for file: LOG_FILE_FILTER > config.file_log_filter > LOG_FILTER > config.log_filter
+        let file_filter_directives = env::var("LOG_FILE_FILTER")
+            .ok()
+            .or_else(|| format.file_log_filter.clone())
+            .or_else(|| env::var("LOG_FILTER").ok())
             .or_else(|| format.log_filter.clone());
 
         // Check for keep logs: env var takes precedence over config file
@@ -307,8 +319,8 @@ impl Default for TracingConfig {
             file_level: Level::TRACE,
             log_to_stdout,
             log_to_file: true,
-            stdout_filter_directives: filter_directives.clone(),
-            file_filter_directives: filter_directives,
+            stdout_filter_directives,
+            file_filter_directives,
             span_events: FmtSpan::ENTER | FmtSpan::CLOSE,
             format,
             keep_logs,

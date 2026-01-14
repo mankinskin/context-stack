@@ -170,10 +170,18 @@ pub struct FormatConfig {
     /// Enable logging to stdout (overrides LOG_STDOUT env var if present)
     #[serde(default)]
     pub log_to_stdout: Option<bool>,
-    /// Log level filter (e.g., "debug", "trace", "context_search=trace,context_trace=debug")
-    /// Overrides LOG_FILTER env var if present
+    /// Log level filter for both stdout and file (e.g., "debug", "trace", "context_search=trace,context_trace=debug")
+    /// Overrides LOG_FILTER env var if present. Used as fallback if stdout_log_filter or file_log_filter are not set.
     #[serde(default)]
     pub log_filter: Option<String>,
+    /// Log level filter specifically for stdout output
+    /// Overrides LOG_STDOUT_FILTER env var and log_filter if present
+    #[serde(default)]
+    pub stdout_log_filter: Option<String>,
+    /// Log level filter specifically for file output
+    /// Overrides LOG_FILE_FILTER env var and log_filter if present
+    #[serde(default)]
+    pub file_log_filter: Option<String>,
     /// Keep log files even when tests pass (overrides KEEP_LOGS env var if present)
     #[serde(default)]
     pub keep_logs: Option<bool>,
@@ -192,6 +200,8 @@ impl Default for FormatConfig {
             show_timestamp: true,
             log_to_stdout: None,
             log_filter: None,
+            stdout_log_filter: None,
+            file_log_filter: None,
             keep_logs: None,
         }
     }
