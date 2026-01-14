@@ -61,7 +61,7 @@ macro_rules! assert_indices {
         $(
         let $name = $graph
             .find_ancestor(stringify!($name).chars())
-            .unwrap()
+            .unwrap_or_else(|e| panic!("Failed to find index for {}: {:?}", stringify!($name), e))
             .expect_complete(stringify!($name))
             .root_parent();
         )*

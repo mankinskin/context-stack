@@ -60,7 +60,7 @@ impl Response {
             PathCoverage::EntireRoot(path) => path,
             _ => panic!(
                 "{}: Complete response has non-EntireRoot path: {:#?}",
-                msg, self.end.path
+                msg, self
             ),
         }
     }
