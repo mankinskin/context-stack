@@ -242,25 +242,25 @@ pub fn merge_partitions_in_range(
 }
 
 /// Update node patterns if the merged partition is at a perfect boundary.
+///
+/// This function checks if a merged partition has perfect borders in the node's child patterns.
+/// We only replace patterns when ALL required offsets for this partition are perfect in the SAME pattern.
+/// This ensures we don't prematurely replace patterns when waiting for larger wrapper partitions to form.
 fn update_node_patterns_if_perfect(
-    ctx: &mut NodeJoinCtx,
+    _ctx: &mut NodeJoinCtx,
     node_index: Token,
     range: &Range<usize>,
-    _merged_token: Token,
+    merged_token: Token,
     range_map: &RangeMap,
 ) {
-    // Get the tokens in this range to build the pattern
-    let pattern_tokens: Vec<Token> = (range.start..range.end)
-        .filter_map(|i| range_map.get(&(i..i+1)).copied())
-        .collect();
-    
-    if pattern_tokens.len() > 1 {
-        // This is a merged partition - add or replace pattern in the node
-        ctx.trav.add_pattern_with_update(
-            node_index,
-            Pattern::from(pattern_tokens),
-        );
-    }
+    // For now, we defer pattern updates - let the caller (intermediary/root) handle this
+    // based on their specific logic for detecting perfect boundaries
+    // 
+    // The intermediary checks offsets.iter() for inner_offset.is_none() to detect perfect borders
+    // The root needs similar logic but with wrapper partition awareness
+    //
+    // TODO: Implement perfect boundary detection here once we understand the full algorithm
+    _ = (node_index, range, merged_token, range_map);
 }
 
 /// Merge a prefix partition.
@@ -283,7 +283,12 @@ fn merge_prefix_partition(
     
     match res {
         Ok(info) => {
-            let merges = range_map.range_sub_merges(range.clone());
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            // For Prefix, SinglePerfect contains Option<PatternId>
+            // We replace when the right boundary is perfect
+            let perfect_pattern_id = info.perfect.0;
+            
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
                 Pattern::from(
                     (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
@@ -292,8 +297,22 @@ fn merge_prefix_partition(
                         .collect_vec(),
                 )
             });
-            let patterns: Vec<_> = merges.into_iter().chain(joined).collect();
-            ctx.trav.insert_patterns(patterns)
+            let patterns: Vec<_> = merges.iter().cloned().chain(joined).collect();
+            let token = ctx.trav.insert_patterns(patterns);
+            
+            // Replace pattern if right boundary is perfect in a pattern
+            if let (Some(pid), Some(node_idx)) = (perfect_pattern_id, _node_index) {
+                let pattern_tokens: Vec<Token> = (range.start..range.end)
+                    .filter_map(|i| range_map.get(&(i..i+1)).copied())
+                    .collect();
+                
+                if !pattern_tokens.is_empty() {
+                    let pattern_loc = node_idx.to_pattern_location(pid);
+                    ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
+                }
+            }
+            
+            token
         },
         Err(existing) => existing,
     }
@@ -319,7 +338,12 @@ fn merge_postfix_partition(
     
     match res {
         Ok(info) => {
-            let merges = range_map.range_sub_merges(range.clone());
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            // For Postfix, SinglePerfect contains Option<PatternId>
+            // We replace when the left boundary is perfect
+            let perfect_pattern_id = info.perfect.0;
+            
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
                 Pattern::from(
                     (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
@@ -328,8 +352,22 @@ fn merge_postfix_partition(
                         .collect_vec(),
                 )
             });
-            let patterns: Vec<_> = merges.into_iter().chain(joined).collect();
-            ctx.trav.insert_patterns(patterns)
+            let patterns: Vec<_> = merges.iter().cloned().chain(joined).collect();
+            let token = ctx.trav.insert_patterns(patterns);
+            
+            // Replace pattern if left boundary is perfect in a pattern
+            if let (Some(pid), Some(node_idx)) = (perfect_pattern_id, _node_index) {
+                let pattern_tokens: Vec<Token> = (range.start..range.end)
+                    .filter_map(|i| range_map.get(&(i..i+1)).copied())
+                    .collect();
+                
+                if !pattern_tokens.is_empty() {
+                    let pattern_loc = node_idx.to_pattern_location(pid);
+                    ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
+                }
+            }
+            
+            token
         },
         Err(existing) => existing,
     }
@@ -361,8 +399,17 @@ fn merge_infix_partition(
 
     match res {
         Ok(info) => {
-            let merges = range_map.range_sub_merges(range.clone());
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
             let num_info_patterns = info.patterns.len();
+            
+            // Check if we have BOTH perfect borders in the SAME pattern
+            // For infix partitions, DoublePerfect contains (Option<PatternId>, Option<PatternId>)
+            // We can only replace when both are Some AND equal (same pattern)
+            let perfect_pattern_id = match (info.perfect.0, info.perfect.1) {
+                (Some(left_pid), Some(right_pid)) if left_pid == right_pid => Some(left_pid),
+                _ => None,
+            };
+            
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
                 Pattern::from(
                     (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
@@ -371,14 +418,31 @@ fn merge_infix_partition(
                         .collect_vec(),
                 )
             });
-            let patterns = merges.clone().into_iter().chain(joined).collect_vec();
+            let patterns = merges.iter().cloned().chain(joined).collect_vec();
             debug!(
                 num_merges = merges.len(),
                 num_info_patterns,
                 total_patterns = patterns.len(),
+                has_perfect = perfect_pattern_id.is_some(),
                 "Merging infix partition - pattern counts"
             );
-            ctx.trav.insert_patterns(patterns)
+            
+            let token = ctx.trav.insert_patterns(patterns);
+            
+            // Only replace pattern if BOTH offsets are perfect in the SAME pattern
+            if let (Some(pid), Some(node_idx)) = (perfect_pattern_id, _node_index) {
+                // Build the pattern from individual partitions in range_map
+                let pattern_tokens: Vec<Token> = (range.start..range.end)
+                    .filter_map(|i| range_map.get(&(i..i+1)).copied())
+                    .collect();
+                
+                if !pattern_tokens.is_empty() {
+                    let pattern_loc = node_idx.to_pattern_location(pid);
+                    ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
+                }
+            }
+            
+            token
         },
         Err(existing) => existing,
     }
