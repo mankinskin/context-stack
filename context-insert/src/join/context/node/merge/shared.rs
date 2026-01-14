@@ -205,10 +205,20 @@ pub fn merge_partitions_in_range(
     range_map: &mut RangeMap,
     node_index: Option<Token>,
 ) {
+    debug!(
+        partition_range_start = partition_range.start,
+        partition_range_end = partition_range.end,
+        num_offsets,
+        num_partitions = partitions.len(),
+        has_node_index = node_index.is_some(),
+        "merge_partitions_in_range: ENTERED"
+    );
+    
     let max_len = partition_range.len();
     
     // Merge from smallest to largest partitions
     for len in 1..max_len {
+        debug!(len, max_len, "merge_partitions_in_range: starting merge loop iteration");
         for start_offset in 0..(max_len - len) {
             let start = partition_range.start + start_offset;
             let end = start + len;
@@ -332,6 +342,14 @@ fn merge_postfix_partition(
     start: usize,
     _node_index: Option<Token>,
 ) -> Token {
+    debug!(
+        range_start = range.start,
+        range_end = range.end,
+        start,
+        has_node_idx = _node_index.is_some(),
+        "merge_postfix_partition: ENTERED"
+    );
+    
     let lo = offsets
         .iter()
         .map(PosSplitCtx::from)
@@ -341,6 +359,11 @@ fn merge_postfix_partition(
     let postfix_start = Postfix::new(lo);
     let res: Result<PartitionInfo<Post<Join>>, _> = postfix_start.info_partition(ctx);
     
+    debug!(
+        is_ok = res.is_ok(),
+        " merge_postfix_partition: info_partition result"
+    );
+    
     match res {
         Ok(info) => {
             let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
@@ -348,6 +371,16 @@ fn merge_postfix_partition(
             // For Postfix, SinglePerfect contains Option<PatternId>
             // We replace when the left boundary is perfect
             let perfect_pattern_id = info.perfect.0;
+            
+            debug!(
+                ?perfect_pattern_id,
+                has_node_idx = _node_index.is_some(),
+                range_start = range.start,
+                range_end = range.end,
+                num_patterns = info.patterns.len(),
+                num_merges = merges.len(),
+                "POSTFIX merge_postfix_partition: perfect border check"
+            );
             
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
                 Pattern::from(
@@ -379,7 +412,17 @@ fn merge_postfix_partition(
             
             token
         },
-        Err(existing) => existing,
+        Err(existing) => {
+            debug!(
+                ?existing,
+                "POSTFIX: Token already exists, but checking for pattern replacement anyway"
+            );
+            
+            // Even if token exists, we might need to replace it in patterns if it has perfect borders
+            // Try to get partition info again to check for perfect borders
+            // For now, just return existing - this is a limitation we need to address
+            existing
+        },
     }
 }
 
