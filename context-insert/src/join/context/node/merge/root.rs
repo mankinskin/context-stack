@@ -3,10 +3,7 @@
 //! This module implements root node joining by reusing the intermediary merge algorithm
 //! with protection of non-participating ranges.
 
-use std::{
-    borrow::Borrow,
-    ops::Range,
-};
+use std::ops::Range;
 
 use derive_new::new;
 use itertools::Itertools;
@@ -36,6 +33,7 @@ use crate::{
     },
 };
 use context_trace::*;
+use std::borrow::Borrow;
 use tracing::{
     debug,
     info,
@@ -121,9 +119,9 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         target_token
     }
 
-    /// Core merge algorithm - exactly mirrors `NodeMergeCtx::merge_partitions` from intermediary.rs.
+    /// Core merge algorithm - now uses shared `merge_partitions_in_range` utility.
     ///
-    /// The only difference is we extract the target token instead of creating split halves.
+    /// The only difference from intermediary is we extract the target token instead of creating split halves.
     fn merge_partitions(
         &mut self,
         offsets: &SplitVertexCache,
@@ -132,133 +130,37 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         target_offset_range: Range<usize>,
     ) -> (RangeMap, Token) {
         let mut range_map = RangeMap::from(partitions);
-        let mut target_token = None;
 
-        // Determine the maximum merge length based on how many partitions we have
-        let max_len = partitions.len();
+        // Determine the range of partitions to merge
+        let partition_range = 0..partitions.len();
 
         debug!(
             num_partitions = partitions.len(),
             num_offsets,
-            max_len,
-            "Merge loop bounds"
+            ?partition_range,
+            "Using shared merge logic"
         );
 
-        // Same loop structure as intermediary merge in intermediary.rs
-        // Merges partitions from smallest to largest, but up to max_len instead of num_offsets
-        for len in 1..max_len {
-            for start in 0..(max_len - len) {
-                let range = start..start + len;
+        // Use shared merge logic - exactly the same as intermediary!
+        super::shared::merge_partitions_in_range(
+            self.ctx,
+            offsets,
+            partitions,
+            partition_range,
+            num_offsets,
+            &mut range_map,
+        );
 
-                // Check if this range includes prefix or postfix boundaries
-                let has_prefix = start == 0 && partitions.len() > num_offsets;
-                let has_postfix = start + len == partitions.len() - 1 && partitions.len() > num_offsets;
+        // Extract target token from range_map
+        let target_token = *range_map.get(&target_offset_range)
+            .unwrap_or_else(|| panic!(
+                "Target token not found in range_map for range {:?}. Available ranges: {:?}",
+                target_offset_range,
+                range_map.map.keys().collect::<Vec<_>>()
+            ));
 
-                let index = if has_prefix && start == 0 && start + len < num_offsets {
-                    // Merging prefix with infix partitions: use Prefix partition type
-                    let ro = offsets
-                        .iter()
-                        .map(PosSplitCtx::from)
-                        .nth(start + len)
-                        .unwrap();
-                    let prefix_end = crate::interval::partition::Prefix::new(ro);
-                    let res: Result<PartitionInfo<Pre<Join>>, _> = prefix_end.info_partition(self.ctx);
-                    
-                    match res {
-                        Ok(info) => {
-                            let merges = range_map.range_sub_merges(range.clone());
-                            let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                                Pattern::from(
-                                    (pinfo.join_pattern(self.ctx, &pid).borrow()
-                                        as &'_ Pattern)
-                                        .iter()
-                                        .cloned()
-                                        .collect_vec(),
-                                )
-                            });
-                            let patterns: Vec<_> = merges.into_iter().chain(joined).collect();
-                            self.ctx.trav.insert_patterns(patterns)
-                        },
-                        Err(existing) => existing,
-                    }
-                } else if has_postfix && start + len == num_offsets {
-                    // Merging infix with postfix partitions: use Postfix partition type  
-                    let lo = offsets
-                        .iter()
-                        .map(PosSplitCtx::from)
-                        .nth(start)
-                        .unwrap();
-                    let postfix_start = crate::interval::partition::Postfix::new(lo);
-                    let res: Result<PartitionInfo<Post<Join>>, _> = postfix_start.info_partition(self.ctx);
-                    
-                    match res {
-                        Ok(info) => {
-                            let merges = range_map.range_sub_merges(range.clone());
-                            let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                                Pattern::from(
-                                    (pinfo.join_pattern(self.ctx, &pid).borrow()
-                                        as &'_ Pattern)
-                                        .iter()
-                                        .cloned()
-                                        .collect_vec(),
-                                )
-                            });
-                            let patterns: Vec<_> = merges.into_iter().chain(joined).collect();
-                            self.ctx.trav.insert_patterns(patterns)
-                        },
-                        Err(existing) => existing,
-                    }
-                } else {
-                    // Normal infix merge between two offsets
-                    let lo = offsets
-                        .iter()
-                        .map(PosSplitCtx::from)
-                        .nth(start)
-                        .unwrap();
-                    let ro = offsets
-                        .iter()
-                        .map(PosSplitCtx::from)
-                        .nth(start + len)
-                        .unwrap();
-                    
-                    let infix = Infix::new(lo, ro);
-                    let res: Result<PartitionInfo<In<Join>>, _> = infix.info_partition(self.ctx);
+        info!(?target_token, "Target token extracted from range_map");
 
-                    match res {
-                        Ok(info) => {
-                            // Get 2-way merges from range_map - same as intermediary
-                            let merges = range_map.range_sub_merges(range.clone());
-
-                            // Get patterns from perfect boundaries - same as intermediary
-                            let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                                Pattern::from(
-                                    (pinfo.join_pattern(self.ctx, &pid).borrow()
-                                        as &'_ Pattern)
-                                        .iter()
-                                        .cloned()
-                                        .collect_vec(),
-                                )
-                            });
-
-                            // Combine and insert - same as intermediary
-                            let patterns = merges.into_iter().chain(joined).collect_vec();
-                            self.ctx.trav.insert_patterns(patterns)
-                        },
-                        Err(existing) => existing,
-                    }
-                };
-
-                range_map.insert(range.clone(), index);
-
-                // Check if we just merged the target partition
-                if range == target_offset_range {
-                    debug!(?range, ?index, "Extracted target token from merge");
-                    target_token = Some(index);
-                }
-            }
-        }
-
-        let target_token = target_token.expect("Target token was never extracted during merge");
         (range_map, target_token)
     }
 

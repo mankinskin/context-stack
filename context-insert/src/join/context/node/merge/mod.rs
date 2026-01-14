@@ -3,8 +3,10 @@
 //! This module contains merge algorithms for both intermediary and root nodes:
 //! - `NodeMergeCtx`: Merges intermediary nodes and creates split halves
 //! - `RootMergeCtx`: Merges root nodes and extracts the target token
+//! - `shared`: Common merge utilities used by both contexts
 
 mod range_map;
+pub(super) mod shared;
 
 pub mod intermediary;
 pub mod root;

@@ -1,24 +1,14 @@
 use std::borrow::Borrow;
 
 use derive_new::new;
-use itertools::Itertools;
 use linked_hash_map::LinkedHashMap;
 
 use crate::{
-    interval::partition::{
-        Infix,
-        info::{
-            InfoPartition,
-            PartitionInfo,
-            range::role::In,
-        },
-    },
     join::{
         context::node::{
             context::NodeJoinCtx,
             merge::RangeMap,
         },
-        partition::Join,
     },
     split::{
         Split,
@@ -26,10 +16,7 @@ use crate::{
             position::PosKey,
             vertex::SplitVertexCache,
         },
-        vertex::{
-            PosSplitCtx,
-            TokenTracePositions,
-        },
+        vertex::TokenTracePositions,
     },
 };
 use context_trace::*;
@@ -83,50 +70,18 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
         partitions: &Vec<Token>,
     ) -> RangeMap {
         let num_offsets = offsets.positions.len();
-
         let mut range_map = RangeMap::from(partitions);
 
-        for len in 1..num_offsets {
-            for start in 0..num_offsets - len + 1 {
-                let range = start..start + len;
+        // Use shared merge logic - merge all partitions (0..num_offsets+1)
+        super::shared::merge_partitions_in_range(
+            self.ctx,
+            offsets,
+            partitions,
+            0..num_offsets + 1,
+            num_offsets,
+            &mut range_map,
+        );
 
-                let lo =
-                    offsets.iter().map(PosSplitCtx::from).nth(start).unwrap();
-                let ro = offsets
-                    .iter()
-                    .map(PosSplitCtx::from)
-                    .nth(start + len)
-                    .unwrap();
-
-                // todo: could be read from cache
-                let infix = Infix::new(lo, ro);
-                let res: Result<PartitionInfo<In<Join>>, _> =
-                    infix.info_partition(self.ctx);
-
-                let index = match res {
-                    Ok(info) => {
-                        let merges =
-                            range_map.range_sub_merges(start..start + len);
-                        let joined =
-                            info.patterns.into_iter().map(|(pid, info)| {
-                                Pattern::from(
-                                    (info.join_pattern(self.ctx, &pid).borrow()
-                                        as &'_ Pattern)
-                                        .iter()
-                                        .cloned()
-                                        .collect_vec(),
-                                )
-                            });
-                        // todo: insert into perfect context
-                        let patterns =
-                            merges.into_iter().chain(joined).collect_vec();
-                        self.ctx.trav.insert_patterns(patterns)
-                    },
-                    Err(c) => c,
-                };
-                range_map.insert(range, index);
-            }
-        }
         range_map
     }
 }
