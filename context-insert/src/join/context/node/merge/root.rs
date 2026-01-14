@@ -4,6 +4,7 @@
 //! with protection of non-participating ranges.
 
 use std::ops::Range;
+use std::borrow::Borrow;
 
 use derive_new::new;
 
@@ -18,6 +19,7 @@ use crate::{
         cache::vertex::SplitVertexCache,
         vertex::output::RootMode,
     },
+    TokenTracePositions,
 };
 use context_trace::*;
 use tracing::{
@@ -88,16 +90,78 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
 
         // Run the merge algorithm - exactly like intermediary
         // Extract target when we complete the merge of target_offset_range
-        let (_range_map, target_token) = self.merge_partitions(
+        let (range_map, target_token) = self.merge_partitions(
             &offsets,
             &partitions,
             num_offsets,
             target_offset_range.clone(),
         );
 
+        // Update root node patterns after merge (like intermediary does)
+        // This replaces sequences of merged tokens in the root's child patterns
+        self.update_root_patterns_after_merge(&offsets, &range_map);
+
         info!(?target_token, "Root join complete - returning target token");
 
         target_token
+    }
+
+    /// Update root node patterns after merge completes.
+    ///
+    /// This checks each offset to see if it aligns perfectly with a pattern boundary,
+    /// and if so, replaces that pattern with the merged left+right tokens from range_map.
+    fn update_root_patterns_after_merge(
+        &mut self,
+        offsets: &SplitVertexCache,
+        range_map: &RangeMap,
+    ) {
+        let len = offsets.len();
+        let root_index = self.ctx.index;
+        
+        debug!(num_offsets = len, ?root_index, num_ranges_in_map = range_map.map.len(), "Updating root patterns after merge");
+
+        for (i, (_, v)) in offsets.iter().enumerate() {
+            let lr = 0..i;
+            let rr = i + 1..len + 1;
+            
+            debug!(offset_index = i, ?lr, ?rr, "Checking offset for pattern update");
+            
+            // Get merged tokens from range_map
+            if let (Some(&left), Some(&right)) = (range_map.get(&lr), range_map.get(&rr)) {
+                debug!(?left, ?right, "Found left and right tokens in range_map");
+                
+                // Check if this offset is perfect (at pattern boundary)
+                if let Some((&pid, _)) = (v.borrow() as &TokenTracePositions)
+                    .iter()
+                    .find(|(_, s)| s.inner_offset.is_none())
+                {
+                    debug!(
+                        ?pid,
+                        ?left,
+                        ?right,
+                        offset_index = i,
+                        "Found perfect border - replacing pattern in root"
+                    );
+                    self.ctx.trav.replace_pattern(
+                        root_index.to_pattern_location(pid),
+                        vec![left, right],
+                    );
+                } else {
+                    debug!(
+                        ?left,
+                        ?right,
+                        offset_index = i,
+                        "Offset not perfect - adding new pattern to root"
+                    );
+                    self.ctx.trav.add_pattern_with_update(
+                        root_index,
+                        Pattern::from(vec![left, right]),
+                    );
+                }
+            } else {
+                debug!(offset_index = i, ?lr, ?rr, has_left = range_map.get(&lr).is_some(), has_right = range_map.get(&rr).is_some(), "Missing left or right token in range_map");
+            }
+        }
     }
 
     /// Core merge algorithm - now uses shared `merge_partitions_in_range` utility.
