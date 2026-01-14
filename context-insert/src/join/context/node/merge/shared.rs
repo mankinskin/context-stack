@@ -329,7 +329,22 @@ fn merge_prefix_partition(
             
             token
         },
-        Err(existing) => existing,
+        Err(existing) => {
+            debug!(
+                ?existing,
+                "PREFIX: Token already exists, adding patterns to existing token"
+            );
+            
+            // Token already exists - we need to add patterns to it
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            // Add the range_sub_merges patterns to the existing token
+            if !merges.is_empty() {
+                ctx.trav.add_patterns_with_update(existing, merges);
+            }
+            
+            existing
+        },
     }
 }
 
@@ -415,12 +430,19 @@ fn merge_postfix_partition(
         Err(existing) => {
             debug!(
                 ?existing,
-                "POSTFIX: Token already exists, but checking for pattern replacement anyway"
+                "POSTFIX: Token already exists, adding patterns to existing token"
             );
             
-            // Even if token exists, we might need to replace it in patterns if it has perfect borders
-            // Try to get partition info again to check for perfect borders
-            // For now, just return existing - this is a limitation we need to address
+            // Token already exists - we need to add patterns to it
+            // Build the patterns we would have added if it was new
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            // We can't get info.patterns since info_partition returned Err
+            // But we can add the range_sub_merges patterns
+            if !merges.is_empty() {
+                ctx.trav.add_patterns_with_update(existing, merges);
+            }
+            
             existing
         },
     }
@@ -501,6 +523,21 @@ fn merge_infix_partition(
             
             token
         },
-        Err(existing) => existing,
+        Err(existing) => {
+            debug!(
+                ?existing,
+                "INFIX: Token already exists, adding patterns to existing token"
+            );
+            
+            // Token already exists - we need to add patterns to it
+            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
+            
+            // Add the range_sub_merges patterns to the existing token
+            if !merges.is_empty() {
+                ctx.trav.add_patterns_with_update(existing, merges);
+            }
+            
+            existing
+        },
     }
 }
