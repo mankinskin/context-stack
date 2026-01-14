@@ -164,6 +164,50 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         }
     }
 
+    /// Print actual VertexData child patterns for tokens.
+    ///
+    /// This shows what patterns each vertex ACTUALLY contains in its VertexData,
+    /// not what we find it through (search cursor patterns).
+    fn print_token_vertex_patterns(&self) {
+        info!("=== VERTEX DATA PATTERNS (actual token child patterns) ===");
+        
+        // Print patterns for all tokens by width
+        for width in &[2, 3, 4, 6] {
+            let tokens: Vec<_> = self.ctx.trav.graph()
+                .tokens()
+                .filter(|t| self.ctx.trav.token_width(**t) == *width)
+                .collect();
+            
+            if tokens.is_empty() {
+                debug!(width, "No tokens found with this width");
+                continue;
+            }
+            
+            for token in tokens {
+                let vertex_data = self.ctx.trav.graph().expect_vertex_data(*token);
+                let patterns: Vec<String> = vertex_data.patterns()
+                    .iter()
+                    .map(|p| {
+                        let tokens: Vec<String> = p.iter()
+                            .map(|t| format!("{:?}", t))
+                            .collect();
+                        format!("[{}]", tokens.join(", "))
+                    })
+                    .collect();
+                
+                info!(
+                    token = ?token,
+                    width,
+                    num_patterns = patterns.len(),
+                    patterns = ?patterns,
+                    "Token VertexData patterns"
+                );
+            }
+        }
+        
+        info!("=== END VERTEX DATA PATTERNS ===");
+    }
+
     /// Core merge algorithm - now uses shared `merge_partitions_in_range` utility.
     ///
     /// The only difference from intermediary is we extract the target token instead of creating split halves.
@@ -206,6 +250,9 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             ));
 
         info!(?target_token, "Target token extracted from range_map");
+        
+        // Print actual vertex patterns after merge
+        self.print_token_vertex_patterns();
 
         (range_map, target_token)
     }
