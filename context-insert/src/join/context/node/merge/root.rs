@@ -97,9 +97,6 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
 
         info!(?target_token, "Root join complete - returning target token");
 
-        // VERIFICATION: Print actual pattern structures after merge
-        self.print_merge_verification(&target_token);
-
         target_token
     }
 
@@ -147,70 +144,5 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         info!(?target_token, "Target token extracted from range_map");
 
         (range_map, target_token)
-    }
-
-    /// Print verification of merge results - check actual token patterns
-    fn print_merge_verification(&self, target_token: &Token) {
-        info!("=== MERGE VERIFICATION ===");
-        
-        // Get root node token
-        let root_token = self.ctx.ctx.node_token;
-        info!(?root_token, "Root token (should be ababcd)");
-        
-        // Print root patterns
-        if let Some(vertex) = self.ctx.trav.graph().get_index_ref(*root_token) {
-            info!("Root vertex patterns:");
-            for (pid, pattern) in vertex.iter_patterns_index_ref() {
-                let pattern_vec: Vec<Token> = pattern.iter().copied().collect();
-                info!(?pid, ?pattern_vec, width=pattern.width(), "  Pattern");
-            }
-        }
-        
-        // Try to find cd, bcd, abcd tokens by searching graph
-        info!("Searching for expected intermediate tokens:");
-        
-        // Find all width-2 tokens (should include cd)
-        for (token, vertex) in self.ctx.trav.graph().iter() {
-            if vertex.width() == 2 {
-                info!(?token, width=2, "Found width-2 token (cd candidate)");
-                for (pid, pattern) in vertex.iter_patterns_index_ref() {
-                    let pattern_vec: Vec<Token> = pattern.iter().copied().collect();
-                    info!(?pid, ?pattern_vec, "    Pattern");
-                }
-            }
-        }
-        
-        // Find all width-3 tokens (should include bcd)  
-        for (token, vertex) in self.ctx.trav.graph().iter() {
-            if vertex.width() == 3 {
-                info!(?token, width=3, "Found width-3 token (bcd candidate)");
-                for (pid, pattern) in vertex.iter_patterns_index_ref() {
-                    let pattern_vec: Vec<Token> = pattern.iter().copied().collect();
-                    info!(?pid, ?pattern_vec, "    Pattern");
-                }
-            }
-        }
-        
-        // Find all width-4 tokens (should include abcd)
-        for (token, vertex) in self.ctx.trav.graph().iter() {
-            if vertex.width() == 4 {
-                info!(?token, width=4, "Found width-4 token (abcd candidate)");
-                for (pid, pattern) in vertex.iter_patterns_index_ref() {
-                    let pattern_vec: Vec<Token> = pattern.iter().copied().collect();
-                    info!(?pid, ?pattern_vec, "    Pattern");
-                }
-            }
-        }
-        
-        info!(?target_token, "Target token returned from merge");
-        if let Some(vertex) = self.ctx.trav.graph().get_index_ref(*target_token) {
-            info!(width=vertex.width(), "Target token width");
-            for (pid, pattern) in vertex.iter_patterns_index_ref() {
-                let pattern_vec: Vec<Token> = pattern.iter().copied().collect();
-                info!(?pid, ?pattern_vec, "  Target pattern");
-            }
-        }
-        
-        info!("=== END VERIFICATION ===");
     }
 }
