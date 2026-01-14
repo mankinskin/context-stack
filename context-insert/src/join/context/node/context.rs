@@ -50,8 +50,6 @@ use crate::{
         position_splits,
         vertex::{
             PosSplitCtx,
-            TokenTracePositions,
-            VertexSplits,
             node::{
                 AsNodeTraceCtx,
                 NodeTraceCtx,
@@ -155,31 +153,24 @@ impl NodeJoinCtx<'_> {
         self.interval.cache.get(&self.index.vertex_index()).unwrap()
     }
     pub fn join_partitions(&mut self) -> LinkedHashMap<PosKey, Split> {
-        // insert partitions between all offsets
+        // Use shared initial partition creation
         let pos_splits = self.vertex_cache().clone();
         let len = pos_splits.len();
         assert!(len > 0);
 
-        let mut iter = pos_splits.iter().map(|(&pos, splits)| VertexSplits {
-            pos,
-            splits: (splits.borrow() as &TokenTracePositions).clone(),
-        });
+        // Create all partitions: prefix + infixes + postfix
+        let partitions = super::merge::shared::create_initial_partitions(
+            self,
+            &pos_splits,
+            0..len + 1,  // All partitions
+        );
 
-        let mut prev = iter.next().unwrap();
-        let mut partitions = Vec::<Token>::with_capacity(1 + len);
-        partitions.push(Prefix::new(&prev).join_partition(self).into());
-        for offset in iter {
-            partitions
-                .push(Infix::new(&prev, &offset).join_partition(self).into());
-            prev = offset;
-        }
-        partitions.push(Postfix::new(prev).join_partition(self).into());
         assert_eq!(
             *self.index.width(),
             partitions.iter().map(|t| *t.width()).sum::<usize>()
         );
-        let pos_splits = self.vertex_cache();
-        assert_eq!(partitions.len(), pos_splits.len() + 1,);
+        assert_eq!(partitions.len(), pos_splits.len() + 1);
+        
         NodeMergeCtx::new(self).merge_node(&partitions)
     }
     pub fn join_root_partitions(&mut self) -> Token {
