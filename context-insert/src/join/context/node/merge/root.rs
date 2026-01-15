@@ -72,16 +72,32 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         // Define target partition range based on mode
         // Target is defined by a range of partition indices in the partitions array
         // We use partition indices throughout - NOT offset indices
+        // 
+        // The target is what we're INSERTING, not necessarily all created partitions.
+        // For modes with protection (prefix/postfix), we exclude the first/last partition.
         let target_partition_range = match root_mode {
             RootMode::Prefix => {
                 // Prefix mode: partition_range is 0..num_offsets (prefix + infixes, no postfix)
-                // Target is ALL these partitions
-                0..partitions.len()
+                // Partitions created: [prefix, infix1, infix2, ...] 
+                // Target: infixes only (exclude protected prefix at index 0)
+                // Example: [ab, c, d] → target is [1..3] = [c, d] = "cd"
+                if partitions.len() > 1 {
+                    1..partitions.len()
+                } else {
+                    0..partitions.len() // Edge case: only one partition
+                }
             },
             RootMode::Postfix => {
                 // Postfix mode: partition_range is 1..num_offsets+1 (infixes + postfix, no prefix)
-                // Target is ALL these partitions (which start at index 0 in partitions array)
-                0..partitions.len()
+                // Partitions created: [infix1, infix2, ..., postfix]
+                // Target: all partitions EXCEPT we need to identify the target range
+                // Example: [a, b, cd] → target is [1..3] = [b, cd] = "bcd"
+                // The target excludes the wrapper prefix (first infix that merges with prefix)
+                if partitions.len() > 1 {
+                    1..partitions.len()
+                } else {
+                    0..partitions.len() // Edge case: only one partition
+                }
             },
             RootMode::Infix => {
                 // Infix mode: partition_range is 1..num_offsets (infixes only)
