@@ -493,14 +493,16 @@ fn merge_infix_partition(
     let has_prefix = partitions.len() > num_offsets + 1;
     
     let (start_offset_idx, end_offset_idx) = if has_prefix {
-        // With prefix: partition i (i>0) → offsets (i-1) and i
+        // With prefix: partition i (i>0) is between offset (i-1) and offset i
+        // So merging partitions [start..end] uses offsets [(start-1)..(end-1)]
         let start_off = if start_partition_idx > 0 { start_partition_idx - 1 } else { 0 };
         let end_off = if end_partition_idx > 0 { end_partition_idx - 1 } else { 0 };
         (start_off, end_off)
     } else {
-        // Without prefix: partition i → offsets i and (i+1)
-        (start_partition_idx, end_partition_idx)
-    }
+        // Without prefix: partition i is between offset i and offset (i+1)
+        // So merging partitions [start..end] uses offsets [start..(end-1)]
+        // The end partition is BETWEEN two offsets, so we use the left offset of the rightmost partition
+        (start_partition_idx, end_partition_idx - 1)
     };
     
     debug!(
