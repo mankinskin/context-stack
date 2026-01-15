@@ -481,33 +481,26 @@ fn merge_infix_partition(
     num_offsets: usize,
     _node_index: Option<Token>,
 ) -> Token {
-    // Map partition indices to offset indices
+    // Map partition indices to offset indices per comment #3752447456:
     // 
-    // If NO prefix exists:
-    // - partitions.len() == num_offsets + 1
-    // - partition i is between offset i-1 and offset i (for i > 0)
-    // - partition 0 is before offset 0 (start of range)
-    // - So: partition range [start..end] maps to offset range [start..end-1]
-    //
-    // If prefix exists:
-    // - partitions.len() == num_offsets + 2 (prefix + infixes + postfix)
-    // - partition 0 is the prefix (before offset 0)
-    // - partition i (i>0) is between offset i-1 and offset i
-    // - So: partition range [start..end] maps to offset range [start-1..end-2] when start>0
-    let has_prefix = partitions.len() > num_offsets + 1 || (partitions.len() > num_offsets && start_partition_idx == 0);
+    // WITH prefix (partition 0 exists before offset 0):
+    // - partition 0: before offset 0
+    // - partition i (i > 0): between offset (i-1) and offset i
+    // 
+    // WITHOUT prefix:
+    // - partition i: between offset i and offset (i+1)
     
-    let start_offset_idx = if has_prefix && start_partition_idx > 0 {
-        start_partition_idx - 1
-    } else {
-        start_partition_idx
-    };
+    let has_prefix = partitions.len() > num_offsets + 1;
     
-    // For end: partition index end_partition_idx represents the partition BEFORE offset end_partition_idx
-    // So offset index is end_partition_idx - 1
-    let end_offset_idx = if has_prefix && end_partition_idx > 0 {
-        end_partition_idx - 2  // -1 for the offset, -1 for the prefix
+    let (start_offset_idx, end_offset_idx) = if has_prefix {
+        // With prefix: partition i (i>0) → offsets (i-1) and i
+        let start_off = if start_partition_idx > 0 { start_partition_idx - 1 } else { 0 };
+        let end_off = if end_partition_idx > 0 { end_partition_idx - 1 } else { 0 };
+        (start_off, end_off)
     } else {
-        end_partition_idx - 1  // -1 because partition end_partition_idx is before offset end_partition_idx-1
+        // Without prefix: partition i → offsets i and (i+1)
+        (start_partition_idx, end_partition_idx)
+    }
     };
     
     debug!(
