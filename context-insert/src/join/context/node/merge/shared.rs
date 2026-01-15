@@ -236,18 +236,35 @@ pub fn merge_partitions_in_range(
             let range = start..end;
 
             // Determine partition type based on boundaries
+            // Important: partition indices in range (start..end) refer to positions in the partitions array,
+            // NOT offset indices. We need to map these to the appropriate merge function.
+            
             let has_prefix = start == 0 && partitions.len() > num_offsets;
             let has_postfix = end == partitions.len() && partitions.len() > num_offsets;
 
-            let index = if has_prefix && start == 0 && end < num_offsets {
-                // Merging prefix with infix partitions
+            let index = if has_prefix && has_postfix {
+                // Merging the entire range: prefix + all infixes + postfix
+                // This happens when start==0 and end==partitions.len()
+                // Use postfix merge starting from the first offset (offset 0)
+                merge_postfix_partition(ctx, offsets, range_map, &range, 0, node_index)
+            } else if has_prefix && start == 0 && end <= num_offsets {
+                // Merging prefix with some infixes (right boundary at an offset)
+                // The `end` index maps to offset index `end`
                 merge_prefix_partition(ctx, offsets, range_map, &range, end, node_index)
-            } else if has_postfix && end == num_offsets {
-                // Merging infix with postfix partitions
-                merge_postfix_partition(ctx, offsets, range_map, &range, start, node_index)
-            } else {
+            } else if has_postfix && start > 0 && start < partitions.len() {
+                // Merging some infixes with postfix (left boundary at an offset)
+                // The `start` index maps to offset index `start` (adjusted for prefix if present)
+                let offset_start = if partitions.len() > num_offsets { start - 1 } else { start };
+                merge_postfix_partition(ctx, offsets, range_map, &range, offset_start, node_index)
+            } else if start < num_offsets && end <= num_offsets {
                 // Normal infix merge between two offsets
+                // Both start and end map to offset indices
                 merge_infix_partition(ctx, offsets, range_map, &range, start, end, node_index)
+            } else {
+                // Fallback: treat as postfix partition
+                // This handles edge cases where partition/offset mapping is unclear
+                let offset_start = if start > 0 { start - 1 } else { 0 };
+                merge_postfix_partition(ctx, offsets, range_map, &range, offset_start, node_index)
             };
 
             range_map.insert(range.clone(), index);
@@ -345,59 +362,13 @@ fn merge_prefix_partition(
                 ?existing,
                 range_start = range.start,
                 range_end = range.end,
-                "PREFIX: Token already exists - need to merge subranges and build new token"
+                "PREFIX: Token already exists - using without modification"
             );
             
-            // When info_partition returns Err(existing), we need to build the merged token ourselves
-            // by combining patterns from:
-            // 1. range_sub_merges - patterns from previously merged subranges
-            // 2. Node's child patterns - by merging the subrange tokens
-            
-            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
-            
-            // Build the merged token from subranges in range_map
-            // For prefix partition spanning range start..end, we need to merge the subranges:
-            // e.g., for range 1..3: merge (1..2) with (2..3) to create (1..3)
-            let merged_patterns = if range.end > range.start + 1 {
-                // Multi-partition range - merge subranges from range_map
-                let subrange_tokens: Vec<Token> = (range.start..range.end)
-                    .map(|i| {
-                        let subrange = i..(i + 1);
-                        *range_map.get(&subrange).expect("subrange should exist in range_map")
-                    })
-                    .collect();
-                
-                debug!(
-                    ?subrange_tokens,
-                    num_subranges = subrange_tokens.len(),
-                    "PREFIX: Merging subrange tokens to create new merged token"
-                );
-                
-                // Create pattern from merged subrange tokens
-                vec![Pattern::from(subrange_tokens)]
-            } else {
-                // Single-partition range - just use merges from range_sub_merges
-                Vec::new()
-            };
-            
-            // Combine all patterns: range_sub_merges + merged subranges
-            let all_patterns: Vec<_> = merges.iter().cloned()
-                .chain(merged_patterns.into_iter())
-                .collect();
-            
-            if !all_patterns.is_empty() {
-                debug!(
-                    num_patterns = all_patterns.len(),
-                    "PREFIX: Creating new merged token with combined patterns"
-                );
-                ctx.trav.insert_patterns(all_patterns)
-            } else {
-                debug!(
-                    ?existing,
-                    "PREFIX: No patterns to add, returning existing token"
-                );
-                existing
-            }
+            // When a full token already exists for this partition range, simply use it.
+            // The token is already complete with all necessary patterns.
+            // Track it in range_map for use in larger hierarchical merges.
+            existing
         },
     }
 }
@@ -486,59 +457,13 @@ fn merge_postfix_partition(
                 ?existing,
                 range_start = range.start,
                 range_end = range.end,
-                "POSTFIX: Token already exists - need to merge subranges and build new token"
+                "POSTFIX: Token already exists - using without modification"
             );
             
-            // When info_partition returns Err(existing), we need to build the merged token ourselves
-            // by combining patterns from:
-            // 1. range_sub_merges - patterns from previously merged subranges
-            // 2. Node's child patterns - by merging the subrange tokens
-            
-            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
-            
-            // Build the merged token from subranges in range_map
-            // For postfix partition spanning range start..end, we need to merge the subranges:
-            // e.g., for range 1..3: merge (1..2) with (2..3) to create (1..3)
-            let merged_patterns = if range.end > range.start + 1 {
-                // Multi-partition range - merge subranges from range_map
-                let subrange_tokens: Vec<Token> = (range.start..range.end)
-                    .map(|i| {
-                        let subrange = i..(i + 1);
-                        *range_map.get(&subrange).expect("subrange should exist in range_map")
-                    })
-                    .collect();
-                
-                debug!(
-                    ?subrange_tokens,
-                    num_subranges = subrange_tokens.len(),
-                    "POSTFIX: Merging subrange tokens to create new merged token"
-                );
-                
-                // Create pattern from merged subrange tokens
-                vec![Pattern::from(subrange_tokens)]
-            } else {
-                // Single-partition range - just use merges from range_sub_merges
-                Vec::new()
-            };
-            
-            // Combine all patterns: range_sub_merges + merged subranges
-            let all_patterns: Vec<_> = merges.iter().cloned()
-                .chain(merged_patterns.into_iter())
-                .collect();
-            
-            if !all_patterns.is_empty() {
-                debug!(
-                    num_patterns = all_patterns.len(),
-                    "POSTFIX: Creating new merged token with combined patterns"
-                );
-                ctx.trav.insert_patterns(all_patterns)
-            } else {
-                debug!(
-                    ?existing,
-                    "POSTFIX: No patterns to add, returning existing token"
-                );
-                existing
-            }
+            // When a full token already exists for this partition range, simply use it.
+            // The token is already complete with all necessary patterns.
+            // Track it in range_map for use in larger hierarchical merges.
+            existing
         },
     }
 }
@@ -623,59 +548,13 @@ fn merge_infix_partition(
                 ?existing,
                 range_start = range.start,
                 range_end = range.end,
-                "INFIX: Token already exists - need to merge subranges and build new token"
+                "INFIX: Token already exists - using without modification"
             );
             
-            // When info_partition returns Err(existing), we need to build the merged token ourselves
-            // by combining patterns from:
-            // 1. range_sub_merges - patterns from previously merged subranges
-            // 2. Node's child patterns - by merging the subrange tokens
-            
-            let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
-            
-            // Build the merged token from subranges in range_map
-            // For infix partition spanning range start..end, we need to merge the subranges:
-            // e.g., for range 1..3: merge (1..2) with (2..3) to create (1..3)
-            let merged_patterns = if range.end > range.start + 1 {
-                // Multi-partition range - merge subranges from range_map
-                let subrange_tokens: Vec<Token> = (range.start..range.end)
-                    .map(|i| {
-                        let subrange = i..(i + 1);
-                        *range_map.get(&subrange).expect("subrange should exist in range_map")
-                    })
-                    .collect();
-                
-                debug!(
-                    ?subrange_tokens,
-                    num_subranges = subrange_tokens.len(),
-                    "INFIX: Merging subrange tokens to create new merged token"
-                );
-                
-                // Create pattern from merged subrange tokens
-                vec![Pattern::from(subrange_tokens)]
-            } else {
-                // Single-partition range - just use merges from range_sub_merges
-                Vec::new()
-            };
-            
-            // Combine all patterns: range_sub_merges + merged subranges
-            let all_patterns: Vec<_> = merges.iter().cloned()
-                .chain(merged_patterns.into_iter())
-                .collect();
-            
-            if !all_patterns.is_empty() {
-                debug!(
-                    num_patterns = all_patterns.len(),
-                    "INFIX: Creating new merged token with combined patterns"
-                );
-                ctx.trav.insert_patterns(all_patterns)
-            } else {
-                debug!(
-                    ?existing,
-                    "INFIX: No patterns to add, returning existing token"
-                );
-                existing
-            }
+            // When a full token already exists for this partition range, simply use it.
+            // The token is already complete with all necessary patterns.
+            // Track it in range_map for use in larger hierarchical merges.
+            existing
         },
     }
 }
