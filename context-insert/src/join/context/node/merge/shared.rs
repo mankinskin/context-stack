@@ -228,14 +228,16 @@ pub fn merge_partitions_in_range(
     // Start at len=2 because len=1 (single partitions) are already created in create_initial_partitions
     for len in 2..=max_len {
         debug!(len, max_len, "merge_partitions_in_range: starting merge loop iteration");
-        for start_offset in 0..(max_len - len) {
+        // For each partition length, iterate over all valid starting positions
+        // E.g., with max_len=2, len=2: start_offset in 0..1 gives start_offset=0, creating range 0..2
+        for start_offset in 0..(max_len - len + 1) {
             let start = partition_range.start + start_offset;
             let end = start + len;
             let range = start..end;
 
             // Determine partition type based on boundaries
             let has_prefix = start == 0 && partitions.len() > num_offsets;
-            let has_postfix = end == partitions.len() - 1 && partitions.len() > num_offsets;
+            let has_postfix = end == partitions.len() && partitions.len() > num_offsets;
 
             let index = if has_prefix && start == 0 && end < num_offsets {
                 // Merging prefix with infix partitions

@@ -71,19 +71,16 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         );
 
         // Define target offset range based on mode
-        // Target partition is defined by a range of offsets (in offset index space)
+        // Target partition is defined by a range of partition indices in the partitions array
         let target_offset_range = match root_mode {
-            RootMode::Prefix => 0..1,       // Prefix: from start (0) to first offset (1)
+            RootMode::Prefix => 0..1,       // Prefix: just the prefix partition (index 0)
             RootMode::Postfix => {
-                // Postfix: from last offset to end
-                // Target is the entire postfix range - all partitions from first offset to end
-                if num_offsets == 0 {
-                    0..1
-                } else {
-                    0..(partitions.len() - 1)
-                }
+                // Postfix: ALL partitions (entire postfix range - from first partition to last)
+                // For postfix mode, partitions includes all infixes + postfix
+                // We want to merge ALL of them into the target token
+                0..partitions.len()
             }
-            RootMode::Infix => 0..2,        // Infix: between first two offsets
+            RootMode::Infix => 0..2,        // Infix: between first two offsets  
         };
 
         debug!(?target_offset_range, num_partitions = partitions.len(), "Target partition offset range");
