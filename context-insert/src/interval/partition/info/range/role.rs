@@ -65,10 +65,11 @@ pub type PatternRangeOf<R> = <R as RangeRole>::PatternRange;
 pub type ModeOf<R> = <R as RangeRole>::Mode;
 pub type BordersOf<R> = <R as RangeRole>::Borders;
 pub type ModeChildrenOf<R> = <ModeOf<R> as ModeChildren<R>>::Result;
-pub type ModePatternCtxOf<'a, R> =
-    <<R as RangeRole>::Mode as ModeCtx>::PatternResult<'a>;
-pub type ModeNodeCtxOf<'a, 'b, R> =
-    <<R as RangeRole>::Mode as ModeCtx>::NodeCtx<'a, 'b>;
+/// Type alias for the pattern context of a given range role's mode.
+pub type ModePatternCtxOf<R> =
+    <<R as RangeRole>::Mode as ModeCtx>::PatternResult;
+pub type ModeNodeCtxOf<'a, R> =
+    <<R as RangeRole>::Mode as ModeCtx>::NodeCtx<'a>;
 
 pub trait RangeKind: Debug + Clone {}
 

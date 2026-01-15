@@ -20,7 +20,7 @@ pub trait GraphRootPattern: GraphRoot + RootPattern {
     fn graph_root_pattern<'a: 'g, 'g, G: HasGraph + 'a>(
         &self,
         trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern {
+    ) -> Pattern {
         trav.expect_pattern_at(self.root_pattern_location())
     }
 }
@@ -73,7 +73,7 @@ macro_rules! impl_root {
                 'b: 'g,
                 'g,
                 G: $crate::HasGraph + 'a
-            >(&'b $self_, $trav: &'g G::Guard<'a>) -> &'g $crate::Pattern {
+            >(&'b $self_, $trav: &'g G::Guard<'a>) -> $crate::Pattern {
                 $func
             }
         }
@@ -111,10 +111,10 @@ pub trait RootPattern {
     fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
         &'b self,
         trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern;
+    ) -> Pattern;
 }
 impl_root! { RootPattern for ChildLocation, self, trav => GraphRootPattern::graph_root_pattern::<G>(self, trav) }
 impl_root! { RootPattern for PatternLocation, self, trav => GraphRootPattern::graph_root_pattern::<G>(self, trav) }
 impl_root! { RootPattern for IndexRoot, self, trav => self.location.root_pattern::<G>(trav) }
-impl_root! { RootPattern for Pattern, self, _trav => self }
+impl_root! { RootPattern for Pattern, self, _trav => self.clone() }
 impl_root! { <T: RootPattern> RootPattern for PositionAnnotated<T>, self, trav => self.node.root_pattern::<G>(trav) }

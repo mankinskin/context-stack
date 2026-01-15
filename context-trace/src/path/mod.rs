@@ -137,7 +137,7 @@ pub trait RolePathUtils {
         let location = self.role_root_child_location::<R>();
         let pattern = graph.expect_pattern_at(location);
         <R::BorderDirection as PatternDirection>::pattern_index_next(
-            pattern,
+            &pattern,
             location.sub_index,
         )
         .is_none()

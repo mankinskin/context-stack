@@ -1,7 +1,6 @@
-use std::{
-    borrow::Borrow,
-    fmt::Display,
-};
+use std::fmt::Display;
+
+use dashmap::mapref::one::Ref;
 
 use crate::graph::{
     Hypergraph,
@@ -10,7 +9,6 @@ use crate::graph::{
     vertex::{
         VertexEntry,
         VertexIndex,
-        VertexPatternView,
         data::VertexData,
         has_vertex_index::HasVertexIndex,
         has_vertex_key::HasVertexKey,
@@ -106,162 +104,199 @@ impl<T: GetVertexIndex> GetVertexIndex for &'_ T {
     }
 }
 
+/// A read guard for vertex data from the concurrent graph.
+/// 
+/// This holds both the DashMap ref and the RwLock read guard.
+pub struct VertexReadGuard<'a> {
+    _entry_ref: Ref<'a, VertexKey, VertexEntry>,
+    // We store a raw pointer because we can't express the lifetime properly
+    // The RwLockReadGuard is logically borrowed from entry_ref
+    data_ptr: *const VertexData,
+}
+
+impl<'a> std::ops::Deref for VertexReadGuard<'a> {
+    type Target = VertexData;
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: The pointer is valid as long as _entry_ref is held
+        unsafe { &*self.data_ptr }
+    }
+}
+
+/// Trait for accessing vertices in a graph.
+/// 
+/// With DashMap, we can't return direct references, so methods return
+/// cloned data or use callbacks.
 pub trait VertexSet<I: GetVertexIndex> {
-    fn get_vertex(
+    /// Get vertex data by key. Returns a clone of the data.
+    fn get_vertex_data(
         &self,
         key: I,
-    ) -> Result<&VertexData, ErrorReason>;
-    fn get_vertex_mut(
-        &mut self,
+    ) -> Result<VertexData, ErrorReason>;
+    
+    /// Get vertex data, panicking if not found.
+    fn expect_vertex_data(
+        &self,
+        index: I,
+    ) -> VertexData {
+        self.get_vertex_data(index)
+            .unwrap_or_else(|_| panic!("Vertex {} does not exist!", index))
+    }
+    
+    /// Execute a function with read access to vertex data.
+    fn with_vertex<R>(
+        &self,
         key: I,
-    ) -> Result<&mut VertexData, ErrorReason>;
-    fn expect_vertex(
+        f: impl FnOnce(&VertexData) -> R,
+    ) -> Result<R, ErrorReason>;
+    
+    /// Execute a function with write access to vertex data.
+    fn with_vertex_mut<R>(
         &self,
-        index: I,
-    ) -> &VertexData {
-        self.get_vertex(index)
-            .unwrap_or_else(|_| panic!("Vertex {} does not exist!", index))
-    }
-    #[track_caller]
-    fn expect_vertex_mut(
-        &mut self,
-        index: I,
-    ) -> &mut VertexData {
-        self.get_vertex_mut(index)
-            .unwrap_or_else(|_| panic!("Vertex {} does not exist!", index))
-    }
-    fn vertex_entry(
-        &mut self,
-        index: I,
-    ) -> VertexEntry<'_>;
-    fn get_vertices(
-        &self,
-        indices: impl Iterator<Item = I>,
-    ) -> Result<VertexPatternView<'_>, ErrorReason> {
-        indices.map(move |index| self.get_vertex(index)).collect()
-    }
-    #[track_caller]
-    fn expect_vertices(
-        &self,
-        indices: impl Iterator<Item = I>,
-    ) -> VertexPatternView<'_> {
-        indices
-            .map(move |index| self.expect_vertex(index))
-            .collect()
-    }
-    #[track_caller]
+        key: I,
+        f: impl FnOnce(&mut VertexData) -> R,
+    ) -> Result<R, ErrorReason>;
+    
+    /// Check if vertex exists.
     fn contains_vertex(
         &self,
         key: I,
     ) -> bool {
-        self.get_vertex(key).is_ok()
+        self.get_vertex_data(key).is_ok()
     }
 }
+
 impl<'t, G: GraphKind, I: GetVertexIndex> VertexSet<&'t I> for Hypergraph<G>
 where
     Hypergraph<G>: VertexSet<I>,
 {
-    fn get_vertex(
+    fn get_vertex_data(
         &self,
         key: &'t I,
-    ) -> Result<&VertexData, ErrorReason> {
-        self.get_vertex(*key)
+    ) -> Result<VertexData, ErrorReason> {
+        self.get_vertex_data(*key)
     }
-    fn get_vertex_mut(
-        &mut self,
+    
+    fn with_vertex<R>(
+        &self,
         key: &'t I,
-    ) -> Result<&mut VertexData, ErrorReason> {
-        self.get_vertex_mut(*key)
+        f: impl FnOnce(&VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        self.with_vertex(*key, f)
     }
-    fn vertex_entry(
-        &mut self,
-        index: &'t I,
-    ) -> VertexEntry<'_> {
-        self.vertex_entry(*index)
+    
+    fn with_vertex_mut<R>(
+        &self,
+        key: &'t I,
+        f: impl FnOnce(&mut VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        self.with_vertex_mut(*key, f)
     }
 }
+
 impl<G: GraphKind> VertexSet<VertexKey> for Hypergraph<G> {
-    fn get_vertex(
+    fn get_vertex_data(
         &self,
         key: VertexKey,
-    ) -> Result<&VertexData, ErrorReason> {
+    ) -> Result<VertexData, ErrorReason> {
         self.graph
-            .get(key.borrow())
+            .get(&key)
+            .map(|entry| entry.clone_data())
             .ok_or(ErrorReason::UnknownIndex)
     }
-    fn get_vertex_mut(
-        &mut self,
+    
+    fn with_vertex<R>(
+        &self,
         key: VertexKey,
-    ) -> Result<&mut VertexData, ErrorReason> {
-        self.graph
-            .get_mut(key.borrow())
-            .ok_or(ErrorReason::UnknownIndex)
+        f: impl FnOnce(&VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        // Clone the Arc to release the DashMap shard lock before acquiring vertex lock.
+        // This prevents deadlocks when the callback accesses other vertices.
+        let entry = self.graph
+            .get(&key)
+            .map(|r| r.clone())
+            .ok_or(ErrorReason::UnknownIndex)?;
+        Ok(f(&entry.read()))
     }
-    fn vertex_entry(
-        &mut self,
-        index: VertexKey,
-    ) -> VertexEntry<'_> {
-        self.graph.entry(index)
+    
+    fn with_vertex_mut<R>(
+        &self,
+        key: VertexKey,
+        f: impl FnOnce(&mut VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        // Clone the Arc to release the DashMap shard lock before acquiring vertex lock.
+        // This prevents deadlocks when the callback accesses other vertices.
+        let entry = self.graph
+            .get(&key)
+            .map(|r| r.clone())
+            .ok_or(ErrorReason::UnknownIndex)?;
+        Ok(f(&mut entry.write()))
     }
 }
+
 impl<G: GraphKind> VertexSet<VertexIndex> for Hypergraph<G> {
-    fn get_vertex(
+    fn get_vertex_data(
         &self,
         key: VertexIndex,
-    ) -> Result<&VertexData, ErrorReason> {
-        self.graph
-            .get_index(**key.borrow())
-            .map(|(_, d)| d)
-            .ok_or(ErrorReason::UnknownIndex)
+    ) -> Result<VertexData, ErrorReason> {
+        let vk = self.get_key_for_index(key)?;
+        self.get_vertex_data(vk)
     }
-    fn get_vertex_mut(
-        &mut self,
+    
+    fn with_vertex<R>(
+        &self,
         key: VertexIndex,
-    ) -> Result<&mut VertexData, ErrorReason> {
-        self.graph
-            .get_index_mut(**key.borrow())
-            .map(|(_, d)| d)
-            .ok_or(ErrorReason::UnknownIndex)
+        f: impl FnOnce(&VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        let vk = self.get_key_for_index(key)?;
+        self.with_vertex(vk, f)
     }
-    fn vertex_entry(
-        &mut self,
-        index: VertexIndex,
-    ) -> VertexEntry<'_> {
-        let key = *self.graph.get_index(*index).unwrap().0;
-        self.vertex_entry(key)
+    
+    fn with_vertex_mut<R>(
+        &self,
+        key: VertexIndex,
+        f: impl FnOnce(&mut VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        let vk = self.get_key_for_index(key)?;
+        self.with_vertex_mut(vk, f)
     }
 }
+
 impl<G: GraphKind> VertexSet<Token> for Hypergraph<G> {
-    fn get_vertex(
+    fn get_vertex_data(
         &self,
         key: Token,
-    ) -> Result<&VertexData, ErrorReason> {
-        self.get_vertex(key.vertex_index())
+    ) -> Result<VertexData, ErrorReason> {
+        self.get_vertex_data(key.vertex_index())
     }
-    fn get_vertex_mut(
-        &mut self,
+    
+    fn with_vertex<R>(
+        &self,
         key: Token,
-    ) -> Result<&mut VertexData, ErrorReason> {
-        self.get_vertex_mut(key.vertex_index())
+        f: impl FnOnce(&VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        self.with_vertex(key.vertex_index(), f)
     }
-    fn vertex_entry(
-        &mut self,
-        index: Token,
-    ) -> VertexEntry<'_> {
-        let key = *self.graph.get_index(*index.vertex_index()).unwrap().0;
-        self.vertex_entry(key)
+    
+    fn with_vertex_mut<R>(
+        &self,
+        key: Token,
+        f: impl FnOnce(&mut VertexData) -> R,
+    ) -> Result<R, ErrorReason> {
+        self.with_vertex_mut(key.vertex_index(), f)
     }
 }
 impl<G: GraphKind> Hypergraph<G> {
+    /// Get the index for a key by looking up in key_to_index map.
     pub(crate) fn get_index_for_key(
         &self,
         key: &VertexKey,
     ) -> Result<VertexIndex, ErrorReason> {
-        self.graph
-            .get_index_of(key)
-            .map(VertexIndex::from)
+        self.key_to_index
+            .get(key)
+            .map(|r| *r)
             .ok_or(ErrorReason::UnknownKey)
     }
+    
     #[track_caller]
     pub fn expect_index_for_key(
         &self,
@@ -269,15 +304,18 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> VertexIndex {
         self.get_index_for_key(key).expect("Key does not exist")
     }
+    
+    /// Get the key for an index by looking up in index_to_key map.
     pub(crate) fn get_key_for_index(
         &self,
         index: impl HasVertexIndex,
     ) -> Result<VertexKey, ErrorReason> {
-        self.graph
-            .get_index(*index.vertex_index())
-            .map(|(k, _)| *k)
+        self.index_to_key
+            .get(&index.vertex_index())
+            .map(|r| *r)
             .ok_or(ErrorReason::UnknownKey)
     }
+    
     #[track_caller]
     pub fn expect_key_for_index(
         &self,
@@ -286,28 +324,35 @@ impl<G: GraphKind> Hypergraph<G> {
         self.get_key_for_index(index).expect("Key does not exist")
     }
 
+    /// Get the next vertex index that would be allocated (without incrementing).
     pub fn next_vertex_index(&self) -> VertexIndex {
-        self.graph.len().into()
+        VertexIndex::from(self.next_id.load(std::sync::atomic::Ordering::Relaxed))
     }
-    pub(crate) fn vertex_iter(
-        &self
-    ) -> impl Iterator<Item = (&VertexKey, &VertexData)> {
-        self.graph.iter()
+    
+    /// Try to get vertex data without blocking.
+    ///
+    /// This is useful for avoiding deadlocks when called from within a callback
+    /// that already holds a lock on a vertex (e.g., when formatting tokens during
+    /// validation inside a write lock).
+    ///
+    /// Returns `None` if:
+    /// - The vertex doesn't exist
+    /// - A write lock is currently held on the vertex
+    pub fn try_get_vertex_data(
+        &self,
+        index: impl HasVertexIndex,
+    ) -> Option<VertexData> {
+        let key = self.get_key_for_index(index).ok()?;
+        self.graph.get(&key).and_then(|entry| entry.try_clone_data())
     }
-}
-#[allow(dead_code)]
-impl<G: GraphKind> Hypergraph<G> {
-    pub(crate) fn vertex_iter_mut(
-        &mut self
-    ) -> impl Iterator<Item = (&VertexKey, &mut VertexData)> {
-        self.graph.iter_mut()
+    
+    /// Iterate over all vertices (key, data pairs) - returns cloned data.
+    pub(crate) fn vertex_iter(&self) -> impl Iterator<Item = (VertexKey, VertexData)> + '_ {
+        self.graph.iter().map(|entry| (*entry.key(), entry.clone_data()))
     }
-    pub(crate) fn vertex_data_iter(&self) -> impl Iterator<Item = &VertexData> {
-        self.graph.values()
-    }
-    pub(crate) fn vertex_data_iter_mut(
-        &mut self
-    ) -> impl Iterator<Item = &mut VertexData> {
-        self.graph.values_mut()
+    
+    /// Iterate over all vertex keys.
+    pub(crate) fn vertex_keys(&self) -> impl Iterator<Item = VertexKey> + '_ {
+        self.graph.iter().map(|entry| *entry.key())
     }
 }

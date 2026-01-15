@@ -12,26 +12,26 @@ use std::{
 
 pub trait ToNewAtomIndices: Debug {
     #[allow(non_snake_case)]  // Follows NewAtom naming convention
-    fn to_new_Atom_indices<'a: 'g, 'g, G: HasGraphMut<Kind = BaseGraphKind>>(
+    fn to_new_Atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
         self,
-        graph: &'a mut G,
+        graph: &G,
     ) -> NewAtomIndices;
 }
 
 impl ToNewAtomIndices for NewAtomIndices {
-    fn to_new_Atom_indices<'a: 'g, 'g, G: HasGraphMut<Kind = BaseGraphKind>>(
+    fn to_new_Atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
         self,
-        _graph: &'a mut G,
+        _graph: &G,
     ) -> NewAtomIndices {
         self
     }
 }
 impl ToNewAtomIndices for Chars<'_> {
-    fn to_new_Atom_indices<'a: 'g, 'g, G: HasGraphMut<Kind = BaseGraphKind>>(
+    fn to_new_Atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
         self,
-        graph: &'a mut G,
+        graph: &G,
     ) -> NewAtomIndices {
-        graph.graph_mut().new_atom_indices(self)
+        graph.graph().new_atom_indices(self)
     }
 }
 //impl<T: Atomize> ToNewTokenIndices<T> for Vec<T> {

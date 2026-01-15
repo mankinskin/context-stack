@@ -44,10 +44,7 @@ use crate::{
 };
 use std::{
     cell::RefCell,
-    sync::{
-        Arc,
-        RwLock,
-    },
+    sync::Arc,
 };
 
 /// Type-erased graph accessor for getting string representations
@@ -58,7 +55,9 @@ trait GraphStringGetter: Send + Sync {
     ) -> Option<String>;
 }
 
-impl<G: GraphKind> GraphStringGetter for Arc<RwLock<Hypergraph<G>>>
+// Implementation for Arc<Hypergraph<G>> - now with interior mutability,
+// we can always read individual vertices without global locking
+impl<G: GraphKind> GraphStringGetter for Arc<Hypergraph<G>>
 where
     G::Atom: std::fmt::Display,
 {
@@ -66,12 +65,12 @@ where
         &self,
         index: usize,
     ) -> Option<String> {
-        // Use try_read to avoid deadlocks when the graph is locked for writing
-        // (e.g., during insert operations in parallel tests)
-        let graph = self.try_read().ok()?;
-        graph.get_vertex(VertexIndex::from(index)).ok().map(|_| {
-            <Hypergraph<G>>::index_string(&*graph, VertexIndex::from(index))
-        })
+        // Use try_get_vertex_data to avoid deadlocks when called from within
+        // a write lock callback (e.g., during validation/formatting inside add_pattern).
+        // If we can't acquire the read lock (because we're inside a write lock),
+        // return None and let the caller fall back to a simpler format.
+        self.try_get_vertex_data(VertexIndex::from(index))
+            .map(|data| self.vertex_data_string(data))
     }
 }
 
@@ -118,7 +117,7 @@ where
 
 /// Register a Hypergraph for use in tests (legacy compatibility)
 ///
-/// **Note:** This wraps the graph in an Arc<RwLock<>> to support the same
+/// **Note:** This wraps the graph in an Arc to support the same
 /// interface as HypergraphRef. However, since you only have a reference,
 /// the graph is cloned. For dynamic updates, use `register_test_graph_ref` instead.
 pub fn register_test_graph<G: GraphKind + 'static>(graph: &Hypergraph<G>)
@@ -127,7 +126,7 @@ where
 {
     // Clone the graph and wrap it - needed because we only have a reference
     let graph_clone = graph.clone();
-    let graph_arc = Arc::new(RwLock::new(graph_clone));
+    let graph_arc = Arc::new(graph_clone);
     TEST_GRAPH.with(|tg| {
         *tg.borrow_mut() = Some(Box::new(graph_arc));
     });

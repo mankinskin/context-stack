@@ -276,7 +276,7 @@ impl<R: PathRole> HasLeafToken<R> for RolePath<R> {}
 
 impl_root_child_token! {
     RootChildToken for IndexRolePath<R>, self,
-    trav => *trav.graph().expect_child_at(
+    trav => trav.graph().expect_child_at(
             self.path_root().location.to_child_location(
                 HasRootChildIndex::<R>::root_child_index(&self.role_path)
             )
@@ -321,7 +321,7 @@ impl<Role: PathRole, Root: PathRoot> RootPattern
     fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
         &'b self,
         trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern {
+    ) -> Pattern {
         self.root.root_pattern::<G>(trav)
     }
 }

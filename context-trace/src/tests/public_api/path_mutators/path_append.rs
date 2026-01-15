@@ -6,7 +6,7 @@ use crate::*;
 fn subpath_append_pushes_childlocation() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b]

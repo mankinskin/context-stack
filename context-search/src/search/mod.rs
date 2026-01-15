@@ -47,8 +47,6 @@ use tracing::{
     trace,
 };
 pub(crate) mod context;
-pub(crate) mod ext;
-// pub(crate) mod final_state; // Unused - references old EndState type
 pub(crate) mod searchable;
 
 pub(crate) type SearchResult = Result<Response, ErrorReason>;

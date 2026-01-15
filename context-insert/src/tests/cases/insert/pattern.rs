@@ -197,7 +197,7 @@ fn insert_pattern2() {
         .expect_complete("ab")
         .root_parent();
     let g = graph.graph();
-    let aby_vertex = g.expect_vertex(aby);
+    let aby_vertex = g.expect_vertex_data(aby);
     assert_eq!(aby_vertex.parents().len(), 1, "aby");
     assert_eq!(
         aby_vertex

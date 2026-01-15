@@ -88,17 +88,17 @@ impl PatternLocation {
             range,
         }
     }
-    pub(crate) fn get_pattern<'a, Trav: HasGraph + 'a>(
-        &'a self,
-        trav: &'a Trav,
+    pub(crate) fn get_pattern<Trav: HasGraph>(
+        &self,
+        trav: &Trav,
     ) -> Option<Pattern> {
-        trav.graph().get_pattern_at(self).ok().cloned()
+        trav.graph().get_pattern_at(self).ok()
     }
-    pub(crate) fn expect_pattern<'a, Trav: HasGraph + 'a>(
-        &'a self,
-        trav: &'a Trav,
+    pub(crate) fn expect_pattern<Trav: HasGraph>(
+        &self,
+        trav: &Trav,
     ) -> Pattern {
-        trav.graph().expect_pattern_at(self).clone()
+        trav.graph().expect_pattern_at(self)
     }
     pub(crate) fn get_pattern_in<'a>(
         &self,

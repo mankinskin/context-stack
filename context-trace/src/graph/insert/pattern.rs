@@ -21,7 +21,7 @@ impl<G: GraphKind> Hypergraph<G> {
     /// Create new node from a pattern
     #[track_caller]
     pub fn insert_pattern_with_id(
-        &mut self,
+        &self,
         pattern: impl IntoPattern,
     ) -> (Token, Option<PatternId>) {
         let indices = pattern.into_pattern();
@@ -41,12 +41,12 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Create new node from a pattern (even if single index)
     pub(crate) fn force_insert_pattern_with_id(
-        &mut self,
+        &self,
         pattern: impl IntoPattern,
     ) -> (Token, PatternId) {
         let indices = pattern.into_pattern();
         let (width, indices, tokens) = self.to_width_indices_children(indices);
-        let index = self.next_vertex_index();
+        let index = self.alloc_vertex_index();
         let mut new_data = VertexData::new(Token::new(index, width));
         let pattern_id = PatternId::default();
         new_data.add_pattern_no_update(pattern_id, Pattern::from(tokens));
@@ -57,7 +57,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Create new node from a pattern
     pub fn insert_pattern(
-        &mut self,
+        &self,
         pattern: impl IntoPattern,
     ) -> Token {
         let indices = pattern.into_pattern();
@@ -69,7 +69,7 @@ impl<G: GraphKind> Hypergraph<G> {
 impl<G: GraphKind> Hypergraph<G> {
     /// Create new node from a pattern
     pub(crate) fn force_insert_pattern(
-        &mut self,
+        &self,
         indices: impl IntoPattern,
     ) -> Token {
         self.force_insert_pattern_with_id(indices).0

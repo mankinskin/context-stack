@@ -90,7 +90,7 @@ impl HasRootChildToken<Start> for IndexRangePath {
         &self,
         trav: &G,
     ) -> Token {
-        *trav.graph().expect_child_at(
+        trav.graph().expect_child_at(
             self.path_root()
                 .location
                 .to_child_location(self.start.sub_path.root_entry),
@@ -103,7 +103,7 @@ impl HasRootChildToken<End> for IndexRangePath {
         &self,
         trav: &G,
     ) -> Token {
-        *trav.graph().expect_child_at(
+        trav.graph().expect_child_at(
             self.path_root()
                 .location
                 .to_child_location(self.end.sub_path.root_entry),
@@ -119,7 +119,7 @@ impl HasRootChildToken<End>
         &self,
         trav: &G,
     ) -> Token {
-        *trav.graph().expect_child_at(
+        trav.graph().expect_child_at(
             self.path_root()
                 .location
                 .to_child_location(self.end.sub_path.root_entry),
@@ -134,7 +134,7 @@ impl HasRootChildToken<Start>
         &self,
         trav: &G,
     ) -> Token {
-        *trav.graph().expect_child_at(
+        trav.graph().expect_child_at(
             self.path_root()
                 .location
                 .to_child_location(self.start.sub_path.root_entry),

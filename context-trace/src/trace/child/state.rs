@@ -152,7 +152,7 @@ impl<EndNode: PathNode> RootPattern for ChildState<EndNode> {
     fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
         &'b self,
         trav: &'g G::Guard<'a>,
-    ) -> &'g crate::Pattern {
+    ) -> crate::Pattern {
         self.path.root_pattern::<G>(trav)
     }
 }

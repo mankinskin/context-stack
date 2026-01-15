@@ -60,7 +60,7 @@ impl IndexRangePath<ChildLocation, ChildLocation> {
 
                 // Calculate width of tokens before the child we're entering
                 let width_before =
-                    pattern_width(pattern_pre_ctx(pattern, loc.sub_index));
+                    pattern_width(pattern_pre_ctx(pattern.iter().cloned(), loc.sub_index));
 
                 // Update position for next iteration: add width before child + width of child token
                 current_position.advance_key(
@@ -124,7 +124,6 @@ impl IndexRangePath<ChildLocation, PositionAnnotated<ChildLocation>> {
         // Get token at that location, or fall back to root child token
         trav.graph()
             .get_child_at(leaf_loc)
-            .copied()
             .unwrap_or(self.root_child_token(trav))
     }
 }

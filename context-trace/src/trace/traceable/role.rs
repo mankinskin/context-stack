@@ -140,7 +140,7 @@ impl TraceDirection for TopDown {
         location: &ChildLocation,
     ) -> Self::Key {
         let graph = trav.graph();
-        let index = *graph.expect_child_at(location);
+        let index = graph.expect_child_at(location);
         let delta = graph.expect_child_offset(location);
         DownKey {
             index,

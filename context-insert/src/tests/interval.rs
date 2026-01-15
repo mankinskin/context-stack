@@ -243,7 +243,7 @@ fn interval_graph1() {
     let res = graph.find_ancestor(query).unwrap();
     assert!(res.query_exhausted());
     let init = InitInterval::from(res);
-    let interval = IntervalGraph::from((&mut *graph, init));
+    let interval = IntervalGraph::from((&*graph, init));
     assert_eq!(
         interval.clone(),
         IntervalGraph {
@@ -293,8 +293,9 @@ fn interval_graph2() {
     let cdefg_hi_id = cdefghi_ids[0];
     let cd_efghi_id = cdefghi_ids[1];
 
+    // With interior mutability, we only need &graph for IntervalGraph creation
     let interval =
-        IntervalGraph::from((&mut *trace_test.env.graph.graph_mut(), init));
+        IntervalGraph::from((&*trace_test.env.graph, init));
 
     // Check root and states
     assert_eq!(interval.root, cdefghi);

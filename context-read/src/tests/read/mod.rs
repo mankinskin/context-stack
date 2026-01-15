@@ -10,7 +10,7 @@ use pretty_assertions::{
 };
 #[test]
 fn sync_read_text1() {
-    let mut graph: HypergraphRef = HypergraphRef::from(Hypergraph::default());
+    let mut graph: HypergraphRef = HypergraphRef::<BaseGraphKind>::from(Hypergraph::default());
     let result = (&mut graph, "heldldo world!".chars())
         .read_sequence()
         .unwrap();
@@ -32,7 +32,7 @@ fn sync_read_text1() {
 }
 #[test]
 fn sync_read_text2() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::<BaseGraphKind>::<BaseGraphKind>::<BaseGraphKind>::default();
     let heldld = (&mut graph, "heldld".chars()).read_sequence().unwrap();
     expect_atoms!(graph, {h, e, l, d});
     assert_indices!(graph, ld);
@@ -58,7 +58,7 @@ fn sync_read_text2() {
 
 #[test]
 fn read_sequence1() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let ind_hypergraph =
         (&mut graph, "hypergraph".chars()).read_sequence().unwrap();
 
@@ -127,7 +127,7 @@ fn read_sequence1() {
 }
 #[test]
 fn read_sequence2() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let ind_abab = (&mut graph, "abab".chars()).read_sequence().unwrap();
     expect_atoms!(graph, {a, b});
     assert_indices!(graph, ab);
@@ -162,7 +162,7 @@ fn read_sequence2() {
 
 #[test]
 fn read_infix1() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let subdivision =
         (&mut graph, "subdivision".chars()).read_sequence().unwrap();
     assert_eq!(subdivision.width(), 11);
@@ -225,7 +225,7 @@ fn read_infix1() {
 
 #[test]
 fn read_infix2() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let subvisu = (&mut graph, "subvisu".chars()).read_sequence().unwrap();
     assert_eq!(subvisu.width(), 7);
     expect_atoms!(graph, {s, u, b, v, i});
@@ -255,7 +255,7 @@ fn read_infix2() {
 
 #[test]
 fn read_loose_sequence1() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let abxaxxb = (&mut graph, "abxaxxb".chars()).read_sequence().unwrap();
     assert_eq!(abxaxxb.width(), 7);
     expect_atoms!(graph, {a, b, x});
@@ -269,7 +269,7 @@ fn read_loose_sequence1() {
 
 #[test]
 fn read_repeating_known1() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let xyyxy = (&mut graph, "xyyxy".chars()).read_sequence().unwrap();
     assert_eq!(xyyxy.width(), 5);
     expect_atoms!(graph, {x, y});
@@ -283,7 +283,7 @@ fn read_repeating_known1() {
 
 #[test]
 fn read_multiple_overlaps1() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let abcde = (&mut graph, "abcde".chars()).read_sequence().unwrap();
     // abcde
     //  bcde

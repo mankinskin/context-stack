@@ -111,7 +111,7 @@ macro_rules! build_trace_cache {
 
 #[test]
 fn test_build_trace_cache1() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {h, e, l, d});
     insert_patterns!(graph,
         (ld, ld_id) => [l, d],
@@ -209,7 +209,7 @@ fn test_build_trace_cache1() {
 
 #[test]
 fn test_build_trace_cache2() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c, d});
 
     insert_patterns!(graph,

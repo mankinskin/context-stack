@@ -5,79 +5,63 @@ use derive_new::new;
 
 use crate::split::vertex::node::NodeTraceCtx;
 
+/// Pattern trace context that owns its data.
+/// 
+/// With interior mutability, we can't hold references across lock boundaries,
+/// so this struct owns the pattern data.
 #[derive(Debug, Clone, Derivative, new)]
 #[derivative(Hash, PartialEq, Eq)]
-pub struct PatternTraceCtx<'a> {
+pub struct PatternTraceCtx {
     pub(crate) loc: PatternLocation,
     #[derivative(Hash = "ignore", PartialEq = "ignore")]
-    pub(crate) pattern: &'a Pattern,
+    pub(crate) pattern: Pattern,
 }
 
-impl<'p> From<PatternTraceCtx<'p>> for PatternId {
-    fn from(value: PatternTraceCtx<'p>) -> Self {
+impl From<PatternTraceCtx> for PatternId {
+    fn from(value: PatternTraceCtx) -> Self {
         value.loc.pattern_id
     }
 }
 
 pub trait HasPatternTraceCtx {
-    fn pattern_trace_context<'a>(&'a self) -> PatternTraceCtx<'a>
-    where
-        Self: 'a;
+    fn pattern_trace_context(&self) -> PatternTraceCtx;
 }
-impl HasPatternTraceCtx for PatternTraceCtx<'_> {
-    fn pattern_trace_context<'a>(&'a self) -> PatternTraceCtx<'a>
-    where
-        Self: 'a,
-    {
+impl HasPatternTraceCtx for PatternTraceCtx {
+    fn pattern_trace_context(&self) -> PatternTraceCtx {
         self.clone()
     }
 }
 pub trait GetPatternTraceCtx {
-    fn get_pattern_trace_context<'b>(
-        &'b self,
+    fn get_pattern_trace_context(
+        &self,
         pattern_id: &PatternId,
-    ) -> PatternTraceCtx<'b>
-    where
-        Self: 'b;
+    ) -> PatternTraceCtx;
 }
 pub trait GetPatternCtx {
-    type PatternCtx<'b>: HasPatternTraceCtx
-    where
-        Self: 'b;
-    fn get_pattern_context<'b>(
-        &'b self,
+    type PatternCtx: HasPatternTraceCtx;
+    fn get_pattern_context(
+        &self,
         pattern_id: &PatternId,
-    ) -> Self::PatternCtx<'b>
-    where
-        Self: 'b;
+    ) -> Self::PatternCtx;
 }
 
-impl GetPatternCtx for NodeTraceCtx<'_> {
-    type PatternCtx<'b>
-        = PatternTraceCtx<'b>
-    where
-        Self: 'b;
-    fn get_pattern_context<'b>(
-        &'b self,
+impl GetPatternCtx for NodeTraceCtx {
+    type PatternCtx = PatternTraceCtx;
+    fn get_pattern_context(
+        &self,
         pattern_id: &PatternId,
-    ) -> Self::PatternCtx<'b>
-    where
-        Self: 'b,
-    {
+    ) -> Self::PatternCtx {
         self.get_pattern_trace_context(pattern_id)
     }
 }
-impl GetPatternTraceCtx for NodeTraceCtx<'_> {
-    fn get_pattern_trace_context<'b>(
-        &'b self,
+impl GetPatternTraceCtx for NodeTraceCtx {
+    fn get_pattern_trace_context(
+        &self,
         pattern_id: &PatternId,
-    ) -> PatternTraceCtx<'b>
-    where
-        Self: 'b,
-    {
+    ) -> PatternTraceCtx {
         PatternTraceCtx {
             loc: self.index.to_pattern_location(*pattern_id),
-            pattern: self.patterns.get(pattern_id).unwrap(),
+            pattern: self.patterns.get(pattern_id).unwrap().clone(),
         }
     }
 }

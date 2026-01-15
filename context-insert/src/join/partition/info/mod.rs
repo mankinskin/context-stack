@@ -31,21 +31,26 @@ pub struct JoinPartitionInfo<R: RangeRole<Mode = Join>>(PartitionInfo<R>)
 where
     R::Borders: JoinBorders<R>;
 
-impl<'a: 'b, 'b: 'c, 'c, R: RangeRole<Mode = Join>> JoinPartitionInfo<R>
+impl<R: RangeRole<Mode = Join>> JoinPartitionInfo<R>
 where
     R::Borders: JoinBorders<R>,
-    Self: 'a,
 {
-    pub fn into_joined_patterns(
+    pub fn into_joined_patterns<'a>(
         self,
-        ctx: &'c mut ModeNodeCtxOf<'a, 'b, R>,
-    ) -> JoinedPatterns<R> {
+        ctx: &mut ModeNodeCtxOf<'a, R>,
+    ) -> JoinedPatterns<R>
+    where
+        R: 'a,
+    {
         JoinedPatterns::from_partition_info(self, ctx)
     }
-    pub fn into_joined_partition(
+    pub fn into_joined_partition<'a>(
         self,
-        ctx: &'c mut ModeNodeCtxOf<'a, 'b, R>,
-    ) -> JoinedPartition<R> {
+        ctx: &mut ModeNodeCtxOf<'a, R>,
+    ) -> JoinedPartition<R>
+    where
+        R: 'a,
+    {
         JoinedPartition::from_partition_info(self, ctx)
     }
 }

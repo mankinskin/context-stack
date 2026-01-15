@@ -120,7 +120,7 @@ impl IntoRootCommand<End> for PostfixCommand {
         ctx: &mut TraceCtx<G>,
     ) -> Self::RootCommand {
         let first = self.path.role_leaf_token_location::<Start>().unwrap();
-        let start_index = *ctx.trav.graph().expect_child_at(first);
+        let start_index = ctx.trav.graph().expect_child_at(first);
         let initial_prev = UpKey {
             index: start_index,
             pos: start_index.width().0.into(),
@@ -156,7 +156,7 @@ impl IntoRootCommand<Start> for RangeCommand {
         ctx: &mut TraceCtx<G>,
     ) -> Self::RootCommand {
         let first = self.path.role_leaf_token_location::<Start>().unwrap();
-        let start_index = *ctx.trav.graph().expect_child_at(first);
+        let start_index = ctx.trav.graph().expect_child_at(first);
         let initial_prev = UpKey {
             index: start_index,
             pos: start_index.width().0.into(),

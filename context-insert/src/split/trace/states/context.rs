@@ -39,7 +39,7 @@ impl<G: HasGraph> SplitTraceStatesCtx<G> {
         let mut subs = self.completed_splits::<InnerNode>(&index);
         subs.entry(offset).or_insert_with(|| {
             let graph = self.ctx.trav.graph();
-            let node = graph.expect_vertex(index);
+            let node = graph.expect_vertex_data(index);
             //let entry = self.cache.entries.get(&index.index).unwrap();
             cleaned_position_splits(node.child_patterns().iter(), offset)
         });
@@ -72,7 +72,7 @@ impl<G: HasGraph> SplitTraceStatesCtx<G> {
     ) -> SplitPositionCache {
         let splits = {
             let graph = self.ctx.trav.graph();
-            let node = graph.expect_vertex(index);
+            let node = graph.expect_vertex_data(index);
             cleaned_position_splits(node.child_patterns().iter(), offset)
         };
 

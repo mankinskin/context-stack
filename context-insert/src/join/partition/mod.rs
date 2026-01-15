@@ -60,8 +60,8 @@ impl<R: RangeRole<Mode = Join>, P: InfoPartition<R>> JoinPartition<R> for P wher
 pub struct Join;
 
 impl ModeCtx for Join {
-    type NodeCtx<'a: 'b, 'b> = NodeJoinCtx<'a>;
-    type PatternResult<'a> = PatternJoinCtx<'a>;
+    type NodeCtx<'a> = NodeJoinCtx<'a>;
+    type PatternResult = PatternJoinCtx;
 }
 
 impl<R: RangeRole<Mode = Join>> ModeChildren<R> for Join {

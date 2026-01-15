@@ -27,14 +27,14 @@ use crate::{
 pub trait JoinBorders<R: RangeRole<Mode = Join>>: TraceBorders<R> {
     fn get_child_splits(
         &self,
-        ctx: &ModePatternCtxOf<'_, R>,
+        ctx: &PatternJoinCtx,
     ) -> Option<ModeChildrenOf<R>>;
 }
 
 impl JoinBorders<Post<Join>> for BorderInfo {
     fn get_child_splits(
         &self,
-        ctx: &PatternJoinCtx<'_>,
+        ctx: &PatternJoinCtx,
     ) -> Option<ChildrenOf<Post<Join>>> {
         self.inner_offset.map(|o| {
             ctx.splits
@@ -48,7 +48,7 @@ impl JoinBorders<Post<Join>> for BorderInfo {
 impl JoinBorders<Pre<Join>> for BorderInfo {
     fn get_child_splits(
         &self,
-        ctx: &PatternJoinCtx<'_>,
+        ctx: &PatternJoinCtx,
     ) -> Option<ChildrenOf<Pre<Join>>> {
         self.inner_offset.map(|o| {
             ctx.splits
@@ -62,7 +62,7 @@ impl JoinBorders<Pre<Join>> for BorderInfo {
 impl JoinBorders<In<Join>> for (BorderInfo, BorderInfo) {
     fn get_child_splits(
         &self,
-        ctx: &PatternJoinCtx<'_>,
+        ctx: &PatternJoinCtx,
     ) -> Option<ChildrenOf<In<Join>>> {
         tracing::debug!(
             pattern_len = ctx.pattern.len(),

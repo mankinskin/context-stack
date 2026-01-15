@@ -108,7 +108,7 @@ impl TraceRoot for PrefixRootCommand {
             index: self.root_exit.parent,
             pos: self.exit_pos,
         };
-        let exit_index = *ctx.trav.graph().expect_child_at(self.root_exit);
+        let exit_index = ctx.trav.graph().expect_child_at(self.root_exit);
         // key for exit index in root
         let exit = DownKey {
             index: exit_index,

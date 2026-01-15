@@ -60,20 +60,21 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         id: impl IntoPatternLocation,
         range: R,
-    ) -> Result<&[Token], ErrorReason> {
+    ) -> Result<Vec<Token>, ErrorReason> {
         let loc = id.into_pattern_location();
-        self.get_vertex(loc.parent)?
-            .get_child_pattern_range(&loc.pattern_id, range)
+        self.with_vertex(loc.parent, |vertex| {
+            vertex.get_child_pattern_range(&loc.pattern_id, range).map(|s| s.to_vec())
+        })?
     }
     #[track_caller]
     pub fn expect_pattern_range<R: PatternRangeIndex>(
         &self,
         id: impl IntoPatternLocation,
         range: R,
-    ) -> &[Token] {
+    ) -> Vec<Token> {
         let loc = id.into_pattern_location();
-        self.expect_vertex(loc.parent)
-            .expect_child_pattern_range(&loc.pattern_id, range)
+        self.expect_vertex_data(loc.parent)
+            .expect_child_pattern_range(&loc.pattern_id, range).to_vec()
     }
     /// get sub-vertex at range relative to index
     /// FIXME: can crash if range does not have an exact match in the root vertex
@@ -82,7 +83,7 @@ impl<G: GraphKind> Hypergraph<G> {
         vertex: impl HasVertexData,
         range: Range<usize>,
     ) -> Token {
-        let mut data = vertex.vertex(&self);
+        let mut data = vertex.vertex(&self).clone();
         let mut wrap = 0..data.width().0;
         assert!(wrap.start <= range.start && wrap.end >= range.end);
 
@@ -97,7 +98,7 @@ impl<G: GraphKind> Hypergraph<G> {
                 })
                 .unwrap();
 
-            data = self.expect_vertex(next.0);
+            data = self.expect_vertex_data(next.0);
             wrap = next.1;
         }
 

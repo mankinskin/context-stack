@@ -14,6 +14,7 @@ use crate::{
     SearchKind,
 };
 use context_trace::{
+    graph::vertex::data::VertexData,
     logging::format_utils::pretty,
     path::{
         accessors::child::HasRootedLeafToken,
@@ -115,9 +116,9 @@ pub trait StartFoldPath:
             // and it doesn't have children
             trace!("checking token vertex data in graph");
             if let Ok(vertex_data) =
-                trav.graph().get_vertex(token.vertex_index())
+                trav.graph().get_vertex_data(token.vertex_index())
             {
-                trace!(vertex_data = %pretty(vertex_data), "token vertex data");
+                trace!(vertex_data = %pretty::<VertexData>(&vertex_data), "token vertex data");
                 let child_patterns = vertex_data.child_patterns();
                 if child_patterns.is_empty() {
                     warn!(

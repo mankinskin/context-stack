@@ -72,6 +72,6 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         index: &impl HasVertexIndex,
     ) -> usize {
-        self.expect_vertex(index.vertex_index()).width().0
+        self.expect_vertex_data(index.vertex_index()).width().0
     }
 }

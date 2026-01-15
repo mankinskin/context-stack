@@ -37,7 +37,8 @@ impl SplitStates {
     ) {
         let (perfect, next) = {
             let graph = trav.graph();
-            let node = graph.expect_vertex(index);
+            let node = graph.expect_vertex_data(index);
+            let node = &node; // Take reference for use in closures
             pos_splits
                 .into_iter()
                 .flat_map(|(parent_offset, locs)| {

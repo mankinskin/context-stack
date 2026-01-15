@@ -68,7 +68,7 @@ impl<P: IntoPattern> From<P>
         }
     }
 }
-impl_root! { RootPattern for PatternRangePath<ChildLocation, ChildLocation>, self, _trav => PatternRoot::pattern_root_pattern(self) }
+impl_root! { RootPattern for PatternRangePath<ChildLocation, ChildLocation>, self, _trav => PatternRoot::pattern_root_pattern(self).clone() }
 impl_root! { PatternRoot for PatternRangePath<ChildLocation, ChildLocation>, self => self.root.borrow() }
 impl_root! { <Role: PathRole> PatternRoot for PatternRolePath<Role>, self => self.root.borrow() }
 

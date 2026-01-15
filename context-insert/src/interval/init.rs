@@ -26,10 +26,15 @@ impl From<Response> for InitInterval {
         }
     }
 }
-impl<'a, G: HasGraphMut + 'a> From<(&'a mut G, InitInterval)>
+
+/// Create IntervalGraph from a graph reference and InitInterval.
+/// 
+/// With interior mutability, we only need `&G` since graph mutations
+/// happen through per-vertex locks inside the graph.
+impl<'a, G: HasGraph + 'a> From<(&'a G, InitInterval)>
     for IntervalGraph
 {
-    fn from((trav, init): (&'a mut G, InitInterval)) -> Self {
+    fn from((trav, init): (&'a G, InitInterval)) -> Self {
         let InitInterval {
             root,
             cache,

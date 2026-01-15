@@ -97,7 +97,7 @@ where
     // Collect all vertices and their string representations
     for index in 0..graph.vertex_count() {
         let vertex_index = VertexIndex::from(index);
-        if graph.get_vertex(vertex_index).is_ok() {
+        if graph.get_vertex_data(vertex_index).is_ok() {
             let string_repr =
                 Hypergraph::<G>::index_string(graph, vertex_index);
             string_to_indices

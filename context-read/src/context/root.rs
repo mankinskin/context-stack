@@ -1,5 +1,3 @@
-use std::sync::RwLockWriteGuard;
-
 use context_insert::*;
 use context_trace::*;
 use derive_more::{
@@ -32,21 +30,20 @@ impl RootManager {
             },
             _ => {
                 if let Some(root) = &mut self.root {
-                    let mut graph = self.graph.graph_mut();
-                    let vertex = (*root).vertex(&graph);
+                    let vertex = (*root).vertex(&self.graph);
                     *root = if vertex.child_patterns().len() == 1
                         && vertex.parents().is_empty()
                     {
                         let (&pid, _) = vertex.expect_any_child_pattern();
-                        graph.append_to_pattern(*root, pid, new)
+                        self.graph.append_to_pattern(*root, pid, new)
                     } else {
                         // some old overlaps though
                         let new = new.into_pattern();
-                        graph
+                        self.graph
                             .insert_pattern([&[*root], new.as_slice()].concat())
                     };
                 } else {
-                    let c = self.graph_mut().insert_pattern(new);
+                    let c = self.graph.insert_pattern(new);
                     self.root = Some(c);
                 }
             },
@@ -59,16 +56,15 @@ impl RootManager {
     ) {
         let index = index.to_child();
         if let Some(root) = &mut self.root {
-            let mut graph = self.graph.graph_mut();
-            let vertex = (*root).vertex(&graph);
+            let vertex = (*root).vertex(&self.graph);
             *root = if index.vertex_index() != root.vertex_index()
                 && vertex.child_patterns().len() == 1
                 && vertex.parents().is_empty()
             {
                 let (&pid, _) = vertex.expect_any_child_pattern();
-                graph.append_to_pattern(*root, pid, index)
+                self.graph.append_to_pattern(*root, pid, index)
             } else {
-                graph.insert_pattern(vec![*root, index])
+                self.graph.insert_pattern(vec![*root, index])
             };
         } else {
             self.root = Some(index);
@@ -76,18 +72,14 @@ impl RootManager {
     }
 }
 
+// RootManager derefs to HypergraphRef, which implements HasGraph
 impl_has_graph! {
     impl for RootManager,
-    self => self.graph.write().unwrap();
-    <'a> RwLockWriteGuard<'a, Hypergraph>
+    self => &**self;
+    <'a> &'a Hypergraph
 }
 impl<R: InsertResult> ToInsertCtx<R> for RootManager {
     fn insert_context(&self) -> InsertCtx<R> {
         InsertCtx::from(self.graph.clone())
     }
-}
-impl_has_graph_mut! {
-    impl for RootManager,
-    self => self.graph.write().unwrap();
-    <'a> RwLockWriteGuard<'a, Hypergraph>
 }

@@ -22,15 +22,16 @@ use crate::{
 impl<G: GraphKind> Hypergraph<G> {
     /// Add pattern to existing node
     pub fn add_pattern_with_update(
-        &mut self,
+        &self,
         index: impl HasVertexIndex,
         pattern: Pattern,
     ) -> PatternId {
         let indices = pattern.into_pattern();
         let (width, indices, tokens) = self.to_width_indices_children(indices);
         let pattern_id = PatternId::default();
-        let data = self.expect_vertex_mut(index.vertex_index());
-        data.add_pattern_no_update(pattern_id, Pattern::from(tokens));
+        self.with_vertex_mut(index.vertex_index(), |data| {
+            data.add_pattern_no_update(pattern_id, Pattern::from(tokens));
+        }).expect("Vertex should exist");
         self.add_parents_to_pattern_nodes(
             indices,
             Token::new(index, width),
@@ -41,7 +42,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Add patterns to existing node
     pub fn add_patterns_with_update(
-        &mut self,
+        &self,
         index: impl HasVertexIndex,
         patterns: impl IntoIterator<Item = Pattern>,
     ) -> Vec<PatternId> {
@@ -53,7 +54,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
 
     pub fn insert_patterns_with_ids(
-        &mut self,
+        &self,
         patterns: impl IntoIterator<Item = Pattern>,
     ) -> (Token, Vec<PatternId>) {
         let patterns = patterns.into_iter().collect_vec();
@@ -70,7 +71,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Create new node from multiple patterns
     pub fn insert_patterns(
-        &mut self,
+        &self,
         patterns: impl IntoIterator<Item = impl IntoPattern>,
     ) -> Token {
         let patterns = patterns
@@ -98,7 +99,7 @@ impl<G: GraphKind> Hypergraph<G> {
 impl<G: GraphKind> Hypergraph<G> {
     #[track_caller]
     pub(crate) fn try_insert_patterns(
-        &mut self,
+        &self,
         patterns: impl IntoIterator<Item = Pattern>,
     ) -> Option<Token> {
         let patterns = patterns

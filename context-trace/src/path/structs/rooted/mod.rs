@@ -307,7 +307,7 @@ impl<EndNode> RootPattern
     fn root_pattern<'a: 'g, 'b: 'g, 'g, G: HasGraph + 'a>(
         &'b self,
         trav: &'g G::Guard<'a>,
-    ) -> &'g Pattern {
+    ) -> Pattern {
         self.root.root_pattern::<G>(trav)
     }
 }

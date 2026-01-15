@@ -1,9 +1,7 @@
 use crate::graph::{
     Hypergraph,
-    getters::{
-        ErrorReason,
-        vertex::VertexSet,
-    },
+    getters::ErrorReason,
+    getters::vertex::VertexSet,
     kind::GraphKind,
     vertex::{
         IndexPattern,
@@ -57,11 +55,8 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         atom: impl AsAtom<G::Atom>,
     ) -> Result<VertexIndex, ErrorReason> {
-        Ok(self
-            .graph
-            .get_index_of(&self.get_atom_key(atom.as_atom())?)
-            .unwrap()
-            .into())
+        let key = self.get_atom_key(atom.as_atom())?;
+        self.get_index_for_key(&key)
     }
     pub(crate) fn get_atom_key(
         &self,
@@ -69,7 +64,7 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> Result<VertexKey, ErrorReason> {
         self.atom_keys
             .get(&atom.as_atom())
-            .copied()
+            .map(|r| *r)
             .ok_or(ErrorReason::UnknownAtom)
     }
     pub(crate) fn to_atom_index_iter<'a>(
@@ -89,15 +84,8 @@ impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn get_atom_data(
         &self,
         atom: &Atom<G::Atom>,
-    ) -> Result<&VertexData, ErrorReason> {
-        self.get_vertex(self.get_atom_index(atom)?)
-    }
-    #[allow(dead_code)]
-    pub(crate) fn get_atom_data_mut(
-        &mut self,
-        atom: &Atom<G::Atom>,
-    ) -> Result<&mut VertexData, ErrorReason> {
-        self.get_vertex_mut(self.get_atom_index(atom)?)
+    ) -> Result<VertexData, ErrorReason> {
+        self.get_vertex_data(self.get_atom_index(atom)?)
     }
     #[allow(dead_code)]
     pub(crate) fn get_atom_child(

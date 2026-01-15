@@ -89,7 +89,7 @@ fn trace_ctx_prefix_traces_path_downward() {
 fn trace_ctx_range_demonstrates_basic_usage() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -120,7 +120,7 @@ fn trace_ctx_range_demonstrates_basic_usage() {
 fn path_append_and_trace_creates_nested_path() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],

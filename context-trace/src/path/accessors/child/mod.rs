@@ -36,7 +36,7 @@ pub trait HasLeafToken<R: PathRole>:
         trav: &G,
     ) -> Option<Token> {
         self.leaf_token_location()
-            .map(|loc| *trav.graph().expect_child_at(loc))
+            .map(|loc| trav.graph().expect_child_at(loc))
     }
 }
 

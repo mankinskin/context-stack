@@ -90,7 +90,7 @@ impl PathRaise for ParentState {
         // path raise is only called when path matches until end
         // avoid pointing path to the first token
         if !path.is_empty()
-            || TravDir::<G>::pattern_index_prev(prev_pattern, prev.sub_index)
+            || TravDir::<G>::pattern_index_prev(&prev_pattern, prev.sub_index)
                 .is_some()
         {
             path.path.push(prev);

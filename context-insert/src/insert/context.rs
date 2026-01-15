@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    sync::RwLockWriteGuard,
-};
+use std::fmt::Debug;
 
 use crate::{
     insert::result::ResultExtraction,
@@ -19,7 +16,6 @@ use context_search::{
     Searchable,
 };
 use context_trace::*;
-use std::sync::RwLockReadGuard;
 
 use crate::insert::result::InsertResult;
 
@@ -63,7 +59,8 @@ impl<R: InsertResult> InsertCtx<R> {
         ext: R::Extract,
         init: InitInterval,
     ) -> R {
-        let interval = IntervalGraph::from((&mut self.graph.graph_mut(), init));
+        // With interior mutability, we just pass a reference to the graph
+        let interval = IntervalGraph::from((&*self.graph, init));
         let mut ctx =
             FrontierSplitIterator::from((self.graph.clone(), interval));
         let joined = ctx.find_map(|joined| joined).unwrap();
@@ -102,13 +99,10 @@ impl<R: InsertResult> InsertCtx<R> {
         self.insert_result(searchable).map_err(|err| err.reason)
     }
 }
+
+// With interior mutability, HypergraphRef (Arc<Hypergraph>) just derefs to &Hypergraph
 impl_has_graph! {
     impl<R: InsertResult> for InsertCtx<R>,
-    self => self.graph.read().unwrap();
-    <'a> RwLockReadGuard<'a, Hypergraph>
-}
-impl_has_graph_mut! {
-    impl<R: InsertResult> for InsertCtx<R>,
-    self => self.graph.write().unwrap();
-    <'a> RwLockWriteGuard<'a, Hypergraph>
+    self => &*self.graph;
+    <'a> &'a Hypergraph
 }

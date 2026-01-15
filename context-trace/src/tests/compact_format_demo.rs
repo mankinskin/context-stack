@@ -10,7 +10,7 @@ fn test_compact_formatting() {
     let _tracing = init_test_tracing!();
 
     // Create a simple graph
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c],
@@ -61,7 +61,7 @@ fn test_compact_formatting() {
 fn test_compact_with_token_display() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {x, y, z});
     insert_patterns!(graph,
         (_xyz, xyz_id) => [x, y, z]

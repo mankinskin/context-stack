@@ -1,7 +1,12 @@
 use std::sync::{
     Arc,
-    RwLock,
+    atomic::{
+        AtomicUsize,
+        Ordering,
+    },
 };
+
+use dashmap::DashMap;
 
 use crate::{
     HashMap,
@@ -15,6 +20,7 @@ use crate::{
             GraphKind,
         },
         vertex::{
+            VertexEntry,
             data::VertexData,
             key::VertexKey,
         },
@@ -46,10 +52,12 @@ pub mod vertex;
 #[cfg(any(test, feature = "test-api"))]
 pub mod test_graph;
 
+/// Thread-safe reference to a Hypergraph.
+///
+/// Uses `Arc<Hypergraph>` with interior mutability (per-vertex RwLocks via DashMap).
+/// All methods can be called with `&self` - no need for `.read()` or `.write()`.
 #[derive(Debug, Clone, Default)]
-pub struct HypergraphRef<G: GraphKind = BaseGraphKind>(
-    pub Arc<RwLock<Hypergraph<G>>>,
-);
+pub struct HypergraphRef<G: GraphKind = BaseGraphKind>(pub Arc<Hypergraph<G>>);
 
 impl<G: GraphKind> HypergraphRef<G> {
     pub fn new(g: Hypergraph<G>) -> Self {
@@ -59,20 +67,14 @@ impl<G: GraphKind> HypergraphRef<G> {
 
 impl<G: GraphKind> From<Hypergraph<G>> for HypergraphRef<G> {
     fn from(g: Hypergraph<G>) -> Self {
-        Self(Arc::new(RwLock::new(g)))
+        Self(Arc::new(g))
     }
 }
 
 impl<G: GraphKind> std::ops::Deref for HypergraphRef<G> {
-    type Target = Arc<RwLock<Hypergraph<G>>>;
+    type Target = Hypergraph<G>;
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl<G: GraphKind> std::ops::DerefMut for HypergraphRef<G> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -88,42 +90,81 @@ impl<G: GraphKind> AsMut<Self> for Hypergraph<G> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// A hypergraph data structure with concurrent per-vertex access.
+///
+/// Uses `DashMap` for the vertex storage with per-vertex `RwLock`s,
+/// enabling concurrent reads during writes to other vertices.
+#[derive(Debug)]
 pub struct Hypergraph<G: GraphKind = BaseGraphKind> {
-    graph: indexmap::IndexMap<VertexKey, VertexData>,
-    atoms: indexmap::IndexMap<VertexKey, Atom<G::Atom>>,
-    atom_keys: indexmap::IndexMap<Atom<G::Atom>, VertexKey>,
+    /// Lock-free vertex ID counter
+    next_id: AtomicUsize,
+    /// Concurrent vertex storage with per-vertex locking
+    graph: DashMap<VertexKey, VertexEntry>,
+    /// Bidirectional key<->index mappings
+    key_to_index: DashMap<VertexKey, VertexIndex>,
+    index_to_key: DashMap<VertexIndex, VertexKey>,
+    /// Atom data (indexed by key)
+    atoms: DashMap<VertexKey, Atom<G::Atom>>,
+    /// Reverse lookup: atom value -> key
+    atom_keys: DashMap<Atom<G::Atom>, VertexKey>,
     _ty: std::marker::PhantomData<G>,
 }
+
 impl<G: GraphKind> Clone for Hypergraph<G> {
     fn clone(&self) -> Self {
+        // Clone all entries from DashMaps
+        let graph = DashMap::new();
+        for entry in self.graph.iter() {
+            graph.insert(*entry.key(), VertexEntry::new(entry.value().clone_data()));
+        }
+        let key_to_index = DashMap::new();
+        for entry in self.key_to_index.iter() {
+            key_to_index.insert(*entry.key(), *entry.value());
+        }
+        let index_to_key = DashMap::new();
+        for entry in self.index_to_key.iter() {
+            index_to_key.insert(*entry.key(), *entry.value());
+        }
+        let atoms = DashMap::new();
+        for entry in self.atoms.iter() {
+            atoms.insert(*entry.key(), entry.value().clone());
+        }
+        let atom_keys = DashMap::new();
+        for entry in self.atom_keys.iter() {
+            atom_keys.insert(entry.key().clone(), *entry.value());
+        }
         Self {
-            graph: self.graph.clone(),
-            atoms: self.atoms.clone(),
-            atom_keys: self.atom_keys.clone(),
-            //pattern_id_count: self.pattern_id_count.load(Ordering::SeqCst).clone().into(),
-            //vertex_id_count: self.vertex_id_count.load(Ordering::SeqCst).clone().into(),
+            next_id: AtomicUsize::new(self.next_id.load(Ordering::SeqCst)),
+            graph,
+            key_to_index,
+            index_to_key,
+            atoms,
+            atom_keys,
             _ty: self._ty,
         }
     }
 }
+
 impl<G: GraphKind> PartialEq for Hypergraph<G> {
     fn eq(
         &self,
         other: &Self,
     ) -> bool {
-        self.graph.eq(&other.graph)
-            && self.atoms.eq(&other.atoms)
-            && self.atom_keys.eq(&other.atom_keys)
-            //&& self
-            //    .pattern_id_count
-            //    .load(Ordering::SeqCst)
-            //    .eq(&other.pattern_id_count.load(Ordering::SeqCst))
-            //&& self
-            //    .vertex_id_count
-            //    .load(Ordering::SeqCst)
-            //    .eq(&other.vertex_id_count.load(Ordering::SeqCst))
-            && self._ty.eq(&other._ty)
+        if self.graph.len() != other.graph.len() {
+            return false;
+        }
+        // Compare all entries
+        for entry in self.graph.iter() {
+            match other.graph.get(entry.key()) {
+                Some(other_entry) => {
+                    if *entry.value().read() != *other_entry.read() {
+                        return false;
+                    }
+                }
+                None => return false,
+            }
+        }
+        true
     }
 }
 impl<G: GraphKind> Eq for Hypergraph<G> {}
@@ -131,11 +172,12 @@ impl<G: GraphKind> Eq for Hypergraph<G> {}
 impl<G: GraphKind> Default for Hypergraph<G> {
     fn default() -> Self {
         Self {
-            graph: indexmap::IndexMap::default(),
-            atoms: indexmap::IndexMap::default(),
-            atom_keys: indexmap::IndexMap::default(),
-            //pattern_id_count: AtomicUsize::new(0),
-            //vertex_id_count: AtomicUsize::new(0),
+            next_id: AtomicUsize::new(0),
+            graph: DashMap::new(),
+            key_to_index: DashMap::new(),
+            index_to_key: DashMap::new(),
+            atoms: DashMap::new(),
+            atom_keys: DashMap::new(),
             _ty: Default::default(),
         }
     }
@@ -151,55 +193,12 @@ impl<G: GraphKind> Hypergraph<G> {
     pub fn vertex_count(&self) -> usize {
         self.graph.len()
     }
-    //pub(crate) fn next_vertex_id(&mut self) -> vertex::VertexIndex {
-    //    self.vertex_id_count.fetch_add(1, atomic::Ordering::SeqCst)
-    //}
-    //pub(crate) fn next_pattern_id(&mut self) -> PatternId {
-    //    self.pattern_id_count.fetch_add(1, atomic::Ordering::SeqCst)
-    //}
-    //pub(crate) fn index_sequence<N: Into<G>, I: IntoIterator<Item = N>>(&mut self, seq: I) -> VertexIndex {
-    //    let seq = seq.into_iter();
-    //    let atoms = T::atomize(seq);
-    //    let pattern = self.to_atom_children(atoms);
-    //    self.insert_pattern(&pattern[..])
-    //}
-    //pub(crate) fn insert_atom_indices(
-    //    &self,
-    //    index: impl ToToken,
-    //) -> Vec<VertexIndex> {
-    //    if index.width() == 1 {
-    //        vec![index.vertex_index()]
-    //    } else {
-    //        let data = self.expect_vertex(index);
-    //        assert!(!data.tokens.is_empty());
-    //        data.tokens
-    //            .values()
-    //            .search(None, |acc, p| {
-    //                let exp = self.pattern_atom_indices(p.borrow());
-    //                acc.map(|acc| {
-    //                    assert_eq!(acc, exp);
-    //                    acc
-    //                })
-    //                .or(Some(exp.clone()))
-    //            })
-    //            .unwrap()
-    //    }
-    //}
-    //pub(crate) fn pattern_atom_indices(
-    //    &self,
-    //    pattern: impl IntoPattern,
-    //) -> Vec<VertexIndex> {
-    //    pattern
-    //        .into_iter()
-    //        .flat_map(|c| self.insert_atom_indices(c))
-    //        .collect_vec()
-    //}
     pub fn validate_expansion(
         &self,
         index: impl HasVertexIndex,
     ) {
         //let root = index.index();
-        let data = self.expect_vertex(index.vertex_index());
+        let data = self.expect_vertex_data(index.vertex_index());
         data.children.iter().fold(
             Vec::new(),
             |mut acc: Vec<vertex::VertexIndex>, (_pid, p)| {
@@ -266,8 +265,9 @@ where
     }
 
     pub fn to_node_child_strings(&self) -> TokenStrings {
-        let nodes = self.graph.iter().map(|(_, data)| {
-            (self.vertex_data_string(data), data.to_pattern_strings(self))
+        let nodes = self.graph.iter().map(|entry| {
+            let data = entry.value().clone_data();
+            (self.vertex_data_string(data.clone()), data.to_pattern_strings(self))
         });
         TokenStrings::from_nodes(nodes)
     }
@@ -279,7 +279,7 @@ where
         let nodes = pattern.into_pattern().into_iter().map(|token| {
             (
                 self.index_string(token.vertex_index()),
-                self.expect_vertex(token.vertex_index())
+                self.expect_vertex_data(token.vertex_index())
                     .to_pattern_strings(self),
             )
         });
@@ -324,14 +324,14 @@ where
     pub(crate) fn get_atom_by_key(
         &self,
         key: &VertexKey,
-    ) -> Option<&Atom<G::Atom>> {
-        self.atoms.get(key)
+    ) -> Option<Atom<G::Atom>> {
+        self.atoms.get(key).map(|r| r.clone())
     }
     #[allow(dead_code)]
     pub(crate) fn expect_atom_by_key(
         &self,
         key: &VertexKey,
-    ) -> &Atom<G::Atom> {
+    ) -> Atom<G::Atom> {
         self.get_atom_by_key(key)
             .expect("Key does not belong to an atom!")
     }
@@ -340,11 +340,11 @@ where
         &self,
         key: &VertexKey,
     ) -> String {
-        self.vertex_data_string(self.expect_vertex(key))
+        self.vertex_data_string(self.expect_vertex_data(key))
     }
     pub fn vertex_data_string(
         &self,
-        data: &VertexData,
+        data: VertexData,
     ) -> String {
         #[cfg(any(test, feature = "test-api"))]
         {
@@ -378,7 +378,7 @@ where
         &self,
         index: impl HasVertexIndex,
     ) -> String {
-        let data = self.expect_vertex(index.vertex_index());
+        let data = self.expect_vertex_data(index.vertex_index());
         self.vertex_data_string(data)
     }
 }

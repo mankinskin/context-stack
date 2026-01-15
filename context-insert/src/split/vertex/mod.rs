@@ -227,9 +227,9 @@ impl VertexSplitCtx<'_> {
     ) -> N::CompleteSplitOutput {
         let graph = trav.graph();
 
-        let node = graph.expect_vertex(self.index);
+        let node = graph.expect_vertex_data(self.index);
 
-        let output = self.global_splits::<N>(end_pos, node);
+        let output = self.global_splits::<N>(end_pos, &node);
 
         N::map(output, |global_splits| {
             global_splits

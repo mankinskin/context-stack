@@ -68,7 +68,7 @@ pub trait PathBorder {
         let graph = trav.graph();
         let pattern = graph.expect_pattern_at(location);
         <Self::BorderDirection as PatternDirection>::pattern_index_next(
-            pattern,
+            &pattern,
             location.sub_index,
         )
         .is_none()

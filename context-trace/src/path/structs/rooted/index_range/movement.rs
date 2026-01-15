@@ -56,7 +56,7 @@ impl<EndNode: PathNode> MoveRootIndex<Right, End>
         let pattern = self.root_pattern::<G>(&graph);
         let current_index = HasRootChildIndex::<End>::root_child_index(self);
         if let Some(next) =
-            TravDir::<G>::pattern_index_next(pattern, current_index)
+            TravDir::<G>::pattern_index_next(&pattern, current_index)
         {
             tracing::debug!(
                 "IndexRangePath::move_root_index - advancing end.root_entry from {} to {}",
@@ -81,7 +81,7 @@ impl<EndNode: PathNode> MoveRootIndex<Left, End>
         let graph = trav.graph();
         let pattern = self.root_pattern::<G>(&graph);
         if let Some(prev) = TravDir::<G>::pattern_index_prev(
-            pattern,
+            &pattern,
             HasRootChildIndex::<End>::root_child_index(self),
         ) {
             *self.root_child_index_mut() = prev;

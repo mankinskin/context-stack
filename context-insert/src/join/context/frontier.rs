@@ -68,11 +68,15 @@ impl Iterator for FrontierSplitIterator {
                 }
                 None
             },
-            Some(None) => None,
-            None => Some(
-                self.node(self.frontier.interval.root)
-                    .join_root_partitions(),
-            ),
+            Some(None) => {
+                None
+            },
+            None => {
+                Some(
+                    self.node(self.frontier.interval.root)
+                        .join_root_partitions(),
+                )
+            },
         })
     }
 }

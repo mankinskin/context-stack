@@ -106,7 +106,7 @@ impl MoveLeaf<Right> for ChildLocation {
         let graph = trav.graph();
         let pattern = graph.expect_pattern_at(*self);
         if let Some(next) =
-            TravDir::<G>::pattern_index_next(pattern, self.sub_index)
+            TravDir::<G>::pattern_index_next(&pattern, self.sub_index)
         {
             self.sub_index = next;
             ControlFlow::Continue(())
@@ -123,7 +123,7 @@ impl MoveLeaf<Left> for ChildLocation {
         let graph = trav.graph();
         let pattern = graph.expect_pattern_at(*self);
         if let Some(prev) =
-            TravDir::<G>::pattern_index_prev(pattern, self.sub_index)
+            TravDir::<G>::pattern_index_prev(&pattern, self.sub_index)
         {
             self.sub_index = prev;
             ControlFlow::Continue(())

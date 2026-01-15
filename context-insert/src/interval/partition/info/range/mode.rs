@@ -44,21 +44,22 @@ impl<R: RangeRole<Mode = Self>> ModeInfo<R> for Trace {
     type PatternInfo = TraceRangeInfo<R>;
 }
 
+/// Mode context trait for pattern operations.
+/// 
+/// Uses GATs (Generic Associated Types) to allow contexts to have lifetimes
+/// while the trait itself doesn't require them upfront.
 pub trait ModeCtx {
-    type NodeCtx<'a: 'b, 'b>: AsNodeTraceCtx
-        + GetPatternCtx<PatternCtx<'b> = Self::PatternResult<'b>>
+    type NodeCtx<'a>: AsNodeTraceCtx
+        + GetPatternCtx<PatternCtx = Self::PatternResult>
         + GetPatternTraceCtx
-        + 'b
     where
         Self: 'a;
-    type PatternResult<'a>: HasPatternTraceCtx + Hash + Eq
-    where
-        Self: 'a;
+    type PatternResult: HasPatternTraceCtx + Hash + Eq + Clone;
 }
 
 impl ModeCtx for Trace {
-    type NodeCtx<'a: 'b, 'b> = NodeTraceCtx<'b>;
-    type PatternResult<'a> = PatternTraceCtx<'a>;
+    type NodeCtx<'a> = NodeTraceCtx;
+    type PatternResult = PatternTraceCtx;
 }
 
 pub trait ModeChildren<R: RangeRole> {

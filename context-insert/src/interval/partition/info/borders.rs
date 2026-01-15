@@ -23,7 +23,7 @@ pub struct PartitionBorders<R: RangeRole, C: PartitionBorderKey = PatternId> {
     pub perfect: R::Perfect,
 }
 
-impl<R: RangeRole> PartitionBorders<R, ModePatternCtxOf<'_, R>> {
+impl<R: RangeRole> PartitionBorders<R, ModePatternCtxOf<R>> {
     pub fn into_partition_info(self) -> Result<PartitionInfo<R>, Token> {
         let perfect = self.perfect;
         let patterns: Result<_, _> = self

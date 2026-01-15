@@ -65,16 +65,20 @@ use crate::{
 };
 use context_trace::*;
 
+/// Context for locked frontier operations during join.
+/// 
+/// With interior mutability, we only need `&Hypergraph` - mutations happen
+/// through per-vertex locks inside the graph.
 #[derive(Debug)]
 pub struct LockedFrontierCtx<'a> {
-    pub trav: <HypergraphRef as HasGraphMut>::GuardMut<'a>,
+    pub trav: &'a Hypergraph,
     pub interval: &'a IntervalGraph,
     pub splits: &'a SplitMap,
 }
 impl<'a> LockedFrontierCtx<'a> {
     pub fn new(ctx: &'a mut FrontierSplitIterator) -> Self {
         Self {
-            trav: ctx.trav.graph_mut(),
+            trav: &*ctx.trav,
             interval: &ctx.frontier.interval,
             splits: &ctx.splits,
         }
@@ -99,51 +103,40 @@ impl<'a> NodeJoinCtx<'a> {
         }
     }
 }
-impl<'a> AsNodeTraceCtx for NodeJoinCtx<'a> {
-    fn as_trace_context<'t>(&'t self) -> NodeTraceCtx<'t>
-    where
-        Self: 't,
-        'a: 't,
-    {
+impl AsNodeTraceCtx for NodeJoinCtx<'_> {
+    fn as_trace_context(&self) -> NodeTraceCtx {
         NodeTraceCtx::new(self.patterns(), self.borrow().index)
     }
 }
 impl GetPatternTraceCtx for NodeJoinCtx<'_> {
-    fn get_pattern_trace_context<'c>(
-        &'c self,
+    fn get_pattern_trace_context(
+        &self,
         pattern_id: &PatternId,
-    ) -> PatternTraceCtx<'c>
-    where
-        Self: 'c,
-    {
+    ) -> PatternTraceCtx {
         PatternTraceCtx::new(
             self.index.to_pattern_location(*pattern_id),
-            self.as_trace_context().patterns.get(pattern_id).unwrap(),
+            self.as_trace_context().patterns.get(pattern_id).unwrap().clone(),
         )
     }
 }
 impl GetPatternCtx for NodeJoinCtx<'_> {
-    type PatternCtx<'c>
-        = PatternJoinCtx<'c>
-    where
-        Self: 'c;
+    type PatternCtx = PatternJoinCtx;
 
-    fn get_pattern_context<'c>(
-        &'c self,
+    fn get_pattern_context(
+        &self,
         pattern_id: &PatternId,
-    ) -> Self::PatternCtx<'c>
-    where
-        Self: 'c,
-    {
+    ) -> Self::PatternCtx {
         let ctx = self.get_pattern_trace_context(pattern_id);
         PatternJoinCtx {
             ctx,
-            splits: self.splits,
+            splits: self.splits.clone(),
         }
     }
 }
 impl NodeJoinCtx<'_> {
-    pub fn patterns(&self) -> &ChildPatterns {
+    /// Get the child patterns for the current node.
+    /// Returns owned data since graph access returns owned values now.
+    pub fn patterns(&self) -> ChildPatterns {
         self.ctx.trav.expect_child_patterns(self.index)
     }
 }
@@ -265,7 +258,8 @@ impl NodeJoinCtx<'_> {
                         rp_brd.start_offset.unwrap().get() + *lc.width(),
                     )
                     .unwrap();
-                    (position_splits(self.patterns(), outer_offset), li)
+                    let patterns = self.patterns();
+                    (position_splits(patterns.iter(), outer_offset), li)
                 };
                 let ri = roffset.1.pattern_splits[&rp].sub_index();
 
@@ -321,7 +315,8 @@ impl NodeJoinCtx<'_> {
                         lp_brd.start_offset.unwrap().get() + *rc.width(),
                     )
                     .unwrap();
-                    (position_splits(self.patterns(), outer_offset), ri)
+                    let patterns = self.patterns();
+                    (position_splits(patterns.iter(), outer_offset), ri)
                 };
 
                 let li = loffset.1.pattern_splits[&lp].sub_index();

@@ -121,7 +121,7 @@ macro_rules! rooted_path {
 
 #[test]
 fn test_rooted_path_macro_range() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph, (abc, abc_id) => [a, b, c]);
 
@@ -175,7 +175,7 @@ fn test_rooted_path_macro_range() {
 
 #[test]
 fn test_rooted_path_macro_single_role() {
-    let mut graph = HypergraphRef::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph, (abc, abc_id) => [a, b, c]);
 

@@ -54,13 +54,13 @@ where
         "getting prefix_children"
     );
     let prefix_children =
-        trav.graph().expect_vertex(leaf).prefix_children::<G>();
+        trav.graph().expect_vertex_data(leaf).prefix_children::<G>();
     debug!(num_children = prefix_children.len(), "got prefix_children");
 
     let result = prefix_children
         .iter()
-        .sorted_unstable_by(|a, b| b.token().width().cmp(&a.token().width()))
-        .map(|sub| {
+        .sorted_unstable_by(|a: &&SubToken, b: &&SubToken| b.token().width().cmp(&a.token().width()))
+        .map(|sub: &SubToken| {
             let child_location = leaf.to_child_location(*sub.sub_location());
             let next_state = update_state(sub.clone(), child_location);
             (sub.clone(), next_state)
@@ -103,7 +103,7 @@ impl PrefixStates for ChildState<PositionAnnotated<ChildLocation>> {
             self.path.end_path().last().map(|annotated| annotated.node);
 
         let leaf = if let Some(loc) = leaf_location {
-            *trav.graph().expect_child_at(loc)
+            trav.graph().expect_child_at(loc)
         } else {
             // If path is empty, use root child
             self.path.role_root_child_token::<End, _>(trav)
@@ -144,12 +144,12 @@ where
             "getting prefix_children"
         );
         let prefix_children =
-            trav.graph().expect_vertex(leaf).prefix_children::<G>();
+            trav.graph().expect_vertex_data(leaf).prefix_children::<G>();
         debug!(num_children = prefix_children.len(), "got prefix_children");
 
         let sorted_children: Vec<_> = prefix_children
             .iter()
-            .sorted_unstable_by(|a, b| {
+            .sorted_unstable_by(|a: &&SubToken, b: &&SubToken| {
                 b.token().width().cmp(&a.token().width())
             })
             .collect();

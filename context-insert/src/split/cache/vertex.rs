@@ -67,7 +67,7 @@ impl SplitVertexCache {
             for start in 0..num_offsets - len + 1 {
                 let part = self
                     .offset_range_partition::<In<Trace>>(start..start + len);
-                let (splits, next) = Self::add_inner_offsets(ctx, part);
+                let (splits, next) = Self::add_inner_offsets(ctx.clone(), part);
                 self.positions.extend(splits);
                 states.extend(next);
             }
@@ -84,11 +84,11 @@ impl SplitVertexCache {
         // First add inner offsets for the target partition
         let (splits, next) = match root_mode {
             RootMode::Infix => Self::add_inner_offsets(
-                ctx,
+                ctx.clone(),
                 OffsetIndexRange::<In<Trace>>::get_splits(&(0..1), self),
             ),
             RootMode::Prefix => Self::add_inner_offsets::<Pre<Trace>, _>(
-                ctx,
+                ctx.clone(),
                 OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self),
             ),
             RootMode::Postfix => {
@@ -97,7 +97,7 @@ impl SplitVertexCache {
                     eprintln!("    split_pos={}, cache={:?}", split_pos, self.positions[&split_pos]);
                 }
                 Self::add_inner_offsets::<Post<Trace>, _>(
-                    ctx,
+                    ctx.clone(),
                     OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self),
                 )
             },
@@ -110,8 +110,8 @@ impl SplitVertexCache {
 
         // Then add wrapper offsets for Prefix/Postfix modes
         let wrapper_splits = match root_mode {
-            RootMode::Prefix => self.add_wrapper_offsets_prefix(ctx),
-            RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx),
+            RootMode::Prefix => self.add_wrapper_offsets_prefix(ctx.clone()),
+            RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx.clone()),
             RootMode::Infix => BTreeMap::new(), // Infix handles wrappers differently
         };
         eprintln!("  After add_wrapper_offsets: {} splits added", wrapper_splits.len());
@@ -137,12 +137,10 @@ impl SplitVertexCache {
         range.get_splits(self).to_partition()
     }
     pub fn inner_offsets<
-        'a: 't,
-        't,
         R: RangeRole<Mode = Trace>,
         P: ToPartition<R>,
     >(
-        ctx: NodeTraceCtx<'a>,
+        ctx: NodeTraceCtx,
         part: P,
     ) -> Vec<NonZeroUsize> {
         part.info_partition(&ctx)
@@ -150,9 +148,9 @@ impl SplitVertexCache {
                 //let merges = range_map.range_sub_merges(start..start + len);
                 bundle.patterns.into_iter().flat_map(|(_pid, info)|
                     info.inner_range.map(|range| {
-                        let splits = range.offsets.as_splits(ctx);
+                        let splits = range.offsets.as_splits(ctx.clone());
                         Self::inner_offsets(
-                            ctx,
+                            ctx.clone(),
                             splits,
                         )
                     })
@@ -162,12 +160,10 @@ impl SplitVertexCache {
             .unwrap_or_default()
     }
     pub fn add_inner_offsets<
-        'a: 't,
-        't,
         K: RangeRole<Mode = Trace>,
         P: ToPartition<K>,
     >(
-        ctx: NodeTraceCtx<'a>,
+        ctx: NodeTraceCtx,
         part: P,
     ) -> (
         BTreeMap<NonZeroUsize, SplitPositionCache>,
@@ -175,14 +171,14 @@ impl SplitVertexCache {
     )
 //where K::Mode: ModeChildren::<K>,
     {
-        let offsets = Self::inner_offsets(ctx, part);
+        let offsets = Self::inner_offsets(ctx.clone(), part);
         let splits: BTreeMap<_, _> = offsets
             .into_iter()
             .map(|offset| {
                 (
                     offset,
                     SplitPositionCache::root(position_splits(
-                        ctx.patterns,
+                        ctx.patterns.iter(),
                         offset,
                     )),
                 )
@@ -255,7 +251,7 @@ impl SplitVertexCache {
                         wrapper_splits.insert(
                             wrapper_pos,
                             SplitPositionCache::root(position_splits(
-                                ctx.patterns,
+                                ctx.patterns.iter(),
                                 wrapper_pos,
                             )),
                         );
@@ -274,7 +270,7 @@ impl SplitVertexCache {
                             wrapper_splits.insert(
                                 intermediate_pos,
                                 SplitPositionCache::root(position_splits(
-                                    ctx.patterns,
+                                    ctx.patterns.iter(),
                                     intermediate_pos,
                                 )),
                             );
@@ -302,7 +298,7 @@ impl SplitVertexCache {
                         wrapper_splits.insert(
                             target_inner_pos,
                             SplitPositionCache::root(position_splits(
-                                ctx.patterns,
+                                ctx.patterns.iter(),
                                 target_inner_pos,
                             )),
                         );
@@ -353,7 +349,7 @@ impl SplitVertexCache {
                         wrapper_splits.insert(
                             wrapper_pos,
                             SplitPositionCache::root(position_splits(
-                                ctx.patterns,
+                                ctx.patterns.iter(),
                                 wrapper_pos,
                             )),
                         );

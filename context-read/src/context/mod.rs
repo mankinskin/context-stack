@@ -1,6 +1,5 @@
 pub mod has_read_context;
 pub mod root;
-use std::sync::RwLockWriteGuard;
 
 use context_insert::*;
 use context_trace::*;
@@ -39,11 +38,11 @@ impl Iterator for ReadCtx {
 }
 impl ReadCtx {
     pub fn new(
-        mut graph: HypergraphRef,
+        graph: HypergraphRef,
         seq: impl ToNewAtomIndices,
     ) -> Self {
         debug!("New ReadCtx");
-        let new_indices = seq.to_new_Atom_indices(&mut graph.graph_mut());
+        let new_indices = seq.to_new_Atom_indices(&graph);
         Self {
             blocks: BlockIter::new(new_indices),
             root: RootManager::new(graph),
@@ -106,18 +105,14 @@ impl ReadCtx {
     //}
 }
 
+// ReadCtx derefs to RootManager which derefs to HypergraphRef
 impl_has_graph! {
     impl for ReadCtx,
-    self => self.graph.write().unwrap();
-    <'a> RwLockWriteGuard<'a, Hypergraph>
+    self => &***self;  // ReadCtx -> RootManager -> HypergraphRef -> Hypergraph
+    <'a> &'a Hypergraph
 }
 impl<R: InsertResult> ToInsertCtx<R> for ReadCtx {
     fn insert_context(&self) -> InsertCtx<R> {
         InsertCtx::from(self.graph.clone())
     }
-}
-impl_has_graph_mut! {
-    impl for ReadCtx,
-    self => self.graph.write().unwrap();
-    <'a> RwLockWriteGuard<'a, Hypergraph>
 }

@@ -38,7 +38,7 @@ macro_rules! expect_atoms {
 macro_rules! insert_atoms {
     ($graph:ident, {$($name:ident),*}) => {
         use itertools::Itertools;
-        let ($($name),*) = $crate::trace::has_graph::HasGraphMut::graph_mut(&mut $graph)
+        let ($($name),*) = $graph
             .insert_atoms([
                 $(
                     $crate::graph::vertex::atom::Atom::Element($crate::charify::charify!($name))

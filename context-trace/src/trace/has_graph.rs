@@ -1,12 +1,6 @@
-use std::{
-    ops::{
-        Deref,
-        DerefMut,
-    },
-    sync::{
-        RwLockReadGuard,
-        RwLockWriteGuard,
-    },
+use std::ops::{
+    Deref,
+    DerefMut,
 };
 
 use crate::graph::{
@@ -77,22 +71,12 @@ macro_rules! impl_has_graph_mut {
 pub use impl_has_graph;
 pub use impl_has_graph_mut;
 
+// HypergraphRef is now Arc<Hypergraph> with interior mutability
+// We just deref to get &Hypergraph
 impl_has_graph! {
-    impl for RwLockReadGuard<'_, Hypergraph>,
-    self => self; <'a> &'a Hypergraph
+    impl for HypergraphRef, self => &**self;
+    <'a> &'a Hypergraph
 }
-impl_has_graph! {
-    impl for RwLockWriteGuard<'_, Hypergraph>,
-    self => &**self; <'a> &'a Hypergraph
-}
-impl_has_graph! {
-    impl for HypergraphRef, self => self.read().unwrap();
-    <'a> RwLockReadGuard<'a, Hypergraph>
-}
-
-//impl_has_graph! {
-//    impl<G: GraphKind> for Hypergraph<G>, self => self; <'g> &'g Self
-//}
 
 impl<G: GraphKind> HasGraph for Hypergraph<G> {
     type Kind = G;
@@ -104,6 +88,7 @@ impl<G: GraphKind> HasGraph for Hypergraph<G> {
         self
     }
 }
+
 pub trait HasGraphMut: HasGraph {
     type GuardMut<'a>: HasGraphMut<Kind = Self::Kind>
         + Deref<Target = Hypergraph<Self::Kind>>
@@ -126,9 +111,8 @@ impl<T: HasGraphMut> HasGraphMut for &mut T {
 impl_has_graph_mut! {
     impl for Hypergraph, self => self; <'a> &'a mut Self
 }
-impl_has_graph_mut! {
-    impl for RwLockWriteGuard<'_, Hypergraph>, self => &mut **self; <'a> &'a mut Hypergraph
-}
-impl_has_graph_mut! {
-    impl for HypergraphRef, self => self.write().unwrap(); <'a> RwLockWriteGuard<'a, Hypergraph>
-}
+
+// HypergraphRef with interior mutability doesn't need mutable access
+// for graph mutations - they happen through &self now
+// But we still implement HasGraphMut for compatibility, using &Hypergraph
+// Note: This works because all mutations now use interior mutability (per-vertex locks)

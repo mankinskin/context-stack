@@ -3,23 +3,23 @@
 //! This module implements root node joining by reusing the intermediary merge algorithm
 //! with protection of non-participating ranges.
 
-use std::ops::Range;
-use std::borrow::Borrow;
+use std::{
+    borrow::Borrow,
+    ops::Range,
+};
 
 use derive_new::new;
 
 use crate::{
-    join::{
-        context::node::{
-            context::NodeJoinCtx,
-            merge::RangeMap,
-        },
+    TokenTracePositions,
+    join::context::node::{
+        context::NodeJoinCtx,
+        merge::RangeMap,
     },
     split::{
         cache::vertex::SplitVertexCache,
         vertex::output::RootMode,
     },
-    TokenTracePositions,
 };
 use context_trace::*;
 use tracing::{
@@ -53,16 +53,15 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         // Determine partition range based on root_mode
         // This controls which initial partitions to create (with protection)
         let partition_range = match root_mode {
-            RootMode::Prefix => 0..num_offsets,     // Prefix + infixes (no postfix)
+            RootMode::Prefix => 0..num_offsets, // Prefix + infixes (no postfix)
             RootMode::Postfix => 1..num_offsets + 1, // Infixes + postfix (no prefix)
-            RootMode::Infix => 1..num_offsets,       // Infixes only (no prefix/postfix)
+            RootMode::Infix => 1..num_offsets, // Infixes only (no prefix/postfix)
         };
 
         debug!(
             ?partition_range,
             "Protection strategy - partition range for initial partitions"
         );
-
         // Get initial partitions using shared function
         let partitions = super::shared::create_initial_partitions(
             self.ctx,
@@ -91,7 +90,11 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             },
         };
 
-        debug!(?target_partition_range, num_partitions = partitions.len(), "Target partition range (partition indices)");
+        debug!(
+            ?target_partition_range,
+            num_partitions = partitions.len(),
+            "Target partition range (partition indices)"
+        );
 
         // Run the merge algorithm - exactly like intermediary
         // Extract target when we complete the merge of target_partition_range
@@ -126,19 +129,35 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
     ) {
         let len = offsets.len();
         let root_index = self.ctx.index;
-        
-        debug!(num_offsets = len, ?root_index, num_ranges_in_map = range_map.map.len(), "Updating root patterns after merge");
+
+        debug!(
+            num_offsets = len,
+            ?root_index,
+            num_ranges_in_map = range_map.map.len(),
+            "Updating root patterns after merge"
+        );
 
         for (i, (_, v)) in offsets.iter().enumerate() {
             let lr = 0..i;
             let rr = i + 1..len + 1;
-            
-            debug!(offset_index = i, ?lr, ?rr, "Checking offset for pattern update");
-            
+
+            debug!(
+                offset_index = i,
+                ?lr,
+                ?rr,
+                "Checking offset for pattern update"
+            );
+
             // Get merged tokens from range_map
-            if let (Some(&left), Some(&right)) = (range_map.get(&lr), range_map.get(&rr)) {
-                debug!(?left, ?right, "Found left and right tokens in range_map");
-                
+            if let (Some(&left), Some(&right)) =
+                (range_map.get(&lr), range_map.get(&rr))
+            {
+                debug!(
+                    ?left,
+                    ?right,
+                    "Found left and right tokens in range_map"
+                );
+
                 // Check if this offset is perfect (at pattern boundary)
                 if let Some((&pid, _)) = (v.borrow() as &TokenTracePositions)
                     .iter()
@@ -168,7 +187,14 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
                     );
                 }
             } else {
-                debug!(offset_index = i, ?lr, ?rr, has_left = range_map.get(&lr).is_some(), has_right = range_map.get(&rr).is_some(), "Missing left or right token in range_map");
+                debug!(
+                    offset_index = i,
+                    ?lr,
+                    ?rr,
+                    has_left = range_map.get(&lr).is_some(),
+                    has_right = range_map.get(&rr).is_some(),
+                    "Missing left or right token in range_map"
+                );
             }
         }
     }
@@ -177,25 +203,29 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
     ///
     /// This shows what patterns each vertex ACTUALLY contains in its VertexData,
     /// not what we find it through (search cursor patterns).
-    fn print_token_vertex_patterns(&mut self, target: Token) {
+    fn print_token_vertex_patterns(
+        &mut self,
+        target: Token,
+    ) {
         info!("=== VERTEX DATA PATTERNS (actual token child patterns) ===");
-        
+
         // Print root patterns
         let root = self.ctx.index;
-        let vertex = self.ctx.trav.expect_vertex(root);
+        let vertex = self.ctx.trav.expect_vertex_data(root);
         let patterns = vertex.child_patterns();
         info!(
             node = ?root,
             num_patterns = patterns.len(),
-            "Root (ababcd) has {} child pattern(s)", patterns.len()
+            "Root has {} child pattern(s)", patterns.len()
         );
         for (i, (_pattern_id, pattern)) in patterns.iter().enumerate() {
-            let tokens_str: Vec<String> = pattern.iter().map(|t| format!("{:?}", t)).collect();
+            let tokens_str: Vec<String> =
+                pattern.iter().map(|t| format!("{:?}", t)).collect();
             info!("  Child Pattern {}: [{}]", i, tokens_str.join(", "));
         }
-        
+
         // Print target token patterns
-        let vertex = self.ctx.trav.expect_vertex(target);
+        let vertex = self.ctx.trav.expect_vertex_data(target);
         let patterns = vertex.child_patterns();
         info!(
             token = ?target,
@@ -203,10 +233,11 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             "Target token has {} child pattern(s)", patterns.len()
         );
         for (i, (_pattern_id, pattern)) in patterns.iter().enumerate() {
-            let tokens_str: Vec<String> = pattern.iter().map(|t| format!("{:?}", t)).collect();
+            let tokens_str: Vec<String> =
+                pattern.iter().map(|t| format!("{:?}", t)).collect();
             info!("  Child Pattern {}: [{}]", i, tokens_str.join(", "));
         }
-        
+
         info!("=== END VERTEX DATA PATTERNS ===");
     }
 
@@ -249,7 +280,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             partition_range,
             num_offsets,
             &mut range_map,
-            Some(self.ctx.index),  // Pass node index for pattern updates
+            Some(self.ctx.index), // Pass node index for pattern updates
         );
 
         // Extract target token from range_map

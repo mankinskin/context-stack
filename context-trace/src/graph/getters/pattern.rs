@@ -4,10 +4,7 @@ use crate::{
         Hypergraph,
         getters::{
             ErrorReason,
-            vertex::{
-                GetVertexIndex,
-                VertexSet,
-            },
+            vertex::GetVertexIndex,
         },
         kind::GraphKind,
         vertex::{
@@ -24,90 +21,76 @@ use crate::{
     },
 };
 
+use super::vertex::VertexSet;
+
 #[allow(dead_code)]
 impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn get_pattern_at(
         &self,
         location: impl IntoPatternLocation,
-    ) -> Result<&Pattern, ErrorReason> {
+    ) -> Result<Pattern, ErrorReason> {
         let location = location.into_pattern_location();
-        let vertex = self.get_vertex(location.parent)?;
-        vertex
-            .child_patterns()
-            .get(&location.pattern_id())
-            .ok_or(ErrorReason::NoTokenPatterns) // todo: better error
+        self.with_vertex(location.parent, |vertex| {
+            vertex
+                .child_patterns()
+                .get(&location.pattern_id())
+                .cloned()
+                .ok_or(ErrorReason::NoTokenPatterns)
+        })?
     }
     #[track_caller]
     pub fn expect_pattern_at(
         &self,
         location: impl IntoPatternLocation,
-    ) -> &Pattern {
+    ) -> Pattern {
         let location = location.into_pattern_location();
         self.get_pattern_at(location).unwrap_or_else(|_| {
-            panic!("Pattern not found at location {:#?}", location)
-        })
-    }
-    pub(crate) fn get_pattern_mut_at(
-        &mut self,
-        location: impl IntoPatternLocation,
-    ) -> Result<&mut Pattern, ErrorReason> {
-        let location = location.into_pattern_location();
-        let vertex = self.get_vertex_mut(location.parent)?;
-        let tokens = vertex.child_patterns_mut();
-        tokens
-            .get_mut(&location.pattern_id())
-            .ok_or(ErrorReason::NoTokenPatterns) // todo: better error
-    }
-    #[track_caller]
-    pub(crate) fn expect_pattern_mut_at(
-        &mut self,
-        location: impl IntoPatternLocation,
-    ) -> &mut Pattern {
-        let location = location.into_pattern_location();
-        self.get_pattern_mut_at(location).unwrap_or_else(|_| {
             panic!("Pattern not found at location {:#?}", location)
         })
     }
     pub(crate) fn child_patterns_of(
         &self,
         index: impl GetVertexIndex,
-    ) -> Result<&ChildPatterns, ErrorReason> {
-        self.get_vertex(index.get_vertex_index(self))
-            .map(|vertex| vertex.child_patterns())
+    ) -> Result<ChildPatterns, ErrorReason> {
+        self.with_vertex(index.get_vertex_index(self), |vertex| {
+            vertex.child_patterns().clone()
+        })
     }
     pub(crate) fn get_pattern_of(
         &self,
         index: impl HasVertexIndex,
         pid: PatternId,
-    ) -> Result<&Pattern, ErrorReason> {
-        self.get_vertex(index.vertex_index())
-            .and_then(|vertex| vertex.get_child_pattern(&pid))
+    ) -> Result<Pattern, ErrorReason> {
+        self.with_vertex(index.vertex_index(), |vertex| {
+            vertex.get_child_pattern(&pid).cloned()
+        })?
     }
     #[track_caller]
     pub(crate) fn expect_child_pattern(
         &self,
         index: impl GetVertexIndex,
         pid: PatternId,
-    ) -> &Pattern {
-        self.expect_vertex(index.get_vertex_index(self))
-            .expect_child_pattern(&pid)
+    ) -> Pattern {
+        self.expect_vertex_data(index.get_vertex_index(self))
+            .expect_child_pattern(&pid).clone()
     }
     #[track_caller]
     pub fn expect_child_patterns(
         &self,
         index: impl GetVertexIndex,
-    ) -> &ChildPatterns {
-        self.expect_vertex(index.get_vertex_index(self))
-            .child_patterns()
+    ) -> ChildPatterns {
+        self.expect_vertex_data(index.get_vertex_index(self))
+            .child_patterns().clone()
     }
 
     #[track_caller]
     pub(crate) fn expect_any_child_pattern(
         &self,
         index: impl GetVertexIndex,
-    ) -> (&PatternId, &Pattern) {
-        self.expect_vertex(index.get_vertex_index(self))
-            .expect_any_child_pattern()
+    ) -> (PatternId, Pattern) {
+        let data = self.expect_vertex_data(index.get_vertex_index(self));
+        let (pid, pat) = data.expect_any_child_pattern();
+        (*pid, pat.clone())
     }
     #[track_caller]
     pub(crate) fn expect_pattern_range_width(

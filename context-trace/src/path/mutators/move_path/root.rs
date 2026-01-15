@@ -40,7 +40,7 @@ impl<Root: PathRoot, Role: PathRole, D: PatternDirection> MoveRootIndex<D, Role>
         let graph = trav.graph();
         let pattern = self.root_pattern::<G>(&graph);
         if let Some(next) = D::pattern_index_next(
-            pattern,
+            &pattern,
             HasRootChildIndex::<Role>::root_child_index(self),
         ) {
             assert!(next < pattern.len());

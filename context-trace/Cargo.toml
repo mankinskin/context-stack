@@ -9,6 +9,7 @@ test-api = []
 
 [dependencies]
 
+dashmap = "6"
 context-trace-macros = { path = "../context-trace-macros" }
 syntect = { version = "5.2", default-features = false, features = [
     "default-fancy",

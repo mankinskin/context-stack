@@ -23,7 +23,7 @@ use crate::{
 
 impl<G: GraphKind> Hypergraph<G> {
     fn insert_atom_key(
-        &mut self,
+        &self,
         atom: Atom<G::Atom>,
         key: VertexKey,
     ) {
@@ -33,7 +33,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Insert raw vertex data for an atom
     pub(crate) fn insert_atom_data(
-        &mut self,
+        &self,
         atom: Atom<G::Atom>,
         data: VertexData,
     ) -> Token {
@@ -43,11 +43,12 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Insert single atom node
     pub fn insert_atom(
-        &mut self,
+        &self,
         atom: Atom<G::Atom>,
     ) -> Token {
+        let index = self.alloc_vertex_index();
         let data = VertexData::new(Token::new(
-            self.next_vertex_index(),
+            index,
             TokenWidth(1),
         ));
         self.insert_atom_data(atom, data)
@@ -55,7 +56,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Insert multiple atom nodes
     pub fn insert_atoms(
-        &mut self,
+        &self,
         atoms: impl IntoIterator<Item = Atom<G::Atom>>,
     ) -> Vec<Token> {
         atoms
@@ -68,7 +69,7 @@ impl<G: GraphKind> Hypergraph<G> {
 #[allow(dead_code)]
 impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn insert_atom_builder(
-        &mut self,
+        &self,
         atom: Atom<G::Atom>,
         builder: VertexDataBuilder,
     ) -> Token {
@@ -77,7 +78,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
 
     pub fn new_atom_indices(
-        &mut self,
+        &self,
         sequence: impl IntoIterator<Item = G::Atom>,
     ) -> NewAtomIndices {
         sequence
