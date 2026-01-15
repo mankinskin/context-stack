@@ -14,7 +14,7 @@ use crate::{
     TokenTracePositions,
     join::context::node::{
         context::NodeJoinCtx,
-        merge::RangeMap,
+        merge::{RangeMap, PartitionRange},
     },
     split::{
         cache::vertex::SplitVertexCache,
@@ -76,7 +76,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         // The target is what we're INSERTING, not necessarily all created partitions.
         // For modes with protection (prefix/postfix), we exclude the first/last partition.
         let target_partition_range = if partitions.len() == 1 {
-            0..partitions.len() // Edge case: only one partition
+            PartitionRange::new(0..partitions.len()) // Edge case: only one partition
         } else {
             match root_mode {
                 RootMode::Prefix => {
@@ -84,7 +84,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
                     // Partitions created: [prefix, infix1, infix2, ...]
                     // Target: infixes only (exclude protected prefix at index 0)
                     // Example: [ab, c, d] → target is [1..3] = [c, d] = "cd"
-                    1..partitions.len()
+                    PartitionRange::new(1..partitions.len())
                 },
                 RootMode::Postfix => {
                     // Postfix mode: partition_range is 1..num_offsets+1 (infixes + postfix, no prefix)
@@ -92,12 +92,12 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
                     // Target: all partitions EXCEPT we need to identify the target range
                     // Example: [a, b, cd] → target is [1..3] = [b, cd] = "bcd"
                     // The target excludes the wrapper prefix (first infix that merges with prefix)
-                    1..partitions.len()
+                    PartitionRange::new(1..partitions.len())
                 },
                 RootMode::Infix => {
                     // Infix mode: partition_range is 1..num_offsets (infixes only)
                     // Target is ALL these partitions
-                    1..partitions.len() - 1
+                    PartitionRange::new(1..partitions.len() - 1)
                 },
             }
         };
@@ -150,8 +150,10 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         );
 
         for (i, (_, v)) in offsets.iter().enumerate() {
-            let lr = 0..i;
-            let rr = i + 1..len + 1;
+            // Create partition ranges to query the range_map
+            // These are partition index ranges, NOT offset indices
+            let lr = PartitionRange::new(0..i);
+            let rr = PartitionRange::new(i + 1..len + 1);
 
             debug!(
                 offset_index = i,
@@ -267,7 +269,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         partitions: &[Token],
         num_offsets: usize,
         partition_range_for_creation: Range<usize>,
-        target_partition_range: Range<usize>,
+        target_partition_range: PartitionRange,
     ) -> (RangeMap, Token) {
         let mut range_map = RangeMap::from(partitions);
 

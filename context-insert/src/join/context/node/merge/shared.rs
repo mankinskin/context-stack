@@ -25,7 +25,7 @@ use crate::{
     join::{
         context::node::{
             context::NodeJoinCtx,
-            merge::RangeMap,
+            merge::{RangeMap, PartitionRange},
         },
         partition::Join,
     },
@@ -247,7 +247,7 @@ pub fn merge_partitions_in_range(
         for start_offset in 0..(max_len - len + 1) {
             let start = partition_range.start + start_offset;
             let end = start + len;
-            let range = start..end;
+            let range = PartitionRange::new(start..end);
 
             // Determine partition type based on boundaries
             // Important: partition indices in range (start..end) refer to positions in the partitions array,
@@ -324,7 +324,7 @@ pub fn merge_partitions_in_range(
 fn update_node_patterns_if_perfect(
     _ctx: &mut NodeJoinCtx,
     node_index: Token,
-    range: &Range<usize>,
+    range: &PartitionRange,
     merged_token: Token,
     range_map: &RangeMap,
 ) {
@@ -343,7 +343,7 @@ fn merge_prefix_partition(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     range_map: &RangeMap,
-    range: &Range<usize>,
+    range: &PartitionRange,
     end: usize,
     _node_index: Option<Token>,
 ) -> Token {
@@ -356,7 +356,7 @@ fn merge_prefix_partition(
     match res {
         Ok(info) => {
             let merges: Vec<_> = range_map
-                .range_sub_merges(range.clone())
+                .range_sub_merges(range)
                 .into_iter()
                 .collect();
 
@@ -418,13 +418,13 @@ fn merge_postfix_partition(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     range_map: &RangeMap,
-    range: &Range<usize>,
+    range: &PartitionRange,
     start: usize,
     _node_index: Option<Token>,
 ) -> Token {
     debug!(
-        range_start = range.start,
-        range_end = range.end,
+        range_start = range.start(),
+        range_end = range.end(),
         start,
         has_node_idx = _node_index.is_some(),
         "merge_postfix_partition: ENTERED"
@@ -444,7 +444,7 @@ fn merge_postfix_partition(
     match res {
         Ok(info) => {
             let merges: Vec<_> = range_map
-                .range_sub_merges(range.clone())
+                .range_sub_merges(range)
                 .into_iter()
                 .collect();
 
@@ -522,7 +522,7 @@ fn merge_infix_partition(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     range_map: &RangeMap,
-    range: &Range<usize>,
+    range: &PartitionRange,
     start_partition_idx: usize,
     end_partition_idx: usize,
     partitions: &[Token],
@@ -589,7 +589,7 @@ fn merge_infix_partition(
     match res {
         Ok(info) => {
             let merges: Vec<_> = range_map
-                .range_sub_merges(range.clone())
+                .range_sub_merges(range)
                 .into_iter()
                 .collect();
             let num_info_patterns = info.patterns.len();
