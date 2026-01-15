@@ -256,15 +256,10 @@ pub fn merge_partitions_in_range(
                 // The `start` index maps to offset index `start` (adjusted for prefix if present)
                 let offset_start = if partitions.len() > num_offsets { start - 1 } else { start };
                 merge_postfix_partition(ctx, offsets, range_map, &range, offset_start, node_index)
-            } else if start < num_offsets && end <= num_offsets {
-                // Normal infix merge between two offsets
-                // Both start and end map to offset indices
-                merge_infix_partition(ctx, offsets, range_map, &range, start, end, node_index)
             } else {
-                // Fallback: treat as postfix partition
-                // This handles edge cases where partition/offset mapping is unclear
-                let offset_start = if start > 0 { start - 1 } else { 0 };
-                merge_postfix_partition(ctx, offsets, range_map, &range, offset_start, node_index)
+                // Normal infix merge between two offsets
+                // Pass partition indices directly - function will map to offset indices
+                merge_infix_partition(ctx, offsets, range_map, &range, start, end, partitions, num_offsets, node_index)
             };
 
             range_map.insert(range.clone(), index);
@@ -469,24 +464,72 @@ fn merge_postfix_partition(
 }
 
 /// Merge an infix partition between two offsets.
+/// 
+/// # Parameters
+/// - `start_partition_idx`: Partition index in the partitions array (NOT offset index)
+/// - `end_partition_idx`: Partition index in the partitions array (NOT offset index)
+/// - `partitions`: The partitions array to determine offset mapping
+/// - `num_offsets`: Total number of offsets to determine if prefix exists
 fn merge_infix_partition(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     range_map: &RangeMap,
     range: &Range<usize>,
-    start: usize,
-    end: usize,
+    start_partition_idx: usize,
+    end_partition_idx: usize,
+    partitions: &[Token],
+    num_offsets: usize,
     _node_index: Option<Token>,
 ) -> Token {
+    // Map partition indices to offset indices
+    // 
+    // If NO prefix exists:
+    // - partitions.len() == num_offsets + 1
+    // - partition i is between offset i-1 and offset i (for i > 0)
+    // - partition 0 is before offset 0 (start of range)
+    // - So: partition range [start..end] maps to offset range [start..end-1]
+    //
+    // If prefix exists:
+    // - partitions.len() == num_offsets + 2 (prefix + infixes + postfix)
+    // - partition 0 is the prefix (before offset 0)
+    // - partition i (i>0) is between offset i-1 and offset i
+    // - So: partition range [start..end] maps to offset range [start-1..end-2] when start>0
+    let has_prefix = partitions.len() > num_offsets + 1 || (partitions.len() > num_offsets && start_partition_idx == 0);
+    
+    let start_offset_idx = if has_prefix && start_partition_idx > 0 {
+        start_partition_idx - 1
+    } else {
+        start_partition_idx
+    };
+    
+    // For end: partition index end_partition_idx represents the partition BEFORE offset end_partition_idx
+    // So offset index is end_partition_idx - 1
+    let end_offset_idx = if has_prefix && end_partition_idx > 0 {
+        end_partition_idx - 2  // -1 for the offset, -1 for the prefix
+    } else {
+        end_partition_idx - 1  // -1 because partition end_partition_idx is before offset end_partition_idx-1
+    };
+    
+    debug!(
+        start_partition_idx,
+        end_partition_idx,
+        start_offset_idx,
+        end_offset_idx,
+        has_prefix,
+        num_offsets,
+        num_partitions = partitions.len(),
+        "merge_infix_partition: mapping partition indices to offset indices"
+    );
+    
     let lo = offsets
         .iter()
         .map(PosSplitCtx::from)
-        .nth(start)
+        .nth(start_offset_idx)
         .unwrap();
     let ro = offsets
         .iter()
         .map(PosSplitCtx::from)
-        .nth(end)
+        .nth(end_offset_idx)
         .unwrap();
     
     let infix = Infix::new(lo, ro);
