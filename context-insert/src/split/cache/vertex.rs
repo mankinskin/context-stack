@@ -91,10 +91,16 @@ impl SplitVertexCache {
                 ctx,
                 OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self),
             ),
-            RootMode::Postfix => Self::add_inner_offsets::<Post<Trace>, _>(
-                ctx,
-                OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self),
-            ),
+            RootMode::Postfix => {
+                eprintln!("  Postfix mode - checking target split at first position");
+                if let Some(split_pos) = self.positions.keys().next().copied() {
+                    eprintln!("    split_pos={}, cache={:?}", split_pos, self.positions[&split_pos]);
+                }
+                Self::add_inner_offsets::<Post<Trace>, _>(
+                    ctx,
+                    OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self),
+                )
+            },
         };
         eprintln!("  After add_inner_offsets: {} splits added", splits.len());
         for (pos, _) in &splits {
@@ -274,7 +280,32 @@ impl SplitVertexCache {
                             );
                         }
                     } else {
-                        eprintln!("  No inner_offset found");
+                        eprintln!("  No inner_offset found in wrapper");
+                    }
+                }
+            }
+            
+            // CRITICAL: Also check for inner_offset in the TARGET partition (at split_pos)
+            // This gives us offsets WITHIN the target partition itself
+            eprintln!("  Checking for inner offsets in target partition at pos {}", pos);
+            for (pid, trace_pos) in &split_cache.pattern_splits {
+                if let Some(inner_offset) = trace_pos.inner_offset {
+                    // The inner_offset is relative to the split position
+                    let target_inner_offset = pos.get() + inner_offset.get();
+                    eprintln!("    Found target inner_offset={:?}, target_inner_offset={}", inner_offset, target_inner_offset);
+                    
+                    if let Some(target_inner_pos) = NonZeroUsize::new(target_inner_offset)
+                        && !self.positions.contains_key(&target_inner_pos)
+                        && !wrapper_splits.contains_key(&target_inner_pos)
+                    {
+                        eprintln!("    Adding target inner offset at pos {}", target_inner_pos);
+                        wrapper_splits.insert(
+                            target_inner_pos,
+                            SplitPositionCache::root(position_splits(
+                                ctx.patterns,
+                                target_inner_pos,
+                            )),
+                        );
                     }
                 }
             }
