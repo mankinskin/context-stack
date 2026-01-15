@@ -40,8 +40,11 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
         let index = self.ctx.index;
         let mut finals = LinkedHashMap::new();
         for (i, (offset, v)) in offsets.iter().enumerate() {
-            let lr = 0..i;
-            let rr = i + 1..len;
+            // Ranges now use i..(i+1) convention from RangeMap
+            // Left partition: from start (0) to current offset (i+1)
+            // Right partition: from current offset (i+1) to end (len+1)
+            let lr = 0..(i + 1);
+            let rr = (i + 1)..(len + 1);
             let left = *merges.get(&lr).unwrap();
             let right = *merges.get(&rr).unwrap();
             if !lr.is_empty() || !lr.is_empty() {

@@ -225,7 +225,8 @@ pub fn merge_partitions_in_range(
     let max_len = partition_range.len();
     
     // Merge from smallest to largest partitions
-    for len in 1..max_len {
+    // Start at len=2 because len=1 (single partitions) are already created in create_initial_partitions
+    for len in 2..=max_len {
         debug!(len, max_len, "merge_partitions_in_range: starting merge loop iteration");
         for start_offset in 0..(max_len - len) {
             let start = partition_range.start + start_offset;
@@ -340,29 +341,61 @@ fn merge_prefix_partition(
         Err(existing) => {
             debug!(
                 ?existing,
-                "PREFIX: Token already exists, adding patterns from range_sub_merges"
+                range_start = range.start,
+                range_end = range.end,
+                "PREFIX: Token already exists - need to merge subranges and build new token"
             );
             
-            // For existing tokens, we need to add patterns from range_sub_merges
-            // Note: We can't get info.patterns because info_partition returned Err(existing)
-            // Those patterns (from node's child patterns) will need to be added elsewhere
+            // When info_partition returns Err(existing), we need to build the merged token ourselves
+            // by combining patterns from:
+            // 1. range_sub_merges - patterns from previously merged subranges
+            // 2. Node's child patterns - by merging the subrange tokens
+            
             let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
             
-            if !merges.is_empty() {
+            // Build the merged token from subranges in range_map
+            // For prefix partition spanning range start..end, we need to merge the subranges:
+            // e.g., for range 1..3: merge (1..2) with (2..3) to create (1..3)
+            let merged_patterns = if range.end > range.start + 1 {
+                // Multi-partition range - merge subranges from range_map
+                let subrange_tokens: Vec<Token> = (range.start..range.end)
+                    .map(|i| {
+                        let subrange = i..(i + 1);
+                        *range_map.get(&subrange).expect("subrange should exist in range_map")
+                    })
+                    .collect();
+                
                 debug!(
-                    ?existing,
-                    num_patterns = merges.len(),
-                    "PREFIX: Adding sub-merge patterns to existing token"
+                    ?subrange_tokens,
+                    num_subranges = subrange_tokens.len(),
+                    "PREFIX: Merging subrange tokens to create new merged token"
                 );
-                ctx.trav.add_patterns_with_update(existing, merges);
+                
+                // Create pattern from merged subrange tokens
+                vec![Pattern::from(subrange_tokens)]
+            } else {
+                // Single-partition range - just use merges from range_sub_merges
+                Vec::new()
+            };
+            
+            // Combine all patterns: range_sub_merges + merged subranges
+            let all_patterns: Vec<_> = merges.iter().cloned()
+                .chain(merged_patterns.into_iter())
+                .collect();
+            
+            if !all_patterns.is_empty() {
+                debug!(
+                    num_patterns = all_patterns.len(),
+                    "PREFIX: Creating new merged token with combined patterns"
+                );
+                ctx.trav.insert_patterns(all_patterns)
             } else {
                 debug!(
                     ?existing,
-                    "PREFIX: No sub-merge patterns to add (likely single-partition or empty range)"
+                    "PREFIX: No patterns to add, returning existing token"
                 );
+                existing
             }
-            
-            existing
         },
     }
 }
@@ -449,27 +482,61 @@ fn merge_postfix_partition(
         Err(existing) => {
             debug!(
                 ?existing,
-                "POSTFIX: Token already exists, adding patterns from range_sub_merges"
+                range_start = range.start,
+                range_end = range.end,
+                "POSTFIX: Token already exists - need to merge subranges and build new token"
             );
             
-            // For existing tokens, we need to add patterns from range_sub_merges
+            // When info_partition returns Err(existing), we need to build the merged token ourselves
+            // by combining patterns from:
+            // 1. range_sub_merges - patterns from previously merged subranges
+            // 2. Node's child patterns - by merging the subrange tokens
+            
             let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
             
-            if !merges.is_empty() {
+            // Build the merged token from subranges in range_map
+            // For postfix partition spanning range start..end, we need to merge the subranges:
+            // e.g., for range 1..3: merge (1..2) with (2..3) to create (1..3)
+            let merged_patterns = if range.end > range.start + 1 {
+                // Multi-partition range - merge subranges from range_map
+                let subrange_tokens: Vec<Token> = (range.start..range.end)
+                    .map(|i| {
+                        let subrange = i..(i + 1);
+                        *range_map.get(&subrange).expect("subrange should exist in range_map")
+                    })
+                    .collect();
+                
                 debug!(
-                    ?existing,
-                    num_patterns = merges.len(),
-                    "POSTFIX: Adding sub-merge patterns to existing token"
+                    ?subrange_tokens,
+                    num_subranges = subrange_tokens.len(),
+                    "POSTFIX: Merging subrange tokens to create new merged token"
                 );
-                ctx.trav.add_patterns_with_update(existing, merges);
+                
+                // Create pattern from merged subrange tokens
+                vec![Pattern::from(subrange_tokens)]
+            } else {
+                // Single-partition range - just use merges from range_sub_merges
+                Vec::new()
+            };
+            
+            // Combine all patterns: range_sub_merges + merged subranges
+            let all_patterns: Vec<_> = merges.iter().cloned()
+                .chain(merged_patterns.into_iter())
+                .collect();
+            
+            if !all_patterns.is_empty() {
+                debug!(
+                    num_patterns = all_patterns.len(),
+                    "POSTFIX: Creating new merged token with combined patterns"
+                );
+                ctx.trav.insert_patterns(all_patterns)
             } else {
                 debug!(
                     ?existing,
-                    "POSTFIX: No sub-merge patterns to add"
+                    "POSTFIX: No patterns to add, returning existing token"
                 );
+                existing
             }
-            
-            existing
         },
     }
 }
@@ -552,27 +619,61 @@ fn merge_infix_partition(
         Err(existing) => {
             debug!(
                 ?existing,
-                "INFIX: Token already exists, adding patterns from range_sub_merges"
+                range_start = range.start,
+                range_end = range.end,
+                "INFIX: Token already exists - need to merge subranges and build new token"
             );
             
-            // For existing tokens, we need to add patterns from range_sub_merges
+            // When info_partition returns Err(existing), we need to build the merged token ourselves
+            // by combining patterns from:
+            // 1. range_sub_merges - patterns from previously merged subranges
+            // 2. Node's child patterns - by merging the subrange tokens
+            
             let merges: Vec<_> = range_map.range_sub_merges(range.clone()).into_iter().collect();
             
-            if !merges.is_empty() {
+            // Build the merged token from subranges in range_map
+            // For infix partition spanning range start..end, we need to merge the subranges:
+            // e.g., for range 1..3: merge (1..2) with (2..3) to create (1..3)
+            let merged_patterns = if range.end > range.start + 1 {
+                // Multi-partition range - merge subranges from range_map
+                let subrange_tokens: Vec<Token> = (range.start..range.end)
+                    .map(|i| {
+                        let subrange = i..(i + 1);
+                        *range_map.get(&subrange).expect("subrange should exist in range_map")
+                    })
+                    .collect();
+                
                 debug!(
-                    ?existing,
-                    num_patterns = merges.len(),
-                    "INFIX: Adding sub-merge patterns to existing token"
+                    ?subrange_tokens,
+                    num_subranges = subrange_tokens.len(),
+                    "INFIX: Merging subrange tokens to create new merged token"
                 );
-                ctx.trav.add_patterns_with_update(existing, merges);
+                
+                // Create pattern from merged subrange tokens
+                vec![Pattern::from(subrange_tokens)]
+            } else {
+                // Single-partition range - just use merges from range_sub_merges
+                Vec::new()
+            };
+            
+            // Combine all patterns: range_sub_merges + merged subranges
+            let all_patterns: Vec<_> = merges.iter().cloned()
+                .chain(merged_patterns.into_iter())
+                .collect();
+            
+            if !all_patterns.is_empty() {
+                debug!(
+                    num_patterns = all_patterns.len(),
+                    "INFIX: Creating new merged token with combined patterns"
+                );
+                ctx.trav.insert_patterns(all_patterns)
             } else {
                 debug!(
                     ?existing,
-                    "INFIX: No sub-merge patterns to add"
+                    "INFIX: No patterns to add, returning existing token"
                 );
+                existing
             }
-            
-            existing
         },
     }
 }

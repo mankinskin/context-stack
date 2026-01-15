@@ -29,7 +29,9 @@ impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I>
     fn from(iter: I) -> Self {
         let mut map = HashMap::default();
         for (i, part) in iter.into_iter().enumerate() {
-            map.insert(i..i, *part.borrow());
+            // Each initial partition occupies range i..(i+1)
+            // This represents a single partition at index i
+            map.insert(i..(i + 1), *part.borrow());
         }
         Self { map }
     }
