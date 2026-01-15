@@ -110,11 +110,15 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
 
         // Run the merge algorithm - exactly like intermediary
         // Extract target when we complete the merge of target_partition_range
+        // Note: We pass 0..partitions.len() for merge_partition_range since we want to
+        // merge ALL the partitions we created, not the original partition_range
+        // which was used for CREATE (and may skip prefix/postfix).
+        let merge_partition_range = 0..partitions.len();
         let (range_map, target_token) = self.merge_partitions(
             &offsets,
             &partitions,
             num_offsets,
-            partition_range.clone(),
+            merge_partition_range,
             target_partition_range.clone(),
         );
 

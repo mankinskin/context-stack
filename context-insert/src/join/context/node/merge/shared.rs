@@ -302,6 +302,12 @@ pub fn merge_partitions_in_range(
                 )
             };
 
+            debug!(
+                range_start = range.start(),
+                range_end = range.end(),
+                ?index,
+                "RangeMap INSERT: inserting token for range"
+            );
             range_map.insert(range.clone(), index);
 
             // Update node patterns incrementally so subsequent info_partition calls can find them
