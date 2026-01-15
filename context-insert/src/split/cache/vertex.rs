@@ -79,6 +79,8 @@ impl SplitVertexCache {
         ctx: NodeTraceCtx,
         root_mode: RootMode,
     ) -> Vec<SplitTraceState> {
+        eprintln!("AUGMENT_ROOT: root_mode={:?}, existing positions: {:?}", root_mode, self.positions.keys().collect::<Vec<_>>());
+        
         // First add inner offsets for the target partition
         let (splits, next) = match root_mode {
             RootMode::Infix => Self::add_inner_offsets(
@@ -94,6 +96,10 @@ impl SplitVertexCache {
                 OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self),
             ),
         };
+        eprintln!("  After add_inner_offsets: {} splits added", splits.len());
+        for (pos, _) in &splits {
+            eprintln!("    offset at pos {}", pos);
+        }
         self.positions.extend(splits);
 
         // Then add wrapper offsets for Prefix/Postfix modes
@@ -102,7 +108,13 @@ impl SplitVertexCache {
             RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx),
             RootMode::Infix => BTreeMap::new(), // Infix handles wrappers differently
         };
+        eprintln!("  After add_wrapper_offsets: {} splits added", wrapper_splits.len());
+        for (pos, _) in &wrapper_splits {
+            eprintln!("    offset at pos {}", pos);
+        }
         self.positions.extend(wrapper_splits);
+        
+        eprintln!("  Final positions: {:?}", self.positions.keys().collect::<Vec<_>>());
 
         next
     }
@@ -203,15 +215,20 @@ impl SplitVertexCache {
         // Get the first (and only) split position for postfix
         let split_pos = self.positions.keys().next().copied();
 
+        eprintln!("ADD_WRAPPER_OFFSETS_POSTFIX: split_pos={:?}", split_pos);
+
         if let Some(pos) = split_pos {
             let split_cache = &self.positions[&pos];
             let mut wrapper_splits = BTreeMap::new();
 
-            // For each child pattern, find wrapper start position
+            // For each child pattern, find wrapper start position and inner offsets
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                    eprintln!("  Pattern {:?}: trace_pos={:?}", pid, trace_pos);
+                    
                     // The wrapper starts at the beginning of the child that contains the split
                     let child_index = trace_pos.sub_index;
+                    let wrapper_child = pattern[child_index];
 
                     // Calculate the wrapper start offset (start of this child in root)
                     let mut wrapper_start_offset = 0;
@@ -219,12 +236,16 @@ impl SplitVertexCache {
                         wrapper_start_offset += *pattern[i].width;
                     }
 
+                    eprintln!("  wrapper_start_offset={}, child_index={}, wrapper_child={:?}", 
+                              wrapper_start_offset, child_index, wrapper_child);
+
                     // Add wrapper start position if not already present and not at root start
                     if wrapper_start_offset > 0
                         && let Some(wrapper_pos) =
                             NonZeroUsize::new(wrapper_start_offset)
                         && !self.positions.contains_key(&wrapper_pos)
                     {
+                        eprintln!("  Adding wrapper offset at pos {}", wrapper_pos);
                         wrapper_splits.insert(
                             wrapper_pos,
                             SplitPositionCache::root(position_splits(
@@ -233,9 +254,32 @@ impl SplitVertexCache {
                             )),
                         );
                     }
+                    
+                    // If the split has an inner_offset, it means there's a split WITHIN the wrapper child
+                    // Add this intermediate offset as well
+                    if let Some(inner_offset) = trace_pos.inner_offset {
+                        let intermediate_offset = wrapper_start_offset + inner_offset.get();
+                        eprintln!("  inner_offset={:?}, intermediate_offset={}", inner_offset, intermediate_offset);
+                        if let Some(intermediate_pos) = NonZeroUsize::new(intermediate_offset)
+                            && !self.positions.contains_key(&intermediate_pos)
+                            && !wrapper_splits.contains_key(&intermediate_pos)
+                        {
+                            eprintln!("  Adding intermediate offset at pos {}", intermediate_pos);
+                            wrapper_splits.insert(
+                                intermediate_pos,
+                                SplitPositionCache::root(position_splits(
+                                    ctx.patterns,
+                                    intermediate_pos,
+                                )),
+                            );
+                        }
+                    } else {
+                        eprintln!("  No inner_offset found");
+                    }
                 }
             }
 
+            eprintln!("  Total wrapper_splits: {}", wrapper_splits.len());
             wrapper_splits
         } else {
             BTreeMap::new()
