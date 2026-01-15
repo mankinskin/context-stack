@@ -70,28 +70,37 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             partition_range.clone(),
         );
 
-        // Define target offset range based on mode
-        // Target partition is defined by a range of partition indices in the partitions array
-        let target_offset_range = match root_mode {
-            RootMode::Prefix => 0..1,       // Prefix: just the prefix partition (index 0)
-            RootMode::Postfix => {
-                // Postfix: ALL partitions (entire postfix range - from first partition to last)
-                // For postfix mode, partitions includes all infixes + postfix
-                // We want to merge ALL of them into the target token
+        // Define target partition range based on mode
+        // Target is defined by a range of partition indices in the partitions array
+        // We use partition indices throughout - NOT offset indices
+        let target_partition_range = match root_mode {
+            RootMode::Prefix => {
+                // Prefix mode: partition_range is 0..num_offsets (prefix + infixes, no postfix)
+                // Target is ALL these partitions
                 0..partitions.len()
-            }
-            RootMode::Infix => 0..2,        // Infix: between first two offsets  
+            },
+            RootMode::Postfix => {
+                // Postfix mode: partition_range is 1..num_offsets+1 (infixes + postfix, no prefix)
+                // Target is ALL these partitions (which start at index 0 in partitions array)
+                0..partitions.len()
+            },
+            RootMode::Infix => {
+                // Infix mode: partition_range is 1..num_offsets (infixes only)
+                // Target is ALL these partitions
+                0..partitions.len()
+            },
         };
 
-        debug!(?target_offset_range, num_partitions = partitions.len(), "Target partition offset range");
+        debug!(?target_partition_range, num_partitions = partitions.len(), "Target partition range (partition indices)");
 
         // Run the merge algorithm - exactly like intermediary
-        // Extract target when we complete the merge of target_offset_range
+        // Extract target when we complete the merge of target_partition_range
         let (range_map, target_token) = self.merge_partitions(
             &offsets,
             &partitions,
             num_offsets,
-            target_offset_range.clone(),
+            partition_range.clone(),
+            target_partition_range.clone(),
         );
 
         // Update root node patterns after merge (like intermediary does)
@@ -204,23 +213,32 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
     /// Core merge algorithm - now uses shared `merge_partitions_in_range` utility.
     ///
     /// The only difference from intermediary is we extract the target token instead of creating split halves.
+    ///
+    /// # Parameters
+    ///
+    /// - `partition_range_for_creation`: Range of partition indices that were created (e.g., 1..num_offsets+1 for postfix mode)
+    /// - `target_partition_range`: Range of partition indices that constitute the target token
     fn merge_partitions(
         &mut self,
         offsets: &SplitVertexCache,
         partitions: &[Token],
         num_offsets: usize,
-        target_offset_range: Range<usize>,
+        partition_range_for_creation: Range<usize>,
+        target_partition_range: Range<usize>,
     ) -> (RangeMap, Token) {
         let mut range_map = RangeMap::from(partitions);
 
-        // Determine the range of partitions to merge
+        // Use the partition_range for merging - this was the range used to create partitions
+        // All merging happens within this range
         let partition_range = 0..partitions.len();
 
         debug!(
             num_partitions = partitions.len(),
             num_offsets,
             ?partition_range,
-            "Using shared merge logic"
+            ?partition_range_for_creation,
+            ?target_partition_range,
+            "Using shared merge logic with partition indices"
         );
 
         // Use shared merge logic - exactly the same as intermediary!
@@ -235,10 +253,10 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         );
 
         // Extract target token from range_map
-        let target_token = *range_map.get(&target_offset_range)
+        let target_token = *range_map.get(&target_partition_range)
             .unwrap_or_else(|| panic!(
                 "Target token not found in range_map for range {:?}. Available ranges: {:?}",
-                target_offset_range,
+                target_partition_range,
                 range_map.map.keys().collect::<Vec<_>>()
             ));
 
