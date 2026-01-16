@@ -206,7 +206,7 @@ fn find_ancestor1_long_pattern() {
 fn find_ancestor2() {
     use context_trace::*;
 
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
         ab => [a, b],
@@ -309,7 +309,7 @@ fn find_ancestor2() {
 
 #[test]
 fn find_ancestor3() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let (a, b, _w, x, y, z) = graph
         .insert_atoms([
             Atom::Element('a'),

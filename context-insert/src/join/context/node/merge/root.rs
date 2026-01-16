@@ -3,21 +3,15 @@
 //! This module implements root node joining by reusing the intermediary merge algorithm
 //! with protection of non-participating ranges.
 
-use std::{
-    borrow::Borrow,
-    ops::Range,
-};
-
 use derive_new::new;
-use tracing_subscriber::field::debug;
 
 use crate::{
-    TokenTracePositions,
     join::context::node::{
         context::NodeJoinCtx,
         merge::{
             PartitionRange,
             RangeMap,
+            shared::MergeMode,
         },
     },
     split::{
@@ -54,23 +48,11 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             "Starting root join (reusing intermediary algorithm)"
         );
 
-        // Determine partition range based on root_mode
-        // This controls which initial partitions to create (with protection)
-        let partition_range = match root_mode {
-            RootMode::Prefix => 0..num_offsets, // Prefix + infixes (no postfix)
-            RootMode::Postfix => 1..num_offsets + 1, // Infixes + postfix (no prefix)
-            RootMode::Infix => 1..num_offsets, // Infixes only (no prefix/postfix)
-        };
-
-        debug!(
-            ?partition_range,
-            "Protection strategy - partition range for initial partitions"
-        );
         // Get initial partitions using shared function
         let partitions = super::shared::create_initial_partitions(
             self.ctx,
             &offsets,
-            partition_range.clone(),
+            MergeMode::Root(root_mode),
         );
 
         // Define target partition range based on mode
@@ -117,7 +99,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         let target_token = self.merge_partitions(
             &offsets,
             &partitions,
-            partition_range,
+            root_mode,
             target_partition_range.clone(),
         );
 
@@ -184,7 +166,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         &mut self,
         offsets: &SplitVertexCache,
         partitions: &[Token],
-        partition_range_for_creation: Range<usize>,
+        root_mode: RootMode,
         target_partition_range: PartitionRange,
     ) -> Token {
         // Initialize range_map with simple array indices
@@ -199,24 +181,10 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
 
         debug!(
             num_partitions = partitions.len(),
-            ?partition_range_for_creation,
             ?target_partition_range,
             "Using shared merge logic with array indices"
         );
 
-        // Determine has_prefix and has_postfix from partition_range_for_creation
-        // Whether the initial partitions include a prefix/postfix partition
-        let has_prefix = partition_range_for_creation.start == 0;
-        let has_postfix = partition_range_for_creation.end
-            == partition_range_for_creation.start + partitions.len();
-        assert!(
-            !(has_prefix && has_postfix),
-            "Cannot have both prefix and postfix simultaneously in root merge"
-        );
-        debug!(
-            has_prefix,
-            has_postfix, "Determined protection flags for merge"
-        );
         // Use shared merge logic with array indices [0..partitions.len()]
         // partition_range_for_creation only used to determine has_prefix flag
         super::shared::merge_partitions_in_range(
@@ -224,8 +192,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             offsets,
             partitions,
             &mut range_map,
-            has_prefix,
-            has_postfix,
+            MergeMode::Root(root_mode),
         );
 
         // Extract target token from range_map

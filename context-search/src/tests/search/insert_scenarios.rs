@@ -37,7 +37,7 @@ use {
 
 #[test]
 fn prefix1() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {h, e, l, d});
     insert_patterns!(graph,
         (ld, ld_id) => [l, d],
@@ -102,7 +102,7 @@ fn prefix1() {
 }
 #[test]
 fn search_pattern1_by_z() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
         ab => [[a, b]],
@@ -207,7 +207,7 @@ fn search_pattern1_by_z() {
 
 #[test]
 fn search_pattern1_ab_y() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
         ab => [[a, b]],
@@ -311,7 +311,7 @@ fn search_pattern1_ab_y() {
 
 #[test]
 fn search_pattern2_a_b_y() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
         (yz, yz_ids) => [[y, z]],
@@ -462,7 +462,7 @@ fn search_pattern2_a_b_y() {
 
 #[test]
 fn search_pattern2_a_b() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,
         yz => [[y, z]],
@@ -541,7 +541,7 @@ fn search_pattern2_a_b() {
 
 #[test]
 fn search_infix1_a_b_y() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, w, x, y, z});
     insert_patterns!(graph,
         (yz, yz_ids) => [[y, z]],
@@ -661,7 +661,7 @@ fn search_infix1_a_b_y() {
 
 #[test]
 fn search_infix1_a_b() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, w, x, y, z});
     insert_patterns!(graph,
         yz => [[y, z]],
@@ -765,7 +765,7 @@ fn search_infix1_a_b() {
 
 #[test]
 fn search_infix2_a_b_c_d() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d, x, y});
     insert_patterns!(graph,
         yy => [y, y],
@@ -868,7 +868,7 @@ fn search_infix2_a_b_c_d() {
 
 #[test]
 fn search_postfix1_b_c_d_d() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (ab, ab_ids) => [a, b],
@@ -973,7 +973,7 @@ fn search_postfix1_b_c_d_d() {
 
 #[test]
 fn search_complete_token_b_c() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (bc, bc_ids) => [b, c],
@@ -1026,7 +1026,7 @@ fn search_complete_token_b_c() {
 
 #[test]
 fn search_complete_token_a_bc() {
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         bc => [b, c],

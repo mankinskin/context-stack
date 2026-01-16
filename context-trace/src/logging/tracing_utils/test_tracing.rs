@@ -3,10 +3,7 @@
 use std::{
     env,
     fs,
-    io::{
-        LineWriter,
-        Write,
-    },
+    io::Write,
     path::{
         Path,
         PathBuf,
@@ -58,10 +55,7 @@ impl Write for FlushingWriter {
             self.file.clear_poison();
             self.file.lock().ok()
         }) else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to acquire file lock",
-            ));
+            return Err(std::io::Error::other("Failed to acquire file lock"));
         };
         let result = file.write(buf)?;
         file.flush()?;

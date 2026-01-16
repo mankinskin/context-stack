@@ -19,7 +19,7 @@ fn test_pattern_cursor_at_end_cannot_advance() {
     let _tracing = init_test_tracing!();
 
     // Create a simple graph with a pattern: [a, b, c]
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -88,7 +88,7 @@ fn test_can_advance_advance_consistency() {
     let _tracing = init_test_tracing!();
 
     // Create a graph with multiple patterns to test various states
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (abc, _abc_id) => [a, b, c],

@@ -9,6 +9,7 @@ use crate::{
         merge::{
             PartitionRange,
             RangeMap,
+            shared::MergeMode,
         },
     },
     split::{
@@ -82,8 +83,7 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
             offsets,
             partitions,
             &mut range_map,
-            true, // has_prefix
-            true, // has_postfix
+            MergeMode::Full,
         );
 
         range_map

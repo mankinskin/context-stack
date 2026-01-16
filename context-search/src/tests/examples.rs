@@ -18,7 +18,7 @@ use {
 #[test]
 fn example_basic_sequence_search() {
     // Create graph and insert atoms
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     debug!("Created empty hypergraph");
 
     let a = graph.insert_atom(Atom::Element('a'));
@@ -68,7 +68,7 @@ fn example_basic_sequence_search() {
 #[test]
 fn example_single_atom_error() {
     // Create graph and insert single atom
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
 
     // Single atoms have no parent patterns, so searching for them returns SingleIndex error
@@ -89,7 +89,7 @@ fn example_single_atom_error() {
 }
 #[test]
 fn example_helper_methods() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
     let ab = graph.insert_pattern([a, b]);
@@ -109,7 +109,7 @@ fn example_helper_methods() {
 
 #[test]
 fn example_token_pattern_element() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let h = graph.insert_atom(Atom::Element('h'));
     let e = graph.insert_atom(Atom::Element('e'));
     let l = graph.insert_atom(Atom::Element('l'));
@@ -143,7 +143,7 @@ fn example_token_pattern_element() {
 
 #[test]
 fn example_hierarchical_parent_search() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
     let c = graph.insert_atom(Atom::Element('c'));
@@ -189,7 +189,7 @@ fn example_hierarchical_ancestor_search() {
     // - Root parent should be abcd
     // - Result should be QueryExhausted with a Postfix path
     //
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
     let c = graph.insert_atom(Atom::Element('c'));
@@ -265,7 +265,7 @@ fn example_hierarchical_ancestor_search() {
 
 #[test]
 fn example_incomplete_postfix() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
     let c = graph.insert_atom(Atom::Element('c'));
@@ -293,7 +293,7 @@ fn example_incomplete_postfix() {
 
 #[test]
 fn example_incomplete_prefix() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
     let c = graph.insert_atom(Atom::Element('c'));
@@ -320,7 +320,7 @@ fn example_incomplete_prefix() {
 
 #[test]
 fn example_pattern_location_access() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
     let c = graph.insert_atom(Atom::Element('c'));
@@ -342,7 +342,7 @@ fn example_pattern_location_access() {
 
 #[test]
 fn example_pattern_width() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
 
@@ -360,7 +360,7 @@ fn example_pattern_width() {
 
 #[test]
 fn example_expect_complete() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     let a = graph.insert_atom(Atom::Element('a'));
     let b = graph.insert_atom(Atom::Element('b'));
     let ab = graph.insert_pattern([a, b]);

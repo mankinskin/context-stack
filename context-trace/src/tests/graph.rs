@@ -10,7 +10,7 @@ use std::fs;
 
 #[test]
 fn test_to_petgraph() {
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c, d});
     // ab cd
     // abc d

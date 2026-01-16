@@ -1,5 +1,4 @@
 use context_trace::*;
-use derive_new::new;
 
 //impl VertexData {
 //    pub(crate) fn offset_children(
@@ -12,7 +11,7 @@ use derive_new::new;
 //    }
 //}
 /// for insert
-/// 
+///
 /// This context owns the patterns data since with interior mutability
 /// we can't hold references across lock boundaries.
 #[derive(Debug, Clone)]
@@ -22,10 +21,13 @@ pub struct NodeTraceCtx {
 }
 
 impl NodeTraceCtx {
-    pub fn new(patterns: ChildPatterns, index: Token) -> Self {
+    pub fn new(
+        patterns: ChildPatterns,
+        index: Token,
+    ) -> Self {
         Self { patterns, index }
     }
-    
+
     pub fn from_index<K: GraphKind>(
         graph: &Hypergraph<K>,
         index: Token,

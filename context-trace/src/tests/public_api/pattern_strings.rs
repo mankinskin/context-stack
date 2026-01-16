@@ -10,7 +10,7 @@ use std::collections::HashSet;
 fn pattern_strings_single_pattern() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b});
 
     insert_patterns!(graph,
@@ -31,7 +31,7 @@ fn pattern_strings_single_pattern() {
 fn pattern_strings_multiple_patterns() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
 
     insert_patterns!(graph,
@@ -64,7 +64,7 @@ fn pattern_strings_multiple_patterns() {
 fn pattern_strings_complex_decomposition() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = Hypergraph::<BaseGraphKind>::default();
+    let graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c, d});
 
     insert_patterns!(graph,

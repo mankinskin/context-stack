@@ -13,7 +13,7 @@ use std::ops::ControlFlow;
 fn move_leaf_right_advances_through_pattern() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (abcd, abcd_id) => [a, b, c, d]
@@ -37,7 +37,7 @@ fn move_leaf_right_advances_through_pattern() {
 fn move_leaf_right_breaks_at_pattern_end() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -56,7 +56,7 @@ fn move_leaf_right_breaks_at_pattern_end() {
 fn move_leaf_left_retracts_through_pattern() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (abcd, abcd_id) => [a, b, c, d]
@@ -80,7 +80,7 @@ fn move_leaf_left_retracts_through_pattern() {
 fn move_leaf_left_breaks_at_pattern_start() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -99,7 +99,7 @@ fn move_leaf_left_breaks_at_pattern_start() {
 fn move_leaf_works_with_compound_children() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         ab => [a, b],
@@ -126,7 +126,7 @@ fn move_leaf_works_with_compound_children() {
 fn move_leaf_sequential_movements() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d, e});
     insert_patterns!(graph,
         (abcde, abcde_id) => [a, b, c, d, e]

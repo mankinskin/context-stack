@@ -38,7 +38,7 @@ pub struct EnvInsertPostfix1 {
 
 impl TestEnv for EnvInsertPostfix1 {
     fn initialize() -> Self {
-        let mut graph = Hypergraph::default();
+        let graph = Hypergraph::default();
         let [a, b, c, d] = graph.insert_atoms([
             Atom::Element('a'),
             Atom::Element('b'),

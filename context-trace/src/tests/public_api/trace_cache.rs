@@ -17,7 +17,7 @@ use crate::{
 fn trace_cache_new_contains_start_vertex_but_no_positions() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b});
     insert_patterns!(graph,
         ab => [a, b]
@@ -36,7 +36,7 @@ fn trace_cache_new_contains_start_vertex_but_no_positions() {
 fn trace_cache_force_mut_creates_position_and_is_gettable() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b});
     insert_patterns!(graph,
         ab => [a, b]
@@ -60,7 +60,7 @@ fn trace_cache_force_mut_creates_position_and_is_gettable() {
 fn trace_cache_add_state_creates_new_entries() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b]
@@ -96,7 +96,7 @@ fn trace_cache_add_state_creates_new_entries() {
 fn trace_cache_add_state_idempotent_for_existing_entries() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b]
@@ -131,7 +131,7 @@ fn trace_cache_add_state_idempotent_for_existing_entries() {
 fn trace_cache_add_state_with_edges_creates_bottom_edges() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         ab => [a, b],
@@ -172,7 +172,7 @@ fn trace_cache_add_state_with_edges_creates_bottom_edges() {
 fn trace_cache_extend_merges_entries() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {h, e, l, d});
     insert_patterns!(graph,
         (ld, ld_id) => [l, d],
@@ -219,7 +219,7 @@ fn trace_cache_extend_merges_entries() {
 fn trace_cache_extend_merges_positions_for_same_vertex() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b]
@@ -254,7 +254,7 @@ fn trace_cache_extend_merges_positions_for_same_vertex() {
 fn trace_cache_multiple_directed_positions() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, _abc_id) => [a, b, c]

@@ -22,7 +22,7 @@ use {
 #[test]
 fn test_advancement_chain_through_multiple_states() {
     // Test advancing through a sequence of states
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (abcd, abcd_id) => [a, b, c, d]
@@ -90,7 +90,7 @@ fn test_advancement_chain_through_multiple_states() {
 #[test]
 fn test_advancement_preserves_atom_positions() {
     // Verify that advancement preserves atom positions correctly
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -176,7 +176,7 @@ fn test_advancement_preserves_atom_positions() {
 #[test]
 fn test_advancement_with_different_pattern_sizes() {
     // Test advancement with patterns of various sizes
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d, e, f});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],
@@ -239,7 +239,7 @@ fn test_advancement_with_different_pattern_sizes() {
 #[test]
 fn test_advancement_fails_at_boundaries() {
     // Test that advancement properly fails at pattern boundaries
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -299,7 +299,7 @@ fn test_advancement_fails_at_boundaries() {
 #[test]
 fn test_advancement_with_nested_patterns() {
     // Test advancement through nested pattern structures
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         ab => [a, b],
@@ -367,7 +367,7 @@ fn test_advancement_with_nested_patterns() {
 #[test]
 fn test_state_advance_idempotency_on_error() {
     // Test that failed advances don't modify state
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b]

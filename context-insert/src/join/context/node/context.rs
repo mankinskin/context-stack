@@ -30,7 +30,10 @@ use crate::{
     join::{
         context::{
             frontier::FrontierSplitIterator,
-            node::merge::NodeMergeCtx,
+            node::merge::{
+                NodeMergeCtx,
+                shared::MergeMode,
+            },
             pattern::PatternJoinCtx,
         },
         joined::partition::JoinedPartition,
@@ -66,7 +69,7 @@ use crate::{
 use context_trace::*;
 
 /// Context for locked frontier operations during join.
-/// 
+///
 /// With interior mutability, we only need `&Hypergraph` - mutations happen
 /// through per-vertex locks inside the graph.
 #[derive(Debug)]
@@ -115,7 +118,11 @@ impl GetPatternTraceCtx for NodeJoinCtx<'_> {
     ) -> PatternTraceCtx {
         PatternTraceCtx::new(
             self.index.to_pattern_location(*pattern_id),
-            self.as_trace_context().patterns.get(pattern_id).unwrap().clone(),
+            self.as_trace_context()
+                .patterns
+                .get(pattern_id)
+                .unwrap()
+                .clone(),
         )
     }
 }
@@ -155,7 +162,7 @@ impl NodeJoinCtx<'_> {
         let partitions = super::merge::shared::create_initial_partitions(
             self,
             &pos_splits,
-            0..len + 1,  // All partitions
+            MergeMode::Full,
         );
 
         assert_eq!(
@@ -163,7 +170,7 @@ impl NodeJoinCtx<'_> {
             partitions.iter().map(|t| *t.width()).sum::<usize>()
         );
         assert_eq!(partitions.len(), pos_splits.len() + 1);
-        
+
         NodeMergeCtx::new(self).merge_node(&partitions)
     }
     pub fn join_root_partitions(&mut self) -> Token {

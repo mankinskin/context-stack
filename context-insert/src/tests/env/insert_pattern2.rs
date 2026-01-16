@@ -40,7 +40,7 @@ pub struct EnvInsertPattern2 {
 
 impl TestEnv for EnvInsertPattern2 {
     fn initialize() -> Self {
-        let mut graph = Hypergraph::default();
+        let graph = Hypergraph::default();
         let [a, b, x, y, z] = graph.insert_atoms([
             Atom::Element('a'),
             Atom::Element('b'),

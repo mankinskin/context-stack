@@ -20,7 +20,7 @@ use {
 #[test]
 fn test_parent_compare_state_advance_success() {
     // Create a graph with pattern: [a, b, c]
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -107,7 +107,7 @@ fn test_parent_compare_state_advance_success() {
 #[test]
 fn test_parent_compare_state_advance_at_last_index() {
     // Create a graph with pattern: [a, b, c]
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -167,7 +167,7 @@ fn test_parent_compare_state_advance_at_last_index() {
 #[test]
 fn test_parent_compare_state_advance_with_nested_pattern() {
     // Create a graph with nested patterns: [a, b] and [ab, c]
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (ab, _ab_id) => [a, b],
@@ -239,7 +239,7 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
 #[test]
 fn test_parent_compare_state_cursor_conversion() {
     // Test cursor type conversions during advancement
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -313,7 +313,7 @@ fn test_parent_compare_state_cursor_conversion() {
 #[test]
 fn test_state_advance_error_propagation() {
     // Test that errors from underlying ParentState are properly propagated
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, { a, b });
     insert_patterns!(graph,
         (ab, ab_id) => [a, b]

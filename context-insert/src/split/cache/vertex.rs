@@ -81,7 +81,7 @@ impl SplitVertexCache {
         root_mode: RootMode,
     ) -> Vec<SplitTraceState> {
         debug!(?root_mode, positions=?self.positions.keys().collect::<Vec<_>>(), "AUGMENT_ROOT");
-        
+
         // First add inner offsets for the target partition
         let (splits, next) = match root_mode {
             RootMode::Infix => Self::add_inner_offsets(
@@ -93,7 +93,9 @@ impl SplitVertexCache {
                 OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self),
             ),
             RootMode::Postfix => {
-                debug!("Postfix mode - checking target split at first position");
+                debug!(
+                    "Postfix mode - checking target split at first position"
+                );
                 if let Some(split_pos) = self.positions.keys().next().copied() {
                     debug!(split_pos, cache=?self.positions[&split_pos], "Target split info");
                 }
@@ -103,8 +105,8 @@ impl SplitVertexCache {
                 )
             },
         };
-        debug!(count=splits.len(), "After add_inner_offsets");
-        for (pos, _) in &splits {
+        debug!(count = splits.len(), "After add_inner_offsets");
+        for pos in splits.keys() {
             debug!(pos, "Added inner offset");
         }
         self.positions.extend(splits);
@@ -115,12 +117,12 @@ impl SplitVertexCache {
             RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx.clone()),
             RootMode::Infix => BTreeMap::new(), // Infix handles wrappers differently
         };
-        debug!(count=wrapper_splits.len(), "After add_wrapper_offsets");
-        for (pos, _) in &wrapper_splits {
+        debug!(count = wrapper_splits.len(), "After add_wrapper_offsets");
+        for pos in wrapper_splits.keys() {
             debug!(pos, "Added wrapper offset");
         }
         self.positions.extend(wrapper_splits);
-        
+
         debug!(final_positions=?self.positions.keys().collect::<Vec<_>>(), "Final positions");
 
         next
@@ -137,10 +139,7 @@ impl SplitVertexCache {
     ) -> Partition<K> {
         range.get_splits(self).to_partition()
     }
-    pub fn inner_offsets<
-        R: RangeRole<Mode = Trace>,
-        P: ToPartition<R>,
-    >(
+    pub fn inner_offsets<R: RangeRole<Mode = Trace>, P: ToPartition<R>>(
         ctx: NodeTraceCtx,
         part: P,
     ) -> Vec<NonZeroUsize> {
@@ -160,10 +159,7 @@ impl SplitVertexCache {
                     .collect())
             .unwrap_or_default()
     }
-    pub fn add_inner_offsets<
-        K: RangeRole<Mode = Trace>,
-        P: ToPartition<K>,
-    >(
+    pub fn add_inner_offsets<K: RangeRole<Mode = Trace>, P: ToPartition<K>>(
         ctx: NodeTraceCtx,
         part: P,
     ) -> (
@@ -228,7 +224,7 @@ impl SplitVertexCache {
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
                     debug!(?pid, ?trace_pos, "Processing pattern");
-                    
+
                     // The wrapper starts at the beginning of the child that contains the split
                     let child_index = trace_pos.sub_index;
                     let wrapper_child = pattern[child_index];
@@ -239,7 +235,12 @@ impl SplitVertexCache {
                         wrapper_start_offset += *pattern[i].width;
                     }
 
-                    debug!(wrapper_start_offset, child_index, ?wrapper_child, "Wrapper child info");
+                    debug!(
+                        wrapper_start_offset,
+                        child_index,
+                        ?wrapper_child,
+                        "Wrapper child info"
+                    );
 
                     // Add wrapper start position if not already present and not at root start
                     if wrapper_start_offset > 0
@@ -247,7 +248,10 @@ impl SplitVertexCache {
                             NonZeroUsize::new(wrapper_start_offset)
                         && !self.positions.contains_key(&wrapper_pos)
                     {
-                        debug!(pos=wrapper_pos.get(), "Adding wrapper offset");
+                        debug!(
+                            pos = wrapper_pos.get(),
+                            "Adding wrapper offset"
+                        );
                         wrapper_splits.insert(
                             wrapper_pos,
                             SplitPositionCache::root(position_splits(
@@ -256,17 +260,26 @@ impl SplitVertexCache {
                             )),
                         );
                     }
-                    
+
                     // If the split has an inner_offset, it means there's a split WITHIN the wrapper child
                     // Add this intermediate offset as well
                     if let Some(inner_offset) = trace_pos.inner_offset {
-                        let intermediate_offset = wrapper_start_offset + inner_offset.get();
-                        debug!(?inner_offset, intermediate_offset, "Found inner offset in wrapper");
-                        if let Some(intermediate_pos) = NonZeroUsize::new(intermediate_offset)
+                        let intermediate_offset =
+                            wrapper_start_offset + inner_offset.get();
+                        debug!(
+                            ?inner_offset,
+                            intermediate_offset,
+                            "Found inner offset in wrapper"
+                        );
+                        if let Some(intermediate_pos) =
+                            NonZeroUsize::new(intermediate_offset)
                             && !self.positions.contains_key(&intermediate_pos)
                             && !wrapper_splits.contains_key(&intermediate_pos)
                         {
-                            debug!(pos=intermediate_pos.get(), "Adding intermediate offset");
+                            debug!(
+                                pos = intermediate_pos.get(),
+                                "Adding intermediate offset"
+                            );
                             wrapper_splits.insert(
                                 intermediate_pos,
                                 SplitPositionCache::root(position_splits(
@@ -280,21 +293,31 @@ impl SplitVertexCache {
                     }
                 }
             }
-            
+
             // CRITICAL: Also check for inner_offset in the TARGET partition (at split_pos)
             // This gives us offsets WITHIN the target partition itself
-            debug!(pos=pos.get(), "Checking for inner offsets in target partition");
-            for (pid, trace_pos) in &split_cache.pattern_splits {
+            debug!(
+                pos = pos.get(),
+                "Checking for inner offsets in target partition"
+            );
+            for trace_pos in split_cache.pattern_splits.values() {
                 if let Some(inner_offset) = trace_pos.inner_offset {
                     // The inner_offset is relative to the split position
                     let target_inner_offset = pos.get() + inner_offset.get();
-                    debug!(?inner_offset, target_inner_offset, "Found target inner_offset");
-                    
-                    if let Some(target_inner_pos) = NonZeroUsize::new(target_inner_offset)
+                    debug!(
+                        ?inner_offset,
+                        target_inner_offset, "Found target inner_offset"
+                    );
+
+                    if let Some(target_inner_pos) =
+                        NonZeroUsize::new(target_inner_offset)
                         && !self.positions.contains_key(&target_inner_pos)
                         && !wrapper_splits.contains_key(&target_inner_pos)
                     {
-                        debug!(pos=target_inner_pos.get(), "Adding target inner offset");
+                        debug!(
+                            pos = target_inner_pos.get(),
+                            "Adding target inner offset"
+                        );
                         wrapper_splits.insert(
                             target_inner_pos,
                             SplitPositionCache::root(position_splits(
@@ -306,7 +329,7 @@ impl SplitVertexCache {
                 }
             }
 
-            debug!(count=wrapper_splits.len(), "Total wrapper_splits");
+            debug!(count = wrapper_splits.len(), "Total wrapper_splits");
             wrapper_splits
         } else {
             BTreeMap::new()

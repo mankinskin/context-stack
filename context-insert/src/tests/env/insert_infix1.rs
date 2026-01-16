@@ -37,7 +37,7 @@ pub struct EnvInsertInfix1 {
 
 impl TestEnv for EnvInsertInfix1 {
     fn initialize() -> Self {
-        let mut graph = Hypergraph::default();
+        let graph = Hypergraph::default();
         let [a, b, w, x, y, z] = graph.insert_atoms([
             Atom::Element('a'),
             Atom::Element('b'),

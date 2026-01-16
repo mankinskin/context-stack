@@ -105,7 +105,7 @@ impl<T: GetVertexIndex> GetVertexIndex for &'_ T {
 }
 
 /// A read guard for vertex data from the concurrent graph.
-/// 
+///
 /// This holds both the DashMap ref and the RwLock read guard.
 pub struct VertexReadGuard<'a> {
     _entry_ref: Ref<'a, VertexKey, VertexEntry>,
@@ -123,7 +123,7 @@ impl<'a> std::ops::Deref for VertexReadGuard<'a> {
 }
 
 /// Trait for accessing vertices in a graph.
-/// 
+///
 /// With DashMap, we can't return direct references, so methods return
 /// cloned data or use callbacks.
 pub trait VertexSet<I: GetVertexIndex> {
@@ -132,7 +132,7 @@ pub trait VertexSet<I: GetVertexIndex> {
         &self,
         key: I,
     ) -> Result<VertexData, ErrorReason>;
-    
+
     /// Get vertex data, panicking if not found.
     fn expect_vertex_data(
         &self,
@@ -141,21 +141,21 @@ pub trait VertexSet<I: GetVertexIndex> {
         self.get_vertex_data(index)
             .unwrap_or_else(|_| panic!("Vertex {} does not exist!", index))
     }
-    
+
     /// Execute a function with read access to vertex data.
     fn with_vertex<R>(
         &self,
         key: I,
         f: impl FnOnce(&VertexData) -> R,
     ) -> Result<R, ErrorReason>;
-    
+
     /// Execute a function with write access to vertex data.
     fn with_vertex_mut<R>(
         &self,
         key: I,
         f: impl FnOnce(&mut VertexData) -> R,
     ) -> Result<R, ErrorReason>;
-    
+
     /// Check if vertex exists.
     fn contains_vertex(
         &self,
@@ -175,7 +175,7 @@ where
     ) -> Result<VertexData, ErrorReason> {
         self.get_vertex_data(*key)
     }
-    
+
     fn with_vertex<R>(
         &self,
         key: &'t I,
@@ -183,7 +183,7 @@ where
     ) -> Result<R, ErrorReason> {
         self.with_vertex(*key, f)
     }
-    
+
     fn with_vertex_mut<R>(
         &self,
         key: &'t I,
@@ -203,7 +203,7 @@ impl<G: GraphKind> VertexSet<VertexKey> for Hypergraph<G> {
             .map(|entry| entry.clone_data())
             .ok_or(ErrorReason::UnknownIndex)
     }
-    
+
     fn with_vertex<R>(
         &self,
         key: VertexKey,
@@ -211,13 +211,14 @@ impl<G: GraphKind> VertexSet<VertexKey> for Hypergraph<G> {
     ) -> Result<R, ErrorReason> {
         // Clone the Arc to release the DashMap shard lock before acquiring vertex lock.
         // This prevents deadlocks when the callback accesses other vertices.
-        let entry = self.graph
+        let entry = self
+            .graph
             .get(&key)
             .map(|r| r.clone())
             .ok_or(ErrorReason::UnknownIndex)?;
         Ok(f(&entry.read()))
     }
-    
+
     fn with_vertex_mut<R>(
         &self,
         key: VertexKey,
@@ -225,7 +226,8 @@ impl<G: GraphKind> VertexSet<VertexKey> for Hypergraph<G> {
     ) -> Result<R, ErrorReason> {
         // Clone the Arc to release the DashMap shard lock before acquiring vertex lock.
         // This prevents deadlocks when the callback accesses other vertices.
-        let entry = self.graph
+        let entry = self
+            .graph
             .get(&key)
             .map(|r| r.clone())
             .ok_or(ErrorReason::UnknownIndex)?;
@@ -241,7 +243,7 @@ impl<G: GraphKind> VertexSet<VertexIndex> for Hypergraph<G> {
         let vk = self.get_key_for_index(key)?;
         self.get_vertex_data(vk)
     }
-    
+
     fn with_vertex<R>(
         &self,
         key: VertexIndex,
@@ -250,7 +252,7 @@ impl<G: GraphKind> VertexSet<VertexIndex> for Hypergraph<G> {
         let vk = self.get_key_for_index(key)?;
         self.with_vertex(vk, f)
     }
-    
+
     fn with_vertex_mut<R>(
         &self,
         key: VertexIndex,
@@ -268,7 +270,7 @@ impl<G: GraphKind> VertexSet<Token> for Hypergraph<G> {
     ) -> Result<VertexData, ErrorReason> {
         self.get_vertex_data(key.vertex_index())
     }
-    
+
     fn with_vertex<R>(
         &self,
         key: Token,
@@ -276,7 +278,7 @@ impl<G: GraphKind> VertexSet<Token> for Hypergraph<G> {
     ) -> Result<R, ErrorReason> {
         self.with_vertex(key.vertex_index(), f)
     }
-    
+
     fn with_vertex_mut<R>(
         &self,
         key: Token,
@@ -296,7 +298,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .map(|r| *r)
             .ok_or(ErrorReason::UnknownKey)
     }
-    
+
     #[track_caller]
     pub fn expect_index_for_key(
         &self,
@@ -304,7 +306,7 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> VertexIndex {
         self.get_index_for_key(key).expect("Key does not exist")
     }
-    
+
     /// Get the key for an index by looking up in index_to_key map.
     pub(crate) fn get_key_for_index(
         &self,
@@ -315,7 +317,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .map(|r| *r)
             .ok_or(ErrorReason::UnknownKey)
     }
-    
+
     #[track_caller]
     pub fn expect_key_for_index(
         &self,
@@ -326,9 +328,11 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Get the next vertex index that would be allocated (without incrementing).
     pub fn next_vertex_index(&self) -> VertexIndex {
-        VertexIndex::from(self.next_id.load(std::sync::atomic::Ordering::Relaxed))
+        VertexIndex::from(
+            self.next_id.load(std::sync::atomic::Ordering::Relaxed),
+        )
     }
-    
+
     /// Try to get vertex data without blocking.
     ///
     /// This is useful for avoiding deadlocks when called from within a callback
@@ -343,14 +347,20 @@ impl<G: GraphKind> Hypergraph<G> {
         index: impl HasVertexIndex,
     ) -> Option<VertexData> {
         let key = self.get_key_for_index(index).ok()?;
-        self.graph.get(&key).and_then(|entry| entry.try_clone_data())
+        self.graph
+            .get(&key)
+            .and_then(|entry| entry.try_clone_data())
     }
-    
+
     /// Iterate over all vertices (key, data pairs) - returns cloned data.
-    pub(crate) fn vertex_iter(&self) -> impl Iterator<Item = (VertexKey, VertexData)> + '_ {
-        self.graph.iter().map(|entry| (*entry.key(), entry.clone_data()))
+    pub(crate) fn vertex_iter(
+        &self
+    ) -> impl Iterator<Item = (VertexKey, VertexData)> + '_ {
+        self.graph
+            .iter()
+            .map(|entry| (*entry.key(), entry.clone_data()))
     }
-    
+
     /// Iterate over all vertex keys.
     pub(crate) fn vertex_keys(&self) -> impl Iterator<Item = VertexKey> + '_ {
         self.graph.iter().map(|entry| *entry.key())

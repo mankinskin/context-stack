@@ -128,8 +128,8 @@ fn insert_pattern1() {
     // Assert the token has the expected string representation
     {
         let g = env.graph.graph();
-        assert_token_string_repr(&*g, result_token, case.expected_string());
-        assert_all_vertices_unique(&*g);
+        assert_token_string_repr(g, result_token, case.expected_string());
+        assert_all_vertices_unique(g);
     }
     assert_eq!(
         result_token.width(),
@@ -153,8 +153,8 @@ fn insert_pattern1() {
     // Assert aby has the expected string representation
     {
         let g = env.graph.graph();
-        assert_token_string_repr(&*g, result_token2, case2.expected_string());
-        assert_all_vertices_unique(&*g);
+        assert_token_string_repr(g, result_token2, case2.expected_string());
+        assert_all_vertices_unique(g);
     }
 
     let found2 = env.graph.find_parent(&query2);
@@ -177,7 +177,7 @@ fn insert_pattern2() {
     // Verify all vertices have unique string representations before insertion
     {
         let g = graph.graph();
-        assert_all_vertices_unique(&*g);
+        assert_all_vertices_unique(g);
     }
 
     let query = vec![a, b, y, x];
@@ -186,8 +186,8 @@ fn insert_pattern2() {
     // Assert the token has the expected string representation and width
     {
         let g = graph.graph();
-        assert_token_string_repr(&*g, aby, "aby");
-        assert_all_vertices_unique(&*g);
+        assert_token_string_repr(g, aby, "aby");
+        assert_all_vertices_unique(g);
     }
     assert_eq!(aby.width(), 3);
 
@@ -206,7 +206,6 @@ fn insert_pattern2() {
             .collect::<HashSet<_>>(),
         HashSet::from_iter([Pattern::from(vec![ab, y]),])
     );
-    drop(g);
     let query = vec![a, b, y];
     let aby_found = graph.find_ancestor(&query);
     assert_matches!(

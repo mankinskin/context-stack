@@ -10,7 +10,6 @@ use crate::{
                 ChildrenOf,
                 In,
                 ModeChildrenOf,
-                ModePatternCtxOf,
                 Post,
                 Pre,
                 RangeRole,

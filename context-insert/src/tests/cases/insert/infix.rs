@@ -44,8 +44,8 @@ fn insert_infix1() {
     // Assert the token has the expected string representation and width
     {
         let g = graph.graph();
-        assert_token_string_repr(&*g, aby, "aby");
-        assert_all_vertices_unique(&*g);
+        assert_token_string_repr(g, aby, "aby");
+        assert_all_vertices_unique(g);
     }
 
     let ab = graph
@@ -66,7 +66,6 @@ fn insert_infix1() {
         HashSet::from_iter([Pattern::from(vec![ab, y])]),
         "aby"
     );
-    drop(g);
     let query = vec![a, b, y];
     let aby_found = graph.find_ancestor(&query);
     assert_matches!(
@@ -131,8 +130,8 @@ fn insert_infix2() {
     // Assert the token has the expected string representation and width
     {
         let g = graph.graph();
-        assert_token_string_repr(&*g, abcd, "abcd");
-        assert_all_vertices_unique(&*g);
+        assert_token_string_repr(g, abcd, "abcd");
+        assert_all_vertices_unique(g);
     }
 
     let g = graph.graph();

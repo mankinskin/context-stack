@@ -3,12 +3,10 @@
 //! This module provides common logic for merging partitions that can be reused
 //! by both NodeMergeCtx (intermediary) and RootMergeCtx (root).
 
-use std::ops::Range;
-
 use itertools::Itertools;
-use tracing_subscriber::field::debug;
 
 use crate::{
+    RootMode,
     interval::partition::{
         Infix,
         Postfix,
@@ -45,6 +43,41 @@ use context_trace::*;
 use std::borrow::Borrow;
 use tracing::debug;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum MergeMode {
+    Full,
+    Root(RootMode),
+}
+impl MergeMode {
+    pub fn partition_range(
+        &self,
+        num_offsets: usize,
+    ) -> std::ops::Range<usize> {
+        match self {
+            MergeMode::Full => 0..(num_offsets + 1),
+            MergeMode::Root(root_mode) => match root_mode {
+                RootMode::Prefix => 0..num_offsets,
+                RootMode::Postfix => 1..(num_offsets + 1),
+                RootMode::Infix => 1..num_offsets,
+            },
+        }
+    }
+    #[allow(dead_code)]
+    pub fn is_full(&self) -> bool {
+        matches!(self, MergeMode::Full)
+    }
+    #[allow(dead_code)]
+    pub fn is_infix(&self) -> bool {
+        matches!(self, MergeMode::Root(RootMode::Infix))
+    }
+    pub fn has_prefix(&self) -> bool {
+        matches!(self, MergeMode::Full | MergeMode::Root(RootMode::Prefix))
+    }
+    pub fn has_postfix(&self) -> bool {
+        matches!(self, MergeMode::Full | MergeMode::Root(RootMode::Postfix))
+    }
+}
+
 /// Create initial partitions between consecutive offsets.
 ///
 /// This function creates the smallest partitions needed before the merge step.
@@ -66,9 +99,23 @@ use tracing::debug;
 pub fn create_initial_partitions(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
-    partition_range: Range<usize>,
+    merge_mode: MergeMode,
 ) -> Vec<Token> {
     let num_offsets = offsets.len();
+
+    //// Determine partition range based on root_mode
+    //// This controls which initial partitions to create (with protection)
+    //let partition_range = match root_mode {
+    //    RootMode::Prefix => 0..num_offsets, // Prefix + infixes (no postfix)
+    //    RootMode::Postfix => 1..num_offsets + 1, // Infixes + postfix (no prefix)
+    //    RootMode::Infix => 1..num_offsets, // Infixes only (no prefix/postfix)
+    //};
+
+    //debug!(
+    //    ?partition_range,
+    //    "Protection strategy - partition range for initial partitions"
+    //);
+    let partition_range = merge_mode.partition_range(num_offsets);
     let mut partitions = Vec::<Token>::with_capacity(partition_range.len());
 
     // Get split positions in sorted order
@@ -76,11 +123,11 @@ pub fn create_initial_partitions(
         offsets.iter().map(PosSplitCtx::from).collect();
     offset_ctxs.sort_by_key(|ctx| ctx.pos);
 
-    debug!(num_offsets, ?partition_range, "Creating initial partitions");
+    debug!(num_offsets, "Creating initial partitions");
 
     // Determine if we should create prefix/postfix based on partition_range
-    let create_prefix = partition_range.start == 0;
-    let create_postfix = partition_range.end == num_offsets + 1;
+    let create_prefix = merge_mode.has_prefix();
+    let create_postfix = merge_mode.has_postfix();
 
     // Create prefix partition (before first offset) if requested
     if create_prefix && num_offsets > 0 {
@@ -175,11 +222,7 @@ pub fn create_initial_partitions(
         debug!(?postfix_token, "Created postfix partition");
     }
 
-    debug!(
-        num_created = partitions.len(),
-        expected = partition_range.len(),
-        "Initial partitions created"
-    );
+    debug!(num_created = partitions.len(), "Initial partitions created");
 
     partitions
 }
@@ -208,14 +251,10 @@ pub fn merge_partitions_in_range(
     offsets: &SplitVertexCache,
     partitions: &[Token],
     range_map: &mut RangeMap,
-    has_prefix: bool,
-    has_postfix: bool,
+    merge_mode: MergeMode,
 ) {
     let max_len = partitions.len();
-    debug!(
-        max_len,
-        has_prefix, has_postfix, "merge_partitions_in_range: ENTERED"
-    );
+    debug!(max_len, ?merge_mode, "merge_partitions_in_range: ENTERED");
 
     // Merge from smallest to largest partitions
     // Start at len=2 because len=1 (single partitions) are already in range_map
@@ -244,16 +283,12 @@ pub fn merge_partitions_in_range(
                 "Merging partition range"
             );
             let merged_token = if is_start && is_end {
-                // Merging the entire array - just use range_sub_merges patterns
-                // No need for info_partition since we're combining all existing partitions
-                let merges: Vec<_> =
-                    range_map.range_sub_merges(&range).into_iter().collect();
-                ctx.trav.insert_patterns(merges)
-            } else if has_prefix && is_start {
+                panic!("Merging full range partition is not supported");
+            } else if merge_mode.has_prefix() && is_start {
                 // Merging prefix with some infixes (range [0..k])
                 // Right boundary at offset index (end - 1)
                 merge_prefix_partition(ctx, offsets, range_map, &range)
-            } else if has_postfix && is_end {
+            } else if merge_mode.has_postfix() && is_end {
                 // Merging some infixes to the end (range [k..partitions.len()])
                 // This is a postfix partition if and only if no prefix exists
                 // Left boundary at offset index (start - (has_prefix ? 1 : 0))
@@ -261,6 +296,7 @@ pub fn merge_partitions_in_range(
             } else {
                 // Merging infixes in the middle (range [k..m] where k > 0 and m < partitions.len())
                 // Use infix merge
+                // either a side of an infix mode range or somewhere in the middle of any mode
                 merge_infix_partition(ctx, offsets, range_map, &range)
             };
 

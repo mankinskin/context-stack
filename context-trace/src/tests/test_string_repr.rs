@@ -11,7 +11,7 @@ mod tests {
 
     #[test]
     fn test_token_string_representation() {
-        let mut graph: Hypergraph<BaseGraphKind> = Hypergraph::default();
+        let graph: Hypergraph<BaseGraphKind> = Hypergraph::default();
 
         // Insert some atoms
         let a = graph.insert_atom(Atom::Element('a'));
@@ -67,7 +67,7 @@ mod tests {
         // Clear any previously registered graph
         clear_test_graph();
 
-        let mut graph: Hypergraph<BaseGraphKind> = Hypergraph::default();
+        let graph: Hypergraph<BaseGraphKind> = Hypergraph::default();
         let x = graph.insert_atom(Atom::Element('x'));
         let y = graph.insert_atom(Atom::Element('y'));
 
@@ -89,7 +89,7 @@ mod tests {
         // Clear any previously registered graph
         clear_test_graph();
 
-        let mut graph: Hypergraph<BaseGraphKind> = Hypergraph::default();
+        let graph: Hypergraph<BaseGraphKind> = Hypergraph::default();
         let h = graph.insert_atom(Atom::Element('h'));
         let e = graph.insert_atom(Atom::Element('e'));
         let l = graph.insert_atom(Atom::Element('l'));

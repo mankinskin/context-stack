@@ -4,13 +4,11 @@ use context_trace::{
     graph::vertex::parent::PatternIndex,
     *,
 };
-use pretty_assertions::{
-    assert_eq,
-    assert_matches,
-};
+use pretty_assertions::assert_eq;
 #[test]
 fn sync_read_text1() {
-    let mut graph: HypergraphRef = HypergraphRef::<BaseGraphKind>::from(Hypergraph::default());
+    let mut graph: HypergraphRef =
+        HypergraphRef::<BaseGraphKind>::from(Hypergraph::default());
     let result = (&mut graph, "heldldo world!".chars())
         .read_sequence()
         .unwrap();
@@ -32,7 +30,7 @@ fn sync_read_text1() {
 }
 #[test]
 fn sync_read_text2() {
-    let mut graph = HypergraphRef::<BaseGraphKind>::<BaseGraphKind>::<BaseGraphKind>::<BaseGraphKind>::default();
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let heldld = (&mut graph, "heldld".chars()).read_sequence().unwrap();
     expect_atoms!(graph, {h, e, l, d});
     assert_indices!(graph, ld);

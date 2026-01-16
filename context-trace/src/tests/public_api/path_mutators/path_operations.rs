@@ -18,7 +18,7 @@ use std::ops::ControlFlow;
 fn trace_ctx_postfix_traces_path_upward() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],
@@ -53,7 +53,7 @@ fn trace_ctx_postfix_traces_path_upward() {
 fn trace_ctx_prefix_traces_path_downward() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],
@@ -89,7 +89,7 @@ fn trace_ctx_prefix_traces_path_downward() {
 fn trace_ctx_range_demonstrates_basic_usage() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -120,7 +120,7 @@ fn trace_ctx_range_demonstrates_basic_usage() {
 fn path_append_and_trace_creates_nested_path() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],
@@ -147,7 +147,7 @@ fn path_append_and_trace_creates_nested_path() {
 fn move_root_and_leaf_combined() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],
@@ -180,7 +180,7 @@ fn move_root_and_leaf_combined() {
 fn trace_cache_accumulates_across_multiple_commands() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (ab, ab_id) => [a, b],

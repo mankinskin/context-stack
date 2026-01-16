@@ -37,7 +37,6 @@ use crate::{
     Hypergraph,
     HypergraphRef,
     graph::{
-        getters::vertex::VertexSet,
         kind::GraphKind,
         vertex::VertexIndex,
     },

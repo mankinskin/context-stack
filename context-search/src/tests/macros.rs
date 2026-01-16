@@ -3,7 +3,7 @@ macro_rules! assert_not_indices {
     ($graph:ident, $($name:ident),*) => {
         $(
         let result = $graph.find_ancestor(stringify!($name).chars());
-        assert_matches!(
+        pretty_assertions::assert_matches!(
             result,
             Err(_) | Ok(_)
         );

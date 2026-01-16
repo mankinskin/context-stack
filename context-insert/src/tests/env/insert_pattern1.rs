@@ -46,7 +46,7 @@ pub struct EnvInsertPattern1 {
 
 impl TestEnv for EnvInsertPattern1 {
     fn initialize() -> Self {
-        let mut graph = Hypergraph::default();
+        let graph = Hypergraph::default();
         let [a, b, x, y, z] = graph.insert_atoms([
             Atom::Element('a'),
             Atom::Element('b'),
@@ -72,7 +72,7 @@ impl TestEnv for EnvInsertPattern1 {
         // Verify all vertices have unique string representations before insertion
         {
             let g = graph.graph();
-            assert_all_vertices_unique(&*g);
+            assert_all_vertices_unique(g);
         }
         Self {
             graph,

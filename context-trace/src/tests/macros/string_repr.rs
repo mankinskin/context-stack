@@ -287,45 +287,44 @@ mod tests {
 
     #[test]
     fn test_check_token_string_repr() {
-        let mut graph = HypergraphRef::default();
+        let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
 
         let g = graph.graph();
-        assert!(check_token_string_repr(&*g, a, "a"));
-        assert!(check_token_string_repr(&*g, b, "b"));
-        assert!(!check_token_string_repr(&*g, a, "b"));
-        drop(g);
+        assert!(check_token_string_repr(g, a, "a"));
+        assert!(check_token_string_repr(g, b, "b"));
+        assert!(!check_token_string_repr(g, a, "b"));
 
         insert_patterns!(graph, abc => [a, b, c]);
         let g = graph.graph();
-        assert!(check_token_string_repr(&*g, abc, "abc"));
+        assert!(check_token_string_repr(g, abc, "abc"));
     }
 
     #[test]
     fn test_assert_token_string_repr() {
-        let mut graph = HypergraphRef::default();
+        let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
         insert_patterns!(graph, abc => [a, b, c]);
 
         let g = graph.graph();
-        assert_token_string_repr(&*g, a, "a");
-        assert_token_string_repr(&*g, abc, "abc");
+        assert_token_string_repr(g, a, "a");
+        assert_token_string_repr(g, abc, "abc");
     }
 
     #[test]
     #[should_panic(expected = "Token string representation mismatch")]
     #[allow(unused)]
     fn test_assert_token_string_repr_fails() {
-        let mut graph = HypergraphRef::default();
+        let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b});
 
         let g = graph.graph();
-        assert_token_string_repr(&*g, a, "b");
+        assert_token_string_repr(g, a, "b");
     }
 
     #[test]
     fn test_check_all_vertices_unique() {
-        let mut graph = HypergraphRef::default();
+        let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c, d});
         insert_patterns!(graph,
             _ab => [a, b],
@@ -333,7 +332,7 @@ mod tests {
         );
 
         let g = graph.graph();
-        let (is_unique, duplicates) = check_all_vertices_unique(&*g);
+        let (is_unique, duplicates) = check_all_vertices_unique(g);
         assert!(
             is_unique,
             "Expected unique string reprs, got duplicates: {:?}",
@@ -343,17 +342,17 @@ mod tests {
 
     #[test]
     fn test_assert_all_vertices_unique() {
-        let mut graph = HypergraphRef::default();
+        let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
         insert_patterns!(graph, _abc => [a, b, c]);
 
         let g = graph.graph();
-        assert_all_vertices_unique(&*g);
+        assert_all_vertices_unique(g);
     }
 
     #[test]
     fn test_check_tokens_unique() {
-        let mut graph = HypergraphRef::default();
+        let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c, d});
         insert_patterns!(graph,
             ab => [a, b],
@@ -361,7 +360,7 @@ mod tests {
         );
 
         let g = graph.graph();
-        let (is_unique, duplicates) = check_tokens_unique(&*g, &[ab, cd]);
+        let (is_unique, duplicates) = check_tokens_unique(g, &[ab, cd]);
         assert!(
             is_unique,
             "Expected unique tokens, got duplicates: {:?}",

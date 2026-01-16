@@ -6,11 +6,13 @@
 use std::{
     borrow::Borrow,
     collections::HashMap,
-    ops::Range,
 };
 
-use derive_more::{Deref, DerefMut};
 use context_trace::*;
+use derive_more::{
+    Deref,
+    DerefMut,
+};
 
 use super::partition_range::PartitionRange;
 
@@ -34,9 +36,7 @@ pub struct RangeMap {
     pub map: HashMap<PartitionRange, Token>,
 }
 
-impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I>
-    for RangeMap
-{
+impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I> for RangeMap {
     fn from(iter: I) -> Self {
         let mut map = HashMap::default();
         for (i, part) in iter.into_iter().enumerate() {

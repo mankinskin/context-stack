@@ -16,15 +16,12 @@ use context_search::{
     tests::search::trace_cache::CdefghiTraceCase,
     *,
 };
-use context_trace::{
-    tests::{
-        env::{
-            Env1,
-            Env2,
-        },
-        test_case::TestEnv,
+use context_trace::tests::{
+    env::{
+        Env1,
+        Env2,
     },
-    *,
+    test_case::TestEnv,
 };
 fn build_split_cache1(env: &Env1) -> SplitCache {
     let Env1 {
@@ -260,7 +257,7 @@ fn interval_graph1() {
 #[test]
 fn interval_graph2() {
     // Use test environment and trace cache test case from context-search
-    let mut trace_test = CdefghiTraceCase::default();
+    let trace_test = CdefghiTraceCase::default();
     let _tracing = context_trace::init_test_tracing!(&trace_test.env.graph);
 
     // Build InitInterval directly from test case expected values (no search needed)
@@ -294,8 +291,7 @@ fn interval_graph2() {
     let cd_efghi_id = cdefghi_ids[1];
 
     // With interior mutability, we only need &graph for IntervalGraph creation
-    let interval =
-        IntervalGraph::from((&*trace_test.env.graph, init));
+    let interval = IntervalGraph::from((&*trace_test.env.graph, init));
 
     // Check root and states
     assert_eq!(interval.root, cdefghi);

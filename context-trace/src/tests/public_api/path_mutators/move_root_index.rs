@@ -10,7 +10,7 @@ use std::ops::ControlFlow;
 fn move_root_index_right_advances_through_pattern() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (abcd, abcd_id) => [a, b, c, d]
@@ -35,7 +35,7 @@ fn move_root_index_right_advances_through_pattern() {
 fn move_root_index_right_breaks_at_pattern_end() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -55,7 +55,7 @@ fn move_root_index_right_breaks_at_pattern_end() {
 fn move_root_index_left_retracts_through_pattern() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         (abcd, abcd_id) => [a, b, c, d]
@@ -80,7 +80,7 @@ fn move_root_index_left_retracts_through_pattern() {
 fn move_root_index_left_breaks_at_pattern_start() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
         (abc, abc_id) => [a, b, c]
@@ -100,7 +100,7 @@ fn move_root_index_left_breaks_at_pattern_start() {
 fn move_root_index_works_with_compound_patterns() {
     let _tracing = init_test_tracing!();
 
-    let mut graph = HypergraphRef::default();
+    let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
     insert_patterns!(graph,
         ab => [a, b],
