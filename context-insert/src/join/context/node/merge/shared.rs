@@ -248,7 +248,22 @@ pub fn merge_partitions_in_range(
                 // No need for info_partition since we're combining all existing partitions
                 let merges: Vec<_> =
                     range_map.range_sub_merges(&range).into_iter().collect();
-                ctx.trav.insert_patterns(merges)
+                let token = ctx.trav.insert_patterns(merges);
+                
+                // Replace the root node pattern with the merged token
+                // This is the entire pattern, so we replace all of it
+                debug!(
+                    ?token,
+                    range_start = range.start,
+                    range_end = range.end,
+                    "FULL RANGE: Replacing entire root pattern with merged token"
+                );
+                // TODO(#3760834806): Replace root node pattern with merged token
+                // Need to determine which pattern index to use for the root node
+                // For now, just return the token without replacement
+                // ctx.trav.replace_in_pattern(root_pattern_loc, 0..pattern_len, vec![token]);
+                
+                token
             } else if has_prefix && is_start {
                 // Merging prefix with some infixes (range [0..k])
                 // Right boundary at offset index (end - 1)
@@ -342,8 +357,32 @@ fn merge_prefix_partition(
                 ?existing,
                 range_start = range.start,
                 range_end = range.end,
-                "PREFIX: Token already exists - using without modification"
+                "PREFIX: Token already exists - checking if pattern replacement needed"
             );
+
+            // Even though token exists, we still need to replace patterns that have
+            // perfect boundaries at this offset.
+            // For prefix, the right boundary (ro) determines which patterns to update.
+            // If a pattern has this offset in its pattern_splits, it has a boundary here.
+            for (pid, trace_pos) in &ro.split.pattern_splits {
+                let pattern_loc = node_index.to_pattern_location(*pid);
+                let pattern_end_index = trace_pos.sub_index;
+                debug!(
+                    ?node_index,
+                    ?pid,
+                    ?pattern_loc,
+                    ?pattern_end_index,
+                    ?existing,
+                    range_start = range.start,
+                    range_end = range.end,
+                    "PREFIX (existing): Replacing pattern with existing token"
+                );
+                ctx.trav.replace_in_pattern(
+                    pattern_loc,
+                    0..pattern_end_index,
+                    vec![existing],
+                );
+            }
 
             existing
         },
@@ -443,8 +482,34 @@ fn merge_postfix_partition(
                 ?existing,
                 range_start = range.start,
                 range_end = range.end,
-                "POSTFIX: Token already exists - using without modification"
+                "POSTFIX: Token already exists - checking if pattern replacement needed"
             );
+
+            // Even though token exists, we still need to replace patterns that have
+            // perfect boundaries at this offset.
+            // For postfix, the left boundary (lo) determines which patterns to update.
+            for (pid, trace_pos) in &lo.split.pattern_splits {
+                let pattern_loc = node_index.to_pattern_location(*pid);
+                let pattern_start_index = trace_pos.sub_index;
+                debug!(
+                    ?node_index,
+                    ?pid,
+                    ?pattern_loc,
+                    ?pattern_start_index,
+                    ?existing,
+                    range_start = range.start,
+                    range_end = range.end,
+                    "POSTFIX (existing): Replacing pattern with existing token"
+                );
+                ctx.trav.replace_in_pattern(
+                    pattern_loc,
+                    PostfixRangeFrom::new(
+                        pattern_start_index,
+                        ctx.patterns().get(pid).unwrap().len(),
+                    ),
+                    vec![existing],
+                );
+            }
             existing
         },
     }
@@ -543,8 +608,37 @@ fn merge_infix_partition(
                 ?existing,
                 range_start = range.start,
                 range_end = range.end,
-                "INFIX: Token already exists - using without modification"
+                "INFIX: Token already exists - checking if pattern replacement needed"
             );
+
+            // Even though token exists, we still need to replace patterns that have
+            // perfect boundaries at BOTH offsets in the SAME pattern.
+            // Find patterns that appear in both lo and ro pattern_splits
+            for (pid, lo_trace_pos) in &lo.split.pattern_splits {
+                if let Some(ro_trace_pos) = ro.split.pattern_splits.get(pid) {
+                    // Both boundaries exist in this pattern - replace it
+                    let pattern_loc = node_index.to_pattern_location(*pid);
+                    let pattern_start_index = lo_trace_pos.sub_index;
+                    let pattern_end_index = ro_trace_pos.sub_index;
+                    debug!(
+                        ?node_index,
+                        ?pid,
+                        ?pattern_loc,
+                        ?pattern_start_index,
+                        ?pattern_end_index,
+                        ?existing,
+                        range_start = range.start,
+                        range_end = range.end,
+                        "INFIX (existing): Replacing pattern with existing token"
+                    );
+                    ctx.trav.replace_in_pattern(
+                        pattern_loc,
+                        pattern_start_index..pattern_end_index,
+                        vec![existing],
+                    );
+                }
+            }
+
             existing
         },
     }
