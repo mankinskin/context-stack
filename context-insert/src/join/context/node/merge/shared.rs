@@ -286,7 +286,16 @@ pub fn merge_partitions_in_range(
                 // Merging infixes in the middle (range [k..m] where k > 0 and m < partitions.len())
                 // Use infix merge
                 merge_infix_partition(
-                    ctx, offsets, range_map, &range, has_prefix, node_index,
+                    ctx,
+                    offsets,
+                    range_map,
+                    &range,
+                    start,
+                    end,
+                    partitions,
+                    num_offsets,
+                    has_prefix,
+                    node_index,
                 )
             };
 
