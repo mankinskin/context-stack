@@ -87,16 +87,16 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
                     PartitionRange::new(1..partitions.len())
                 },
                 RootMode::Postfix => {
-                    // Postfix mode: partition_range is 1..num_offsets+1 (infixes + postfix, no prefix)
-                    // Partitions at array indices: [0, 1, 2, ...] map to conceptual [1, 2, 3, ...]  
-                    // Target in conceptual space: [2..num_offsets+1] = all except first infix (wrapper)
-                    // Example: partitions=[a, b, cd] (conceptual [1,2,3]) → target conceptual [2..4] = "bcd"
-                    PartitionRange::new(2..num_offsets + 1)
+                    // Postfix mode: skip first partition (wrapper that merges with prefix)
+                    // Partitions array: [a, b, cd] at indices [0, 1, 2]
+                    // Target: [1..3] extracts partitions[1..3] = [b, cd] = "bcd"
+                    PartitionRange::new(1..partitions.len())
                 },
                 RootMode::Infix => {
-                    // Infix mode: partition_range is 1..num_offsets (infixes only)
-                    // Target is ALL these partitions
-                    PartitionRange::new(1..partitions.len() - 1)
+                    // Infix mode: all partitions are infix, target is all of them
+                    // Partitions array: [a, b, c] at indices [0, 1, 2]
+                    // Target: [0..3] extracts all partitions = "abc"
+                    PartitionRange::new(0..partitions.len())
                 },
             }
         };
@@ -109,7 +109,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
 
         // Run the merge algorithm - exactly like intermediary
         // Extract target when we complete the merge of target_partition_range
-        // Pass the original partition_range so RangeMap uses conceptual indices
+        // RangeMap uses array indices into partitions array
         let (range_map, target_token) = self.merge_partitions(
             &offsets,
             &partitions,
@@ -150,10 +150,12 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         );
 
         for (i, (_, v)) in offsets.iter().enumerate() {
-            // Create partition ranges to query the range_map
-            // These are partition index ranges, NOT offset indices
-            let lr = PartitionRange::new(0..i);
-            let rr = PartitionRange::new(i + 1..len + 1);
+            // Create partition ranges using array indices
+            // For partitions=[a, b, cd] at indices [0,1,2] with offset at index i=1:
+            // - lr = [0..1] = partitions[0] = "a"
+            // - rr = [1..2] = partitions[1] = "b"
+            let lr = PartitionRange::new(0..(i + 1));
+            let rr = PartitionRange::new((i + 1)..(len + 1));
 
             debug!(
                 offset_index = i,
@@ -261,8 +263,8 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
     ///
     /// # Parameters
     ///
-    /// - `partition_range_for_creation`: Range of partition indices that were created (e.g., 1..num_offsets+1 for postfix mode)
-    /// - `target_partition_range`: Range of partition indices that constitute the target token
+    /// - `partition_range_for_creation`: Range of partition indices that were created (only used to determine has_prefix)
+    /// - `target_partition_range`: Array indices into partitions that constitute the target token
     fn merge_partitions(
         &mut self,
         offsets: &SplitVertexCache,
@@ -271,15 +273,14 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         partition_range_for_creation: Range<usize>,
         target_partition_range: PartitionRange,
     ) -> (RangeMap, Token) {
-        // Initialize range_map with conceptual partition indices
-        // For postfix mode where partition_range_for_creation = 1..4:
-        // - partitions[0] → PartitionRange(1..2) conceptual partition 1
-        // - partitions[1] → PartitionRange(2..3) conceptual partition 2
-        // - partitions[2] → PartitionRange(3..4) conceptual partition 3
+        // Initialize range_map with simple array indices
+        // For partitions=[a, b, cd] at array indices [0, 1, 2]:
+        // - partitions[0] → PartitionRange(0..1) for "a"
+        // - partitions[1] → PartitionRange(1..2) for "b"
+        // - partitions[2] → PartitionRange(2..3) for "cd"
         let mut range_map = RangeMap::default();
-        for (array_idx, &token) in partitions.iter().enumerate() {
-            let conceptual_idx = partition_range_for_creation.start + array_idx;
-            range_map.insert(PartitionRange::new(conceptual_idx..(conceptual_idx + 1)), token);
+        for (i, &token) in partitions.iter().enumerate() {
+            range_map.insert(PartitionRange::new(i..(i + 1)), token);
         }
 
         debug!(
@@ -287,16 +288,16 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             num_offsets,
             ?partition_range_for_creation,
             ?target_partition_range,
-            "Using shared merge logic with partition indices"
+            "Using shared merge logic with array indices"
         );
 
-        // Use shared merge logic with the conceptual partition range
-        // This ensures PartitionRange entries use conceptual indices, not array indices
+        // Use shared merge logic with array indices [0..partitions.len()]
+        // partition_range_for_creation only used to determine has_prefix flag
         super::shared::merge_partitions_in_range(
             self.ctx,
             offsets,
             partitions,
-            partition_range_for_creation.clone(),
+            partition_range_for_creation,
             num_offsets,
             &mut range_map,
             Some(self.ctx.index), // Pass node index for pattern updates

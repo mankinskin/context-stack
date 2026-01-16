@@ -207,9 +207,9 @@ pub fn create_initial_partitions(
 /// - `ctx`: The node join context
 /// - `offsets`: Split vertex cache containing offset positions
 /// - `partitions`: Initial partitions to merge
-/// - `partition_range`: Range of partition indices to merge (e.g., 0..num_offsets+1)
+/// - `partition_range_for_creation`: Range used during partition creation (only for has_prefix detection)
 /// - `num_offsets`: Total number of offsets (for boundary detection)
-/// - `range_map`: Mutable range map to store merged tokens
+/// - `range_map`: Mutable range map to store merged tokens (uses array indices)
 /// - `node_index`: The node being merged (for pattern updates), or None to skip updates
 ///
 /// # Returns
@@ -219,90 +219,74 @@ pub fn merge_partitions_in_range(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     partitions: &[Token],
-    partition_range: Range<usize>,
+    partition_range_for_creation: Range<usize>,
     num_offsets: usize,
     range_map: &mut RangeMap,
     node_index: Option<Token>,
 ) {
     debug!(
-        partition_range_start = partition_range.start,
-        partition_range_end = partition_range.end,
+        ?partition_range_for_creation,
         num_offsets,
         num_partitions = partitions.len(),
         has_node_index = node_index.is_some(),
         "merge_partitions_in_range: ENTERED"
     );
 
-    let max_len = partition_range.len();
+    let max_len = partitions.len();
+
+    // Determine has_prefix from partition_range_for_creation
+    // has_prefix = true if partition 0 was created (partition_range_for_creation.start == 0)
+    let has_prefix = partition_range_for_creation.start == 0;
 
     // Merge from smallest to largest partitions
-    // Start at len=2 because len=1 (single partitions) are already created in create_initial_partitions
+    // Start at len=2 because len=1 (single partitions) are already in range_map
     for len in 2..=max_len {
         debug!(
             len,
             max_len, "merge_partitions_in_range: starting merge loop iteration"
         );
-        // For each partition length, iterate over all valid starting positions
-        // E.g., with max_len=2, len=2: start_offset in 0..1 gives start_offset=0, creating range 0..2
-        for start_offset in 0..(max_len - len + 1) {
-            let start = partition_range.start + start_offset;
+        // For each partition length, iterate over all valid starting positions in the array
+        // E.g., with max_len=3, len=2: start in 0..2 gives ranges [0..2] and [1..3]
+        for start in 0..(max_len - len + 1) {
             let end = start + len;
             let range = PartitionRange::new(start..end);
 
-            // Determine partition type based on boundaries
-            // Important: start/end are conceptual partition indices from partition_range
-            // has_prefix: true if partition 0 exists (partition_range.start == 0)
-            // has_postfix: true if the last partition is a postfix (partition_range.end == num_offsets+1)
-            
-            let has_prefix = partition_range.start == 0;
-            let has_postfix = partition_range.end == num_offsets + 1;
-            let is_start = start == partition_range.start;
-            let is_end = end == partition_range.end;
+            // Determine partition type based on position in array
+            // is_start: this range starts at array index 0
+            // is_end: this range ends at array index partitions.len()
+            let is_start = start == 0;
+            let is_end = end == partitions.len();
 
-            let index = if has_prefix && has_postfix && is_start && is_end {
-                // Merging the entire range: prefix + all infixes + postfix
-                // This happens when start==partition_range.start and end==partition_range.end
-                // Use postfix merge starting from the first offset (offset 0)
+            let index = if has_prefix && is_start && is_end {
+                // Merging entire array starting with prefix: prefix + all infixes + possibly postfix
+                // Use postfix merge starting from offset 0
                 merge_postfix_partition(
                     ctx, offsets, range_map, &range, 0, node_index,
                 )
             } else if has_prefix && is_start {
-                // Merging prefix with some infixes (right boundary at an offset)
-                // The `end` index maps to offset index (end - partition_range.start)
-                let offset_end = end - partition_range.start;
+                // Merging prefix with some infixes (range [0..k])
+                // Right boundary at offset index (end - 1)
+                let offset_end = end - 1;
                 merge_prefix_partition(
                     ctx, offsets, range_map, &range, offset_end, node_index,
                 )
-            } else if has_postfix && is_end {
-                // Merging some infixes with postfix (left boundary at an offset)
-                // The `start` index maps to offset index (start - partition_range.start - (has_prefix ? 1 : 0))
+            } else if is_end {
+                // Merging some infixes to the end (range [k..partitions.len()])
+                // This is a postfix partition if and only if no prefix exists
+                // Left boundary at offset index (start - (has_prefix ? 1 : 0))
                 let offset_start = if has_prefix {
-                    start - partition_range.start - 1
+                    start - 1
                 } else {
-                    start - partition_range.start
+                    start
                 };
                 merge_postfix_partition(
-                    ctx,
-                    offsets,
-                    range_map,
-                    &range,
-                    offset_start,
-                    node_index,
+                    ctx, offsets, range_map, &range, offset_start, node_index,
                 )
             } else {
-                // Normal infix merge between two offsets
-                // Pass partition indices directly - function will map to offset indices
+                // Merging infixes in the middle (range [k..m] where k > 0 and m < partitions.len())
+                // Use infix merge
                 merge_infix_partition(
-                    ctx,
-                    offsets,
-                    range_map,
-                    &range,
-                    start,
-                    end,
-                    partitions,
-                    num_offsets,
-                    has_prefix,
-                    node_index,
+                    ctx, offsets, range_map, &range, has_prefix, node_index,
                 )
             };
 
