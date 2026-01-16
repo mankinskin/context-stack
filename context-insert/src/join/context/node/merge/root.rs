@@ -275,27 +275,32 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         partition_range_for_creation: Range<usize>,
         target_partition_range: PartitionRange,
     ) -> (RangeMap, Token) {
-        let mut range_map = RangeMap::from(partitions);
-
-        // Use the partition_range for merging - this was the range used to create partitions
-        // All merging happens within this range
-        let partition_range = 0..partitions.len();
+        // Initialize range_map with conceptual partition indices
+        // For postfix mode where partition_range_for_creation = 1..4:
+        // - partitions[0] → PartitionRange(1..2) conceptual partition 1
+        // - partitions[1] → PartitionRange(2..3) conceptual partition 2
+        // - partitions[2] → PartitionRange(3..4) conceptual partition 3
+        let mut range_map = RangeMap::default();
+        for (array_idx, &token) in partitions.iter().enumerate() {
+            let conceptual_idx = partition_range_for_creation.start + array_idx;
+            range_map.insert(PartitionRange::new(conceptual_idx..(conceptual_idx + 1)), token);
+        }
 
         debug!(
             num_partitions = partitions.len(),
             num_offsets,
-            ?partition_range,
             ?partition_range_for_creation,
             ?target_partition_range,
             "Using shared merge logic with partition indices"
         );
 
-        // Use shared merge logic - exactly the same as intermediary!
+        // Use shared merge logic with the conceptual partition range
+        // This ensures PartitionRange entries use conceptual indices, not array indices
         super::shared::merge_partitions_in_range(
             self.ctx,
             offsets,
             partitions,
-            partition_range,
+            partition_range_for_creation.clone(),
             num_offsets,
             &mut range_map,
             Some(self.ctx.index), // Pass node index for pattern updates
