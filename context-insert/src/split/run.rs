@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use tracing::debug;
 
 use crate::{
     interval::IntervalGraph,

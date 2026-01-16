@@ -42,6 +42,7 @@ use std::{
     iter::FromIterator,
     num::NonZeroUsize,
 };
+use tracing::debug;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut)]
 pub struct SplitVertexCache {
