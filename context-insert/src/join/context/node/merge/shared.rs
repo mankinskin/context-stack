@@ -367,13 +367,12 @@ fn merge_prefix_partition(
             // We replace when the right boundary is perfect
             let perfect_pattern_id = info.perfect.0;
 
-            // TODO(#3759928646): Before calling join_pattern, check if the pattern's token
-            // sequence already exists in range_map to prevent creating duplicate tokens.
-            // See POSTFIX merge for same issue - need to reuse existing merged tokens.
+            // TODO(#3759928646): Check range_map before join_pattern to prevent duplicates.
+            // See POSTFIX merge for detailed explanation of the problem and needed solution.
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                // FIXME: Check range_map before join_pattern to reuse existing merged tokens
+                let pattern = pinfo.join_pattern(ctx, &pid);
                 Pattern::from(
-                    (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
+                    (pattern.borrow() as &'_ Pattern)
                         .iter()
                         .cloned()
                         .collect_vec(),
@@ -469,15 +468,26 @@ fn merge_postfix_partition(
                 "POSTFIX merge_postfix_partition: perfect border check"
             );
 
-            // TODO(#3759928646): Before calling join_pattern, check if the pattern's token
-            // sequence already exists in range_map to prevent creating duplicate tokens.
-            // Example: when merging [b, cd], pattern [c, d] calls join_pattern creating
-            // new "cd" token, but "cd" already exists in partitions[2] and range_map.
-            // Should reuse existing token from range_map instead of creating duplicate.
+            // TODO(#3759928646): Check range_map before join_pattern to prevent duplicates.
+            // PROBLEM: join_pattern() creates tokens as a side effect, so we can't call it
+            // to "check" what it would create - by then it's too late.
+            // 
+            // ATTEMPTED FIX (doesn't work): Call join_pattern first, then check if the
+            // resulting token already exists in range_map. But this still creates the
+            // duplicate token before we can prevent it.
+            //
+            // REAL SOLUTION NEEDED: Determine BEFORE calling join_pattern whether the
+            // pattern corresponds to a partition that's already in range_map. This requires:
+            // 1. Understanding which partition index each pattern corresponds to
+            // 2. Checking if that partition's token is already in range_map
+            // 3. Only calling join_pattern for patterns NOT already in range_map
+            //
+            // This likely requires using pinfo.range or pinfo.offsets to map the pattern
+            // to a partition index, then checking range_map.get(PartitionRange(i..i+1)).
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                // FIXME: Check range_map before join_pattern to reuse existing merged tokens
+                let pattern = pinfo.join_pattern(ctx, &pid);
                 Pattern::from(
-                    (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
+                    (pattern.borrow() as &'_ Pattern)
                         .iter()
                         .cloned()
                         .collect_vec(),
