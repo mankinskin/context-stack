@@ -3,6 +3,10 @@
 use std::{
     env,
     fs,
+    io::{
+        LineWriter,
+        Write,
+    },
     path::{
         Path,
         PathBuf,
@@ -24,6 +28,57 @@ use super::{
 };
 
 static GLOBAL_INIT: Once = Once::new();
+
+/// A file wrapper that flushes after every write to ensure logs are visible on panic.
+///
+/// This is necessary because when a test panics, buffered data may not be flushed
+/// to disk, resulting in truncated log files.
+#[derive(Clone)]
+struct FlushingWriter {
+    file: std::sync::Arc<std::sync::Mutex<fs::File>>,
+}
+
+impl FlushingWriter {
+    fn new(file: fs::File) -> Self {
+        Self {
+            file: std::sync::Arc::new(std::sync::Mutex::new(file)),
+        }
+    }
+}
+
+impl Write for FlushingWriter {
+    fn write(
+        &mut self,
+        buf: &[u8],
+    ) -> std::io::Result<usize> {
+        // Use lock().ok() to handle poisoned mutex during panic gracefully
+        // If we can't get the lock (e.g., during unwind), skip the write
+        let Some(mut file) = self.file.lock().ok().or_else(|| {
+            // Mutex is poisoned, try to recover it
+            self.file.clear_poison();
+            self.file.lock().ok()
+        }) else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Failed to acquire file lock",
+            ));
+        };
+        let result = file.write(buf)?;
+        file.flush()?;
+        Ok(result)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if let Some(mut file) = self.file.lock().ok().or_else(|| {
+            self.file.clear_poison();
+            self.file.lock().ok()
+        }) {
+            file.flush()
+        } else {
+            Ok(())
+        }
+    }
+}
 
 /// Trait for types that can provide access to a Hypergraph for test graph registration
 #[cfg(any(test, feature = "test-api"))]
@@ -236,6 +291,7 @@ impl TestTracing {
                 // Both stdout and file
                 let file =
                     fs::File::create(path).expect("Failed to create log file");
+                let flushing_writer = FlushingWriter::new(file);
 
                 let stdout_layer = tracing_subscriber::fmt::layer()
                     .with_writer(std::io::stdout)
@@ -253,9 +309,7 @@ impl TestTracing {
                     .with_filter(stdout_filter);
 
                 let file_layer = tracing_subscriber::fmt::layer()
-                    .with_writer(move || {
-                        file.try_clone().expect("Failed to clone file")
-                    })
+                    .with_writer(move || flushing_writer.clone())
                     .with_span_events(span_events)
                     .with_target(false)
                     .with_file(false)
@@ -292,11 +346,10 @@ impl TestTracing {
                 // Only file
                 let file =
                     fs::File::create(path).expect("Failed to create log file");
+                let flushing_writer = FlushingWriter::new(file);
 
                 let file_layer = tracing_subscriber::fmt::layer()
-                    .with_writer(move || {
-                        file.try_clone().expect("Failed to clone file")
-                    })
+                    .with_writer(move || flushing_writer.clone())
                     .with_span_events(span_events)
                     .with_target(false)
                     .with_file(false)

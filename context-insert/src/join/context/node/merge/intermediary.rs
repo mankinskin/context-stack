@@ -4,10 +4,11 @@ use derive_new::new;
 use linked_hash_map::LinkedHashMap;
 
 use crate::{
-    join::{
-        context::node::{
-            context::NodeJoinCtx,
-            merge::{RangeMap, PartitionRange},
+    join::context::node::{
+        context::NodeJoinCtx,
+        merge::{
+            PartitionRange,
+            RangeMap,
         },
     },
     split::{
@@ -72,18 +73,17 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
         offsets: &SplitVertexCache,
         partitions: &Vec<Token>,
     ) -> RangeMap {
-        let num_offsets = offsets.positions.len();
         let mut range_map = RangeMap::from(partitions);
 
         // Use shared merge logic - merge all partitions (0..num_offsets+1)
+        // Don't update parent patterns here - intermediary handles that in merge_node
         super::shared::merge_partitions_in_range(
             self.ctx,
             offsets,
             partitions,
-            0..num_offsets + 1,
-            num_offsets,
             &mut range_map,
-            Some(self.ctx.index),  // Pass node index for pattern updates
+            true, // has_prefix
+            true, // has_postfix
         );
 
         range_map

@@ -9,12 +9,16 @@ use std::{
 };
 
 use derive_new::new;
+use tracing_subscriber::field::debug;
 
 use crate::{
     TokenTracePositions,
     join::context::node::{
         context::NodeJoinCtx,
-        merge::{RangeMap, PartitionRange},
+        merge::{
+            PartitionRange,
+            RangeMap,
+        },
     },
     split::{
         cache::vertex::SplitVertexCache,
@@ -110,109 +114,20 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         // Run the merge algorithm - exactly like intermediary
         // Extract target when we complete the merge of target_partition_range
         // RangeMap uses array indices into partitions array
-        let (range_map, target_token) = self.merge_partitions(
+        let target_token = self.merge_partitions(
             &offsets,
             &partitions,
-            num_offsets,
             partition_range,
             target_partition_range.clone(),
         );
 
-        // Update root node patterns after merge (like intermediary does)
-        // This replaces sequences of merged tokens in the root's child patterns
-        self.update_root_patterns_after_merge(&offsets, &range_map);
-
         // Print actual VertexData child patterns to diagnose pattern issues
         self.print_token_vertex_patterns(target_token);
+        self.print_token_vertex_patterns(root_index);
 
         info!(?target_token, "Root join complete - returning target token");
 
         target_token
-    }
-
-    /// Update root node patterns after merge completes.
-    ///
-    /// This checks each offset to see if it aligns perfectly with a pattern boundary,
-    /// and if so, replaces that pattern with the merged left+right tokens from range_map.
-    fn update_root_patterns_after_merge(
-        &mut self,
-        offsets: &SplitVertexCache,
-        range_map: &RangeMap,
-    ) {
-        let len = offsets.len();
-        let root_index = self.ctx.index;
-
-        debug!(
-            num_offsets = len,
-            ?root_index,
-            num_ranges_in_map = range_map.map.len(),
-            "Updating root patterns after merge"
-        );
-
-        for (i, (_, v)) in offsets.iter().enumerate() {
-            // Create partition ranges using array indices
-            // For partitions=[a, b, cd] at indices [0,1,2] with offset at index i=1:
-            // - lr = [0..1] = partitions[0] = "a"
-            // - rr = [1..2] = partitions[1] = "b"
-            let lr = PartitionRange::new(0..(i + 1));
-            let rr = PartitionRange::new((i + 1)..(len + 1));
-
-            debug!(
-                offset_index = i,
-                ?lr,
-                ?rr,
-                "Checking offset for pattern update"
-            );
-
-            // Get merged tokens from range_map
-            if let (Some(&left), Some(&right)) =
-                (range_map.get(&lr), range_map.get(&rr))
-            {
-                debug!(
-                    ?left,
-                    ?right,
-                    "Found left and right tokens in range_map"
-                );
-
-                // Check if this offset is perfect (at pattern boundary)
-                if let Some((&pid, _)) = (v.borrow() as &TokenTracePositions)
-                    .iter()
-                    .find(|(_, s)| s.inner_offset.is_none())
-                {
-                    debug!(
-                        ?pid,
-                        ?left,
-                        ?right,
-                        offset_index = i,
-                        "Found perfect border - replacing pattern in root"
-                    );
-                    self.ctx.trav.replace_pattern(
-                        root_index.to_pattern_location(pid),
-                        vec![left, right],
-                    );
-                } else {
-                    debug!(
-                        ?left,
-                        ?right,
-                        offset_index = i,
-                        "Offset not perfect - adding new pattern to root"
-                    );
-                    self.ctx.trav.add_pattern_with_update(
-                        root_index,
-                        Pattern::from(vec![left, right]),
-                    );
-                }
-            } else {
-                debug!(
-                    offset_index = i,
-                    ?lr,
-                    ?rr,
-                    has_left = range_map.get(&lr).is_some(),
-                    has_right = range_map.get(&rr).is_some(),
-                    "Missing left or right token in range_map"
-                );
-            }
-        }
     }
 
     /// Print actual VertexData child patterns for tokens.
@@ -269,10 +184,9 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         &mut self,
         offsets: &SplitVertexCache,
         partitions: &[Token],
-        num_offsets: usize,
         partition_range_for_creation: Range<usize>,
         target_partition_range: PartitionRange,
-    ) -> (RangeMap, Token) {
+    ) -> Token {
         // Initialize range_map with simple array indices
         // For partitions=[a, b, cd] at array indices [0, 1, 2]:
         // - partitions[0] → PartitionRange(0..1) for "a"
@@ -285,22 +199,33 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
 
         debug!(
             num_partitions = partitions.len(),
-            num_offsets,
             ?partition_range_for_creation,
             ?target_partition_range,
             "Using shared merge logic with array indices"
         );
 
+        // Determine has_prefix and has_postfix from partition_range_for_creation
+        // Whether the initial partitions include a prefix/postfix partition
+        let has_prefix = partition_range_for_creation.start == 0;
+        let has_postfix = partition_range_for_creation.end
+            == partition_range_for_creation.start + partitions.len();
+        assert!(
+            !(has_prefix && has_postfix),
+            "Cannot have both prefix and postfix simultaneously in root merge"
+        );
+        debug!(
+            has_prefix,
+            has_postfix, "Determined protection flags for merge"
+        );
         // Use shared merge logic with array indices [0..partitions.len()]
         // partition_range_for_creation only used to determine has_prefix flag
         super::shared::merge_partitions_in_range(
             self.ctx,
             offsets,
             partitions,
-            partition_range_for_creation,
-            num_offsets,
             &mut range_map,
-            Some(self.ctx.index), // Pass node index for pattern updates
+            has_prefix,
+            has_postfix,
         );
 
         // Extract target token from range_map
@@ -313,6 +238,6 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
 
         info!(?target_token, "Target token extracted from range_map");
 
-        (range_map, target_token)
+        target_token
     }
 }

@@ -6,6 +6,7 @@
 use std::ops::Range;
 
 use itertools::Itertools;
+use tracing_subscriber::field::debug;
 
 use crate::{
     interval::partition::{
@@ -15,17 +16,23 @@ use crate::{
         info::{
             InfoPartition,
             PartitionInfo,
-            range::role::{
-                In,
-                Post,
-                Pre,
+            range::{
+                role::{
+                    In,
+                    Post,
+                    Pre,
+                },
+                splits::PostfixRangeFrom,
             },
         },
     },
     join::{
         context::node::{
             context::NodeJoinCtx,
-            merge::{RangeMap, PartitionRange},
+            merge::{
+                PartitionRange,
+                RangeMap,
+            },
         },
         partition::Join,
     },
@@ -99,15 +106,10 @@ pub fn create_initial_partitions(
                 ctx.trav.insert_patterns(patterns)
             },
             Err(existing) => {
-                // Token already exists - need to add patterns to it!
-                // Re-call info_partition to try to get patterns from node structure
-                // Even though it returns Err(existing), we should still try to build
-                // patterns from the node's child patterns at this location
                 debug!(
                     existing = %pretty(&existing),
                     "PREFIX partition token already exists in create_initial_partitions"
                 );
-                // For now, just return existing - patterns will be added during merge
                 existing
             },
         };
@@ -116,21 +118,7 @@ pub fn create_initial_partitions(
     }
 
     // Create infix partitions between consecutive offsets
-    let infix_start = if create_prefix {
-        0
-    } else {
-        partition_range.start - 1
-    };
-    let infix_end = if create_postfix {
-        num_offsets - 1
-    } else {
-        partition_range.end - 1
-    };
-
-    for i in infix_start..infix_end {
-        if i + 1 >= num_offsets {
-            break;
-        }
+    for i in 0..num_offsets - 1 {
         let lo = offset_ctxs[i];
         let ro = offset_ctxs[i + 1];
         let infix = Infix::new(lo, ro);
@@ -207,10 +195,10 @@ pub fn create_initial_partitions(
 /// - `ctx`: The node join context
 /// - `offsets`: Split vertex cache containing offset positions
 /// - `partitions`: Initial partitions to merge
-/// - `partition_range_for_creation`: Range used during partition creation (only for has_prefix detection)
-/// - `num_offsets`: Total number of offsets (for boundary detection)
 /// - `range_map`: Mutable range map to store merged tokens (uses array indices)
-/// - `node_index`: The node being merged (for pattern updates), or None to skip updates
+/// - `has_prefix`: Whether partition 0 is a prefix (needs Prefix merge logic)
+/// - `has_postfix`: Whether the last partition is a postfix (needs Postfix merge logic)
+/// - `update_parent_patterns`: Whether to update ctx.index patterns when splits complete
 ///
 /// # Returns
 ///
@@ -219,31 +207,22 @@ pub fn merge_partitions_in_range(
     ctx: &mut NodeJoinCtx,
     offsets: &SplitVertexCache,
     partitions: &[Token],
-    partition_range_for_creation: Range<usize>,
-    num_offsets: usize,
     range_map: &mut RangeMap,
-    node_index: Option<Token>,
+    has_prefix: bool,
+    has_postfix: bool,
 ) {
-    debug!(
-        ?partition_range_for_creation,
-        num_offsets,
-        num_partitions = partitions.len(),
-        has_node_index = node_index.is_some(),
-        "merge_partitions_in_range: ENTERED"
-    );
-
     let max_len = partitions.len();
-
-    // Determine has_prefix from partition_range_for_creation
-    // has_prefix = true if partition 0 was created (partition_range_for_creation.start == 0)
-    let has_prefix = partition_range_for_creation.start == 0;
+    debug!(
+        max_len,
+        has_prefix, has_postfix, "merge_partitions_in_range: ENTERED"
+    );
 
     // Merge from smallest to largest partitions
     // Start at len=2 because len=1 (single partitions) are already in range_map
     for len in 2..=max_len {
         debug!(
-            len,
-            max_len, "merge_partitions_in_range: starting merge loop iteration"
+            "merge_partitions_in_range: merging partitions of length {}",
+            len
         );
         // For each partition length, iterate over all valid starting positions in the array
         // E.g., with max_len=3, len=2: start in 0..2 gives ranges [0..2] and [1..3]
@@ -256,89 +235,44 @@ pub fn merge_partitions_in_range(
             // is_end: this range ends at array index partitions.len()
             let is_start = start == 0;
             let is_end = end == partitions.len();
-
-            let index = if has_prefix && is_start && is_end {
-                // Merging entire array starting with prefix: prefix + all infixes + possibly postfix
-                // Use postfix merge starting from offset 0
-                merge_postfix_partition(
-                    ctx, offsets, range_map, &range, 0, node_index,
-                )
+            debug!(
+                range_start = range.start(),
+                range_end = range.end(),
+                is_start,
+                is_end,
+                ?range,
+                "Merging partition range"
+            );
+            let merged_token = if is_start && is_end {
+                // Merging the entire array - just use range_sub_merges patterns
+                // No need for info_partition since we're combining all existing partitions
+                let merges: Vec<_> =
+                    range_map.range_sub_merges(&range).into_iter().collect();
+                ctx.trav.insert_patterns(merges)
             } else if has_prefix && is_start {
                 // Merging prefix with some infixes (range [0..k])
                 // Right boundary at offset index (end - 1)
-                let offset_end = end - 1;
-                merge_prefix_partition(
-                    ctx, offsets, range_map, &range, offset_end, node_index,
-                )
-            } else if is_end {
+                merge_prefix_partition(ctx, offsets, range_map, &range)
+            } else if has_postfix && is_end {
                 // Merging some infixes to the end (range [k..partitions.len()])
                 // This is a postfix partition if and only if no prefix exists
                 // Left boundary at offset index (start - (has_prefix ? 1 : 0))
-                let offset_start = if has_prefix {
-                    start - 1
-                } else {
-                    start
-                };
-                merge_postfix_partition(
-                    ctx, offsets, range_map, &range, offset_start, node_index,
-                )
+                merge_postfix_partition(ctx, offsets, range_map, &range)
             } else {
                 // Merging infixes in the middle (range [k..m] where k > 0 and m < partitions.len())
                 // Use infix merge
-                merge_infix_partition(
-                    ctx,
-                    offsets,
-                    range_map,
-                    &range,
-                    start,
-                    end,
-                    partitions,
-                    num_offsets,
-                    has_prefix,
-                    node_index,
-                )
+                merge_infix_partition(ctx, offsets, range_map, &range)
             };
 
             debug!(
                 range_start = range.start(),
                 range_end = range.end(),
-                ?index,
+                ?merged_token,
                 "RangeMap INSERT: inserting token for range"
             );
-            range_map.insert(range.clone(), index);
-
-            // Update node patterns incrementally so subsequent info_partition calls can find them
-            if let Some(node_idx) = node_index {
-                // Check if this merge creates a partition at a perfect boundary in the node's child patterns
-                // If so, update the node's patterns to include this newly merged token
-                update_node_patterns_if_perfect(
-                    ctx, node_idx, &range, index, range_map,
-                );
-            }
+            range_map.insert(range.clone(), merged_token);
         }
     }
-}
-
-/// Update node patterns if the merged partition is at a perfect boundary.
-///
-/// This function checks if a merged partition has perfect borders in the node's child patterns.
-/// We only replace patterns when ALL required offsets for this partition are perfect in the SAME pattern.
-/// This ensures we don't prematurely replace patterns when waiting for larger wrapper partitions to form.
-fn update_node_patterns_if_perfect(
-    _ctx: &mut NodeJoinCtx,
-    node_index: Token,
-    range: &PartitionRange,
-    merged_token: Token,
-    range_map: &RangeMap,
-) {
-    // For now, we defer pattern updates - let the caller (intermediary/root) handle this
-    // based on their specific logic for detecting perfect boundaries
-    //
-    // The intermediary checks offsets.iter() for inner_offset.is_none() to detect perfect borders
-    // The root needs similar logic but with wrapper partition awareness
-    //
-    // TODO: Implement perfect boundary detection here once we understand the full algorithm
-    _ = (node_index, range, merged_token, range_map);
 }
 
 /// Merge a prefix partition.
@@ -347,58 +281,58 @@ fn merge_prefix_partition(
     offsets: &SplitVertexCache,
     range_map: &RangeMap,
     range: &PartitionRange,
-    end: usize,
-    _node_index: Option<Token>,
 ) -> Token {
-    let ro = offsets.iter().map(PosSplitCtx::from).nth(end).unwrap();
+    let node_index = ctx.index;
 
-    let prefix_end = Prefix::new(ro);
+    debug!(
+        range_start = range.start(),
+        range_end = range.end(),
+        num_offsets = offsets.len(),
+        "merge_prefix_partition: ENTERED"
+    );
+    let ro = offsets
+        .iter()
+        .map(PosSplitCtx::from)
+        .nth(range.end())
+        .unwrap();
+
+    let prefix_partition = Prefix::new(ro);
     let res: Result<PartitionInfo<Pre<Join>>, _> =
-        prefix_end.info_partition(ctx);
+        prefix_partition.info_partition(ctx);
 
     match res {
         Ok(info) => {
-            let merges: Vec<_> = range_map
-                .range_sub_merges(range)
-                .into_iter()
-                .collect();
+            let merges: Vec<_> =
+                range_map.range_sub_merges(range).into_iter().collect();
 
             // For Prefix, SinglePerfect contains Option<PatternId>
             // We replace when the right boundary is perfect
             let perfect_pattern_id = info.perfect.0;
 
-            // TODO(#3759928646): Check range_map before join_pattern to prevent duplicates.
-            // See POSTFIX merge for detailed explanation of the problem and needed solution.
-            let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                let pattern = pinfo.join_pattern(ctx, &pid);
-                Pattern::from(
-                    (pattern.borrow() as &'_ Pattern)
-                        .iter()
-                        .cloned()
-                        .collect_vec(),
-                )
-            });
-            let patterns: Vec<_> =
-                merges.iter().cloned().chain(joined).collect();
-            let token = ctx.trav.insert_patterns(patterns);
+            // Use only the merge patterns from range_sub_merges.
+            let token = ctx.trav.insert_patterns(merges.clone());
 
             // Replace pattern if right boundary is perfect in a pattern
-            if let (Some(pid), Some(node_idx)) =
-                (perfect_pattern_id, _node_index)
-            {
+            if let Some(pid) = perfect_pattern_id {
                 // Build pattern replacement: should be the newly merged token at this range
-                let pattern_tokens = vec![token];
-                let pattern_loc = node_idx.to_pattern_location(pid);
+                let pattern_loc = node_index.to_pattern_location(pid);
+                let pattern_end_index =
+                    ro.split.pattern_splits.get(&pid).unwrap().sub_index;
                 debug!(
-                    ?node_idx,
+                    ?node_index,
                     ?pid,
                     ?pattern_loc,
+                    ?pattern_end_index,
                     ?token,
                     range_start = range.start,
                     range_end = range.end,
                     "PREFIX: Replacing pattern with merged token"
                 );
-                ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
+                ctx.trav.replace_in_pattern(
+                    pattern_loc,
+                    0..pattern_end_index,
+                    vec![token],
+                );
             }
 
             token
@@ -411,9 +345,6 @@ fn merge_prefix_partition(
                 "PREFIX: Token already exists - using without modification"
             );
 
-            // When a full token already exists for this partition range, simply use it.
-            // The token is already complete with all necessary patterns.
-            // Track it in range_map for use in larger hierarchical merges.
             existing
         },
     }
@@ -425,22 +356,24 @@ fn merge_postfix_partition(
     offsets: &SplitVertexCache,
     range_map: &RangeMap,
     range: &PartitionRange,
-    start: usize,
-    _node_index: Option<Token>,
 ) -> Token {
     debug!(
         range_start = range.start(),
         range_end = range.end(),
-        start,
-        has_node_idx = _node_index.is_some(),
+        num_offsets = offsets.len(),
         "merge_postfix_partition: ENTERED"
     );
 
-    let lo = offsets.iter().map(PosSplitCtx::from).nth(start).unwrap();
+    let lo = offsets
+        .iter()
+        .map(PosSplitCtx::from)
+        .nth(range.start())
+        .unwrap();
 
-    let postfix_start = Postfix::new(lo);
+    let node_index = ctx.index;
+    let postfix_partition = Postfix::new(lo);
     let res: Result<PartitionInfo<Post<Join>>, _> =
-        postfix_start.info_partition(ctx);
+        postfix_partition.info_partition(ctx);
 
     debug!(
         is_ok = res.is_ok(),
@@ -449,10 +382,8 @@ fn merge_postfix_partition(
 
     match res {
         Ok(info) => {
-            let merges: Vec<_> = range_map
-                .range_sub_merges(range)
-                .into_iter()
-                .collect();
+            let merges: Vec<_> =
+                range_map.range_sub_merges(range).into_iter().collect();
 
             // For Postfix, SinglePerfect contains Option<PatternId>
             // We replace when the left boundary is perfect
@@ -460,7 +391,6 @@ fn merge_postfix_partition(
 
             debug!(
                 ?perfect_pattern_id,
-                has_node_idx = _node_index.is_some(),
                 range_start = range.start,
                 range_end = range.end,
                 num_patterns = info.patterns.len(),
@@ -468,52 +398,42 @@ fn merge_postfix_partition(
                 "POSTFIX merge_postfix_partition: perfect border check"
             );
 
-            // TODO(#3759928646): Check range_map before join_pattern to prevent duplicates.
-            // PROBLEM: join_pattern() creates tokens as a side effect, so we can't call it
-            // to "check" what it would create - by then it's too late.
-            // 
-            // ATTEMPTED FIX (doesn't work): Call join_pattern first, then check if the
-            // resulting token already exists in range_map. But this still creates the
-            // duplicate token before we can prevent it.
+            // Use only the merge patterns from range_sub_merges.
+            // These are patterns composed of tokens that already exist in the RangeMap,
+            // representing all valid binary splits of this range.
             //
-            // REAL SOLUTION NEEDED: Determine BEFORE calling join_pattern whether the
-            // pattern corresponds to a partition that's already in range_map. This requires:
-            // 1. Understanding which partition index each pattern corresponds to
-            // 2. Checking if that partition's token is already in range_map
-            // 3. Only calling join_pattern for patterns NOT already in range_map
-            //
-            // This likely requires using pinfo.range or pinfo.offsets to map the pattern
-            // to a partition index, then checking range_map.get(PartitionRange(i..i+1)).
-            let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                let pattern = pinfo.join_pattern(ctx, &pid);
-                Pattern::from(
-                    (pattern.borrow() as &'_ Pattern)
-                        .iter()
-                        .cloned()
-                        .collect_vec(),
-                )
-            });
-            let patterns: Vec<_> =
-                merges.iter().cloned().chain(joined).collect();
-            let token = ctx.trav.insert_patterns(patterns);
+            // We do NOT call join_pattern here because:
+            // 1. join_pattern creates new tokens as side effects, causing duplicates
+            // 2. range_sub_merges already provides all necessary merge patterns using
+            //    tokens that were created during initial partition creation
+            // 3. The patterns from join_pattern would be equivalent to what's in range_sub_merges
+            //    but with potentially different (duplicate) token indices
+            let token = ctx.trav.insert_patterns(merges.clone());
 
             // Replace pattern if left boundary is perfect in a pattern
-            if let (Some(pid), Some(node_idx)) =
-                (perfect_pattern_id, _node_index)
-            {
+            if let Some(pid) = perfect_pattern_id {
                 // Build pattern replacement: should be the newly merged token at this range
-                let pattern_tokens = vec![token];
-                let pattern_loc = node_idx.to_pattern_location(pid);
+                let pattern_loc = node_index.to_pattern_location(pid);
+                let pattern_start_index =
+                    lo.split.pattern_splits.get(&pid).unwrap().sub_index;
                 debug!(
-                    ?node_idx,
+                    ?node_index,
                     ?pid,
                     ?pattern_loc,
+                    ?pattern_start_index,
                     ?token,
                     range_start = range.start,
                     range_end = range.end,
                     "POSTFIX: Replacing pattern with merged token"
                 );
-                ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
+                ctx.trav.replace_in_pattern(
+                    pattern_loc,
+                    PostfixRangeFrom::new(
+                        pattern_start_index,
+                        ctx.patterns().get(&pid).unwrap().len(),
+                    ),
+                    vec![token],
+                );
             }
 
             token
@@ -525,10 +445,6 @@ fn merge_postfix_partition(
                 range_end = range.end,
                 "POSTFIX: Token already exists - using without modification"
             );
-
-            // When a full token already exists for this partition range, simply use it.
-            // The token is already complete with all necessary patterns.
-            // Track it in range_map for use in larger hierarchical merges.
             existing
         },
     }
@@ -547,75 +463,33 @@ fn merge_infix_partition(
     offsets: &SplitVertexCache,
     range_map: &RangeMap,
     range: &PartitionRange,
-    start_partition_idx: usize,
-    end_partition_idx: usize,
-    partitions: &[Token],
-    num_offsets: usize,
-    has_prefix: bool,
-    _node_index: Option<Token>,
 ) -> Token {
-    // Map partition indices to offset indices per comment #3752447456:
-    //
-    // WITH prefix (partition 0 exists before offset 0):
-    // - partition 0: before offset 0
-    // - partition i (i > 0): between offset (i-1) and offset i
-    //
-    // WITHOUT prefix:
-    // - partition i: between offset i and offset (i+1)
-
-    let (start_offset_idx, end_offset_idx) = if has_prefix {
-        // With prefix: partition i (i>0) is between offset (i-1) and offset i
-        // So merging partitions [start..end] uses offsets [(start-1)..(end-1)]
-        let start_off = if start_partition_idx > 0 {
-            start_partition_idx - 1
-        } else {
-            0
-        };
-        let end_off = if end_partition_idx > 0 {
-            end_partition_idx - 1
-        } else {
-            0
-        };
-        (start_off, end_off)
-    } else {
-        // Without prefix: partition i is between offset i and offset (i+1)
-        // So merging partitions [start..end] uses offsets [start..(end-1)]
-        // The end partition is BETWEEN two offsets, so we use the left offset of the rightmost partition
-        (start_partition_idx, end_partition_idx - 1)
-    };
-
+    let node_index = ctx.index;
     debug!(
-        start_partition_idx,
-        end_partition_idx,
-        start_offset_idx,
-        end_offset_idx,
-        has_prefix,
-        num_offsets,
-        num_partitions = partitions.len(),
-        "merge_infix_partition: mapping partition indices to offset indices"
+        range_start = range.start(),
+        range_end = range.end(),
+        num_offsets = offsets.len(),
+        "merge_infix_partition: ENTERED"
     );
-
     let lo = offsets
         .iter()
         .map(PosSplitCtx::from)
-        .nth(start_offset_idx)
+        .nth(range.start())
         .unwrap();
     let ro = offsets
         .iter()
         .map(PosSplitCtx::from)
-        .nth(end_offset_idx)
+        .nth(range.end())
         .unwrap();
 
-    let infix = Infix::new(lo, ro);
-    let res: Result<PartitionInfo<In<Join>>, _> = infix.info_partition(ctx);
+    let infix_partition = Infix::new(lo, ro);
+    let res: Result<PartitionInfo<In<Join>>, _> =
+        infix_partition.info_partition(ctx);
 
     match res {
         Ok(info) => {
-            let merges: Vec<_> = range_map
-                .range_sub_merges(range)
-                .into_iter()
-                .collect();
-            let num_info_patterns = info.patterns.len();
+            let merges: Vec<_> =
+                range_map.range_sub_merges(range).into_iter().collect();
 
             // Check if we have BOTH perfect borders in the SAME pattern
             // For infix partitions, DoublePerfect contains (Option<PatternId>, Option<PatternId>)
@@ -626,42 +500,40 @@ fn merge_infix_partition(
                 _ => None,
             };
 
-            let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
-                Pattern::from(
-                    (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
-                        .iter()
-                        .cloned()
-                        .collect_vec(),
-                )
-            });
-            let patterns = merges.iter().cloned().chain(joined).collect_vec();
+            // Use only the merge patterns from range_sub_merges.
+            // See merge_postfix_partition for detailed explanation.
             debug!(
                 num_merges = merges.len(),
-                num_info_patterns,
-                total_patterns = patterns.len(),
                 has_perfect = perfect_pattern_id.is_some(),
                 "Merging infix partition - pattern counts"
             );
 
-            let token = ctx.trav.insert_patterns(patterns);
+            let token = ctx.trav.insert_patterns(merges.clone());
 
             // Only replace pattern if BOTH offsets are perfect in the SAME pattern
-            if let (Some(pid), Some(node_idx)) =
-                (perfect_pattern_id, _node_index)
-            {
+            if let Some(pid) = perfect_pattern_id {
                 // Build pattern replacement: should be the newly merged token at this range
-                let pattern_tokens = vec![token];
-                let pattern_loc = node_idx.to_pattern_location(pid);
+                let pattern_loc = node_index.to_pattern_location(pid);
+                let pattern_start_index =
+                    lo.split.pattern_splits.get(&pid).unwrap().sub_index;
+                let pattern_end_index =
+                    ro.split.pattern_splits.get(&pid).unwrap().sub_index;
                 debug!(
-                    ?node_idx,
+                    ?node_index,
                     ?pid,
                     ?pattern_loc,
+                    ?pattern_start_index,
+                    ?pattern_end_index,
                     ?token,
                     range_start = range.start,
                     range_end = range.end,
                     "INFIX: Replacing pattern with merged token"
                 );
-                ctx.trav.replace_pattern(pattern_loc, pattern_tokens);
+                ctx.trav.replace_in_pattern(
+                    pattern_loc,
+                    pattern_start_index..pattern_end_index,
+                    vec![token],
+                );
             }
 
             token
@@ -673,10 +545,6 @@ fn merge_infix_partition(
                 range_end = range.end,
                 "INFIX: Token already exists - using without modification"
             );
-
-            // When a full token already exists for this partition range, simply use it.
-            // The token is already complete with all necessary patterns.
-            // Track it in range_map for use in larger hierarchical merges.
             existing
         },
     }
