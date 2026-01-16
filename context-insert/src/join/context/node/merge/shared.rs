@@ -367,7 +367,11 @@ fn merge_prefix_partition(
             // We replace when the right boundary is perfect
             let perfect_pattern_id = info.perfect.0;
 
+            // TODO(#3759928646): Before calling join_pattern, check if the pattern's token
+            // sequence already exists in range_map to prevent creating duplicate tokens.
+            // See POSTFIX merge for same issue - need to reuse existing merged tokens.
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
+                // FIXME: Check range_map before join_pattern to reuse existing merged tokens
                 Pattern::from(
                     (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
                         .iter()
@@ -465,7 +469,13 @@ fn merge_postfix_partition(
                 "POSTFIX merge_postfix_partition: perfect border check"
             );
 
+            // TODO(#3759928646): Before calling join_pattern, check if the pattern's token
+            // sequence already exists in range_map to prevent creating duplicate tokens.
+            // Example: when merging [b, cd], pattern [c, d] calls join_pattern creating
+            // new "cd" token, but "cd" already exists in partitions[2] and range_map.
+            // Should reuse existing token from range_map instead of creating duplicate.
             let joined = info.patterns.into_iter().map(|(pid, pinfo)| {
+                // FIXME: Check range_map before join_pattern to reuse existing merged tokens
                 Pattern::from(
                     (pinfo.join_pattern(ctx, &pid).borrow() as &'_ Pattern)
                         .iter()
