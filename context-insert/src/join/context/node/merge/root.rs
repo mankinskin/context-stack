@@ -88,11 +88,10 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
                 },
                 RootMode::Postfix => {
                     // Postfix mode: partition_range is 1..num_offsets+1 (infixes + postfix, no prefix)
-                    // Partitions created: [infix1, infix2, ..., postfix]
-                    // Target: all partitions EXCEPT we need to identify the target range
-                    // Example: [a, b, cd] → target is [1..3] = [b, cd] = "bcd"
-                    // The target excludes the wrapper prefix (first infix that merges with prefix)
-                    PartitionRange::new(1..partitions.len())
+                    // Partitions at array indices: [0, 1, 2, ...] map to conceptual [1, 2, 3, ...]  
+                    // Target in conceptual space: [2..num_offsets+1] = all except first infix (wrapper)
+                    // Example: partitions=[a, b, cd] (conceptual [1,2,3]) → target conceptual [2..4] = "bcd"
+                    PartitionRange::new(2..num_offsets + 1)
                 },
                 RootMode::Infix => {
                     // Infix mode: partition_range is 1..num_offsets (infixes only)
