@@ -1,14 +1,17 @@
 use std::fmt::Debug;
 
-use crate::split::{
-    cache::{
-        SplitCache,
-        position::{
-            PosKey,
-            SplitPositionCache,
+use crate::{
+    join::context::node::merge::PartitionRange,
+    split::{
+        cache::{
+            SplitCache,
+            position::{
+                PosKey,
+                SplitPositionCache,
+            },
         },
+        trace::states::SplitStates,
     },
-    trace::states::SplitStates,
 };
 use context_trace::*;
 
@@ -20,6 +23,7 @@ pub struct IntervalGraph {
     pub(crate) states: SplitStates,
     pub(crate) cache: SplitCache,
     pub(crate) root: Token,
+    pub(crate) target_range: PartitionRange, // range of target partition indices in root
 }
 impl IntervalGraph {
     pub fn get(

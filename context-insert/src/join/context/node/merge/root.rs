@@ -35,12 +35,12 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
     /// Main entry point for root node joining.
     ///
     /// Reuses intermediary merge algorithm with protection of non-participating ranges.
-    pub fn merge_root(&mut self) -> Token {
+    pub fn join(&mut self) -> Token {
         let root_mode = self.ctx.ctx.interval.cache.root_mode;
         let offsets = self.ctx.vertex_cache().clone();
         let num_offsets = offsets.len();
         let root_index = self.ctx.index;
-
+        let target_partition_range = self.ctx.ctx.interval.target_range.clone();
         info!(
             ?root_mode,
             num_offsets,
@@ -54,38 +54,6 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
             &offsets,
             MergeMode::Root(root_mode),
         );
-
-        // Define target partition range based on mode
-        // Target is defined by a range of partition indices in the partitions array
-        // We use partition indices throughout - NOT offset indices
-        //
-        // The target is what we're INSERTING, not necessarily all created partitions.
-        // For modes with protection (prefix/postfix), we exclude the first/last partition.
-        let target_partition_range = if partitions.len() == 1 {
-            PartitionRange::new(0..partitions.len()) // Edge case: only one partition
-        } else {
-            match root_mode {
-                RootMode::Prefix => {
-                    // Prefix mode: partition_range is 0..num_offsets (prefix + infixes, no postfix)
-                    // Partitions created: [prefix, infix1, infix2, ...]
-                    // Target: infixes only (exclude protected prefix at index 0)
-                    // Example: [ab, c, d] → target is [1..3] = [c, d] = "cd"
-                    PartitionRange::new(1..partitions.len())
-                },
-                RootMode::Postfix => {
-                    // Postfix mode: skip first partition (wrapper that merges with prefix)
-                    // Partitions array: [a, b, cd] at indices [0, 1, 2]
-                    // Target: [1..3] extracts partitions[1..3] = [b, cd] = "bcd"
-                    PartitionRange::new(1..partitions.len())
-                },
-                RootMode::Infix => {
-                    // Infix mode: all partitions are infix, target is all of them
-                    // Partitions array: [a, b, c] at indices [0, 1, 2]
-                    // Target: [0..3] extracts all partitions = "abc"
-                    PartitionRange::new(0..partitions.len())
-                },
-            }
-        };
 
         debug!(
             ?target_partition_range,

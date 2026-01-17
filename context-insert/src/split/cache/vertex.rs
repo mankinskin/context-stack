@@ -19,6 +19,7 @@ use crate::{
             },
         },
     },
+    join::context::node::merge::PartitionRange,
     split::{
         cache::position::{
             PosKey,
@@ -58,7 +59,7 @@ impl SplitVertexCache {
             positions: BTreeMap::from_iter([(pos, entry)]),
         }
     }
-    pub fn augment_node(
+    pub fn node_augmentation(
         &mut self,
         ctx: NodeTraceCtx,
     ) -> Vec<SplitTraceState> {
@@ -75,12 +76,13 @@ impl SplitVertexCache {
         }
         states
     }
-    pub fn augment_root(
+    pub fn root_augmentation(
         &mut self,
         ctx: NodeTraceCtx,
         root_mode: RootMode,
-    ) -> Vec<SplitTraceState> {
-        debug!(?root_mode, positions=?self.positions.keys().collect::<Vec<_>>(), "AUGMENT_ROOT");
+    ) -> (Vec<SplitTraceState>, PartitionRange) {
+        let target_positions = self.positions.keys().cloned().collect_vec();
+        debug!(?root_mode, ?target_positions, "AUGMENT_ROOT");
 
         // First add inner offsets for the target partition
         let (splits, next) = match root_mode {
@@ -105,10 +107,11 @@ impl SplitVertexCache {
                 )
             },
         };
-        debug!(count = splits.len(), "After add_inner_offsets");
-        for pos in splits.keys() {
-            debug!(pos, "Added inner offset");
-        }
+        debug!(
+            count = splits.len(),
+            inner_offsets = ?splits.keys().collect_vec(),
+            "After add_inner_offsets"
+        );
         self.positions.extend(splits);
 
         // Then add wrapper offsets for Prefix/Postfix modes
@@ -124,8 +127,29 @@ impl SplitVertexCache {
         self.positions.extend(wrapper_splits);
 
         debug!(final_positions=?self.positions.keys().collect::<Vec<_>>(), "Final positions");
+        let offsets = self
+            .positions
+            .keys()
+            .enumerate()
+            .filter_map(|(i, pos)| target_positions.contains(pos).then_some(i))
+            .collect_vec();
 
-        next
+        // calculate target partition range based on root mode
+        let target_range = PartitionRange::from(match root_mode {
+            RootMode::Infix => {
+                assert_eq!(offsets.len(), 2);
+                offsets[0]..offsets[1]
+            },
+            RootMode::Prefix => {
+                assert_eq!(offsets.len(), 1);
+                0..offsets[0]
+            },
+            RootMode::Postfix => {
+                assert_eq!(offsets.len(), 1);
+                offsets[0]..self.positions.len()
+            },
+        });
+        (next, target_range)
     }
     pub fn pos_mut(
         &mut self,

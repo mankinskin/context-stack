@@ -11,7 +11,10 @@ use std::{
 use linked_hash_set::LinkedHashSet;
 use pretty_assertions::assert_eq;
 
-use crate::*;
+use crate::{
+    join::context::node::merge::PartitionRange,
+    *,
+};
 use context_search::{
     tests::search::trace_cache::CdefghiTraceCase,
     *,
@@ -249,7 +252,8 @@ fn interval_graph1() {
                 leaves: LinkedHashSet::from_iter([PosKey::new(*ef, 1)]).into(),
                 queue: VecDeque::default(),
             },
-            cache: build_split_cache1(env)
+            cache: build_split_cache1(env),
+            target_range: PartitionRange::from(0..5),
         }
     );
 }
