@@ -38,15 +38,9 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
     pub fn join(&mut self) -> Token {
         let root_mode = self.ctx.ctx.interval.cache.root_mode;
         let offsets = self.ctx.vertex_cache().clone();
-        let num_offsets = offsets.len();
         let root_index = self.ctx.index;
         let target_partition_range = self.ctx.ctx.interval.target_range.clone();
-        info!(
-            ?root_mode,
-            num_offsets,
-            root_index = ?root_index,
-            "Starting root join (reusing intermediary algorithm)"
-        );
+        info!("Starting root merge join");
 
         // Get initial partitions using shared function
         let partitions = super::shared::create_initial_partitions(
@@ -148,9 +142,9 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         }
 
         debug!(
-            num_partitions = partitions.len(),
+            ?partitions,
             ?target_partition_range,
-            "Using shared merge logic with array indices"
+            "Merging root partitions"
         );
 
         // Use shared merge logic with array indices [0..partitions.len()]

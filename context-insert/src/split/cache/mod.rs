@@ -19,6 +19,7 @@ use derive_more::derive::{
 };
 use derive_new::new;
 use std::fmt::Debug;
+use tracing::debug;
 
 pub mod vertex;
 
@@ -63,6 +64,7 @@ impl SplitCache {
         ctx: &mut SplitTraceStatesCtx<G>,
         nodes: I,
     ) {
+        debug!("augment_nodes");
         for c in nodes {
             let new = self.augment_node(&ctx.trav, c);
             // todo: force order

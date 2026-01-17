@@ -64,6 +64,10 @@ impl SplitVertexCache {
         ctx: NodeTraceCtx,
     ) -> Vec<SplitTraceState> {
         let num_offsets = self.positions.len();
+        debug!(?num_offsets,
+            root_patterns = ?ctx.patterns,
+            "node_augmentation"
+        );
         let mut states = Vec::new();
         for len in 1..num_offsets {
             for start in 0..num_offsets - len + 1 {
@@ -82,7 +86,10 @@ impl SplitVertexCache {
         root_mode: RootMode,
     ) -> (Vec<SplitTraceState>, PartitionRange) {
         let target_positions = self.positions.keys().cloned().collect_vec();
-        debug!(?root_mode, ?target_positions, "AUGMENT_ROOT");
+        debug!(?root_mode, ?target_positions,
+            root_patterns = ?ctx.patterns,
+            "root_augmentation"
+        );
 
         // First add inner offsets for the target partition
         let (splits, next) = match root_mode {
@@ -94,21 +101,12 @@ impl SplitVertexCache {
                 ctx.clone(),
                 OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self),
             ),
-            RootMode::Postfix => {
-                debug!(
-                    "Postfix mode - checking target split at first position"
-                );
-                if let Some(split_pos) = self.positions.keys().next().copied() {
-                    debug!(split_pos, cache=?self.positions[&split_pos], "Target split info");
-                }
-                Self::add_inner_offsets::<Post<Trace>, _>(
-                    ctx.clone(),
-                    OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self),
-                )
-            },
+            RootMode::Postfix => Self::add_inner_offsets::<Post<Trace>, _>(
+                ctx.clone(),
+                OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self),
+            ),
         };
         debug!(
-            count = splits.len(),
             inner_offsets = ?splits.keys().collect_vec(),
             "After add_inner_offsets"
         );
@@ -118,16 +116,17 @@ impl SplitVertexCache {
         let wrapper_splits = match root_mode {
             RootMode::Prefix => self.add_wrapper_offsets_prefix(ctx.clone()),
             RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx.clone()),
-            RootMode::Infix => BTreeMap::new(), // Infix handles wrappers differently
+            RootMode::Infix => unimplemented!(), // TODO: Add wrapper offsets for Infix
         };
-        debug!(count = wrapper_splits.len(), "After add_wrapper_offsets");
-        for pos in wrapper_splits.keys() {
-            debug!(pos, "Added wrapper offset");
-        }
+
+        debug!(
+            wrapper_offsets = ?wrapper_splits.keys().collect_vec(),
+            "After add_wrapper_offsets"
+        );
         self.positions.extend(wrapper_splits);
 
         debug!(final_positions=?self.positions.keys().collect::<Vec<_>>(), "Final positions");
-        let offsets = self
+        let toi = self
             .positions
             .keys()
             .enumerate()
@@ -137,18 +136,19 @@ impl SplitVertexCache {
         // calculate target partition range based on root mode
         let target_range = PartitionRange::from(match root_mode {
             RootMode::Infix => {
-                assert_eq!(offsets.len(), 2);
-                offsets[0]..offsets[1]
+                assert_eq!(toi.len(), 2);
+                toi[0]..toi[1]
             },
             RootMode::Prefix => {
-                assert_eq!(offsets.len(), 1);
-                0..offsets[0]
+                assert_eq!(toi.len(), 1);
+                0..toi[0]
             },
             RootMode::Postfix => {
-                assert_eq!(offsets.len(), 1);
-                offsets[0]..self.positions.len()
+                assert_eq!(toi.len(), 1);
+                toi[0]..self.positions.len()
             },
         });
+        debug!(?target_range, "calculated target_range");
         (next, target_range)
     }
     pub fn pos_mut(

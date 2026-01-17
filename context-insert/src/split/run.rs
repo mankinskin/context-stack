@@ -64,12 +64,12 @@ impl<G: HasGraph> From<SplitCacheCtx<G>> for IntervalGraph {
 }
 impl<G: HasGraph> From<SplitRun<G>> for IntervalGraph {
     fn from(mut run: SplitRun<G>) -> Self {
-        debug!("SplitRun::from - calling init");
+        debug!("IntervalGraph::from - init");
         let (next, target_range) = run.init();
         run.ctx.states.queue.extend(next);
-        debug!("SplitRun::from - init done, calling all()");
+        debug!("IntervalGraph::from - run iterator to end");
         run.all(|_| true); // run iterator to end
-        debug!("SplitRun::from - all() done, calling finish");
+        debug!("SplitRun::from - calling finish");
         let cache = run.finish();
         debug!("SplitRun::from - finish done, creating IntervalGraph");
         Self {
