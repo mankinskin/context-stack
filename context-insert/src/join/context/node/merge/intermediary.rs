@@ -8,16 +8,12 @@ use crate::{
         context::NodeJoinCtx,
         merge::{
             PartitionRange,
-            RangeMap,
             shared::MergeMode,
         },
     },
     split::{
         Split,
-        cache::{
-            position::PosKey,
-            vertex::SplitVertexCache,
-        },
+        cache::position::PosKey,
         vertex::TokenTracePositions,
     },
 };
@@ -29,14 +25,14 @@ pub struct NodeMergeCtx<'a: 'b, 'b> {
 }
 
 impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
-    pub fn merge_node(
-        &'c mut self,
-        partitions: &Vec<Token>,
-    ) -> LinkedHashMap<PosKey, Split> {
+    pub fn merge_node(&'c mut self) -> LinkedHashMap<PosKey, Split> {
         let offsets = self.ctx.vertex_cache().clone();
-        assert_eq!(partitions.len(), offsets.len() + 1);
 
-        let merges = self.merge_partitions(&offsets, partitions);
+        let (_, merges) = super::shared::merge_partitions_in_range(
+            self.ctx,
+            &offsets,
+            MergeMode::Full,
+        );
 
         let len = offsets.len();
         let index = self.ctx.index;
@@ -68,25 +64,6 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
             finals.insert(PosKey::new(index, *offset), Split::new(left, right));
         }
         finals
-    }
-    pub fn merge_partitions(
-        &mut self,
-        offsets: &SplitVertexCache,
-        partitions: &Vec<Token>,
-    ) -> RangeMap {
-        let mut range_map = RangeMap::from(partitions);
-
-        // Use shared merge logic - merge all partitions (0..num_offsets+1)
-        // Don't update parent patterns here - intermediary handles that in merge_node
-        super::shared::merge_partitions_in_range(
-            self.ctx,
-            offsets,
-            partitions,
-            &mut range_map,
-            MergeMode::Full,
-        );
-
-        range_map
     }
 }
 

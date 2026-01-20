@@ -5,25 +5,12 @@
 
 use derive_new::new;
 
-use crate::{
-    join::context::node::{
-        context::NodeJoinCtx,
-        merge::{
-            PartitionRange,
-            RangeMap,
-            shared::MergeMode,
-        },
-    },
-    split::{
-        cache::vertex::SplitVertexCache,
-        vertex::output::RootMode,
-    },
+use crate::join::context::node::{
+    context::NodeJoinCtx,
+    merge::shared::MergeMode,
 };
 use context_trace::*;
-use tracing::{
-    debug,
-    info,
-};
+use tracing::info;
 
 /// Root merge context - follows same pattern as NodeMergeCtx but extracts target token.
 #[derive(Debug, new)]
@@ -39,31 +26,16 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         let root_mode = self.ctx.ctx.interval.cache.root_mode;
         let offsets = self.ctx.vertex_cache().clone();
         let root_index = self.ctx.index;
-        let target_partition_range = self.ctx.ctx.interval.target_range.clone();
+        //let target_partition_range = self.ctx.ctx.interval.target_range.clone();
         info!("Starting root merge join");
 
-        // Get initial partitions using shared function
-        let partitions = super::shared::create_initial_partitions(
+        let (target_token, _) = super::shared::merge_partitions_in_range(
             self.ctx,
             &offsets,
             MergeMode::Root(root_mode),
         );
 
-        debug!(
-            ?target_partition_range,
-            num_partitions = partitions.len(),
-            "Target partition range (partition indices)"
-        );
-
-        // Run the merge algorithm - exactly like intermediary
-        // Extract target when we complete the merge of target_partition_range
-        // RangeMap uses array indices into partitions array
-        let target_token = self.merge_partitions(
-            &offsets,
-            &partitions,
-            root_mode,
-            target_partition_range.clone(),
-        );
+        info!(?target_token, "Target token extracted from range_map");
 
         // Print actual VertexData child patterns to diagnose pattern issues
         self.print_token_vertex_patterns(target_token);
@@ -114,59 +86,5 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         }
 
         info!("=== END VERTEX DATA PATTERNS ===");
-    }
-
-    /// Core merge algorithm - now uses shared `merge_partitions_in_range` utility.
-    ///
-    /// The only difference from intermediary is we extract the target token instead of creating split halves.
-    ///
-    /// # Parameters
-    ///
-    /// - `partition_range_for_creation`: Range of partition indices that were created (only used to determine has_prefix)
-    /// - `target_partition_range`: Array indices into partitions that constitute the target token
-    fn merge_partitions(
-        &mut self,
-        offsets: &SplitVertexCache,
-        partitions: &[Token],
-        root_mode: RootMode,
-        target_partition_range: PartitionRange,
-    ) -> Token {
-        // Initialize range_map with simple array indices
-        // For partitions=[a, b, cd] at array indices [0, 1, 2]:
-        // - partitions[0] → PartitionRange(0..1) for "a"
-        // - partitions[1] → PartitionRange(1..2) for "b"
-        // - partitions[2] → PartitionRange(2..3) for "cd"
-        let mut range_map = RangeMap::default();
-        for (i, &token) in partitions.iter().enumerate() {
-            range_map.insert(PartitionRange::new(i..(i + 1)), token);
-        }
-
-        debug!(
-            ?partitions,
-            ?target_partition_range,
-            "Merging root partitions"
-        );
-
-        // Use shared merge logic with array indices [0..partitions.len()]
-        // partition_range_for_creation only used to determine has_prefix flag
-        super::shared::merge_partitions_in_range(
-            self.ctx,
-            offsets,
-            partitions,
-            &mut range_map,
-            MergeMode::Root(root_mode),
-        );
-
-        // Extract target token from range_map
-        let target_token = *range_map.get(&target_partition_range)
-            .unwrap_or_else(|| panic!(
-                "Target token not found in range_map for range {:?}. Available ranges: {:?}",
-                target_partition_range,
-                range_map.map.keys().collect::<Vec<_>>()
-            ));
-
-        info!(?target_token, "Target token extracted from range_map");
-
-        target_token
     }
 }

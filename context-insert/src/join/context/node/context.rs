@@ -13,7 +13,6 @@ use crate::{
         node::merge::{
             NodeMergeCtx,
             RootMergeCtx,
-            shared::MergeMode,
         },
         pattern::PatternJoinCtx,
     },
@@ -135,20 +134,6 @@ impl NodeJoinCtx<'_> {
         let pos_splits = self.vertex_cache().clone();
         let len = pos_splits.len();
         assert!(len > 0);
-
-        // Create all partitions: prefix + infixes + postfix
-        let partitions = super::merge::shared::create_initial_partitions(
-            self,
-            &pos_splits,
-            MergeMode::Full,
-        );
-
-        assert_eq!(
-            *self.index.width(),
-            partitions.iter().map(|t| *t.width()).sum::<usize>()
-        );
-        assert_eq!(partitions.len(), pos_splits.len() + 1);
-
-        NodeMergeCtx::new(self).merge_node(&partitions)
+        NodeMergeCtx::new(self).merge_node()
     }
 }
