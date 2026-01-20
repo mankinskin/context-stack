@@ -89,6 +89,7 @@ pub trait RangeRole: Debug + Clone + Copy {
     type Borders: VisitBorders<Self, Splits = <Self::Splits as PatternSplits>::Pos>;
     type Splits: PatternSplits + ToPartition<Self>;
     fn to_partition(splits: Self::Splits) -> Partition<Self>;
+    const ROLE_STR: &'static str;
 }
 
 #[derive(Debug, Clone, Default, Copy)]
@@ -105,6 +106,7 @@ impl<M: PreVisitMode> RangeRole for Pre<M> {
     type Splits = VertexSplits;
     type Offsets = NonZeroUsize;
     type Perfect = SinglePerfect;
+    const ROLE_STR: &'static str = "PREFIX";
     fn to_partition(splits: Self::Splits) -> Partition<Self> {
         Partition { offsets: splits }
     }
@@ -124,6 +126,7 @@ impl<M: InVisitMode> RangeRole for In<M> {
     type Splits = (VertexSplits, VertexSplits);
     type Offsets = (NonZeroUsize, NonZeroUsize);
     type Perfect = DoublePerfect;
+    const ROLE_STR: &'static str = "INFIX";
     fn to_partition(splits: Self::Splits) -> Partition<Self> {
         Partition { offsets: splits }
     }
@@ -143,6 +146,7 @@ impl<M: PostVisitMode> RangeRole for Post<M> {
     type Splits = VertexSplits;
     type Offsets = NonZeroUsize;
     type Perfect = SinglePerfect;
+    const ROLE_STR: &'static str = "POSTFIX";
     fn to_partition(splits: Self::Splits) -> Partition<Self> {
         Partition { offsets: splits }
     }

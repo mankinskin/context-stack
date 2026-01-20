@@ -20,6 +20,11 @@ pub struct NodeTraceCtx {
     pub(crate) index: Token,
 }
 
+impl HasToken for NodeTraceCtx {
+    fn token(&self) -> Token {
+        self.index
+    }
+}
 impl NodeTraceCtx {
     pub fn new(
         patterns: ChildPatterns,

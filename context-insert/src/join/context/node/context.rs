@@ -65,7 +65,11 @@ pub struct NodeJoinCtx<'a> {
     pub ctx: LockedFrontierCtx<'a>,
     pub index: Token,
 }
-
+impl HasToken for NodeJoinCtx<'_> {
+    fn token(&self) -> Token {
+        self.index
+    }
+}
 impl<'a> NodeJoinCtx<'a> {
     pub fn new(
         index: Token,

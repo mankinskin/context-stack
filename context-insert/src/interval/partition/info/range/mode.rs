@@ -3,6 +3,8 @@ use std::{
     hash::Hash,
 };
 
+use context_trace::HasToken;
+
 use crate::{
     interval::partition::info::range::{
         ModeRangeInfo,
@@ -45,13 +47,14 @@ impl<R: RangeRole<Mode = Self>> ModeInfo<R> for Trace {
 }
 
 /// Mode context trait for pattern operations.
-/// 
+///
 /// Uses GATs (Generic Associated Types) to allow contexts to have lifetimes
 /// while the trait itself doesn't require them upfront.
 pub trait ModeCtx {
     type NodeCtx<'a>: AsNodeTraceCtx
         + GetPatternCtx<PatternCtx = Self::PatternResult>
         + GetPatternTraceCtx
+        + HasToken
     where
         Self: 'a;
     type PatternResult: HasPatternTraceCtx + Hash + Eq + Clone;

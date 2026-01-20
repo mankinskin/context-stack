@@ -28,6 +28,7 @@ use crate::{
         position_splits,
         trace::SplitTraceState,
         vertex::{
+            PosSplitCtx,
             node::NodeTraceCtx,
             output::RootMode,
         },
@@ -51,6 +52,21 @@ pub struct SplitVertexCache {
 }
 
 impl SplitVertexCache {
+    pub fn pos_ctx_by_index(
+        &'_ self,
+        index: usize,
+    ) -> PosSplitCtx<'_> {
+        self.positions
+            .iter()
+            .map(PosSplitCtx::from)
+            .nth(index)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Expected offset at index {} in {:#?}",
+                    index, self.positions
+                )
+            })
+    }
     pub fn new(
         pos: NonZeroUsize,
         entry: SplitPositionCache,
