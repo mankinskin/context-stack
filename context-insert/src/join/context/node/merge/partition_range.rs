@@ -2,8 +2,14 @@
 //!
 //! This module provides a clear distinction between partition indices and offset indices.
 
-use std::ops::Range;
-use derive_more::{Deref, DerefMut};
+use derive_more::{
+    Deref,
+    DerefMut,
+};
+use std::ops::{
+    Range,
+    RangeInclusive,
+};
 
 /// A range of partition indices.
 ///
@@ -20,45 +26,34 @@ use derive_more::{Deref, DerefMut};
 ///
 /// `PartitionRange(1..3)` refers to partitions 1 and 2, which span tokens between offsets 0 and 2.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut)]
-pub struct PartitionRange(pub Range<usize>);
+pub struct PartitionRange(pub RangeInclusive<usize>);
 
 impl PartitionRange {
-    pub fn new(range: Range<usize>) -> Self {
+    pub fn new(range: RangeInclusive<usize>) -> Self {
         Self(range)
-    }
-
-    pub fn start(&self) -> usize {
-        self.0.start
-    }
-
-    pub fn end(&self) -> usize {
-        self.0.end
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub fn as_range(&self) -> &Range<usize> {
-        &self.0
+        self.end() - self.start()
     }
 
     pub fn into_range(self) -> Range<usize> {
-        self.0
+        *self.start()..(self.end() + 1)
     }
 }
 
-impl From<Range<usize>> for PartitionRange {
-    fn from(range: Range<usize>) -> Self {
+impl From<usize> for PartitionRange {
+    fn from(i: usize) -> Self {
+        Self(i..=i)
+    }
+}
+impl From<RangeInclusive<usize>> for PartitionRange {
+    fn from(range: RangeInclusive<usize>) -> Self {
         Self(range)
     }
 }
 
-impl From<PartitionRange> for Range<usize> {
+impl From<PartitionRange> for RangeInclusive<usize> {
     fn from(pr: PartitionRange) -> Self {
         pr.0
     }

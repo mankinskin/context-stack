@@ -42,7 +42,7 @@ impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I> for RangeMap {
         for (i, part) in iter.into_iter().enumerate() {
             // Each initial partition occupies partition range i..(i+1)
             // This represents a single partition at index i in the partitions array
-            map.insert(PartitionRange::new(i..(i + 1)), *part.borrow());
+            map.insert(i.into(), *part.borrow());
         }
         Self { map }
     }
@@ -52,22 +52,24 @@ impl RangeMap {
     /// Get all 2-way merge combinations for a partition range.
     ///
     /// Iterates over interior split points to generate all possible binary splits.
-    /// For example, PartitionRange(0..3) produces splits at points 1 and 2:
-    /// - `(0..1) + (1..3)`
-    /// - `(0..2) + (2..3)`
+    /// For example, PartitionRange(0..=2) produces splits at points 1 and 2:
+    /// - `(0..=0) + (1..=2)`
+    /// - `(0..=1) + (2..=2)`
     pub fn range_sub_merges(
         &self,
         range: &PartitionRange,
     ) -> impl IntoIterator<Item = Pattern> + '_ {
-        let (start, end) = (range.start(), range.end());
-        // Iterate interior split points only (start+1..end)
-        // For range 0..3, this gives [1, 2] producing splits:
-        // - (0..1) + (1..3)
-        // - (0..2) + (2..3)
-        // For single-partition ranges like 0..1, this gives [] (empty)
-        (start + 1..end).map(move |ri| {
-            let &left = self.map.get(&PartitionRange::new(start..ri)).unwrap();
-            let &right = self.map.get(&PartitionRange::new(ri..end)).unwrap();
+        let (start, end) = (*range.start(), *range.end());
+        // Iterate interior split points (start+1..=end)
+        // For range 0..=2, this gives [1, 2] producing splits:
+        // - (0..=0) + (1..=2)
+        // - (0..=1) + (2..=2)
+        // For range 0..=1, this gives [1] producing:
+        // - (0..=0) + (1..=1)
+        // For single-partition ranges like 0..=0, this gives [] (empty)
+        (start + 1..=end).map(move |ri| {
+            let &left = self.map.get(&PartitionRange::new(start..=(ri - 1))).unwrap();
+            let &right = self.map.get(&PartitionRange::new(ri..=end)).unwrap();
             Pattern::from(vec![left, right])
         })
     }

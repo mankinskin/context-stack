@@ -41,8 +41,8 @@ impl<'a: 'b, 'b: 'c, 'c> NodeMergeCtx<'a, 'b> {
             // Ranges now use partition indices: i..(i+1) convention from RangeMap
             // Left partition: from start (0) to current offset (i+1)
             // Right partition: from current offset (i+1) to end (len+1)
-            let lr = PartitionRange::new(0..(i + 1));
-            let rr = PartitionRange::new((i + 1)..(len + 1));
+            let lr = PartitionRange::new(0..=i);
+            let rr = PartitionRange::new((i + 1)..=len);
             let left = *merges.get(&lr).unwrap();
             let right = *merges.get(&rr).unwrap();
             if !lr.is_empty() || !lr.is_empty() {

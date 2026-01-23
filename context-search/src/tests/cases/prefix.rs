@@ -46,21 +46,21 @@ impl TestCase for Prefix1 {
 
 impl SearchTestCase for Prefix1 {
     fn query(&self) -> Vec<Token> {
-        let EnvInsertPrefix1 { h, e, l, .. } = *<Self as TestCase>::Env::get();
-        vec![h, e, l, l]
+        let EnvInsertPrefix1 { a, b, c, .. } = *<Self as TestCase>::Env::get();
+        vec![a, b, c, c]
     }
 
     fn expected_response(&self) -> Response {
         let env = <Self as TestCase>::Env::get();
-        let query: Vec<Token> = vec![env.h, env.e, env.l, env.l];
+        let query: Vec<Token> = vec![env.a, env.b, env.c, env.c];
 
         // Bring tokens into scope for macro
-        let heldld = env.heldld;
-        let ld = env.ld;
-        let h = env.h;
-        let l = env.l;
-        let heldld_id = env.heldld_id;
-        let ld_id = env.ld_id;
+        let abcdcd = env.abcdcd;
+        let cd = env.cd;
+        let a = env.a;
+        let c = env.c;
+        let abcdcd_id = env.abcdcd_id;
+        let cd_id = env.cd_id;
 
         Response {
             end: MatchResult {
@@ -77,14 +77,14 @@ impl SearchTestCase for Prefix1 {
                 )),
                 path: PathCoverage::Prefix(PrefixEnd {
                     path: RootedRolePath::new(
-                        PatternLocation::new(heldld, heldld_id),
+                        PatternLocation::new(abcdcd, abcdcd_id),
                         RolePath::new(
                             2,
-                            vec![ChildLocation::new(ld, ld_id, 0)],
+                            vec![ChildLocation::new(cd, cd_id, 0)],
                         ),
                     ),
                     target: DownKey {
-                        index: l,
+                        index: c,
                         pos: 2.into(),
                     },
                     exit_pos: 2.into(),
@@ -92,19 +92,19 @@ impl SearchTestCase for Prefix1 {
                 }),
             },
             cache: build_trace_cache!(
-                heldld => (
+                abcdcd => (
                     BU {},
-                    TD { 2 => ld -> (heldld_id, 2) },
+                    TD { 2 => cd -> (abcdcd_id, 2) },
                 ),
-                ld => (
+                cd => (
                     BU {},
-                    TD { 2 => l -> (ld_id, 0) },
+                    TD { 2 => c -> (cd_id, 0) },
                 ),
-                h => (
+                a => (
                     BU {},
                     TD {},
                 ),
-                l => (
+                c => (
                     BU {},
                     TD { 2 },
                 ),

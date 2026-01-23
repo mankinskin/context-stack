@@ -26,45 +26,45 @@ use std::sync::{
 #[derive(Debug)]
 pub struct EnvInsertPrefix1 {
     pub graph: HypergraphRef,
-    pub h: Token,
-    pub e: Token,
-    pub l: Token,
+    pub a: Token,
+    pub b: Token,
+    pub c: Token,
     pub d: Token,
-    pub ld: Token,
-    pub ld_id: PatternId,
-    pub heldld: Token,
-    pub heldld_id: PatternId,
+    pub cd: Token,
+    pub cd_id: PatternId,
+    pub abcdcd: Token,
+    pub abcdcd_id: PatternId,
 }
 
 impl TestEnv for EnvInsertPrefix1 {
     fn initialize() -> Self {
         let graph = Hypergraph::default();
-        let [h, e, l, d] = graph.insert_atoms([
-            Atom::Element('h'),
-            Atom::Element('e'),
-            Atom::Element('l'),
+        let [a, b, c, d] = graph.insert_atoms([
+            Atom::Element('a'),
+            Atom::Element('b'),
+            Atom::Element('c'),
             Atom::Element('d'),
         ])[..] else {
             panic!()
         };
 
-        let (ld, ld_id) = graph.insert_pattern_with_id(vec![l, d]);
-        let (heldld, heldld_id) =
-            graph.insert_pattern_with_id(vec![h, e, ld, ld]);
+        let (cd, cd_id) = graph.insert_pattern_with_id(vec![c, d]);
+        let (abcdcd, abcdcd_id) =
+            graph.insert_pattern_with_id(vec![a, b, cd, cd]);
 
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
 
         Self {
             graph: HypergraphRef::from(graph),
-            h,
-            e,
-            l,
+            a,
+            b,
+            c,
             d,
-            ld,
-            ld_id: ld_id.unwrap(),
-            heldld,
-            heldld_id: heldld_id.unwrap(),
+            cd,
+            cd_id: cd_id.unwrap(),
+            abcdcd,
+            abcdcd_id: abcdcd_id.unwrap(),
         }
     }
 

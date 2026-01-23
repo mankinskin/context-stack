@@ -19,7 +19,13 @@ use crate::{
             },
         },
     },
-    join::context::node::merge::PartitionRange,
+    join::context::node::merge::{
+        PartitionRange,
+        shared::{
+            MergeContext,
+            MergeMode,
+        },
+    },
     split::{
         cache::position::{
             PosKey,
@@ -142,6 +148,9 @@ impl SplitVertexCache {
         self.positions.extend(wrapper_splits);
 
         debug!(final_positions=?self.positions.keys().collect::<Vec<_>>(), "Final positions");
+
+        // Find where the original target positions are in the final positions array
+        // toi = "target offset indices"
         let toi = self
             .positions
             .keys()
@@ -149,21 +158,45 @@ impl SplitVertexCache {
             .filter_map(|(i, pos)| target_positions.contains(pos).then_some(i))
             .collect_vec();
 
-        // calculate target partition range based on root mode
+        debug!(?toi, "target offset indices");
+
+        // Calculate target partition range based on root mode and original target positions
+        // The target range is defined by where the ORIGINAL target positions are,
+        // not by the total number of offsets (which includes wrapper offsets)
         let target_range = PartitionRange::from(match root_mode {
             RootMode::Infix => {
-                assert_eq!(toi.len(), 2);
-                toi[0]..toi[1]
+                // Infix: partitions between first and last target offset
+                assert_eq!(
+                    toi.len(),
+                    2,
+                    "Infix mode requires exactly 2 target positions"
+                );
+                // Partition range from after first offset to before last offset
+                (toi[0] + 1)..=toi[1]
             },
             RootMode::Prefix => {
-                assert_eq!(toi.len(), 1);
-                0..toi[0]
+                // Prefix: all partitions left of (and including) the last target offset
+                assert_eq!(
+                    toi.len(),
+                    1,
+                    "Prefix mode requires exactly 1 target position"
+                );
+                // Partition range from 0 to the target offset index
+                0..=toi[0]
             },
             RootMode::Postfix => {
-                assert_eq!(toi.len(), 1);
-                toi[0]..self.positions.len()
+                // Postfix: all partitions right of (and including) the first target offset
+                assert_eq!(
+                    toi.len(),
+                    1,
+                    "Postfix mode requires exactly 1 target position"
+                );
+                let num_offsets = self.positions.len();
+                // Partition range from after target offset to end
+                (toi[0] + 1)..=num_offsets
             },
         });
+
         debug!(?target_range, "calculated target_range");
         (next, target_range)
     }

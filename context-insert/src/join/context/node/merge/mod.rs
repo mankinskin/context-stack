@@ -7,7 +7,7 @@
 
 mod partition_range;
 mod range_map;
-pub(super) mod shared;
+pub mod shared;
 
 pub mod intermediary;
 pub mod root;
@@ -16,3 +16,4 @@ pub use intermediary::NodeMergeCtx;
 pub use partition_range::PartitionRange;
 pub use range_map::RangeMap;
 pub use root::RootMergeCtx;
+pub use shared::{MergeContext, MergeMode, PartitionType};

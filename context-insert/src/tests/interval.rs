@@ -253,7 +253,7 @@ fn interval_graph1() {
                 queue: VecDeque::default(),
             },
             cache: build_split_cache1(env),
-            target_range: PartitionRange::from(0..5),
+            target_range: PartitionRange::from(0..=2),
         }
     );
 }

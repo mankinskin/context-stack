@@ -26,7 +26,7 @@ impl<'a: 'b, 'b> RootMergeCtx<'a, 'b> {
         let root_mode = self.ctx.ctx.interval.cache.root_mode;
         let offsets = self.ctx.vertex_cache().clone();
         let root_index = self.ctx.index;
-        //let target_partition_range = self.ctx.ctx.interval.target_range.clone();
+        let target_partition_range = self.ctx.ctx.interval.target_range.clone();
         info!("Starting root merge join");
 
         let (target_token, _) = super::shared::merge_partitions_in_range(

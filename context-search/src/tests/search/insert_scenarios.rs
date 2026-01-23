@@ -1086,19 +1086,19 @@ fn test_index_prefix1_hell() {
 
     let EnvInsertPrefix1 {
         graph,
-        h,
-        e,
-        l,
+        a,
+        b,
+        c,
         d: _d,
-        ld,
-        ld_id,
-        heldld,
-        heldld_id,
+        cd,
+        cd_id,
+        abcdcd,
+        abcdcd_id,
     } = EnvInsertPrefix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
-    let query = vec![h, e, l, l];
+    let query = vec![a, b, c, c];
     let res = Searchable::<AncestorSearchTraversal<_>>::search(
         query.clone(),
         graph.into(),
@@ -1119,11 +1119,11 @@ fn test_index_prefix1_hell() {
             )),
             path: PathCoverage::Prefix(PrefixEnd {
                 path: RootedRolePath::new(
-                    PatternLocation::new(heldld, heldld_id),
-                    RolePath::new(2, vec![ChildLocation::new(ld, ld_id, 0)]),
+                    PatternLocation::new(abcdcd, abcdcd_id),
+                    RolePath::new(2, vec![ChildLocation::new(cd, cd_id, 0)]),
                 ),
                 target: DownKey {
-                    index: l,
+                    index: c,
                     pos: 2.into(),
                 },
                 exit_pos: 2.into(),
@@ -1131,19 +1131,19 @@ fn test_index_prefix1_hell() {
             }),
         },
         cache: build_trace_cache!(
-            heldld => (
+            abcdcd => (
                 BU {},
-                TD { 2 => ld -> (heldld_id, 2) },
+                TD { 2 => cd -> (abcdcd_id, 2) },
             ),
-            ld => (
+            cd => (
                 BU {},
-                TD { 2 => l -> (ld_id, 0) },
+                TD { 2 => c -> (cd_id, 0) },
             ),
-            h => (
+            a => (
                 BU {},
                 TD {},
             ),
-            l => (
+            c => (
                 BU {},
                 TD { 2 },
             ),

@@ -18,35 +18,35 @@ fn insert_prefix1() {
     // Create independent test environment
     let EnvInsertPrefix1 {
         graph,
-        h,
-        e,
-        l,
+        a,
+        b,
+        c,
         d,
-        ld,
-        ld_id,
-        heldld,
-        heldld_id,
+        cd,
+        cd_id,
+        abcdcd,
+        abcdcd_id,
     } = EnvInsertPrefix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Expected InitInterval from search for [h, e, l, l]
     let expected_init = InitInterval {
-        root: heldld,
+        root: abcdcd,
         cache: build_trace_cache!(
-            heldld => (
+            abcdcd => (
                 BU {},
-                TD { 2 => ld -> (heldld_id, 2) },
+                TD { 2 => cd -> (abcdcd_id, 2) },
             ),
-            ld => (
+            cd => (
                 BU {},
-                TD { 2 => l -> (ld_id, 0) },
+                TD { 2 => c -> (cd_id, 0) },
             ),
-            h => (
+            a => (
                 BU {},
                 TD {},
             ),
-            l => (
+            c => (
                 BU {},
                 TD { 2 },
             ),
@@ -54,13 +54,13 @@ fn insert_prefix1() {
         end_bound: 3.into(),
     };
 
-    let hel: Token = graph.insert_init((), expected_init);
-    assert_indices!(graph, he, held);
+    let abc: Token = graph.insert_init((), expected_init);
+    assert_indices!(graph, ab, abcd);
     assert_patterns! {
         graph,
-        he => [[h, e]],
-        hel => [[he, l]],
-        held => [[hel, d], [he, ld]],
-        heldld => [[held, ld]]
+        ab => [[a, b]],
+        abc => [[ab, c]],
+        abcd => [[abc, d], [ab, cd]],
+        abcdcd => [[abcd, cd]]
     };
 }
