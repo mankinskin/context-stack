@@ -2,6 +2,7 @@ use crate::{
     interval::partition::{
         Partition,
         ToPartition,
+        delta::PatternSubDeltas,
         info::{
             InfoPartition,
             range::{
@@ -19,13 +20,7 @@ use crate::{
             },
         },
     },
-    join::context::node::merge::{
-        PartitionRange,
-        shared::{
-            MergeContext,
-            MergeMode,
-        },
-    },
+    join::context::node::merge::PartitionRange,
     split::{
         cache::position::{
             PosKey,
@@ -73,6 +68,21 @@ impl SplitVertexCache {
                 )
             })
     }
+
+    /// Apply delta adjustments to all positions.
+    ///
+    /// This decrements the `sub_index` for each pattern by the delta amount.
+    /// Called after a prefix partition is merged and patterns are replaced,
+    /// so that subsequent lookups use correct indices into the modified patterns.
+    pub fn apply_deltas(
+        &mut self,
+        deltas: &PatternSubDeltas,
+    ) {
+        for pos_cache in self.positions.values_mut() {
+            *pos_cache -= deltas;
+        }
+    }
+
     pub fn new(
         pos: NonZeroUsize,
         entry: SplitPositionCache,

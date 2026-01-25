@@ -10,9 +10,9 @@ use crate::{
     interval::IntervalGraph,
     join::context::{
         frontier::FrontierSplitIterator,
-        node::merge::{
-            NodeMergeCtx,
-            RootMergeCtx,
+        node::merge::context::{
+            MergeCtx,
+            MergeMode,
         },
         pattern::PatternJoinCtx,
     },
@@ -79,9 +79,6 @@ impl<'a> NodeJoinCtx<'a> {
             ctx: LockedFrontierCtx::new(ctx),
         }
     }
-    pub fn root_merge_ctx(&mut self) -> RootMergeCtx<'a, '_> {
-        RootMergeCtx::new(self)
-    }
 }
 impl AsNodeTraceCtx for NodeJoinCtx<'_> {
     fn as_trace_context(&self) -> NodeTraceCtx {
@@ -129,11 +126,8 @@ impl NodeJoinCtx<'_> {
     pub fn vertex_cache(&self) -> &SplitVertexCache {
         self.interval.cache.get(&self.index.vertex_index()).unwrap()
     }
-    pub fn join_partitions(&mut self) -> LinkedHashMap<PosKey, Split> {
+    pub fn join_partitions(self) -> LinkedHashMap<PosKey, Split> {
         // Use shared initial partition creation
-        let pos_splits = self.vertex_cache().clone();
-        let len = pos_splits.len();
-        assert!(len > 0);
-        NodeMergeCtx::new(self).merge_node()
+        MergeCtx::new(self, MergeMode::Full).merge_node()
     }
 }

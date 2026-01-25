@@ -36,9 +36,23 @@ impl JoinBorders<Post<Join>> for BorderInfo {
         ctx: &PatternJoinCtx,
     ) -> Option<ChildrenOf<Post<Join>>> {
         self.inner_offset.map(|o| {
+            let token = ctx.pattern[self.sub_index];
+            let key = PosKey::new(token, o);
+            tracing::debug!(
+                ?token,
+                ?key,
+                sub_index = self.sub_index,
+                pattern_len = ctx.pattern.len(),
+                ?o,
+                splits_keys = ?ctx.splits.keys().collect::<Vec<_>>(),
+                "Post<Join>::get_child_splits lookup"
+            );
             ctx.splits
-                .get(&PosKey::new(ctx.pattern[self.sub_index], o))
-                .unwrap()
+                .get(&key)
+                .unwrap_or_else(|| panic!(
+                    "Split not found for {:?} in splits map. Pattern: {:?}, sub_index: {}, inner_offset: {:?}",
+                    key, ctx.pattern, self.sub_index, o
+                ))
                 .right
         })
     }

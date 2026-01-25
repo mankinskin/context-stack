@@ -3,7 +3,13 @@ use linked_hash_set::LinkedHashSet;
 
 use crate::{
     interval::IntervalGraph,
-    join::context::node::context::NodeJoinCtx,
+    join::context::node::{
+        context::NodeJoinCtx,
+        merge::context::{
+            MergeCtx,
+            MergeMode,
+        },
+    },
     split::{
         SplitMap,
         cache::position::PosKey,
@@ -70,9 +76,9 @@ impl Iterator for FrontierSplitIterator {
             },
             Some(None) => None,
             None => Some({
-                self.node(self.frontier.interval.root)
-                    .root_merge_ctx()
-                    .join()
+                let ctx = self.node(self.frontier.interval.root);
+                let root_mode = ctx.interval.cache.root_mode;
+                MergeCtx::new(ctx, MergeMode::Root(root_mode)).merge_root()
             }),
         })
     }

@@ -5,15 +5,12 @@
 //! - `RootMergeCtx`: Merges root nodes and extracts the target token
 //! - `shared`: Common merge utilities used by both contexts
 
+pub mod context;
+pub mod partition;
 mod partition_range;
 mod range_map;
-pub mod shared;
 
-pub mod intermediary;
-pub mod root;
+pub mod node;
 
-pub use intermediary::NodeMergeCtx;
 pub use partition_range::PartitionRange;
 pub use range_map::RangeMap;
-pub use root::RootMergeCtx;
-pub use shared::{MergeContext, MergeMode, PartitionType};

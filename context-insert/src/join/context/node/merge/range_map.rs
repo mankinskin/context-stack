@@ -68,7 +68,10 @@ impl RangeMap {
         // - (0..=0) + (1..=1)
         // For single-partition ranges like 0..=0, this gives [] (empty)
         (start + 1..=end).map(move |ri| {
-            let &left = self.map.get(&PartitionRange::new(start..=(ri - 1))).unwrap();
+            let &left = self
+                .map
+                .get(&PartitionRange::new(start..=(ri - 1)))
+                .unwrap();
             let &right = self.map.get(&PartitionRange::new(ri..=end)).unwrap();
             Pattern::from(vec![left, right])
         })

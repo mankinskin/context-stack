@@ -53,10 +53,20 @@ impl std::ops::Sub<PatternSubDeltas> for SplitPositionCache {
         mut self,
         rhs: PatternSubDeltas,
     ) -> Self::Output {
+        self -= &rhs;
+        self
+    }
+}
+
+impl std::ops::SubAssign<&PatternSubDeltas> for SplitPositionCache {
+    fn sub_assign(&mut self, rhs: &PatternSubDeltas) {
         self.pattern_splits
             .iter_mut()
-            .for_each(|(pid, pos)| *pos.sub_index_mut() -= rhs[pid]);
-        self
+            .for_each(|(pid, pos)| {
+                if let Some(&delta) = rhs.get(pid) {
+                    *pos.sub_index_mut() -= delta;
+                }
+            });
     }
 }
 
