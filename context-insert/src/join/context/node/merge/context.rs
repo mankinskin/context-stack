@@ -184,10 +184,18 @@ impl<'a> MergeCtx<'a> {
                 // Partition type is always relative to full node (determines offset boundaries)
                 let partition_type = self.partition_type(&partition_range);
                 // Check if this is the full operating range (for intermediary node handling)
-                let is_full_operating_range = partition_range == operating_range;
-                debug!(?partition_type, ?is_full_operating_range, "Detected partition type");
+                let is_full_operating_range =
+                    partition_range == operating_range;
+                debug!(
+                    ?partition_type,
+                    ?is_full_operating_range,
+                    "Detected partition type"
+                );
 
-                let (merged_token, delta) = match (is_full_operating_range, partition_type) {
+                let (merged_token, delta) = match (
+                    is_full_operating_range,
+                    partition_type,
+                ) {
                     (true, _) if matches!(self.mode, MergeMode::Full) => {
                         // Full operating range for intermediary node - use the node itself
                         let token = self.ctx.index;

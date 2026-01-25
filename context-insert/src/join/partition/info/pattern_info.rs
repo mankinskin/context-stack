@@ -2,9 +2,9 @@ use crate::{
     interval::partition::info::{
         border::{
             PartitionBorder,
+            info::InfoBorder,
             perfect::BoolPerfect,
             trace::TraceBorders,
-            visit::VisitBorders,
         },
         range::{
             InnerRangeInfo,

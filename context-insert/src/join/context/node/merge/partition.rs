@@ -272,23 +272,6 @@ where
     R::Borders: JoinBorders<R>,
     for<'c> MergePartitionBuilder<'c>: ToPartition<R>,
 {
-    /// Create a partition context from MergeCtx and partition range.
-    ///
-    /// The partition is built automatically based on the role type `R`
-    /// using the `ToPartition` implementation for `MergePartitionBuilder`.
-    ///
-    /// # Type Parameters
-    /// - `R`: The partition role (`Pre<Join>`, `Post<Join>`, or `In<Join>`)
-    ///
-    /// # Example
-    /// ```ignore
-    /// // Create a prefix partition context
-    /// let ctx = MergePartitionCtx::<Pre<Join>>::from_merge_ctx(
-    ///     merge_ctx,
-    ///     &range_map,
-    ///     partition_range,
-    /// );
-    /// ```
     pub fn from_merge_ctx(
         merge_ctx: &'a mut MergeCtx<'b>,
         range_map: &'a RangeMap,

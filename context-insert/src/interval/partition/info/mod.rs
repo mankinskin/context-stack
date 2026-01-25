@@ -17,7 +17,7 @@ use crate::{
     interval::partition::{
         ToPartition,
         info::{
-            border::visit::VisitBorders,
+            border::info::InfoBorder,
             range::role::ModeNodeCtxOf,
         },
     },
@@ -78,9 +78,7 @@ pub trait InfoPartition<R: RangeRole>: Sized + Clone + ToPartition<R> {
 
     /// bundle pattern range infos of each pattern
     /// or extract complete token for range
-    fn partition_borders<
-        C: PartitionBorderKey + From<ModePatternCtxOf<R>>,
-    >(
+    fn partition_borders<C: PartitionBorderKey + From<ModePatternCtxOf<R>>>(
         &self,
         ctx: &ModeNodeCtxOf<'_, R>,
     ) -> PartitionBorders<R, C> {

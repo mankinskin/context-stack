@@ -27,7 +27,7 @@ use crate::{
 };
 use context_trace::*;
 
-pub trait VisitBorders<R: RangeRole>: Sized + PartitionBorder<R> {
+pub trait InfoBorder<R: RangeRole>: Sized + PartitionBorder<R> {
     type Splits;
     /// The atom position type for this border visitor.
     /// - NonZeroUsize for Pre/Post modes
@@ -51,7 +51,7 @@ pub trait VisitBorders<R: RangeRole>: Sized + PartitionBorder<R> {
     fn outer_range(&self) -> PatternRangeOf<R>;
 }
 
-impl<M: PostVisitMode> VisitBorders<Post<M>> for BorderInfo {
+impl<M: PostVisitMode> InfoBorder<Post<M>> for BorderInfo {
     type Splits = TokenTracePos;
     type AtomPos = NonZeroUsize;
 
@@ -84,7 +84,7 @@ impl<M: PostVisitMode> VisitBorders<Post<M>> for BorderInfo {
     }
 }
 
-impl<M: PreVisitMode> VisitBorders<Pre<M>> for BorderInfo {
+impl<M: PreVisitMode> InfoBorder<Pre<M>> for BorderInfo {
     type Splits = TokenTracePos;
     type AtomPos = NonZeroUsize;
 
@@ -111,10 +111,10 @@ impl<M: PreVisitMode> VisitBorders<Pre<M>> for BorderInfo {
     }
 }
 
-impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
+impl<M: InVisitMode> InfoBorder<In<M>> for (BorderInfo, BorderInfo) {
     type Splits = (
-        <BorderInfo as VisitBorders<Post<M>>>::Splits,
-        <BorderInfo as VisitBorders<Pre<M>>>::Splits,
+        <BorderInfo as InfoBorder<Post<M>>>::Splits,
+        <BorderInfo as InfoBorder<Pre<M>>>::Splits,
     );
     type AtomPos = (NonZeroUsize, NonZeroUsize);
 
@@ -134,16 +134,23 @@ impl<M: InVisitMode> VisitBorders<In<M>> for (BorderInfo, BorderInfo) {
         &self,
         pattern: &Pattern,
     ) -> Option<OffsetsOf<In<M>>> {
-        let a = VisitBorders::<Post<M>>::inner_range_offsets(&self.0, pattern);
-        let b = VisitBorders::<Pre<M>>::inner_range_offsets(&self.1, pattern);
+        let a = InfoBorder::<Post<M>>::inner_range_offsets(&self.0, pattern);
+        let b = InfoBorder::<Pre<M>>::inner_range_offsets(&self.1, pattern);
         let r = match (a, b) {
             (Some(lio), Some(rio)) => Some((lio, rio)),
             (Some(lio), None) => Some((lio, {
                 let w = *pattern[self.1.sub_index].width();
-                let o = self.1.start_offset.unwrap().get() + w;
+                // start_offset can be None when at position 0 - use just width in that case
+                let o = self.1.start_offset.map(|o| o.get() + w).unwrap_or(w);
                 NonZeroUsize::new(o).unwrap()
             })),
-            (None, Some(rio)) => Some((self.0.start_offset.unwrap(), rio)),
+            (None, Some(rio)) => {
+                // start_offset can be None when at position 0 - need inner_offset
+                let lio = self.0.start_offset.or(self.0.inner_offset).expect(
+                    "left border must have start_offset or inner_offset",
+                );
+                Some((lio, rio))
+            },
             (None, None) => None,
         };
         r.filter(|(l, r)| l != r)

@@ -8,7 +8,7 @@ pub mod perfect;
 
 pub mod trace;
 
-pub mod visit;
+pub mod info;
 
 pub struct BorderInfo {
     pub sub_index: usize,

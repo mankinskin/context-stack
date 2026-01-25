@@ -14,8 +14,8 @@ use context_trace::*;
 
 use crate::{
     interval::partition::info::border::{
+        info::InfoBorder,
         trace::TraceBorders,
-        visit::VisitBorders,
     },
     split::vertex::pattern::HasPatternTraceCtx,
 };
