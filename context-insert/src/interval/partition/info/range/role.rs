@@ -86,7 +86,11 @@ pub trait RangeRole: Debug + Clone + Copy {
     type PatternRange: PatternRangeIndex<Self>;
     type PartitionSplits;
     type Children: RangeChildren<Self>;
-    type Borders: VisitBorders<Self, Splits = <Self::Splits as PatternSplits>::Pos>;
+    type Borders: VisitBorders<
+        Self,
+        Splits = <Self::Splits as PatternSplits>::Pos,
+        AtomPos = <Self::Splits as PatternSplits>::AtomPos,
+    >;
     type Splits: PatternSplits + ToPartition<Self>;
     fn to_partition(splits: Self::Splits) -> Partition<Self>;
     const ROLE_STR: &'static str;

@@ -15,14 +15,22 @@ use crate::{
         Infix,
         Postfix,
         Prefix,
-    },
-    join::context::node::{
-        context::NodeJoinCtx,
-        merge::{
-            PartitionRange,
-            RangeMap,
-            partition::MergePartition,
+        info::range::role::{
+            In,
+            Post,
+            Pre,
         },
+    },
+    join::{
+        context::node::{
+            context::NodeJoinCtx,
+            merge::{
+                PartitionRange,
+                RangeMap,
+                partition::merge_partition,
+            },
+        },
+        partition::Join,
     },
     split::vertex::ToVertexSplits,
 };
@@ -85,6 +93,19 @@ impl<'a> MergeCtx<'a> {
             mode,
         }
     }
+
+    /// Add a split to the shared splits map.
+    /// This makes splits for merged tokens available to subsequent pattern operations.
+    pub fn add_split(
+        &mut self,
+        key: crate::split::cache::position::PosKey,
+        split: crate::split::Split,
+    ) {
+        self.ctx.splits.insert(key, split);
+    }
+}
+
+impl<'a> MergeCtx<'a> {
     /// Total number of partitions (num_offsets + 1)
     pub fn num_partitions(&self) -> usize {
         self.offsets.len() + 1
@@ -175,7 +196,7 @@ impl<'a> MergeCtx<'a> {
     ) -> (Token, RangeMap) {
         let num_partitions = self.num_partitions();
         // Use provided target range for Root mode, otherwise compute from MergeCtx
-        let operating_range = self.operating_partition_range();
+        let _operating_range = self.operating_partition_range();
 
         debug!(
             node=?self.ctx.index,
@@ -216,36 +237,47 @@ impl<'a> MergeCtx<'a> {
 
                 let (merged_token, delta) = match partition_type {
                     PartitionType::Full => {
-                        debug!(
-                            "Merging full partition - adding sub-merge patterns"
-                        );
                         let token = self.ctx.index;
 
-                        // Add sub-merge patterns (all 2-way splits around each offset)
-                        let existing_patterns = self
-                            .ctx
-                            .trav
-                            .expect_vertex_data(token)
-                            .child_pattern_set();
-
-                        let sub_merges: Vec<_> = range_map
-                            .range_sub_merges(&partition_range)
-                            .into_iter()
-                            .filter(|p| !existing_patterns.contains(p))
-                            .collect();
-
-                        if !sub_merges.is_empty() {
+                        // For intermediary nodes (Full mode), add sub-merge patterns
+                        // to represent all 2-way decompositions around each offset.
+                        // For Root mode, we don't add sub-merge patterns because
+                        // the root already has its patterns and we're just extracting
+                        // a target partition.
+                        if matches!(self.mode, MergeMode::Full) {
                             debug!(
-                                num_sub_merges = sub_merges.len(),
-                                ?sub_merges,
-                                "Adding sub-merge patterns to full token"
+                                "Merging full partition - adding sub-merge patterns (intermediary node)"
                             );
-                            for merge_pattern in sub_merges {
-                                self.ctx.trav.add_pattern_with_update(
-                                    token,
-                                    merge_pattern,
+
+                            let existing_patterns = self
+                                .ctx
+                                .trav
+                                .expect_vertex_data(token)
+                                .child_pattern_set();
+
+                            let sub_merges: Vec<_> = range_map
+                                .range_sub_merges(&partition_range)
+                                .into_iter()
+                                .filter(|p| !existing_patterns.contains(p))
+                                .collect();
+
+                            if !sub_merges.is_empty() {
+                                debug!(
+                                    num_sub_merges = sub_merges.len(),
+                                    ?sub_merges,
+                                    "Adding sub-merge patterns to full token"
                                 );
+                                for merge_pattern in sub_merges {
+                                    self.ctx.trav.add_pattern_with_update(
+                                        token,
+                                        merge_pattern,
+                                    );
+                                }
                             }
+                        } else {
+                            debug!(
+                                "Merging full partition - skipping sub-merge patterns (root mode)"
+                            );
                         }
 
                         (token, None)
@@ -258,7 +290,8 @@ impl<'a> MergeCtx<'a> {
                             .offsets
                             .pos_ctx_by_index(ro_idx)
                             .to_vertex_splits();
-                        Prefix::new(ro).merge_partition(
+                        merge_partition::<Pre<Join>, _>(
+                            Prefix::new(ro),
                             self,
                             &range_map,
                             &partition_range,
@@ -272,7 +305,8 @@ impl<'a> MergeCtx<'a> {
                             .offsets
                             .pos_ctx_by_index(lo_idx)
                             .to_vertex_splits();
-                        Postfix::new(lo).merge_partition(
+                        merge_partition::<Post<Join>, _>(
+                            Postfix::new(lo),
                             self,
                             &range_map,
                             &partition_range,
@@ -290,7 +324,8 @@ impl<'a> MergeCtx<'a> {
                             .offsets
                             .pos_ctx_by_index(ro_idx)
                             .to_vertex_splits();
-                        Infix::new(lo, ro).merge_partition(
+                        merge_partition::<In<Join>, _>(
+                            Infix::new(lo, ro),
                             self,
                             &range_map,
                             &partition_range,
@@ -298,12 +333,18 @@ impl<'a> MergeCtx<'a> {
                     },
                 };
 
-                // Apply delta to offsets after prefix merges (patterns were modified)
+                // Apply delta to offsets AFTER the merged partition (patterns were modified)
+                // Only offsets that come after the partition's end should have sub_indices adjusted
                 if let Some(ref deltas) = delta
                     && !deltas.is_empty()
                 {
-                    debug!(?deltas, "Applying deltas to offset cache");
-                    self.offsets.apply_deltas(deltas);
+                    debug!(
+                        ?deltas,
+                        partition_end = end,
+                        "Applying deltas to offset cache (after index {})",
+                        end
+                    );
+                    self.offsets.apply_deltas(deltas, end);
                 }
 
                 // Track target token if we've reached the target partition range
@@ -324,6 +365,28 @@ impl<'a> MergeCtx<'a> {
                     "RangeMap INSERT: inserting token for range"
                 );
                 range_map.insert(partition_range.clone(), merged_token);
+
+                // Compute splits for newly merged tokens (partitions with len > 0,
+                // i.e., covering more than one partition index)
+                // The range_map now has all sub-ranges we need to compute splits
+                // Add them to shared splits so subsequent pattern operations can access them
+                if !partition_range.is_empty() {
+                    let computed_splits = range_map
+                        .compute_splits_for_merged_token(
+                            merged_token,
+                            &partition_range,
+                            self.ctx.splits,
+                        );
+                    debug!(
+                        ?merged_token,
+                        ?partition_range,
+                        num_splits = computed_splits.len(),
+                        "Computed splits for merged token"
+                    );
+                    for (key, split) in computed_splits {
+                        self.add_split(key, split);
+                    }
+                }
             }
         }
 

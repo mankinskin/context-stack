@@ -1,25 +1,20 @@
-use std::borrow::Borrow;
-
 use crate::{
     PatternSubDeltas,
     RangeRole,
     interval::partition::{
+        Partition,
         ToPartition,
         info::{
             InfoPartition,
             PartitionInfo,
-            border::perfect::BorderPerfect as _,
         },
     },
     join::{
         context::{
-            node::{
-                context::NodeJoinCtx,
-                merge::{
-                    PartitionRange,
-                    RangeMap,
-                    context::MergeCtx,
-                },
+            node::merge::{
+                PartitionRange,
+                RangeMap,
+                context::MergeCtx,
             },
             pattern::borders::JoinBorders,
         },
@@ -31,110 +26,141 @@ use crate::{
     },
 };
 use context_trace::{
-    Pattern,
-    PatternId,
     Token,
     VertexSet,
 };
-use itertools::Itertools;
 use tracing::debug;
 
-pub trait MergePartition<R: RangeRole<Mode = Join>>:
-    InfoPartition<R> + ToPartition<R>
+/// Context for merging a single partition.
+///
+/// This struct encapsulates the partition being merged along with the necessary
+/// context for performing the merge operation. It provides a cleaner API than
+/// function-based dispatch by holding all partition-specific state together.
+///
+/// # Type Parameters
+/// - `R`: The `RangeRole` (Pre, Post, or In) that determines the partition type
+///
+/// # Example
+/// ```ignore
+/// let ctx = MergePartitionCtx::new(
+///     Prefix::new(splits),
+///     merge_ctx,
+///     &range_map,
+///     &partition_range,
+/// );
+/// let (token, delta) = ctx.merge();
+/// ```
+pub struct MergePartitionCtx<'a, 'b, R: RangeRole<Mode = Join>>
 where
     R::Borders: JoinBorders<R>,
 {
-    fn join_patterns<'a>(
-        &mut self,
-        ctx: &mut NodeJoinCtx<'a>,
-        range_map: &RangeMap,
-        range: &PartitionRange,
-        info: &PartitionInfo<R>,
-    ) -> Vec<Pattern>
-    where
-        R: 'a,
-    {
-        let sub_merges: Vec<_> =
-            range_map.range_sub_merges(range).into_iter().collect();
+    /// The partition being merged (contains offset splits)
+    pub partition: Partition<R>,
+    /// The merge context containing node context and offset cache
+    pub merge_ctx: &'a mut MergeCtx<'b>,
+    /// Map of already-merged partition ranges to their tokens
+    pub range_map: &'a RangeMap,
+    /// The range of partition indices being merged
+    pub partition_range: &'a PartitionRange,
+}
 
-        // Extract joined patterns from partition info
-        let joined_patterns: Vec<Pattern> = info
-            .patterns
-            .iter()
-            .map(|(pid, pat_info)| {
-                Pattern::from(
-                    (pat_info.clone().join_pattern(ctx, pid).borrow()
-                        as &'_ Pattern)
-                        .iter()
-                        .cloned()
-                        .collect_vec(),
-                )
-            })
+impl<'a, 'b, R: RangeRole<Mode = Join> + 'b> MergePartitionCtx<'a, 'b, R>
+where
+    R::Borders: JoinBorders<R>,
+{
+    /// Create a new merge partition context.
+    ///
+    /// # Arguments
+    /// - `partition`: Something that can be converted to a `Partition<R>`
+    /// - `merge_ctx`: The merge context with node context and offset cache
+    /// - `range_map`: Map of already-merged ranges to tokens
+    /// - `partition_range`: The range being merged
+    pub fn new<P: ToPartition<R>>(
+        partition: P,
+        merge_ctx: &'a mut MergeCtx<'b>,
+        range_map: &'a RangeMap,
+        partition_range: &'a PartitionRange,
+    ) -> Self {
+        Self {
+            partition: partition.to_partition(),
+            merge_ctx,
+            range_map,
+            partition_range,
+        }
+    }
+
+    /// Get partition info for all patterns.
+    ///
+    /// Returns `Ok(PartitionInfo)` if the partition needs to be created,
+    /// or `Err(Token)` if a token already exists for this exact partition.
+    pub fn info_partition(&self) -> Result<PartitionInfo<R>, Token> {
+        self.partition.info_partition(&self.merge_ctx.ctx)
+    }
+
+    /// Create a JoinedPartition from partition info.
+    ///
+    /// This handles pattern joining, token creation/lookup, and delta computation.
+    pub fn join_partition(
+        &mut self,
+        info: PartitionInfo<R>,
+    ) -> JoinedPartition<R> {
+        JoinedPartition::from_partition_info(
+            JoinPartitionInfo::new(info),
+            &mut self.merge_ctx.ctx,
+        )
+    }
+
+    /// Add sub-merge patterns to a token if they don't already exist.
+    ///
+    /// Sub-merge patterns are alternative decompositions of the merged token
+    /// that were discovered during the partition merge process.
+    pub fn add_sub_merges(&mut self, token: Token) {
+        let existing_patterns = self
+            .merge_ctx
+            .ctx
+            .trav
+            .expect_vertex_data(token)
+            .child_pattern_set();
+
+        let sub_merges: Vec<_> = self
+            .range_map
+            .range_sub_merges(self.partition_range)
+            .into_iter()
+            .filter(|p| !existing_patterns.contains(p))
             .collect();
 
-        // Combine joined patterns with sub-merges, removing duplicates
-        let mut combined_patterns: Vec<Pattern> = joined_patterns.clone();
-        for merge_pattern in sub_merges.iter() {
-            if !combined_patterns.contains(merge_pattern) {
-                combined_patterns.push(merge_pattern.clone());
+        if !sub_merges.is_empty() {
+            debug!(
+                num_sub_merges = sub_merges.len(),
+                "Adding sub-merge patterns"
+            );
+            for merge_pattern in sub_merges {
+                self.merge_ctx
+                    .ctx
+                    .trav
+                    .add_pattern_with_update(token, merge_pattern);
             }
         }
-
-        debug!(
-            range_start = range.start(),
-            range_end = range.end(),
-            num_partition_patterns = info.patterns.len(),
-            num_sub_merges = sub_merges.len(),
-            num_combined = combined_patterns.len(),
-            ?joined_patterns,
-            ?sub_merges,
-            ?combined_patterns,
-            "POSTFIX merge_postfix_partition: combining patterns"
-        );
-        combined_patterns
-    }
-    fn perfect_replace_range(
-        &self,
-        info: &PartitionInfo<R>,
-    ) -> Option<(PatternId, <R as RangeRole>::PatternRange)> {
-        info.perfect
-            .clone()
-            .all_perfect_pattern()
-            .map(|pid| (pid, info.patterns.get(&pid).unwrap().range.clone()))
     }
 
-    /// Merge a partition and return (token, delta).
+    /// Merge the partition and return (token, delta).
     ///
-    /// Uses `JoinPartitionInfo` infrastructure which computes deltas automatically.
-    /// The delta represents how many indices were removed from each pattern
-    /// when the partition was replaced with a single merged token.
-    fn merge_partition<'a, 'b>(
-        &mut self,
-        ctx: &mut MergeCtx<'a>,
-        range_map: &RangeMap,
-        range: &PartitionRange,
-    ) -> (Token, Option<PatternSubDeltas>)
-    where
-        R: 'a,
-    {
+    /// This is the main entry point that:
+    /// 1. Gets partition info (or returns existing token)
+    /// 2. Creates JoinedPartition with delta computation
+    /// 3. Adds sub-merge patterns
+    /// 4. Returns the token and any pattern deltas
+    pub fn merge(mut self) -> (Token, Option<PatternSubDeltas>) {
         debug!(
-            range_start = range.start(),
-            range_end = range.end(),
-            num_offsets = ctx.offsets.len(),
-            "Merge Partition with Delta: ENTERED"
+            range_start = self.partition_range.start(),
+            range_end = self.partition_range.end(),
+            num_offsets = self.merge_ctx.offsets.len(),
+            "MergePartitionCtx::merge: ENTERED"
         );
 
-        // Use info_partition to get partition info, then JoinedPartition to handle
-        // pattern joining, replacement, and delta computation
-        // Note: info_partition expects &NodeJoinCtx, so we dereference through ctx.ctx
-        match self.info_partition(&ctx.ctx) {
+        match self.info_partition() {
             Ok(info) => {
-                // Convert to JoinPartitionInfo and then to JoinedPartition
-                // Note: from_partition_info expects &mut NodeJoinCtx
-                let joined = JoinedPartition::from_partition_info(
-                    JoinPartitionInfo::new(info),
-                    &mut ctx.ctx,
-                );
+                let joined = self.join_partition(info);
 
                 debug!(
                     token = %joined.index,
@@ -142,32 +168,7 @@ where
                     "JoinPartitionInfo succeeded with delta"
                 );
 
-                // Add sub-merge patterns if any (alternative decompositions)
-                // First, get existing patterns to avoid duplicates
-                let existing_patterns = ctx
-                    .ctx
-                    .trav
-                    .expect_vertex_data(joined.index)
-                    .child_pattern_set();
-
-                let sub_merges: Vec<_> = range_map
-                    .range_sub_merges(range)
-                    .into_iter()
-                    .filter(|p| !existing_patterns.contains(p))
-                    .collect();
-
-                if !sub_merges.is_empty() {
-                    debug!(
-                        num_sub_merges = sub_merges.len(),
-                        "Adding sub-merge patterns"
-                    );
-                    for merge_pattern in sub_merges {
-                        ctx.ctx.trav.add_pattern_with_update(
-                            joined.index,
-                            merge_pattern,
-                        );
-                    }
-                }
+                self.add_sub_merges(joined.index);
 
                 let delta = if joined.delta.is_empty() {
                     None
@@ -179,8 +180,8 @@ where
             Err(existing) => {
                 debug!(
                     ?existing,
-                    range_start = range.start(),
-                    range_end = range.end(),
+                    range_start = self.partition_range.start(),
+                    range_end = self.partition_range.end(),
                     "{}: Token already exists - using without modification",
                     R::ROLE_STR
                 );
@@ -190,7 +191,20 @@ where
     }
 }
 
-impl<R: RangeRole<Mode = Join>, P: ToPartition<R>> MergePartition<R> for P where
-    R::Borders: JoinBorders<R>
+/// Convenience function to merge a partition.
+///
+/// This creates a `MergePartitionCtx` and calls `merge()` in one step.
+/// For more control over the merge process, use `MergePartitionCtx` directly.
+pub fn merge_partition<'a, 'b, R, P>(
+    partition: P,
+    merge_ctx: &'a mut MergeCtx<'b>,
+    range_map: &'a RangeMap,
+    partition_range: &'a PartitionRange,
+) -> (Token, Option<PatternSubDeltas>)
+where
+    R: RangeRole<Mode = Join> + 'b,
+    R::Borders: JoinBorders<R>,
+    P: ToPartition<R>,
 {
+    MergePartitionCtx::<R>::new(partition, merge_ctx, range_map, partition_range).merge()
 }

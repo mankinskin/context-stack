@@ -18,29 +18,20 @@ pub struct BorderInfo {
     pub start_offset: Option<NonZeroUsize>,
 }
 impl BorderInfo {
-    fn new(
-        pattern: &Pattern,
-        pos: &TokenTracePos,
-    ) -> Self {
-        let offset = End::inner_ctx_width(pattern, pos.sub_index());
-        BorderInfo {
-            sub_index: pos.sub_index(),
-            pattern_len: pattern.len(),
-            inner_offset: pos.inner_offset(),
-            start_offset: NonZeroUsize::new(offset),
-        }
-    }
-
-    /// Create a BorderInfo by recalculating sub_index from atom position.
+    /// Create a BorderInfo by recalculating sub_index AND inner_offset from atom position.
     /// This is more robust when the pattern may have been modified after the
     /// original trace was recorded.
+    ///
+    /// IMPORTANT: After pattern replacement (e.g., merging tokens), the original
+    /// inner_offset from the cache no longer applies to the new token at sub_index.
+    /// We must use the inner_offset calculated from trace_child_pos to get the
+    /// correct position within the current pattern structure.
     pub fn new_from_atom_pos(
         pattern: &Pattern,
         atom_pos: NonZeroUsize,
-        inner_offset: Option<NonZeroUsize>,
     ) -> Self {
         use crate::TraceBack;
-        // Recalculate sub_index from atom position using current pattern
+        // Recalculate BOTH sub_index and inner_offset from atom position using current pattern
         let trace_pos = TraceBack::trace_child_pos(pattern, atom_pos)
             .expect("atom_pos should be valid within pattern");
         let sub_index = trace_pos.sub_index();
@@ -48,7 +39,7 @@ impl BorderInfo {
         BorderInfo {
             sub_index,
             pattern_len: pattern.len(),
-            inner_offset,
+            inner_offset: trace_pos.inner_offset(), // Use recalculated inner_offset!
             start_offset: NonZeroUsize::new(offset),
         }
     }

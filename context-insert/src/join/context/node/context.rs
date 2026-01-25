@@ -36,14 +36,14 @@ use derive_more::{
 pub struct LockedFrontierCtx<'a> {
     pub trav: &'a Hypergraph,
     pub interval: &'a IntervalGraph,
-    pub splits: &'a SplitMap,
+    pub splits: &'a mut SplitMap,
 }
 impl<'a> LockedFrontierCtx<'a> {
     pub fn new(ctx: &'a mut FrontierSplitIterator) -> Self {
         Self {
             trav: &*ctx.trav,
             interval: &ctx.frontier.interval,
-            splits: &ctx.splits,
+            splits: &mut ctx.splits,
         }
     }
 }

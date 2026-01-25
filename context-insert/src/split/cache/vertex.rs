@@ -69,17 +69,23 @@ impl SplitVertexCache {
             })
     }
 
-    /// Apply delta adjustments to all positions.
+    /// Apply delta adjustments to positions AFTER a given offset index.
     ///
     /// This decrements the `sub_index` for each pattern by the delta amount.
-    /// Called after a prefix partition is merged and patterns are replaced,
+    /// Called after a partition is merged and patterns are replaced,
     /// so that subsequent lookups use correct indices into the modified patterns.
+    ///
+    /// Only offsets with index > `after_offset_index` are affected. Offsets at or
+    /// before the merged partition should not have their sub_indices adjusted.
     pub fn apply_deltas(
         &mut self,
         deltas: &PatternSubDeltas,
+        after_offset_index: usize,
     ) {
-        for pos_cache in self.positions.values_mut() {
-            *pos_cache -= deltas;
+        for (idx, pos_cache) in self.positions.values_mut().enumerate() {
+            if idx > after_offset_index {
+                *pos_cache -= deltas;
+            }
         }
     }
 

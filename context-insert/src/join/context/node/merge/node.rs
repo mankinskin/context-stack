@@ -19,26 +19,44 @@ impl<'a> MergeCtx<'a> {
     /// This uses the same merge algorithm as root nodes - `merge_sub_partitions`
     /// handles all pattern creation and replacement. This function just extracts
     /// the Split results from the range_map for use by parent nodes.
+    ///
+    /// Splits for merged tokens are added to the shared splits map during merging,
+    /// so they're available for subsequent pattern operations.
     pub fn merge_node(&mut self) -> LinkedHashMap<PosKey, Split> {
         // Merge all sub-partitions - this handles all pattern creation
+        // and adds splits for merged tokens to the shared map
         let (_, merges) = self.merge_sub_partitions(None);
 
         // Extract splits for each offset from the range_map
         let len = self.offsets.len();
         let index = self.ctx.index;
-        let mut finals = LinkedHashMap::new();
 
-        for (i, (offset, _)) in self.offsets.iter().enumerate() {
+        // Collect offsets first to avoid borrow issues
+        let offsets: Vec<_> = self
+            .offsets
+            .iter()
+            .enumerate()
+            .map(|(i, (offset, _))| (i, *offset))
+            .collect();
+
+        let mut result = LinkedHashMap::new();
+
+        for (i, offset) in offsets {
             // Left partition: from start (0) to current offset position (i)
             // Right partition: from after current offset (i+1) to end (len)
             let lr = PartitionRange::new(0..=i);
             let rr = PartitionRange::new((i + 1)..=len);
             let left = *merges.get(&lr).unwrap();
             let right = *merges.get(&rr).unwrap();
-            finals.insert(PosKey::new(index, *offset), Split::new(left, right));
+            let key = PosKey::new(index, offset);
+            let split = Split::new(left, right);
+            // Add to shared map so parent nodes can access
+            self.add_split(key, split.clone());
+            // Also collect for return
+            result.insert(key, split);
         }
 
-        finals
+        result
     }
 
     /// Merge the root node, returning the target token.

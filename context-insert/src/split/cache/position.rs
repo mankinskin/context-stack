@@ -64,6 +64,21 @@ impl std::ops::SubAssign<&PatternSubDeltas> for SplitPositionCache {
             .iter_mut()
             .for_each(|(pid, pos)| {
                 if let Some(&delta) = rhs.get(pid) {
+                    let sub_index = pos.sub_index();
+                    tracing::debug!(
+                        ?pid,
+                        sub_index,
+                        delta,
+                        inner_offset = ?pos.inner_offset(),
+                        "SubAssign: about to subtract delta from sub_index"
+                    );
+                    assert!(
+                        sub_index >= delta,
+                        "Cannot subtract delta {} from sub_index {} for pattern {:?}. \
+                         This likely means the offset is BEFORE the merged range \
+                         and shouldn't have delta applied.",
+                        delta, sub_index, pid
+                    );
                     *pos.sub_index_mut() -= delta;
                 }
             });
