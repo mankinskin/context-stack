@@ -118,7 +118,7 @@ impl<'a> MergeCtx<'a> {
         })
     }
 
-    /// Determine the partition type for a given partition range.
+    /// Determine the partition type for a given partition range relative to the full node.
     pub fn partition_type(
         &self,
         range: &PartitionRange,
@@ -138,15 +138,16 @@ impl<'a> MergeCtx<'a> {
         &mut self,
         target_range: Option<PartitionRange>,
     ) -> (Token, RangeMap) {
-        let num_partitions = self.num_partitions();
-        // Use provided target range for Root mode, otherwise compute from MergeCtx
-        let _operating_range = self.operating_partition_range();
+        let operating_range = self.operating_partition_range();
+        let op_start = *operating_range.start();
+        let op_end = *operating_range.end();
+        let op_len = op_end - op_start + 1;
 
         debug!(
             node=?self.ctx.index,
             patterns=?self.ctx.patterns(),
             ?self.offsets,
-            num_partitions,
+            ?operating_range,
             ?self.mode,
             ?target_range,
             "merge_partitions_in_range: ENTERED"
@@ -155,8 +156,12 @@ impl<'a> MergeCtx<'a> {
         let mut target_token: Option<Token> = None;
         let mut range_map = RangeMap::default();
 
-        // Iterate over ALL partition ranges by length, then by starting position
-        for len in 1..=num_partitions {
+        // Iterate over partition ranges WITHIN the operating range only
+        // For Full mode: 0..=num_offsets (all partitions)
+        // For Root Postfix: 1..=num_offsets (skip prefix at 0)
+        // For Root Prefix: 0..=(num_offsets-1) (skip postfix)
+        // For Root Infix: 1..=(num_offsets-1) (skip both ends)
+        for len in 1..=op_len {
             debug!(
                 "
     ==============================================================
@@ -164,83 +169,79 @@ impl<'a> MergeCtx<'a> {
     ==============================================================",
                 len
             );
-            for start in 0..=(num_partitions - len) {
+            for start in op_start..=(op_start + op_len - len) {
                 let end = start + len - 1; // end is inclusive (partition index)
                 let partition_range = PartitionRange::new(start..=end);
 
                 debug!(
                     node=?self.ctx.index,
                     ?partition_range,
-                    num_partitions,
+                    ?operating_range,
                     ?self.mode,
                     "Merging partition range"
                 );
 
+                // Partition type is always relative to full node (determines offset boundaries)
                 let partition_type = self.partition_type(&partition_range);
-                debug!(?partition_type, "Detected partition type");
+                // Check if this is the full operating range (for intermediary node handling)
+                let is_full_operating_range = partition_range == operating_range;
+                debug!(?partition_type, ?is_full_operating_range, "Detected partition type");
 
-                let (merged_token, delta) = match partition_type {
-                    PartitionType::Full => {
+                let (merged_token, delta) = match (is_full_operating_range, partition_type) {
+                    (true, _) if matches!(self.mode, MergeMode::Full) => {
+                        // Full operating range for intermediary node - use the node itself
                         let token = self.ctx.index;
+                        debug!(
+                            "Merging full partition - adding sub-merge patterns (intermediary node)"
+                        );
 
-                        // For intermediary nodes (Full mode), add sub-merge patterns
-                        // to represent all 2-way decompositions around each offset.
-                        // For Root mode, we don't add sub-merge patterns because
-                        // the root already has its patterns and we're just extracting
-                        // a target partition.
-                        if matches!(self.mode, MergeMode::Full) {
+                        let existing_patterns = self
+                            .ctx
+                            .trav
+                            .expect_vertex_data(token)
+                            .child_pattern_set();
+
+                        let sub_merges: Vec<_> = range_map
+                            .range_sub_merges(&partition_range)
+                            .into_iter()
+                            .filter(|p| !existing_patterns.contains(p))
+                            .collect();
+
+                        if !sub_merges.is_empty() {
                             debug!(
-                                "Merging full partition - adding sub-merge patterns (intermediary node)"
+                                num_sub_merges = sub_merges.len(),
+                                ?sub_merges,
+                                "Adding sub-merge patterns to full token"
                             );
-
-                            let existing_patterns = self
-                                .ctx
-                                .trav
-                                .expect_vertex_data(token)
-                                .child_pattern_set();
-
-                            let sub_merges: Vec<_> = range_map
-                                .range_sub_merges(&partition_range)
-                                .into_iter()
-                                .filter(|p| !existing_patterns.contains(p))
-                                .collect();
-
-                            if !sub_merges.is_empty() {
-                                debug!(
-                                    num_sub_merges = sub_merges.len(),
-                                    ?sub_merges,
-                                    "Adding sub-merge patterns to full token"
+                            for merge_pattern in sub_merges {
+                                self.ctx.trav.add_pattern_with_update(
+                                    token,
+                                    merge_pattern,
                                 );
-                                for merge_pattern in sub_merges {
-                                    self.ctx.trav.add_pattern_with_update(
-                                        token,
-                                        merge_pattern,
-                                    );
-                                }
                             }
-                        } else {
-                            debug!(
-                                "Merging full partition - skipping sub-merge patterns (root mode)"
-                            );
                         }
-
                         (token, None)
                     },
-                    PartitionType::Prefix =>
+                    // All other cases: use partition_type to determine merge role
+                    (_, PartitionType::Full) => {
+                        // Full node partition - shouldn't happen in normal flow
+                        (self.ctx.index, None)
+                    },
+                    (_, PartitionType::Prefix) =>
                         MergePartitionCtx::<Pre<Join>>::from_merge_ctx(
                             self,
                             &range_map,
                             partition_range.clone(),
                         )
                         .merge(),
-                    PartitionType::Postfix =>
+                    (_, PartitionType::Postfix) =>
                         MergePartitionCtx::<Post<Join>>::from_merge_ctx(
                             self,
                             &range_map,
                             partition_range.clone(),
                         )
                         .merge(),
-                    PartitionType::Infix =>
+                    (_, PartitionType::Infix) =>
                         MergePartitionCtx::<In<Join>>::from_merge_ctx(
                             self,
                             &range_map,
