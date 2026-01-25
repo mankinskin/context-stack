@@ -11,28 +11,22 @@ use tracing::debug;
 use crate::{
     RootMode,
     SplitVertexCache,
-    interval::partition::{
-        Infix,
-        Postfix,
-        Prefix,
-        info::range::role::{
-            In,
-            Post,
-            Pre,
-        },
+    interval::partition::info::range::role::{
+        In,
+        Post,
+        Pre,
     },
     join::{
         context::node::{
             context::NodeJoinCtx,
             merge::{
+                MergePartitionCtx,
                 PartitionRange,
                 RangeMap,
-                partition::merge_partition,
             },
         },
         partition::Join,
     },
-    split::vertex::ToVertexSplits,
 };
 
 /// The type of a partition range based on its bounds.
@@ -140,56 +134,6 @@ impl<'a> MergeCtx<'a> {
         }
     }
 
-    /// Get the right offset index for a prefix partition.
-    /// For partition `0..=p`, the right offset is at index `p`.
-    pub fn prefix_right_offset(
-        &self,
-        partition_end: usize,
-    ) -> usize {
-        debug_assert!(
-            partition_end < self.num_partitions(),
-            "Prefix partition end {} must be < num_partitions {}",
-            partition_end,
-            self.num_partitions()
-        );
-        partition_end
-    }
-
-    /// Get the left offset index for a postfix partition.
-    /// For partition `p..=num_offsets`, the left offset is at index `p - 1`.
-    pub fn postfix_left_offset(
-        &self,
-        partition_start: usize,
-    ) -> usize {
-        debug_assert!(
-            partition_start > 0,
-            "Postfix partition start {} must be > 0",
-            partition_start
-        );
-        partition_start - 1
-    }
-
-    /// Get both offset indices for an infix partition.
-    /// For partition `a..=b`, left offset is at `a - 1`, right offset is at `b`.
-    pub fn infix_offsets(
-        &self,
-        partition_start: usize,
-        partition_end: usize,
-    ) -> (usize, usize) {
-        debug_assert!(
-            partition_start > 0,
-            "Infix partition start {} must be > 0",
-            partition_start
-        );
-        debug_assert!(
-            partition_end < self.num_partitions(),
-            "Infix partition end {} must be < num_partitions {}",
-            partition_end,
-            self.num_partitions()
-        );
-        (partition_start - 1, partition_end)
-    }
-
     pub fn merge_sub_partitions(
         &mut self,
         target_range: Option<PartitionRange>,
@@ -282,55 +226,27 @@ impl<'a> MergeCtx<'a> {
 
                         (token, None)
                     },
-                    PartitionType::Prefix => {
-                        debug!("Merge Prefix partition: ENTERED");
-                        let ro_idx = self.prefix_right_offset(end);
-                        // Convert to owned VertexSplits before mutable borrow
-                        let ro = self
-                            .offsets
-                            .pos_ctx_by_index(ro_idx)
-                            .to_vertex_splits();
-                        merge_partition::<Pre<Join>, _>(
-                            Prefix::new(ro),
+                    PartitionType::Prefix =>
+                        MergePartitionCtx::<Pre<Join>>::from_merge_ctx(
                             self,
                             &range_map,
-                            &partition_range,
+                            partition_range.clone(),
                         )
-                    },
-                    PartitionType::Postfix => {
-                        debug!("Merge Postfix partition: ENTERED");
-                        let lo_idx = self.postfix_left_offset(start);
-                        // Convert to owned VertexSplits before mutable borrow
-                        let lo = self
-                            .offsets
-                            .pos_ctx_by_index(lo_idx)
-                            .to_vertex_splits();
-                        merge_partition::<Post<Join>, _>(
-                            Postfix::new(lo),
+                        .merge(),
+                    PartitionType::Postfix =>
+                        MergePartitionCtx::<Post<Join>>::from_merge_ctx(
                             self,
                             &range_map,
-                            &partition_range,
+                            partition_range.clone(),
                         )
-                    },
-                    PartitionType::Infix => {
-                        debug!("Merge Infix partition: ENTERED");
-                        let (lo_idx, ro_idx) = self.infix_offsets(start, end);
-                        // Convert to owned VertexSplits before mutable borrow
-                        let lo = self
-                            .offsets
-                            .pos_ctx_by_index(lo_idx)
-                            .to_vertex_splits();
-                        let ro = self
-                            .offsets
-                            .pos_ctx_by_index(ro_idx)
-                            .to_vertex_splits();
-                        merge_partition::<In<Join>, _>(
-                            Infix::new(lo, ro),
+                        .merge(),
+                    PartitionType::Infix =>
+                        MergePartitionCtx::<In<Join>>::from_merge_ctx(
                             self,
                             &range_map,
-                            &partition_range,
+                            partition_range.clone(),
                         )
-                    },
+                        .merge(),
                 };
 
                 // Apply delta to offsets AFTER the merged partition (patterns were modified)

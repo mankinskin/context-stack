@@ -7,6 +7,11 @@ use crate::{
         info::{
             InfoPartition,
             PartitionInfo,
+            range::role::{
+                In,
+                Post,
+                Pre,
+            },
         },
     },
     join::{
@@ -24,6 +29,7 @@ use crate::{
             info::JoinPartitionInfo,
         },
     },
+    split::vertex::ToVertexSplits,
 };
 use context_trace::{
     Token,
@@ -34,16 +40,16 @@ use tracing::debug;
 /// Context for merging a single partition.
 ///
 /// This struct encapsulates the partition being merged along with the necessary
-/// context for performing the merge operation. It provides a cleaner API than
-/// function-based dispatch by holding all partition-specific state together.
+/// context for performing the merge operation. It is constructed from a `MergeCtx`
+/// and a `PartitionRange`, automatically extracting the appropriate splits.
 ///
 /// # Type Parameters
 /// - `R`: The `RangeRole` (Pre, Post, or In) that determines the partition type
 ///
 /// # Example
 /// ```ignore
-/// let ctx = MergePartitionCtx::new(
-///     Prefix::new(splits),
+/// // Create a prefix partition context from MergeCtx
+/// let ctx = MergePartitionCtx::<Pre<Join>>::from_prefix(
 ///     merge_ctx,
 ///     &range_map,
 ///     &partition_range,
@@ -61,34 +67,13 @@ where
     /// Map of already-merged partition ranges to their tokens
     pub range_map: &'a RangeMap,
     /// The range of partition indices being merged
-    pub partition_range: &'a PartitionRange,
+    pub partition_range: PartitionRange,
 }
 
 impl<'a, 'b, R: RangeRole<Mode = Join> + 'b> MergePartitionCtx<'a, 'b, R>
 where
     R::Borders: JoinBorders<R>,
 {
-    /// Create a new merge partition context.
-    ///
-    /// # Arguments
-    /// - `partition`: Something that can be converted to a `Partition<R>`
-    /// - `merge_ctx`: The merge context with node context and offset cache
-    /// - `range_map`: Map of already-merged ranges to tokens
-    /// - `partition_range`: The range being merged
-    pub fn new<P: ToPartition<R>>(
-        partition: P,
-        merge_ctx: &'a mut MergeCtx<'b>,
-        range_map: &'a RangeMap,
-        partition_range: &'a PartitionRange,
-    ) -> Self {
-        Self {
-            partition: partition.to_partition(),
-            merge_ctx,
-            range_map,
-            partition_range,
-        }
-    }
-
     /// Get partition info for all patterns.
     ///
     /// Returns `Ok(PartitionInfo)` if the partition needs to be created,
@@ -114,7 +99,10 @@ where
     ///
     /// Sub-merge patterns are alternative decompositions of the merged token
     /// that were discovered during the partition merge process.
-    pub fn add_sub_merges(&mut self, token: Token) {
+    pub fn add_sub_merges(
+        &mut self,
+        token: Token,
+    ) {
         let existing_patterns = self
             .merge_ctx
             .ctx
@@ -124,7 +112,7 @@ where
 
         let sub_merges: Vec<_> = self
             .range_map
-            .range_sub_merges(self.partition_range)
+            .range_sub_merges(&self.partition_range)
             .into_iter()
             .filter(|p| !existing_patterns.contains(p))
             .collect();
@@ -191,20 +179,139 @@ where
     }
 }
 
-/// Convenience function to merge a partition.
+/// Helper struct for building partitions from MergeCtx.
 ///
-/// This creates a `MergePartitionCtx` and calls `merge()` in one step.
-/// For more control over the merge process, use `MergePartitionCtx` directly.
-pub fn merge_partition<'a, 'b, R, P>(
-    partition: P,
-    merge_ctx: &'a mut MergeCtx<'b>,
-    range_map: &'a RangeMap,
-    partition_range: &'a PartitionRange,
-) -> (Token, Option<PatternSubDeltas>)
+/// This struct implements `ToPartition<R>` for each partition role,
+/// enabling a uniform interface for constructing `MergePartitionCtx`.
+///
+/// The builder holds only the data needed to compute the partition,
+/// not the full MergeCtx, to avoid borrow conflicts.
+#[derive(Clone)]
+pub struct MergePartitionBuilder<'a> {
+    offsets: &'a crate::SplitVertexCache,
+    partition_range: PartitionRange,
+    num_partitions: usize,
+}
+
+impl<'a> MergePartitionBuilder<'a> {
+    pub fn new(
+        merge_ctx: &'a MergeCtx<'_>,
+        partition_range: PartitionRange,
+    ) -> Self {
+        Self {
+            offsets: &merge_ctx.offsets,
+            partition_range,
+            num_partitions: merge_ctx.num_partitions(),
+        }
+    }
+}
+
+impl ToPartition<Pre<Join>> for MergePartitionBuilder<'_> {
+    fn to_partition(self) -> Partition<Pre<Join>> {
+        let partition_end = *self.partition_range.end();
+        debug_assert!(
+            partition_end < self.num_partitions,
+            "Prefix partition end {} must be < num_partitions {}",
+            partition_end,
+            self.num_partitions
+        );
+        let ro = self
+            .offsets
+            .pos_ctx_by_index(partition_end)
+            .to_vertex_splits();
+        Partition { offsets: ro }
+    }
+}
+
+impl ToPartition<Post<Join>> for MergePartitionBuilder<'_> {
+    fn to_partition(self) -> Partition<Post<Join>> {
+        let partition_start = *self.partition_range.start();
+        debug_assert!(
+            partition_start > 0,
+            "Postfix partition start {} must be > 0",
+            partition_start
+        );
+        let lo = self
+            .offsets
+            .pos_ctx_by_index(partition_start - 1) // offset left of partition
+            .to_vertex_splits();
+        Partition { offsets: lo }
+    }
+}
+
+impl ToPartition<In<Join>> for MergePartitionBuilder<'_> {
+    fn to_partition(self) -> Partition<In<Join>> {
+        let partition_start = *self.partition_range.start();
+        let partition_end = *self.partition_range.end();
+        debug_assert!(
+            partition_start > 0,
+            "Infix partition start {} must be > 0",
+            partition_start
+        );
+        debug_assert!(
+            partition_end < self.num_partitions,
+            "Infix partition end {} must be < num_partitions {}",
+            partition_end,
+            self.num_partitions
+        );
+        let lo = self
+            .offsets
+            .pos_ctx_by_index(partition_start - 1) // offset left of partition
+            .to_vertex_splits();
+        let ro = self
+            .offsets
+            .pos_ctx_by_index(partition_end)
+            .to_vertex_splits();
+        Partition { offsets: (lo, ro) }
+    }
+}
+
+/// Uniform constructor for MergePartitionCtx using ToPartition trait.
+impl<'a, 'b, R: RangeRole<Mode = Join> + 'b> MergePartitionCtx<'a, 'b, R>
 where
-    R: RangeRole<Mode = Join> + 'b,
     R::Borders: JoinBorders<R>,
-    P: ToPartition<R>,
+    for<'c> MergePartitionBuilder<'c>: ToPartition<R>,
 {
-    MergePartitionCtx::<R>::new(partition, merge_ctx, range_map, partition_range).merge()
+    /// Create a partition context from MergeCtx and partition range.
+    ///
+    /// The partition is built automatically based on the role type `R`
+    /// using the `ToPartition` implementation for `MergePartitionBuilder`.
+    ///
+    /// # Type Parameters
+    /// - `R`: The partition role (`Pre<Join>`, `Post<Join>`, or `In<Join>`)
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Create a prefix partition context
+    /// let ctx = MergePartitionCtx::<Pre<Join>>::from_merge_ctx(
+    ///     merge_ctx,
+    ///     &range_map,
+    ///     partition_range,
+    /// );
+    /// ```
+    pub fn from_merge_ctx(
+        merge_ctx: &'a mut MergeCtx<'b>,
+        range_map: &'a RangeMap,
+        partition_range: PartitionRange,
+    ) -> Self {
+        // Build partition from an immutable borrow that ends before we store merge_ctx
+        let partition = {
+            let builder =
+                MergePartitionBuilder::new(merge_ctx, partition_range.clone());
+            builder.to_partition()
+        };
+
+        debug!(
+            role = R::ROLE_STR,
+            ?partition_range,
+            "MergePartitionCtx::from_merge_ctx: ENTERED"
+        );
+
+        Self {
+            partition,
+            merge_ctx,
+            range_map,
+            partition_range,
+        }
+    }
 }
