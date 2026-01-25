@@ -1,6 +1,7 @@
-use std::mem::offset_of;
-
-use context_trace::Token;
+use context_trace::{
+    Token,
+    VertexSet,
+};
 use derive_more::{
     Deref,
     DerefMut,
@@ -23,6 +24,7 @@ use crate::{
             partition::MergePartition,
         },
     },
+    split::vertex::ToVertexSplits,
 };
 
 /// The type of a partition range based on its bounds.
@@ -88,8 +90,8 @@ impl<'a> MergeCtx<'a> {
         self.offsets.len() + 1
     }
 
-    /// The target partition range based on merge mode.
-    pub fn target_partition_range(&self) -> PartitionRange {
+    /// The operating partition range based on merge mode.
+    pub fn operating_partition_range(&self) -> PartitionRange {
         let num_offsets = self.offsets.len();
         PartitionRange::from(match self.mode {
             MergeMode::Full => 0..=num_offsets,
@@ -169,12 +171,11 @@ impl<'a> MergeCtx<'a> {
 
     pub fn merge_sub_partitions(
         &mut self,
-        target_range_override: Option<PartitionRange>,
+        target_range: Option<PartitionRange>,
     ) -> (Token, RangeMap) {
         let num_partitions = self.num_partitions();
         // Use provided target range for Root mode, otherwise compute from MergeCtx
-        let target_partition_range = target_range_override
-            .unwrap_or_else(|| self.target_partition_range());
+        let operating_range = self.operating_partition_range();
 
         debug!(
             node=?self.ctx.index,
@@ -182,7 +183,7 @@ impl<'a> MergeCtx<'a> {
             ?self.offsets,
             num_partitions,
             ?self.mode,
-            ?target_partition_range,
+            ?target_range,
             "merge_partitions_in_range: ENTERED"
         );
 
@@ -213,16 +214,50 @@ impl<'a> MergeCtx<'a> {
                 let partition_type = self.partition_type(&partition_range);
                 debug!(?partition_type, "Detected partition type");
 
-                // Use normal partition-based merging for Full mode and len=1 within target
                 let (merged_token, delta) = match partition_type {
                     PartitionType::Full => {
-                        debug!("Merging full existing token - skipping");
-                        (self.ctx.index, None)
+                        debug!(
+                            "Merging full partition - adding sub-merge patterns"
+                        );
+                        let token = self.ctx.index;
+
+                        // Add sub-merge patterns (all 2-way splits around each offset)
+                        let existing_patterns = self
+                            .ctx
+                            .trav
+                            .expect_vertex_data(token)
+                            .child_pattern_set();
+
+                        let sub_merges: Vec<_> = range_map
+                            .range_sub_merges(&partition_range)
+                            .into_iter()
+                            .filter(|p| !existing_patterns.contains(p))
+                            .collect();
+
+                        if !sub_merges.is_empty() {
+                            debug!(
+                                num_sub_merges = sub_merges.len(),
+                                ?sub_merges,
+                                "Adding sub-merge patterns to full token"
+                            );
+                            for merge_pattern in sub_merges {
+                                self.ctx.trav.add_pattern_with_update(
+                                    token,
+                                    merge_pattern,
+                                );
+                            }
+                        }
+
+                        (token, None)
                     },
                     PartitionType::Prefix => {
                         debug!("Merge Prefix partition: ENTERED");
                         let ro_idx = self.prefix_right_offset(end);
-                        let ro = self.offsets.pos_ctx_by_index(ro_idx);
+                        // Convert to owned VertexSplits before mutable borrow
+                        let ro = self
+                            .offsets
+                            .pos_ctx_by_index(ro_idx)
+                            .to_vertex_splits();
                         Prefix::new(ro).merge_partition(
                             self,
                             &range_map,
@@ -232,7 +267,11 @@ impl<'a> MergeCtx<'a> {
                     PartitionType::Postfix => {
                         debug!("Merge Postfix partition: ENTERED");
                         let lo_idx = self.postfix_left_offset(start);
-                        let lo = self.offsets.pos_ctx_by_index(lo_idx);
+                        // Convert to owned VertexSplits before mutable borrow
+                        let lo = self
+                            .offsets
+                            .pos_ctx_by_index(lo_idx)
+                            .to_vertex_splits();
                         Postfix::new(lo).merge_partition(
                             self,
                             &range_map,
@@ -242,8 +281,15 @@ impl<'a> MergeCtx<'a> {
                     PartitionType::Infix => {
                         debug!("Merge Infix partition: ENTERED");
                         let (lo_idx, ro_idx) = self.infix_offsets(start, end);
-                        let lo = self.offsets.pos_ctx_by_index(lo_idx);
-                        let ro = self.offsets.pos_ctx_by_index(ro_idx);
+                        // Convert to owned VertexSplits before mutable borrow
+                        let lo = self
+                            .offsets
+                            .pos_ctx_by_index(lo_idx)
+                            .to_vertex_splits();
+                        let ro = self
+                            .offsets
+                            .pos_ctx_by_index(ro_idx)
+                            .to_vertex_splits();
                         Infix::new(lo, ro).merge_partition(
                             self,
                             &range_map,
@@ -260,7 +306,10 @@ impl<'a> MergeCtx<'a> {
                     self.offsets.apply_deltas(deltas);
                 }
 
-                if partition_range == target_partition_range {
+                // Track target token if we've reached the target partition range
+                if let Some(target_range) = target_range.as_ref()
+                    && &partition_range == target_range
+                {
                     debug!(
                         ?partition_range,
                         "merge_partitions_in_range: reached target partition range"
@@ -279,12 +328,19 @@ impl<'a> MergeCtx<'a> {
         }
 
         // Extract target token from range_map
-        let target_token = target_token
-            .unwrap_or_else(|| panic!(
-                "Target token not found in range_map for range {:?}. Available ranges: {:?}",
-                target_partition_range,
-                range_map.map.keys().collect::<Vec<_>>()
-            ));
+        // For intermediary nodes (target_range is None), use the full node token
+        let target_token = match target_range {
+            Some(ref target_range) => target_token
+                .unwrap_or_else(|| panic!(
+                    "Target token not found in range_map for range {:?}. Available ranges: {:?}",
+                    target_range,
+                    range_map.map.keys().collect::<Vec<_>>()
+                )),
+            None => {
+                // For intermediary nodes, the "target" is the full node
+                self.ctx.index
+            }
+        };
         (target_token, range_map)
     }
 }

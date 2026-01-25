@@ -1,28 +1,14 @@
 use std::borrow::Borrow;
 
-use derive_more::{
-    Deref,
-    DerefMut,
-};
-use linked_hash_map::LinkedHashMap;
-
 use crate::{
     interval::IntervalGraph,
     join::context::{
         frontier::FrontierSplitIterator,
-        node::merge::context::{
-            MergeCtx,
-            MergeMode,
-        },
         pattern::PatternJoinCtx,
     },
     split::{
-        Split,
         SplitMap,
-        cache::{
-            position::PosKey,
-            vertex::SplitVertexCache,
-        },
+        cache::vertex::SplitVertexCache,
         vertex::{
             node::{
                 AsNodeTraceCtx,
@@ -37,6 +23,10 @@ use crate::{
     },
 };
 use context_trace::*;
+use derive_more::{
+    Deref,
+    DerefMut,
+};
 
 /// Context for locked frontier operations during join.
 ///
@@ -125,9 +115,5 @@ impl NodeJoinCtx<'_> {
 impl NodeJoinCtx<'_> {
     pub fn vertex_cache(&self) -> &SplitVertexCache {
         self.interval.cache.get(&self.index.vertex_index()).unwrap()
-    }
-    pub fn join_partitions(self) -> LinkedHashMap<PosKey, Split> {
-        // Use shared initial partition creation
-        MergeCtx::new(self, MergeMode::Full).merge_node()
     }
 }

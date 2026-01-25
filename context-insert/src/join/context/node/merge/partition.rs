@@ -126,12 +126,14 @@ where
 
         // Use info_partition to get partition info, then JoinedPartition to handle
         // pattern joining, replacement, and delta computation
-        match self.info_partition(ctx) {
+        // Note: info_partition expects &NodeJoinCtx, so we dereference through ctx.ctx
+        match self.info_partition(&ctx.ctx) {
             Ok(info) => {
                 // Convert to JoinPartitionInfo and then to JoinedPartition
+                // Note: from_partition_info expects &mut NodeJoinCtx
                 let joined = JoinedPartition::from_partition_info(
                     JoinPartitionInfo::new(info),
-                    ctx,
+                    &mut ctx.ctx,
                 );
 
                 debug!(
@@ -143,6 +145,7 @@ where
                 // Add sub-merge patterns if any (alternative decompositions)
                 // First, get existing patterns to avoid duplicates
                 let existing_patterns = ctx
+                    .ctx
                     .trav
                     .expect_vertex_data(joined.index)
                     .child_pattern_set();
@@ -159,7 +162,7 @@ where
                         "Adding sub-merge patterns"
                     );
                     for merge_pattern in sub_merges {
-                        ctx.trav.add_pattern_with_update(
+                        ctx.ctx.trav.add_pattern_with_update(
                             joined.index,
                             merge_pattern,
                         );

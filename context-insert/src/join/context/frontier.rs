@@ -66,7 +66,10 @@ impl Iterator for FrontierSplitIterator {
         Some(match self.frontier.next() {
             Some(Some(key)) => {
                 if !self.splits.contains_key(&key) {
-                    let partitions = self.node(key.index).join_partitions();
+                    let ctx = self.node(key.index);
+                    // Use shared initial partition creation
+                    let partitions =
+                        MergeCtx::new(ctx, MergeMode::Full).merge_node();
 
                     for (key, split) in partitions {
                         self.splits.insert(key, split);
