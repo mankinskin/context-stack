@@ -69,21 +69,77 @@ impl SplitVertexCache {
             })
     }
 
-    /// Apply delta adjustments to positions AFTER a given offset index.
+    /// Apply delta adjustments to positions after a merge.
+    ///
+    /// This handles three categories of positions:
+    /// 1. Positions INSIDE the merged region (partition_start..partition_end):
+    ///    - These need sub_index adjustment AND inner_offset set
+    /// 2. The right boundary position (at partition_end):
+    ///    - This needs sub_index adjustment only
+    /// 3. Positions AFTER the merged region (> partition_end):
+    ///    - These need sub_index adjustment only
+    ///
+    /// The inner_offsets parameter provides the offset within the merged token
+    /// for each position inside the merged region, keyed by enumerate index.
+    pub fn apply_deltas_with_inner_offsets(
+        &mut self,
+        deltas: &PatternSubDeltas,
+        partition_start: usize,
+        partition_end: usize,
+        inner_offsets: &std::collections::BTreeMap<
+            usize,
+            std::num::NonZeroUsize,
+        >,
+    ) {
+        for (idx, pos_cache) in self.positions.values_mut().enumerate() {
+            if idx >= partition_start && idx < partition_end {
+                // Position is INSIDE the merged region
+                if let Some(&inner_offset) = inner_offsets.get(&idx) {
+                    debug!(
+                        idx,
+                        ?deltas,
+                        ?inner_offset,
+                        "Applying delta and inner_offset to inside position"
+                    );
+                    pos_cache
+                        .apply_delta_with_inner_offset(deltas, inner_offset);
+                } else {
+                    // No inner offset info, just apply delta
+                    debug!(
+                        idx,
+                        ?deltas,
+                        "Applying delta to inside position (no inner_offset)"
+                    );
+                    *pos_cache -= deltas;
+                }
+            } else if idx >= partition_end {
+                // Position is at or after the right boundary
+                debug!(idx, ?deltas, "Applying delta to position");
+                *pos_cache -= deltas;
+            }
+        }
+    }
+
+    /// Apply delta adjustments to positions AT OR AFTER a given offset index.
     ///
     /// This decrements the `sub_index` for each pattern by the delta amount.
     /// Called after a partition is merged and patterns are replaced,
     /// so that subsequent lookups use correct indices into the modified patterns.
     ///
-    /// Only offsets with index > `after_offset_index` are affected. Offsets at or
-    /// before the merged partition should not have their sub_indices adjusted.
+    /// Offsets with index >= `from_offset_index` are affected. This includes:
+    /// - The right boundary of the merged partition (at from_offset_index)
+    /// - All positions after the merged partition (> from_offset_index)
+    ///
+    /// Offsets BEFORE from_offset_index (inside or before the merged region)
+    /// should not have their sub_indices adjusted.
     pub fn apply_deltas(
         &mut self,
         deltas: &PatternSubDeltas,
-        after_offset_index: usize,
+        from_offset_index: usize,
     ) {
         for (idx, pos_cache) in self.positions.values_mut().enumerate() {
-            if idx > after_offset_index {
+            if idx >= from_offset_index {
+                debug!(idx, ?deltas, "Applying delta to position");
                 *pos_cache -= deltas;
             }
         }

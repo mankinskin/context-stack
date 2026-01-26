@@ -99,7 +99,15 @@ where
         let children = (!perfect.all_perfect())
             .then(|| borders.get_child_splits(ctx).unwrap());
         match (pat.len(), children) {
-            (0, _) => panic!("Empty range"),
+            // Empty range: This can happen when a partition range has been absorbed
+            // by a previous merge. Return the token at the boundary position.
+            (0, Some(children)) => Err(children.to_token().unwrap()),
+            (0, None) => {
+                // No children info and empty range - use the token at the start position
+                // The start position's sub_index points to the token that absorbed this range
+                let sub_index = borders.start_sub_index();
+                Err(pctx.pattern[sub_index])
+            },
             (1, Some(children)) => Err(children.to_token().unwrap()),
             (1, None) => Err(pat[0]),
             (_, children) => Ok(PatternRangeInfo {

@@ -258,18 +258,51 @@ impl<'a> MergeCtx<'a> {
                         .merge(),
                 };
 
-                // Apply delta to offsets AFTER the merged partition (patterns were modified)
-                // Only offsets that come after the partition's end should have sub_indices adjusted
+                // Apply delta to offsets after the merged partition (patterns were modified)
+                // This handles three cases:
+                // 1. Positions INSIDE the merged region: adjust sub_index and set inner_offset
+                // 2. Right boundary position: adjust sub_index only
+                // 3. Positions AFTER the merged region: adjust sub_index only
                 if let Some(ref deltas) = delta
-                    && !deltas.is_empty()
+                    && deltas.iter().any(|(_, &d)| d > 0)  // Only apply if there are non-zero deltas
                 {
                     debug!(
                         ?deltas,
+                        partition_start = start,
                         partition_end = end,
-                        "Applying deltas to offset cache (after index {})",
-                        end
+                        "Applying deltas to offset cache"
                     );
-                    self.offsets.apply_deltas(deltas, end);
+                    
+                    // Compute inner_offsets for positions inside the merged region
+                    // Position at enum index i (where start <= i < end) has inner_offset
+                    // equal to the sum of widths of partitions start..(i+1-start+start) = start..i+1
+                    let inner_offsets: std::collections::BTreeMap<usize, std::num::NonZeroUsize> = 
+                        (start..end).filter_map(|partition_idx| {
+                            // The enum index for the position AFTER partition partition_idx
+                            // In the positions BTreeMap, position key (partition_idx + 1 + offset_from_op_start)
+                            // corresponds to the boundary after partition partition_idx
+                            // But we use enumerate index, which starts at 0 for the first position key
+                            
+                            // For merge start..=end, positions at enum indices start..(end) are INSIDE
+                            // Each position at enum index i is between partition (i-1+op_start) and (i+op_start)
+                            // Wait, this is getting confusing. Let me use the simpler approach:
+                            // Just compute the cumulative width for each inside position
+                            
+                            let mut cumulative_width = 0usize;
+                            for p in (*partition_range.start())..=partition_idx {
+                                if let Some(token) = range_map.get(&PartitionRange::from(p)) {
+                                    cumulative_width += *token.width;
+                                }
+                            }
+                            std::num::NonZeroUsize::new(cumulative_width).map(|o| (partition_idx, o))
+                        }).collect();
+                    
+                    self.offsets.apply_deltas_with_inner_offsets(
+                        deltas, 
+                        start, 
+                        end,
+                        &inner_offsets,
+                    );
                 }
 
                 // Track target token if we've reached the target partition range

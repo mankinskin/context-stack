@@ -38,6 +38,12 @@ impl HasSubIndexMut for TokenTracePos {
         &mut self.sub_index
     }
 }
+impl TokenTracePos {
+    /// Get mutable reference to inner_offset
+    pub fn inner_offset_mut(&mut self) -> &mut Option<NonZeroUsize> {
+        &mut self.inner_offset
+    }
+}
 impl From<(usize, Option<NonZeroUsize>)> for TokenTracePos {
     fn from((sub_index, inner_offset): (usize, Option<NonZeroUsize>)) -> Self {
         Self {

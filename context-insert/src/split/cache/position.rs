@@ -126,6 +126,40 @@ impl SplitPositionCache {
                 .then_some(SubLocation::new(*pid, s.sub_index))
         })
     }
+    
+    /// Apply delta adjustment with inner_offset for positions inside a merged region.
+    ///
+    /// This is called for positions that fall INSIDE a merged token (not at its boundary).
+    /// In addition to adjusting sub_index, this also sets the inner_offset to indicate
+    /// the position within the merged token.
+    pub fn apply_delta_with_inner_offset(
+        &mut self, 
+        deltas: &PatternSubDeltas, 
+        inner_offset: NonZeroUsize,
+    ) {
+        self.pattern_splits
+            .iter_mut()
+            .for_each(|(pid, pos)| {
+                if let Some(&delta) = deltas.get(pid) {
+                    let sub_index = pos.sub_index();
+                    tracing::debug!(
+                        ?pid,
+                        sub_index,
+                        delta,
+                        ?inner_offset,
+                        "apply_delta_with_inner_offset: adjusting position inside merged region"
+                    );
+                    assert!(
+                        sub_index >= delta,
+                        "Cannot subtract delta {} from sub_index {} for pattern {:?}.",
+                        delta, sub_index, pid
+                    );
+                    *pos.sub_index_mut() -= delta;
+                    // Set inner_offset to indicate this position is inside the merged token
+                    *pos.inner_offset_mut() = Some(inner_offset);
+                }
+            });
+    }
     //pub fn add_location_split(&mut self, location: SubLocation, split: Split) {
     //    self.pattern_splits.insert(location, split);
     //}

@@ -49,6 +49,12 @@ pub trait InfoBorder<R: RangeRole>: Sized + PartitionBorder<R> {
     ) -> Option<OffsetsOf<R>>;
     fn inner_range(&self) -> PatternRangeOf<R>;
     fn outer_range(&self) -> PatternRangeOf<R>;
+
+    /// Get the sub_index of the start position.
+    /// For In mode, this is the left border's sub_index.
+    /// For Pre mode, this is 0.
+    /// For Post mode, this is the border's sub_index.
+    fn start_sub_index(&self) -> usize;
 }
 
 impl<M: PostVisitMode> InfoBorder<Post<M>> for BorderInfo {
@@ -57,10 +63,11 @@ impl<M: PostVisitMode> InfoBorder<Post<M>> for BorderInfo {
 
     fn info_border(
         pattern: &Pattern,
-        _splits: &Self::Splits,
-        atom_pos: Self::AtomPos,
+        splits: &Self::Splits,
+        _atom_pos: Self::AtomPos,
     ) -> Self {
-        Self::new_from_atom_pos(pattern, atom_pos)
+        // Use splits (delta-adjusted) instead of atom_pos to handle modified patterns
+        Self::new_from_trace_pos(pattern, splits)
     }
     fn inner_range_offsets(
         &self,
@@ -82,6 +89,9 @@ impl<M: PostVisitMode> InfoBorder<Post<M>> for BorderInfo {
     fn outer_range(&self) -> PatternRangeOf<Post<M>> {
         PostfixRangeFrom::new(self.sub_index, self.pattern_len)
     }
+    fn start_sub_index(&self) -> usize {
+        self.sub_index
+    }
 }
 
 impl<M: PreVisitMode> InfoBorder<Pre<M>> for BorderInfo {
@@ -90,10 +100,11 @@ impl<M: PreVisitMode> InfoBorder<Pre<M>> for BorderInfo {
 
     fn info_border(
         pattern: &Pattern,
-        _splits: &Self::Splits,
-        atom_pos: Self::AtomPos,
+        splits: &Self::Splits,
+        _atom_pos: Self::AtomPos,
     ) -> Self {
-        Self::new_from_atom_pos(pattern, atom_pos)
+        // Use splits (delta-adjusted) instead of atom_pos to handle modified patterns
+        Self::new_from_trace_pos(pattern, splits)
     }
     fn inner_range_offsets(
         &self,
@@ -109,6 +120,9 @@ impl<M: PreVisitMode> InfoBorder<Pre<M>> for BorderInfo {
     fn outer_range(&self) -> PatternRangeOf<Pre<M>> {
         0..self.sub_index + self.inner_offset.is_some() as usize
     }
+    fn start_sub_index(&self) -> usize {
+        0 // Pre mode always starts at 0
+    }
 }
 
 impl<M: InVisitMode> InfoBorder<In<M>> for (BorderInfo, BorderInfo) {
@@ -120,13 +134,14 @@ impl<M: InVisitMode> InfoBorder<In<M>> for (BorderInfo, BorderInfo) {
 
     fn info_border(
         pattern: &Pattern,
-        _splits: &Self::Splits,
-        atom_pos: Self::AtomPos,
+        splits: &Self::Splits,
+        _atom_pos: Self::AtomPos,
     ) -> Self {
-        let (left_pos, right_pos) = atom_pos;
+        // Use splits (delta-adjusted) instead of atom_pos to handle modified patterns
+        let (left_splits, right_splits) = splits;
         (
-            BorderInfo::new_from_atom_pos(pattern, left_pos),
-            BorderInfo::new_from_atom_pos(pattern, right_pos),
+            BorderInfo::new_from_trace_pos(pattern, left_splits),
+            BorderInfo::new_from_trace_pos(pattern, right_splits),
         )
     }
 
@@ -138,12 +153,12 @@ impl<M: InVisitMode> InfoBorder<In<M>> for (BorderInfo, BorderInfo) {
         let b = InfoBorder::<Pre<M>>::inner_range_offsets(&self.1, pattern);
         let r = match (a, b) {
             (Some(lio), Some(rio)) => Some((lio, rio)),
-            (Some(lio), None) => Some((lio, {
-                let w = *pattern[self.1.sub_index].width();
-                // start_offset can be None when at position 0 - use just width in that case
-                let o = self.1.start_offset.map(|o| o.get() + w).unwrap_or(w);
-                NonZeroUsize::new(o).unwrap()
-            })),
+            (Some(lio), None) => {
+                // Right border has no inner_offset, meaning it's at a clean boundary.
+                // The inner range ends at the START of the right border token, not after it.
+                // Use start_offset directly, which is the position before the right border token.
+                self.1.start_offset.map(|rio| (lio, rio))
+            },
             (None, Some(rio)) => {
                 // start_offset can be None when at position 0 - need inner_offset
                 let lio = self.0.start_offset.or(self.0.inner_offset).expect(
@@ -161,5 +176,8 @@ impl<M: InVisitMode> InfoBorder<In<M>> for (BorderInfo, BorderInfo) {
     fn outer_range(&self) -> PatternRangeOf<In<M>> {
         self.0.sub_index
             ..self.1.sub_index + self.1.inner_offset.is_some() as usize
+    }
+    fn start_sub_index(&self) -> usize {
+        self.0.sub_index // In mode uses left border's sub_index
     }
 }

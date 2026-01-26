@@ -34,12 +34,23 @@ impl BorderInfo {
         // Recalculate BOTH sub_index and inner_offset from atom position using current pattern
         let trace_pos = TraceBack::trace_child_pos(pattern, atom_pos)
             .expect("atom_pos should be valid within pattern");
+        Self::new_from_trace_pos(pattern, &trace_pos)
+    }
+
+    /// Create a BorderInfo from a pre-computed TokenTracePos.
+    /// Use this when you have delta-adjusted split positions, to avoid
+    /// re-tracing from atom positions (which may be invalid after pattern
+    /// modifications).
+    pub fn new_from_trace_pos(
+        pattern: &Pattern,
+        trace_pos: &crate::TokenTracePos,
+    ) -> Self {
         let sub_index = trace_pos.sub_index();
         let offset = End::inner_ctx_width(pattern, sub_index);
         BorderInfo {
             sub_index,
             pattern_len: pattern.len(),
-            inner_offset: trace_pos.inner_offset(), // Use recalculated inner_offset!
+            inner_offset: trace_pos.inner_offset(),
             start_offset: NonZeroUsize::new(offset),
         }
     }
