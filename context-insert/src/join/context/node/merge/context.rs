@@ -143,6 +143,15 @@ impl<'a> MergeCtx<'a> {
         let op_end = *operating_range.end();
         let op_len = op_end - op_start + 1;
 
+        // For root merges, use the required partition set for selective filtering
+        // For intermediary merges (target_range is None), merge all partitions
+        let is_root_merge = target_range.is_some();
+        let required = if is_root_merge {
+            Some(&self.ctx.ctx.interval.required)
+        } else {
+            None
+        };
+
         debug!(
             node=?self.ctx.index,
             patterns=?self.ctx.patterns(),
@@ -150,6 +159,8 @@ impl<'a> MergeCtx<'a> {
             ?operating_range,
             ?self.mode,
             ?target_range,
+            is_root_merge,
+            required = ?required.map(|r| r.iter().collect::<Vec<_>>()),
             "merge_partitions_in_range: ENTERED"
         );
 
@@ -172,6 +183,21 @@ impl<'a> MergeCtx<'a> {
             for start in op_start..=(op_start + op_len - len) {
                 let end = start + len - 1; // end is inclusive (partition index)
                 let partition_range = PartitionRange::new(start..=end);
+
+                // For root merges, skip partitions that are not in the required set
+                // HOWEVER: Single partitions (len == 1, i.e., partition_range.len() == 0) are
+                // always needed as base cases for computing splits of larger merged partitions.
+                // They represent the original partition tokens and don't create new tokens.
+                let is_single = len == 1;
+                if let Some(req) = required {
+                    if !is_single && !req.is_required(&partition_range) {
+                        debug!(
+                            ?partition_range,
+                            "Skipping non-required partition"
+                        );
+                        continue;
+                    }
+                }
 
                 debug!(
                     node=?self.ctx.index,
@@ -264,7 +290,8 @@ impl<'a> MergeCtx<'a> {
                 // 2. Right boundary position: adjust sub_index only
                 // 3. Positions AFTER the merged region: adjust sub_index only
                 if let Some(ref deltas) = delta
-                    && deltas.iter().any(|(_, &d)| d > 0)  // Only apply if there are non-zero deltas
+                    && deltas.iter().any(|(_, &d)| d > 0)
+                // Only apply if there are non-zero deltas
                 {
                     debug!(
                         ?deltas,
@@ -272,34 +299,42 @@ impl<'a> MergeCtx<'a> {
                         partition_end = end,
                         "Applying deltas to offset cache"
                     );
-                    
+
                     // Compute inner_offsets for positions inside the merged region
                     // Position at enum index i (where start <= i < end) has inner_offset
                     // equal to the sum of widths of partitions start..(i+1-start+start) = start..i+1
-                    let inner_offsets: std::collections::BTreeMap<usize, std::num::NonZeroUsize> = 
-                        (start..end).filter_map(|partition_idx| {
+                    let inner_offsets: std::collections::BTreeMap<
+                        usize,
+                        std::num::NonZeroUsize,
+                    > = (start..end)
+                        .filter_map(|partition_idx| {
                             // The enum index for the position AFTER partition partition_idx
                             // In the positions BTreeMap, position key (partition_idx + 1 + offset_from_op_start)
                             // corresponds to the boundary after partition partition_idx
                             // But we use enumerate index, which starts at 0 for the first position key
-                            
+
                             // For merge start..=end, positions at enum indices start..(end) are INSIDE
                             // Each position at enum index i is between partition (i-1+op_start) and (i+op_start)
                             // Wait, this is getting confusing. Let me use the simpler approach:
                             // Just compute the cumulative width for each inside position
-                            
+
                             let mut cumulative_width = 0usize;
-                            for p in (*partition_range.start())..=partition_idx {
-                                if let Some(token) = range_map.get(&PartitionRange::from(p)) {
+                            for p in (*partition_range.start())..=partition_idx
+                            {
+                                if let Some(token) =
+                                    range_map.get(&PartitionRange::from(p))
+                                {
                                     cumulative_width += *token.width;
                                 }
                             }
-                            std::num::NonZeroUsize::new(cumulative_width).map(|o| (partition_idx, o))
-                        }).collect();
-                    
+                            std::num::NonZeroUsize::new(cumulative_width)
+                                .map(|o| (partition_idx, o))
+                        })
+                        .collect();
+
                     self.offsets.apply_deltas_with_inner_offsets(
-                        deltas, 
-                        start, 
+                        deltas,
+                        start,
                         end,
                         &inner_offsets,
                     );

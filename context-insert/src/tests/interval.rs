@@ -12,7 +12,10 @@ use linked_hash_set::LinkedHashSet;
 use pretty_assertions::assert_eq;
 
 use crate::{
-    join::context::node::merge::PartitionRange,
+    join::context::node::merge::{
+        PartitionRange,
+        RequiredPartitions,
+    },
     *,
 };
 use context_search::{
@@ -244,6 +247,13 @@ fn interval_graph1() {
     assert!(res.query_exhausted());
     let init = InitInterval::from(res);
     let interval = IntervalGraph::from((&*graph, init));
+    
+    // Build expected required partitions
+    // For prefix mode with target_range 0..=2, the wrapper is also 0..=2
+    // So required = {0..=2} (target only, no overlap since wrapper == target)
+    let mut expected_required = RequiredPartitions::new();
+    expected_required.add(PartitionRange::from(0..=2));
+    
     assert_eq!(
         interval.clone(),
         IntervalGraph {
@@ -254,6 +264,7 @@ fn interval_graph1() {
             },
             cache: build_split_cache1(env),
             target_range: PartitionRange::from(0..=2),
+            required: expected_required,
         }
     );
 }

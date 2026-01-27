@@ -56,10 +56,16 @@ impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I> for RangeMap {
 impl RangeMap {
     /// Get all 2-way merge combinations for a partition range.
     ///
-    /// Iterates over interior split points to generate all possible binary splits.
+    /// Iterates over interior split points to generate all possible binary splits
+    /// where BOTH components exist in the range_map.
+    /// 
     /// For example, PartitionRange(0..=2) produces splits at points 1 and 2:
-    /// - `(0..=0) + (1..=2)`
-    /// - `(0..=1) + (2..=2)`
+    /// - `(0..=0) + (1..=2)` - only if both exist in range_map
+    /// - `(0..=1) + (2..=2)` - only if both exist in range_map
+    ///
+    /// With selective partition merge, some sub-ranges may not exist in the
+    /// range_map because they were skipped as non-required. This method
+    /// gracefully handles missing sub-ranges by filtering them out.
     pub fn range_sub_merges(
         &self,
         range: &PartitionRange,
@@ -72,13 +78,15 @@ impl RangeMap {
         // For range 0..=1, this gives [1] producing:
         // - (0..=0) + (1..=1)
         // For single-partition ranges like 0..=0, this gives [] (empty)
-        (start + 1..=end).map(move |ri| {
-            let &left = self
-                .map
-                .get(&PartitionRange::new(start..=(ri - 1)))
-                .unwrap();
-            let &right = self.map.get(&PartitionRange::new(ri..=end)).unwrap();
-            Pattern::from(vec![left, right])
+        (start + 1..=end).filter_map(move |ri| {
+            let left_range = PartitionRange::new(start..=(ri - 1));
+            let right_range = PartitionRange::new(ri..=end);
+            
+            // Only yield pattern if BOTH components exist in range_map
+            let left = self.map.get(&left_range)?;
+            let right = self.map.get(&right_range)?;
+            
+            Some(Pattern::from(vec![*left, *right]))
         })
     }
 
@@ -131,21 +139,23 @@ impl RangeMap {
             }
 
             // After processing this partition, if there's a next partition,
-            // add a boundary split
+            // add a boundary split (only if both left and right sub-ranges exist)
             if partition_idx < end {
                 accumulated_width += partition_width;
                 
                 // Get left and right tokens for this boundary
+                // If either sub-range was skipped (not required), we skip this split
                 let left_range = PartitionRange::new(start..=partition_idx);
-                let left_token = *self.map.get(&left_range).unwrap();
-                
                 let right_range = PartitionRange::new((partition_idx + 1)..=end);
-                let right_token = *self.map.get(&right_range).unwrap();
-
-                if let Some(pos) = NonZeroUsize::new(accumulated_width) {
-                    let key = PosKey::new(merged_token, pos);
-                    let split = Split::new(left_token, right_token);
-                    splits.push((key, split));
+                
+                if let (Some(&left_token), Some(&right_token)) = 
+                    (self.map.get(&left_range), self.map.get(&right_range)) 
+                {
+                    if let Some(pos) = NonZeroUsize::new(accumulated_width) {
+                        let key = PosKey::new(merged_token, pos);
+                        let split = Split::new(left_token, right_token);
+                        splits.push((key, split));
+                    }
                 }
             }
         }

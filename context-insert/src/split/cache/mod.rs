@@ -1,5 +1,8 @@
 use crate::{
-    join::context::node::merge::PartitionRange,
+    join::context::node::merge::{
+        PartitionRange,
+        RequiredPartitions,
+    },
     split::{
         cache::vertex::SplitVertexCache,
         trace::{
@@ -50,7 +53,7 @@ impl SplitCache {
         &mut self,
         trav: impl HasGraph,
         root: Token,
-    ) -> (Vec<SplitTraceState>, PartitionRange) {
+    ) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
         let graph = trav.graph();
         let ctx = NodeTraceCtx::from_index(&graph, root);
         let index = root.vertex_index();

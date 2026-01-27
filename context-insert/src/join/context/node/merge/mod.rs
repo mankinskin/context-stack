@@ -10,9 +10,11 @@ pub mod context;
 pub mod partition;
 mod partition_range;
 mod range_map;
+mod required;
 
 pub mod node;
 
 pub use partition::MergePartitionCtx;
 pub use partition_range::PartitionRange;
 pub use range_map::RangeMap;
+pub use required::RequiredPartitions;

@@ -40,6 +40,30 @@ impl PartitionRange {
     pub fn into_range(self) -> Range<usize> {
         *self.start()..(self.end() + 1)
     }
+
+    /// Compute the overlap of two partition ranges.
+    ///
+    /// Returns `Some(overlap)` if the two ranges intersect and the intersection
+    /// is a proper subset of at least one of the ranges. Returns `None` if:
+    /// - The ranges don't intersect, or
+    /// - The intersection equals one of the input ranges (not a proper subset)
+    ///
+    /// This is used for computing inner partitions: when target and wrapper
+    /// overlap, the overlapping portion becomes a required inner partition.
+    pub fn overlap(&self, other: &Self) -> Option<Self> {
+        let start = (*self.start()).max(*other.start());
+        let end = (*self.end()).min(*other.end());
+
+        // Must be non-empty
+        if start <= end {
+            let overlap = Self::new(start..=end);
+            // Only return if it's a proper subset (not equal to either input)
+            if overlap != *self && overlap != *other {
+                return Some(overlap);
+            }
+        }
+        None
+    }
 }
 
 impl From<usize> for PartitionRange {

@@ -3,7 +3,10 @@ use tracing::debug;
 
 use crate::{
     interval::IntervalGraph,
-    join::context::node::merge::PartitionRange,
+    join::context::node::merge::{
+        PartitionRange,
+        RequiredPartitions,
+    },
     split::{
         context::SplitCacheCtx,
         trace::SplitTraceState,
@@ -20,7 +23,7 @@ pub struct SplitRun<G: HasGraph> {
     incomplete: BTreeSet<Token>,
 }
 impl<G: HasGraph> SplitRun<G> {
-    pub fn init(&mut self) -> (Vec<SplitTraceState>, PartitionRange) {
+    pub fn init(&mut self) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
         self.ctx.cache.augment_root(
             &self.ctx.states_ctx.trav,
             self.ctx.states_ctx.ctx.root,
@@ -65,7 +68,7 @@ impl<G: HasGraph> From<SplitCacheCtx<G>> for IntervalGraph {
 impl<G: HasGraph> From<SplitRun<G>> for IntervalGraph {
     fn from(mut run: SplitRun<G>) -> Self {
         debug!("IntervalGraph::from - init");
-        let (next, target_range) = run.init();
+        let (next, target_range, required) = run.init();
         run.ctx.states.queue.extend(next);
         debug!("IntervalGraph::from - run iterator to end");
         run.all(|_| true); // run iterator to end
@@ -77,6 +80,7 @@ impl<G: HasGraph> From<SplitRun<G>> for IntervalGraph {
             states: cache.states_ctx.states,
             cache: cache.cache,
             target_range,
+            required,
         }
     }
 }

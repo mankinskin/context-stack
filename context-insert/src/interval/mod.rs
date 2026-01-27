@@ -1,7 +1,10 @@
 use std::fmt::Debug;
 
 use crate::{
-    join::context::node::merge::PartitionRange,
+    join::context::node::merge::{
+        PartitionRange,
+        RequiredPartitions,
+    },
     split::{
         cache::{
             SplitCache,
@@ -24,6 +27,7 @@ pub struct IntervalGraph {
     pub(crate) cache: SplitCache,
     pub(crate) root: Token,
     pub(crate) target_range: PartitionRange, // range of target partition indices in root
+    pub(crate) required: RequiredPartitions, // required partition ranges for selective merge
 }
 impl IntervalGraph {
     pub fn get(

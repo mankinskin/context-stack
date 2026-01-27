@@ -20,7 +20,10 @@ use crate::{
             },
         },
     },
-    join::context::node::merge::PartitionRange,
+    join::context::node::merge::{
+        PartitionRange,
+        RequiredPartitions,
+    },
     split::{
         cache::position::{
             PosKey,
@@ -178,7 +181,7 @@ impl SplitVertexCache {
         &mut self,
         ctx: NodeTraceCtx,
         root_mode: RootMode,
-    ) -> (Vec<SplitTraceState>, PartitionRange) {
+    ) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
         let target_positions = self.positions.keys().cloned().collect_vec();
         debug!(?root_mode, ?target_positions,
             root_patterns = ?ctx.patterns,
@@ -270,8 +273,83 @@ impl SplitVertexCache {
         });
 
         debug!(?target_range, "calculated target_range");
-        (next, target_range)
+
+        // Compute required partitions based on target and wrapper ranges
+        // The wrapper range is the full operating range (from first to last offset index)
+        let num_offsets = self.positions.len();
+        let wrapper_range = PartitionRange::from(match root_mode {
+            RootMode::Infix => {
+                // Wrapper spans from first to last offset
+                // For infix with 5 offsets: partitions 1..=4 (skip prefix 0 and postfix 5)
+                1..=(num_offsets - 1)
+            },
+            RootMode::Prefix => {
+                // Wrapper spans from 0 to last wrapper offset
+                0..=(num_offsets - 1)
+            },
+            RootMode::Postfix => {
+                // Wrapper spans from first wrapper offset to end
+                1..=num_offsets
+            },
+        });
+
+        debug!(?wrapper_range, "calculated wrapper_range");
+
+        let required =
+            self.compute_required_partitions(&target_range, &wrapper_range);
+        debug!(required = ?required.iter().collect::<Vec<_>>(), "computed required partitions");
+
+        (next, target_range, required)
     }
+
+    /// Compute required partitions from target and wrapper ranges.
+    ///
+    /// Required partitions are:
+    /// 1. Target partition (the token being inserted)
+    /// 2. Wrapper partition (extends to aligned boundary for unperfect splits)
+    /// 3. Inner partitions: the prefix/suffix of target that aligns with wrapper boundaries
+    fn compute_required_partitions(
+        &self,
+        target_range: &PartitionRange,
+        wrapper_range: &PartitionRange,
+    ) -> RequiredPartitions {
+        let mut required = RequiredPartitions::new();
+
+        // Target is always required
+        required.add(target_range.clone());
+
+        // Wrapper is required if different from target (has unperfect split)
+        if wrapper_range != target_range {
+            required.add(wrapper_range.clone());
+
+            // Inner partitions: the prefix of target up to the first pattern-aligned boundary
+            // For infix: if target is 1..=3 and wrapper is 1..=4, inner is 1..=2
+            // This is the portion of target before the unperfect boundary child
+            let target_start = *target_range.start();
+            let target_end = *target_range.end();
+            let wrapper_end = *wrapper_range.end();
+
+            // If wrapper extends past target, the inner is the prefix of wrapper within target
+            if wrapper_end > target_end && target_end > target_start {
+                let inner_range =
+                    PartitionRange::new(target_start..=(target_end - 1));
+                required.add(inner_range);
+            }
+
+            // Also add the suffix of wrapper after target (e.g., 3..=4 for yz)
+            // This ensures we can build pattern [aby, z] for abyz
+            if wrapper_end > target_end {
+                let suffix_range =
+                    PartitionRange::new((target_end + 1)..=wrapper_end);
+                if suffix_range.start() <= suffix_range.end() {
+                    required.add(suffix_range);
+                }
+            }
+        }
+
+        required
+    }
+
     pub fn pos_mut(
         &mut self,
         pos: NonZeroUsize,
