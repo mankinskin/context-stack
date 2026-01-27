@@ -189,14 +189,12 @@ impl<'a> MergeCtx<'a> {
                 // always needed as base cases for computing splits of larger merged partitions.
                 // They represent the original partition tokens and don't create new tokens.
                 let is_single = len == 1;
-                if let Some(req) = required {
-                    if !is_single && !req.is_required(&partition_range) {
-                        debug!(
-                            ?partition_range,
-                            "Skipping non-required partition"
-                        );
-                        continue;
-                    }
+                if let Some(req) = required
+                    && !is_single
+                    && !req.is_required(&partition_range)
+                {
+                    debug!(?partition_range, "Skipping non-required partition");
+                    continue;
                 }
 
                 debug!(

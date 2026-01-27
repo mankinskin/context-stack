@@ -247,13 +247,13 @@ fn interval_graph1() {
     assert!(res.query_exhausted());
     let init = InitInterval::from(res);
     let interval = IntervalGraph::from((&*graph, init));
-    
+
     // Build expected required partitions
-    // For prefix mode with target_range 0..=2, the wrapper is also 0..=2
-    // So required = {0..=2} (target only, no overlap since wrapper == target)
+    // For prefix mode with a single target position, we get target_range 0..=0
+    // (one partition from start up to the single offset)
     let mut expected_required = RequiredPartitions::new();
-    expected_required.add(PartitionRange::from(0..=2));
-    
+    expected_required.add(PartitionRange::from(0..=0));
+
     assert_eq!(
         interval.clone(),
         IntervalGraph {
@@ -263,7 +263,7 @@ fn interval_graph1() {
                 queue: VecDeque::default(),
             },
             cache: build_split_cache1(env),
-            target_range: PartitionRange::from(0..=2),
+            target_range: PartitionRange::from(0..=0),
             required: expected_required,
         }
     );
@@ -355,6 +355,20 @@ fn interval_graph2() {
                 splits: [
                     cd_efghi_id => (0, Some(nz!(1))),
                     cdefg_hi_id => (0, Some(nz!(1))),
+                ]
+            },
+            2 => {
+                top: [],
+                splits: [
+                    cdefg_hi_id => (0, Some(nz!(2))),
+                    cd_efghi_id => (1, None),
+                ]
+            },
+            5 => {
+                top: [],
+                splits: [
+                    cdefg_hi_id => (1, None),
+                    cd_efghi_id => (1, Some(nz!(3))),
                 ]
             },
             6 => {
