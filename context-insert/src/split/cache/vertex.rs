@@ -517,41 +517,6 @@ impl SplitVertexCache {
                 }
             }
 
-            // CRITICAL: Also check for inner_offset in the TARGET partition (at split_pos)
-            // This gives us offsets WITHIN the target partition itself
-            debug!(
-                pos = pos.get(),
-                "Checking for inner offsets in target partition"
-            );
-            for trace_pos in split_cache.pattern_splits.values() {
-                if let Some(inner_offset) = trace_pos.inner_offset {
-                    // The inner_offset is relative to the split position
-                    let target_inner_offset = pos.get() + inner_offset.get();
-                    debug!(
-                        ?inner_offset,
-                        target_inner_offset, "Found target inner_offset"
-                    );
-
-                    if let Some(target_inner_pos) =
-                        NonZeroUsize::new(target_inner_offset)
-                        && !self.positions.contains_key(&target_inner_pos)
-                        && !wrapper_splits.contains_key(&target_inner_pos)
-                    {
-                        debug!(
-                            pos = target_inner_pos.get(),
-                            "Adding target inner offset"
-                        );
-                        wrapper_splits.insert(
-                            target_inner_pos,
-                            SplitPositionCache::root(position_splits(
-                                ctx.patterns.iter(),
-                                target_inner_pos,
-                            )),
-                        );
-                    }
-                }
-            }
-
             debug!(count = wrapper_splits.len(), "Total wrapper_splits");
             wrapper_splits
         } else {
