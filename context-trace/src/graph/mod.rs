@@ -327,7 +327,7 @@ where
             .map(|pattern| self.pattern_string_with_separator(pattern, ""))
             .collect()
     }
-    pub(crate) fn get_atom_by_key(
+    pub fn get_atom_by_key(
         &self,
         key: &VertexKey,
     ) -> Option<Atom<G::Atom>> {

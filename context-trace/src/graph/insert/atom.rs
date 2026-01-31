@@ -32,7 +32,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
 
     /// Insert raw vertex data for an atom
-    pub(crate) fn insert_atom_data(
+    pub fn insert_atom_data(
         &self,
         atom: Atom<G::Atom>,
         data: VertexData,
