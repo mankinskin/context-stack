@@ -13,6 +13,13 @@ use std::sync::{
     RwLockWriteGuard,
 };
 
+use serde::{
+    Deserialize,
+    Deserializer,
+    Serialize,
+    Serializer,
+};
+
 use super::data::VertexData;
 
 /// A concurrent wrapper around `VertexData` with per-vertex read-write locking.
@@ -77,5 +84,25 @@ impl VertexEntry {
     /// when called from within a write lock callback on the same vertex).
     pub fn try_clone_data(&self) -> Option<VertexData> {
         self.try_read().map(|guard| guard.clone())
+    }
+}
+
+impl Serialize for VertexEntry {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        // Acquire read lock and serialize the inner data
+        self.read().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for VertexEntry {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D
+    ) -> Result<Self, D::Error> {
+        // Deserialize the data and wrap in Arc<RwLock<...>>
+        let data = VertexData::deserialize(deserializer)?;
+        Ok(VertexEntry::new(data))
     }
 }

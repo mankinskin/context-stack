@@ -94,7 +94,7 @@ impl<G: GraphKind> AsMut<Self> for Hypergraph<G> {
 ///
 /// Uses `DashMap` for the vertex storage with per-vertex `RwLock`s,
 /// enabling concurrent reads during writes to other vertices.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Hypergraph<G: GraphKind = BaseGraphKind> {
     /// Lock-free vertex ID counter
     next_id: AtomicUsize,
@@ -115,7 +115,10 @@ impl<G: GraphKind> Clone for Hypergraph<G> {
         // Clone all entries from DashMaps
         let graph = DashMap::new();
         for entry in self.graph.iter() {
-            graph.insert(*entry.key(), VertexEntry::new(entry.value().clone_data()));
+            graph.insert(
+                *entry.key(),
+                VertexEntry::new(entry.value().clone_data()),
+            );
         }
         let key_to_index = DashMap::new();
         for entry in self.key_to_index.iter() {
@@ -160,7 +163,7 @@ impl<G: GraphKind> PartialEq for Hypergraph<G> {
                     if *entry.value().read() != *other_entry.read() {
                         return false;
                     }
-                }
+                },
                 None => return false,
             }
         }
@@ -267,7 +270,10 @@ where
     pub fn to_node_child_strings(&self) -> TokenStrings {
         let nodes = self.graph.iter().map(|entry| {
             let data = entry.value().clone_data();
-            (self.vertex_data_string(data.clone()), data.to_pattern_strings(self))
+            (
+                self.vertex_data_string(data.clone()),
+                data.to_pattern_strings(self),
+            )
         });
         TokenStrings::from_nodes(nodes)
     }
