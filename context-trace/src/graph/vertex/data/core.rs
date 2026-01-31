@@ -20,8 +20,7 @@ use serde::{
 /// Central vertex data structure for hypergraph.
 ///
 /// Contains vertex metadata, parent relationships, and child token patterns.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(not(any(test, feature = "test-api")), derive(PartialEq, Eq, Clone))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VertexData {
     /// Total token width of this vertex
     pub(crate) token: Token,
@@ -34,44 +33,6 @@ pub struct VertexData {
 
     /// Child token patterns by PatternId
     pub(crate) children: ChildPatterns,
-
-    /// Cached string representation (test-only)
-    #[cfg(any(test, feature = "test-api"))]
-    #[serde(skip)]
-    pub(crate) cached_string: std::sync::RwLock<Option<String>>,
-}
-
-// Custom PartialEq for test builds that ignores cached_string
-#[cfg(any(test, feature = "test-api"))]
-impl PartialEq for VertexData {
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool {
-        self.token.width == other.token.width
-            && self.token.index == other.token.index
-            && self.key == other.key
-            && self.parents == other.parents
-            && self.children == other.children
-        // cached_string is not compared
-    }
-}
-
-#[cfg(any(test, feature = "test-api"))]
-impl Eq for VertexData {}
-
-// Custom Clone for test builds that resets cached_string
-#[cfg(any(test, feature = "test-api"))]
-impl Clone for VertexData {
-    fn clone(&self) -> Self {
-        Self {
-            token: self.token,
-            key: self.key,
-            parents: self.parents.clone(),
-            children: self.children.clone(),
-            cached_string: std::sync::RwLock::new(None), // Don't clone cache
-        }
-    }
 }
 
 impl VertexData {
@@ -82,8 +43,6 @@ impl VertexData {
             key: VertexKey::default(),
             parents: VertexParents::default(),
             children: ChildPatterns::default(),
-            #[cfg(any(test, feature = "test-api"))]
-            cached_string: std::sync::RwLock::new(None),
         }
     }
 
@@ -111,14 +70,6 @@ impl VertexData {
     /// Get mutable reference to child patterns
     pub fn child_patterns_mut(&mut self) -> &mut ChildPatterns {
         &mut self.children
-    }
-
-    /// Invalidate cached string representation (test-only)
-    #[cfg(any(test, feature = "test-api"))]
-    pub(crate) fn invalidate_string_cache(&self) {
-        if let Ok(mut cache) = self.cached_string.write() {
-            *cache = None;
-        }
     }
 
     /// Validate vertex invariants
@@ -249,8 +200,6 @@ impl VertexDataBuilder {
             key: self.key.unwrap_or_default(),
             parents: self.parents.unwrap_or_default(),
             children: self.children.unwrap_or_default(),
-            #[cfg(any(test, feature = "test-api"))]
-            cached_string: std::sync::RwLock::new(None),
         }
     }
 }

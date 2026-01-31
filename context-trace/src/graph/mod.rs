@@ -352,33 +352,12 @@ where
         &self,
         data: VertexData,
     ) -> String {
-        #[cfg(any(test, feature = "test-api"))]
-        {
-            // Check cache first
-            if let Ok(cache) = data.cached_string.read()
-                && let Some(cached) = cache.as_ref()
-            {
-                return cached.clone();
-            }
-        }
-
-        // Compute string
-        let s = if let Some(atom) = self.get_atom_by_key(&data.key) {
+        if let Some(atom) = self.get_atom_by_key(&data.key) {
             atom.to_string()
         } else {
             assert!(data.width() > TokenWidth(1));
             self.pattern_string(data.expect_any_child_pattern().1)
-        };
-
-        #[cfg(any(test, feature = "test-api"))]
-        {
-            // Populate cache
-            if let Ok(mut cache) = data.cached_string.write() {
-                *cache = Some(s.clone());
-            }
         }
-
-        s
     }
     pub fn index_string(
         &self,

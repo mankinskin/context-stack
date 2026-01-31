@@ -159,8 +159,6 @@ impl VertexData {
             assert!(pat.len() > 1);
         }
         self.children.insert(id, pat.into_pattern());
-        #[cfg(any(test, feature = "test-api"))]
-        self.invalidate_string_cache();
         self.validate();
     }
 
@@ -308,8 +306,6 @@ impl VertexData {
             }
             self.children.insert(id, pat.into_pattern());
         }
-        #[cfg(any(test, feature = "test-api"))]
-        self.invalidate_string_cache();
         self.validate();
     }
     /// Get vector of all child patterns
