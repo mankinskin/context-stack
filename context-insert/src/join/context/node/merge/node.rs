@@ -25,7 +25,7 @@ impl<'a> MergeCtx<'a> {
     pub fn merge_node(&mut self) -> LinkedHashMap<PosKey, Split> {
         // Merge all sub-partitions - this handles all pattern creation
         // and adds splits for merged tokens to the shared map
-        let (_, merges) = self.merge_sub_partitions(None);
+        let result = self.merge_sub_partitions(None);
 
         // Extract splits for each offset from the range_map
         let len = self.offsets.len();
@@ -39,7 +39,8 @@ impl<'a> MergeCtx<'a> {
             .map(|(i, (offset, _))| (i, *offset))
             .collect();
 
-        let mut result = LinkedHashMap::new();
+        let mut split_result = LinkedHashMap::new();
+        let merges = result.range_map;
 
         for (i, offset) in offsets {
             // Left partition: from start (0) to current offset position (i)
@@ -53,10 +54,10 @@ impl<'a> MergeCtx<'a> {
             // Add to shared map so parent nodes can access
             self.add_split(key, split.clone());
             // Also collect for return
-            result.insert(key, split);
+            split_result.insert(key, split);
         }
 
-        result
+        split_result
     }
 
     /// Merge the root node, returning the target token.
@@ -64,16 +65,30 @@ impl<'a> MergeCtx<'a> {
     /// Uses the same merge algorithm as intermediary nodes, but with a
     /// target_range that identifies which partition range contains the
     /// token being inserted.
+    ///
+    /// After merging, adds a new pattern to the root node that includes
+    /// the target token (for Prefix, Postfix, and Infix modes).
     pub fn merge_root(&mut self) -> Token {
         let root_index = self.ctx.index;
         // Use the target range computed during split phase
         let target_range = self.ctx.ctx.interval.target_range.clone();
         info!("Starting root merge join");
 
-        let (target_token, _) =
-            self.merge_sub_partitions(Some(target_range.clone()));
+        let result = self.merge_sub_partitions(Some(target_range.clone()));
+        let target_token = result.target_token;
+        let range_map = result.range_map;
+        let had_perfect_replacement = result.had_perfect_replacement;
 
         info!(?target_token, "Target token extracted from range_map");
+
+        // Add root pattern that includes the target token
+        // This connects the target token to the root in the graph
+        // SKIP if a perfect replacement already modified the pattern in place
+        if !had_perfect_replacement {
+            self.add_root_pattern(&range_map, target_token);
+        } else {
+            info!("Skipping add_root_pattern - pattern was already modified by replace_in_pattern");
+        }
 
         // Debug: Print actual VertexData child patterns
         self.print_token_vertex_patterns(target_token);

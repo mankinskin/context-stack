@@ -7,6 +7,7 @@ use crate::{
         info::{
             InfoPartition,
             PartitionInfo,
+            border::perfect::BorderPerfect,
             range::role::{
                 In,
                 Post,
@@ -70,6 +71,16 @@ where
     pub partition_range: PartitionRange,
 }
 
+/// Result of a partition merge operation.
+pub struct MergeResult {
+    /// The merged token
+    pub token: Token,
+    /// Pattern deltas (if any sub-indices changed)
+    pub delta: Option<PatternSubDeltas>,
+    /// Whether replace_in_pattern was called (perfect pattern match)
+    pub had_pattern_replacement: bool,
+}
+
 impl<'a, 'b, R: RangeRole<Mode = Join> + 'b> MergePartitionCtx<'a, 'b, R>
 where
     R::Borders: JoinBorders<R>,
@@ -85,14 +96,25 @@ where
     /// Create a JoinedPartition from partition info.
     ///
     /// This handles pattern joining, token creation/lookup, and delta computation.
+    /// If `skip_pattern_replacement` is true, patterns won't be modified.
+    pub fn join_partition_with_options(
+        &mut self,
+        info: PartitionInfo<R>,
+        skip_pattern_replacement: bool,
+    ) -> JoinedPartition<R> {
+        JoinedPartition::from_partition_info_with_options(
+            JoinPartitionInfo::new(info),
+            &mut self.merge_ctx.ctx,
+            skip_pattern_replacement,
+        )
+    }
+
+    /// Create a JoinedPartition from partition info (allows pattern replacement).
     pub fn join_partition(
         &mut self,
         info: PartitionInfo<R>,
     ) -> JoinedPartition<R> {
-        JoinedPartition::from_partition_info(
-            JoinPartitionInfo::new(info),
-            &mut self.merge_ctx.ctx,
-        )
+        self.join_partition_with_options(info, false)
     }
 
     /// Add sub-merge patterns to a token if they don't already exist.
@@ -131,39 +153,44 @@ where
         }
     }
 
-    /// Merge the partition and return (token, delta).
-    ///
-    /// This is the main entry point that:
-    /// 1. Gets partition info (or returns existing token)
-    /// 2. Creates JoinedPartition with delta computation
-    /// 3. Adds sub-merge patterns
-    /// 4. Returns the token and any pattern deltas
-    pub fn merge(mut self) -> (Token, Option<PatternSubDeltas>) {
+    /// Internal merge implementation with configurable pattern replacement.
+    fn merge_internal(mut self, skip_pattern_replacement: bool) -> MergeResult {
         debug!(
             range_start = self.partition_range.start(),
             range_end = self.partition_range.end(),
             num_offsets = self.merge_ctx.offsets.len(),
+            skip_pattern_replacement,
             "MergePartitionCtx::merge: ENTERED"
         );
 
         match self.info_partition() {
             Ok(info) => {
-                let joined = self.join_partition(info);
+                // Check if this will be a perfect match BEFORE calling join
+                let will_have_perfect = info.perfect.complete().0.is_some();
+                
+                let joined = self.join_partition_with_options(info, skip_pattern_replacement);
 
                 debug!(
                     token = %joined.index,
                     ?joined.delta,
+                    had_pattern_replacement = will_have_perfect && !skip_pattern_replacement,
                     "JoinPartitionInfo succeeded with delta"
                 );
 
-                self.add_sub_merges(joined.index);
+                if !skip_pattern_replacement {
+                    self.add_sub_merges(joined.index);
+                }
 
                 let delta = if joined.delta.is_empty() {
                     None
                 } else {
                     Some(joined.delta)
                 };
-                (joined.index, delta)
+                MergeResult {
+                    token: joined.index,
+                    delta,
+                    had_pattern_replacement: will_have_perfect && !skip_pattern_replacement,
+                }
             },
             Err(existing) => {
                 debug!(
@@ -173,9 +200,41 @@ where
                     "{}: Token already exists - using without modification",
                     R::ROLE_STR
                 );
-                (existing, None)
+                MergeResult {
+                    token: existing,
+                    delta: None,
+                    had_pattern_replacement: false,
+                }
             },
         }
+    }
+
+    /// Merge the partition and return (token, delta).
+    ///
+    /// This is the main entry point that:
+    /// 1. Gets partition info (or returns existing token)
+    /// 2. Creates JoinedPartition with delta computation
+    /// 3. Adds sub-merge patterns
+    /// 4. Returns the token and any pattern deltas
+    pub fn merge(self) -> (Token, Option<PatternSubDeltas>) {
+        let result = self.merge_internal(false);
+        (result.token, result.delta)
+    }
+
+    /// Merge the partition and return full result info.
+    ///
+    /// This includes whether a pattern replacement occurred.
+    pub fn merge_with_info(self) -> MergeResult {
+        self.merge_internal(false)
+    }
+
+    /// Merge the partition without modifying patterns.
+    ///
+    /// This is used for edge partitions in ROOT mode where we only need
+    /// the token, not pattern modifications. This avoids corrupting the
+    /// root pattern when merging edge partitions.
+    pub fn merge_token_only(self) -> Token {
+        self.merge_internal(true).token
     }
 }
 

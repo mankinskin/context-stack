@@ -1,31 +1,14 @@
-use context_trace::{
-    Token,
-    VertexSet,
-};
 use derive_more::{
     Deref,
     DerefMut,
 };
-use tracing::debug;
 
 use crate::{
     RootMode,
     SplitVertexCache,
-    interval::partition::info::range::role::{
-        In,
-        Post,
-        Pre,
-    },
-    join::{
-        context::node::{
-            context::NodeJoinCtx,
-            merge::{
-                MergePartitionCtx,
-                PartitionRange,
-                RangeMap,
-            },
-        },
-        partition::Join,
+    join::context::node::{
+        context::NodeJoinCtx,
+        merge::PartitionRange,
     },
 };
 
@@ -134,267 +117,22 @@ impl<'a> MergeCtx<'a> {
         }
     }
 
+    /// Merge all sub-partitions and return the target token with range map.
+    ///
+    /// This uses `PartitionMergeIter` to iterate over all partitions in the
+    /// operating range, merging them from smallest to largest.
+    ///
+    /// # Arguments
+    /// - `target_range`: For root merges, the range containing the target token.
+    ///   For intermediary merges, pass `None`.
     pub fn merge_sub_partitions(
         &mut self,
         target_range: Option<PartitionRange>,
-    ) -> (Token, RangeMap) {
-        let operating_range = self.operating_partition_range();
-        let op_start = *operating_range.start();
-        let op_end = *operating_range.end();
-        let op_len = op_end - op_start + 1;
+    ) -> super::iter::MergeIterResult {
+        use super::PartitionMergeIter;
 
-        // For root merges, use the required partition set for selective filtering
-        // For intermediary merges (target_range is None), merge all partitions
-        let is_root_merge = target_range.is_some();
-        let required = if is_root_merge {
-            Some(&self.ctx.ctx.interval.required)
-        } else {
-            None
-        };
-
-        debug!(
-            node=?self.ctx.index,
-            patterns=?self.ctx.patterns(),
-            ?self.offsets,
-            ?operating_range,
-            ?self.mode,
-            ?target_range,
-            is_root_merge,
-            required = ?required.map(|r| r.iter().collect::<Vec<_>>()),
-            "merge_partitions_in_range: ENTERED"
-        );
-
-        let mut target_token: Option<Token> = None;
-        let mut range_map = RangeMap::default();
-
-        // Iterate over partition ranges WITHIN the operating range only
-        // For Full mode: 0..=num_offsets (all partitions)
-        // For Root Postfix: 1..=num_offsets (skip prefix at 0)
-        // For Root Prefix: 0..=(num_offsets-1) (skip postfix)
-        // For Root Infix: 1..=(num_offsets-1) (skip both ends)
-        for len in 1..=op_len {
-            debug!(
-                "
-    ==============================================================
-    merging partitions of length {}
-    ==============================================================",
-                len
-            );
-            for start in op_start..=(op_start + op_len - len) {
-                let end = start + len - 1; // end is inclusive (partition index)
-                let partition_range = PartitionRange::new(start..=end);
-
-                // For root merges, skip partitions that are not in the required set
-                // HOWEVER: Single partitions (len == 1, i.e., partition_range.len() == 0) are
-                // always needed as base cases for computing splits of larger merged partitions.
-                // They represent the original partition tokens and don't create new tokens.
-                let is_single = len == 1;
-                if let Some(req) = required
-                    && !is_single
-                    && !req.is_required(&partition_range)
-                {
-                    debug!(?partition_range, "Skipping non-required partition");
-                    continue;
-                }
-
-                debug!(
-                    node=?self.ctx.index,
-                    ?partition_range,
-                    ?operating_range,
-                    ?self.mode,
-                    "Merging partition range"
-                );
-
-                // Partition type is always relative to full node (determines offset boundaries)
-                let partition_type = self.partition_type(&partition_range);
-                // Check if this is the full operating range (for intermediary node handling)
-                let is_full_operating_range =
-                    partition_range == operating_range;
-                debug!(
-                    ?partition_type,
-                    ?is_full_operating_range,
-                    "Detected partition type"
-                );
-
-                let (merged_token, delta) = match (
-                    is_full_operating_range,
-                    partition_type,
-                ) {
-                    (true, _) if matches!(self.mode, MergeMode::Full) => {
-                        // Full operating range for intermediary node - use the node itself
-                        let token = self.ctx.index;
-                        debug!(
-                            "Merging full partition - adding sub-merge patterns (intermediary node)"
-                        );
-
-                        let existing_patterns = self
-                            .ctx
-                            .trav
-                            .expect_vertex_data(token)
-                            .child_pattern_set();
-
-                        let sub_merges: Vec<_> = range_map
-                            .range_sub_merges(&partition_range)
-                            .into_iter()
-                            .filter(|p| !existing_patterns.contains(p))
-                            .collect();
-
-                        if !sub_merges.is_empty() {
-                            debug!(
-                                num_sub_merges = sub_merges.len(),
-                                ?sub_merges,
-                                "Adding sub-merge patterns to full token"
-                            );
-                            for merge_pattern in sub_merges {
-                                self.ctx.trav.add_pattern_with_update(
-                                    token,
-                                    merge_pattern,
-                                );
-                            }
-                        }
-                        (token, None)
-                    },
-                    // All other cases: use partition_type to determine merge role
-                    (_, PartitionType::Full) => {
-                        // Full node partition - shouldn't happen in normal flow
-                        (self.ctx.index, None)
-                    },
-                    (_, PartitionType::Prefix) =>
-                        MergePartitionCtx::<Pre<Join>>::from_merge_ctx(
-                            self,
-                            &range_map,
-                            partition_range.clone(),
-                        )
-                        .merge(),
-                    (_, PartitionType::Postfix) =>
-                        MergePartitionCtx::<Post<Join>>::from_merge_ctx(
-                            self,
-                            &range_map,
-                            partition_range.clone(),
-                        )
-                        .merge(),
-                    (_, PartitionType::Infix) =>
-                        MergePartitionCtx::<In<Join>>::from_merge_ctx(
-                            self,
-                            &range_map,
-                            partition_range.clone(),
-                        )
-                        .merge(),
-                };
-
-                // Apply delta to offsets after the merged partition (patterns were modified)
-                // This handles three cases:
-                // 1. Positions INSIDE the merged region: adjust sub_index and set inner_offset
-                // 2. Right boundary position: adjust sub_index only
-                // 3. Positions AFTER the merged region: adjust sub_index only
-                if let Some(ref deltas) = delta
-                    && deltas.iter().any(|(_, &d)| d > 0)
-                // Only apply if there are non-zero deltas
-                {
-                    debug!(
-                        ?deltas,
-                        partition_start = start,
-                        partition_end = end,
-                        "Applying deltas to offset cache"
-                    );
-
-                    // Compute inner_offsets for positions inside the merged region
-                    // Position at enum index i (where start <= i < end) has inner_offset
-                    // equal to the sum of widths of partitions start..(i+1-start+start) = start..i+1
-                    let inner_offsets: std::collections::BTreeMap<
-                        usize,
-                        std::num::NonZeroUsize,
-                    > = (start..end)
-                        .filter_map(|partition_idx| {
-                            // The enum index for the position AFTER partition partition_idx
-                            // In the positions BTreeMap, position key (partition_idx + 1 + offset_from_op_start)
-                            // corresponds to the boundary after partition partition_idx
-                            // But we use enumerate index, which starts at 0 for the first position key
-
-                            // For merge start..=end, positions at enum indices start..(end) are INSIDE
-                            // Each position at enum index i is between partition (i-1+op_start) and (i+op_start)
-                            // Wait, this is getting confusing. Let me use the simpler approach:
-                            // Just compute the cumulative width for each inside position
-
-                            let mut cumulative_width = 0usize;
-                            for p in (*partition_range.start())..=partition_idx
-                            {
-                                if let Some(token) =
-                                    range_map.get(&PartitionRange::from(p))
-                                {
-                                    cumulative_width += *token.width;
-                                }
-                            }
-                            std::num::NonZeroUsize::new(cumulative_width)
-                                .map(|o| (partition_idx, o))
-                        })
-                        .collect();
-
-                    self.offsets.apply_deltas_with_inner_offsets(
-                        deltas,
-                        start,
-                        end,
-                        &inner_offsets,
-                    );
-                }
-
-                // Track target token if we've reached the target partition range
-                if let Some(target_range) = target_range.as_ref()
-                    && &partition_range == target_range
-                {
-                    debug!(
-                        ?partition_range,
-                        "merge_partitions_in_range: reached target partition range"
-                    );
-                    assert_eq!(target_token, None, "Target token already set");
-                    target_token = Some(merged_token);
-                }
-
-                debug!(
-                    ?partition_range,
-                    ?merged_token,
-                    "RangeMap INSERT: inserting token for range"
-                );
-                range_map.insert(partition_range.clone(), merged_token);
-
-                // Compute splits for newly merged tokens (partitions with len > 0,
-                // i.e., covering more than one partition index)
-                // The range_map now has all sub-ranges we need to compute splits
-                // Add them to shared splits so subsequent pattern operations can access them
-                if !partition_range.is_empty() {
-                    let computed_splits = range_map
-                        .compute_splits_for_merged_token(
-                            merged_token,
-                            &partition_range,
-                            self.ctx.splits,
-                        );
-                    debug!(
-                        ?merged_token,
-                        ?partition_range,
-                        num_splits = computed_splits.len(),
-                        "Computed splits for merged token"
-                    );
-                    for (key, split) in computed_splits {
-                        self.add_split(key, split);
-                    }
-                }
-            }
-        }
-
-        // Extract target token from range_map
-        // For intermediary nodes (target_range is None), use the full node token
-        let target_token = match target_range {
-            Some(ref target_range) => target_token
-                .unwrap_or_else(|| panic!(
-                    "Target token not found in range_map for range {:?}. Available ranges: {:?}",
-                    target_range,
-                    range_map.map.keys().collect::<Vec<_>>()
-                )),
-            None => {
-                // For intermediary nodes, the "target" is the full node
-                self.ctx.index
-            }
-        };
-        (target_token, range_map)
+        let mut iter = PartitionMergeIter::new(self, target_range);
+        iter.merge_all();
+        iter.finalize()
     }
 }
