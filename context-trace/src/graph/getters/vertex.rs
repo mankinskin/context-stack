@@ -362,7 +362,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
 
     /// Iterate over all vertex keys.
-    pub(crate) fn vertex_keys(&self) -> impl Iterator<Item = VertexKey> + '_ {
+    pub fn vertex_keys(&self) -> impl Iterator<Item = VertexKey> + '_ {
         self.graph.iter().map(|entry| *entry.key())
     }
 }
