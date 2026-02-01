@@ -109,14 +109,10 @@ fn search_pattern1_by_z() {
         by => [[b, y]],
         yz => [[y, z]],
         xa => [[x, a]],
-    );
-    insert_patterns!(graph,
         xab => [[x, ab], [xa, b]],
     );
     insert_patterns!(graph,
         (xaby, xaby_ids) => [[xab, y], [xa, by]],
-    );
-    insert_patterns!(graph,
         (xabyz, xabyz_ids) => [[xaby, z], [xab, yz]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
