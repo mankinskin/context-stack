@@ -36,19 +36,17 @@ derive_more = { version = "2", features = ["full"] }
 linked_hash_set = "0.1.4"
 linked-hash-map = "0.5.6"
 derive-new = "0.7"
-inquire = "0.9"
 auto_impl = "1.2.0"
 nrfind = "1"
 ngram = "0.1"
 csv = "1"
 derivative = "^2.2"
-justlog = { path = "../deps/justlog" }
 context-trace = { path = "../context-trace", features = ["test-api"] }
 context-search = { path = "../context-search", features = ["test-api"] }
 context-insert = { path = "../context-insert", features = ["test-api"] }
 derive_builder = "^0.20"
 tracing = { version = "^0.1", features = ["attributes", "valuable"] }
-uuid = { version = "^1.10", features = ["v4", "fast-rng", "serde"] }
+uuid = { version = "^1.10", features = ["v4", "fast-rng", "serde", "js"] }
 derive-into-owned = "0.2"
 one-of = "0.2"
 charify = "0.1"
@@ -91,7 +89,12 @@ version = "^1"
 
 [dependencies.tokio]
 version = "^1"
-features = ["sync", "rt", "rt-multi-thread", "macros"]
+features = ["sync", "rt", "macros", "time"]
+
+# Multi-thread runtime only on native
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
+version = "^1"
+features = ["rt-multi-thread"]
 
 [dependencies.tokio-stream]
 version = "^0.1"
