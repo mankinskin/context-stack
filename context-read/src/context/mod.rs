@@ -11,6 +11,7 @@ use tracing::debug;
 
 use crate::{
     context::root::RootManager,
+    expansion::ExpansionCtx,
     sequence::{
         block_iter::{
             BlockIter,
@@ -56,10 +57,20 @@ impl ReadCtx {
         &mut self,
         known: Pattern,
     ) {
-        // TODO: This needs to be reimplemented with the current path construction API
-        // The old new_directed API no longer exists
-        // For now, just append the pattern directly
-        let minified = known;
+        let path = PatternEndPath::new(known.clone(), Default::default());
+        let minified = {
+            let mut cursor = path.into_range(0);
+            let expansion = ExpansionCtx::new(self.clone(), &mut cursor)
+                .find_largest_bundle();
+            assert!(cursor.end_path().is_empty());
+            [
+                &[expansion],
+                &cursor.path_root()
+                    [cursor.role_root_child_index::<End>() + 1..],
+            ]
+            .concat()
+        }
+        .into();
         self.append_pattern(minified);
     }
     fn read_block(
@@ -70,39 +81,6 @@ impl ReadCtx {
         self.append_pattern(unknown);
         self.read_known(known);
     }
-    //pub fn read_next(&mut self) -> Option<Token> {
-    //    match ToInsertCtx::<IndexWithPath>::insert_or_get_complete(
-    //        &self.graph,
-    //        self.sequence.clone(),
-    //    ) {
-    //        Ok(IndexWithPath {
-    //            index,
-    //            path: advanced,
-    //        }) => {
-    //            self.sequence = advanced;
-    //            Some(index)
-    //        },
-    //        Err(ErrorReason::SingleIndex(index)) => {
-    //            self.sequence.advance(&self.graph);
-    //            Some(index)
-    //        },
-    //        Err(_) => {
-    //            self.sequence.advance(&self.graph);
-    //            None
-    //        },
-    //    }
-    //}
-    //pub fn read_pattern(
-    //    &mut self,
-    //    known: impl IntoPattern,
-    //) -> Option<Token> {
-    //    self.read_known(known.into_pattern());
-    //    self.root
-    //}
-    //fn append_next(&mut self, end_bound: usize, index: Token) -> usize {
-    //    self.append_index(index);
-    //    0
-    //}
 }
 
 // ReadCtx derefs to RootManager which derefs to HypergraphRef
