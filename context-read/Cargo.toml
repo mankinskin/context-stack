@@ -100,5 +100,8 @@ features = ["rt-multi-thread"]
 version = "^0.1"
 features = ["sync", "time", "io-util"]
 
+[dev-dependencies]
+ngrams = { path = "../../../ngrams" }
+
 #[dev-dependencies.graph_app]
 #path = "../"
