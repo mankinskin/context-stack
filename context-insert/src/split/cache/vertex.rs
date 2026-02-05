@@ -72,6 +72,27 @@ impl SplitVertexCache {
             })
     }
 
+    /// Check if the split at a given offset index is perfect (no inner_offset).
+    ///
+    /// A perfect split means the split position aligns exactly with child token
+    /// boundaries in all patterns. Returns true if none of the patterns have
+    /// an inner_offset at this position.
+    pub fn is_split_perfect_at_index(
+        &self,
+        index: usize,
+    ) -> bool {
+        self.positions
+            .values()
+            .nth(index)
+            .map(|cache| {
+                cache
+                    .pattern_splits
+                    .values()
+                    .all(|pos| pos.inner_offset.is_none())
+            })
+            .unwrap_or(true) // If no split at this index, consider it "perfect"
+    }
+
     /// Apply delta adjustments to positions after a merge.
     ///
     /// This handles three categories of positions:
@@ -308,6 +329,10 @@ impl SplitVertexCache {
     /// 1. Target partition (the token being inserted)
     /// 2. Wrapper partition (extends to aligned boundary for unperfect splits)
     /// 3. Inner partitions: the prefix/suffix of target that aligns with wrapper boundaries
+    ///
+    /// The wrapper is only needed if there's an unperfect split at the boundary
+    /// between target and wrapper ranges. A perfect split (no inner_offset)
+    /// means the split aligns with child token boundaries and no wrapper is needed.
     fn compute_required_partitions(
         &self,
         target_range: &PartitionRange,
@@ -318,31 +343,54 @@ impl SplitVertexCache {
         // Target is always required
         required.add(target_range.clone());
 
-        // Wrapper is required if different from target (has unperfect split)
+        // Wrapper is required only if:
+        // 1. It differs from target AND
+        // 2. There's an unperfect split at the boundary
         if wrapper_range != target_range {
-            required.add(wrapper_range.clone());
-
-            // Inner partitions: the prefix of target up to the first pattern-aligned boundary
-            // For infix: if target is 1..=3 and wrapper is 1..=4, inner is 1..=2
-            // This is the portion of target before the unperfect boundary child
             let target_start = *target_range.start();
             let target_end = *target_range.end();
+            let wrapper_start = *wrapper_range.start();
             let wrapper_end = *wrapper_range.end();
 
-            // If wrapper extends past target, the inner is the prefix of wrapper within target
-            if wrapper_end > target_end && target_end > target_start {
-                let inner_range =
-                    PartitionRange::new(target_start..=(target_end - 1));
-                required.add(inner_range);
-            }
+            // Check if right boundary split is unperfect (wrapper extends past target on right)
+            let right_boundary_unperfect = wrapper_end > target_end
+                && !self.is_split_perfect_at_index(target_end);
 
-            // Also add the suffix of wrapper after target (e.g., 3..=4 for yz)
-            // This ensures we can build pattern [aby, z] for abyz
-            if wrapper_end > target_end {
-                let suffix_range =
-                    PartitionRange::new((target_end + 1)..=wrapper_end);
-                if suffix_range.start() <= suffix_range.end() {
-                    required.add(suffix_range);
+            // Check if left boundary split is unperfect (wrapper extends before target on left)
+            let left_boundary_unperfect = wrapper_start < target_start
+                && target_start > 0
+                && !self.is_split_perfect_at_index(target_start - 1);
+
+            // Only add wrapper-related partitions if there's an unperfect boundary
+            if right_boundary_unperfect || left_boundary_unperfect {
+                required.add(wrapper_range.clone());
+
+                // Inner partitions: the prefix of target up to the first pattern-aligned boundary
+                // For infix: if target is 1..=3 and wrapper is 1..=4, inner is 1..=2
+                // This is the portion of target before the unperfect boundary child
+                if right_boundary_unperfect && target_end > target_start {
+                    let inner_range =
+                        PartitionRange::new(target_start..=(target_end - 1));
+                    required.add(inner_range);
+                }
+
+                // Also add the suffix of wrapper after target (e.g., 3..=4 for yz)
+                // This ensures we can build pattern [aby, z] for abyz
+                if right_boundary_unperfect {
+                    let suffix_range =
+                        PartitionRange::new((target_end + 1)..=wrapper_end);
+                    if suffix_range.start() <= suffix_range.end() {
+                        required.add(suffix_range);
+                    }
+                }
+
+                // Handle left boundary extension similarly
+                if left_boundary_unperfect && target_start > wrapper_start {
+                    let prefix_range =
+                        PartitionRange::new(wrapper_start..=(target_start - 1));
+                    if prefix_range.start() <= prefix_range.end() {
+                        required.add(prefix_range);
+                    }
                 }
             }
         }
@@ -429,7 +477,8 @@ impl SplitVertexCache {
 
     /// Add wrapper offsets for Postfix mode
     /// For each child pattern, find the wrapper range (indices intersected by target partition)
-    /// and add split positions at wrapper boundaries
+    /// and add split positions at wrapper boundaries.
+    /// Wrapper offsets are only added when there's an unperfect split (inner_offset is Some).
     fn add_wrapper_offsets_postfix(
         &self,
         ctx: NodeTraceCtx,
@@ -447,6 +496,13 @@ impl SplitVertexCache {
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
                     debug!(?pid, ?trace_pos, "Processing pattern");
+
+                    // Only add wrapper offset if this is an unperfect split
+                    // A perfect split (inner_offset = None) doesn't need a wrapper
+                    if trace_pos.inner_offset.is_none() {
+                        debug!("Perfect split, skipping wrapper offset");
+                        continue;
+                    }
 
                     // The wrapper starts at the beginning of the child that contains the split
                     let child_index = trace_pos.sub_index;
@@ -511,8 +567,6 @@ impl SplitVertexCache {
                                 )),
                             );
                         }
-                    } else {
-                        debug!("No inner_offset found in wrapper");
                     }
                 }
             }
@@ -525,7 +579,8 @@ impl SplitVertexCache {
     }
 
     /// Add wrapper offsets for Prefix mode
-    /// For each child pattern, find the wrapper range and add split positions at wrapper boundaries
+    /// For each child pattern, find the wrapper range and add split positions at wrapper boundaries.
+    /// Wrapper offsets are only added when there's an unperfect split (inner_offset is Some).
     fn add_wrapper_offsets_prefix(
         &self,
         ctx: NodeTraceCtx,
@@ -540,6 +595,12 @@ impl SplitVertexCache {
             // For each child pattern, find wrapper end position
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                    // Only add wrapper offset if this is an unperfect split
+                    // A perfect split (inner_offset = None) doesn't need a wrapper
+                    if trace_pos.inner_offset.is_none() {
+                        continue;
+                    }
+
                     // The wrapper ends after the child that contains the split
                     let child_index = trace_pos.sub_index;
 
@@ -578,6 +639,7 @@ impl SplitVertexCache {
     /// Infix has TWO split positions (left and right bounds).
     /// - For left split: add wrapper END offset (like Prefix)
     /// - For right split: add wrapper START offset (like Postfix)
+    /// Wrapper offsets are only added when there's an unperfect split (inner_offset is Some).
     fn add_wrapper_offsets_infix(
         &self,
         ctx: NodeTraceCtx,
@@ -596,6 +658,11 @@ impl SplitVertexCache {
 
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                    // Only add wrapper offset if this is an unperfect split
+                    if trace_pos.inner_offset.is_none() {
+                        continue;
+                    }
+
                     // The wrapper ends after the child that contains the split
                     let child_index = trace_pos.sub_index;
 
@@ -632,6 +699,11 @@ impl SplitVertexCache {
 
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                    // Only add wrapper offset if this is an unperfect split
+                    if trace_pos.inner_offset.is_none() {
+                        continue;
+                    }
+
                     // The wrapper starts at the beginning of the child that contains the split
                     let child_index = trace_pos.sub_index;
 

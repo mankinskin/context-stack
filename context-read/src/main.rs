@@ -4,6 +4,7 @@ pub mod context;
 pub mod expansion;
 //pub mod overlap;
 pub mod bands;
+pub mod request;
 pub mod sequence;
 //#[cfg(test)]
 //mod tests;
