@@ -79,7 +79,9 @@ impl ReadCtx {
     ) {
         let NextBlock { unknown, known } = block;
         self.append_pattern(unknown);
-        self.read_known(known);
+        if !known.is_empty() {
+            self.read_known(known);
+        }
     }
 }
 

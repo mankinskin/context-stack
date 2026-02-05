@@ -90,7 +90,8 @@ impl<R: InsertResult> InsertCtx<R> {
                     self.insert_init(
                         <R::Extract as ResultExtraction>::extract_from(&result),
                         InitInterval::from(result),
-                    ).map(Ok)
+                    )
+                    .map(Ok)
                 }
             },
             Err(err) => Err(err),
