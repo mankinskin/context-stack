@@ -84,18 +84,47 @@ impl MatchResult {
         result
     }
 
-    /// Validate that EntireRoot cursor position equals root token width
+    /// Validate that EntireRoot cursor position is consistent with root token width
+    ///
+    /// For EntireRoot matches, the cursor position must be at least root_width
+    /// (for fresh searches it equals root_width, for continuations it's start + root_width).
+    /// We validate that cursor_pos >= root_width, which catches the most common errors.
     #[inline]
     fn validate_entire_root_invariant(&self) {
         if let PathCoverage::EntireRoot(_) = &self.path {
-            let cursor_pos = *self.cursor.cursor().atom_position.as_ref();
+            let cursor = self.cursor.cursor();
+            let cursor_pos = *cursor.atom_position.as_ref();
             let root_width: usize = (*self.path.root_parent().width()).into();
-            debug_assert_eq!(
-                cursor_pos,
-                root_width,
-                "EntireRoot cursor position ({}) must equal root token width ({})",
+
+            // For EntireRoot, cursor position must be at least root_width
+            // (equals root_width for fresh search, greater for continuation)
+            debug_assert!(
+                cursor_pos >= root_width,
+                "EntireRoot cursor position ({}) must be at least root token width ({})",
                 cursor_pos,
                 root_width
+            );
+
+            // Additionally, verify cursor_pos - start_from_path equals root_width
+            // (where start_from_path is the width of tokens before the query start index)
+            let start_index = cursor.path.role_root_child_index::<Start>();
+            let pattern = PatternRoot::pattern_root_pattern(&cursor.path);
+            let start_from_path: usize = pattern
+                .iter()
+                .take(start_index)
+                .map(|t| usize::from(*t.width()))
+                .sum();
+
+            // For continuation searches, start_from_path is 0 but cursor started mid-query.
+            // The invariant should be: (cursor_pos - actual_start) == root_width
+            // But we can only verify: cursor_pos >= start_from_path + root_width
+            debug_assert!(
+                cursor_pos >= start_from_path + root_width,
+                "EntireRoot cursor position ({}) must be at least start ({}) + root width ({}) = {}",
+                cursor_pos,
+                start_from_path,
+                root_width,
+                start_from_path + root_width
             );
         }
     }

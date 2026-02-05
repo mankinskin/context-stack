@@ -15,7 +15,7 @@ use crate::{
         SearchState,
     },
     state::{
-        result::Response,
+        response::Response,
         start::{
             IntoCursor,
             StartCtx,

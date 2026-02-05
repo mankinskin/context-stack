@@ -1,7 +1,7 @@
 pub(crate) mod end;
 pub(crate) mod inner_kind;
 pub(crate) mod matched;
-pub(crate) mod result;
+pub(crate) mod response;
 pub(crate) mod start;
 
 use std::cmp::Ordering;

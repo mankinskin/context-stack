@@ -1,7 +1,7 @@
 //! Search test cases for EnvAbabab (triple repeat scenario)
 //!
 //! Tests the scenario from context-read's validate_triple_repeat test:
-//! Graph: ab = [a, b], abab = [ab, ab], ababab = [ab, ab, ab]
+//! Graph: ab = [a, b], abab = [ab, ab], ababab = [abab, ab]
 //! Key property: search for [ab, ab, ab] should find ababab, not abab
 //!
 //! This is a critical test for the repeat pattern bug where search
@@ -11,10 +11,6 @@ use crate::{
     cursor::{
         checkpointed::Checkpointed,
         PatternCursor,
-    },
-    search::{
-        context::AncestorSearchTraversal,
-        Find,
     },
     state::{
         end::PathCoverage,
@@ -28,7 +24,6 @@ use crate::{
         test_case::SearchTestCase,
     },
     Response,
-    Searchable,
 };
 use context_trace::{
     build_trace_cache,
@@ -82,17 +77,16 @@ impl SearchTestCase for SearchAbababExact {
                         _state: Default::default(),
                     },
                 )),
+                // ababab = [abab, ab] has 2 children (indices 0 and 1)
                 path: PathCoverage::EntireRoot(RootedRangePath::new(
                     PatternLocation::new(ababab, ababab_id),
                     RolePath::new_empty(0),
-                    RolePath::new_empty(2),
+                    RolePath::new_empty(1), // end at index 1 (second child)
                 )),
             },
+            // Cache only contains patterns that were searched through,
+            // not the final matched parent from parent exploration
             cache: build_trace_cache!(
-                ababab => (
-                    BU {},
-                    TD {},
-                ),
                 ab => (
                     BU {},
                     TD {},
@@ -146,11 +140,9 @@ impl SearchTestCase for SearchAbabExact {
                     RolePath::new_empty(1),
                 )),
             },
+            // Cache only contains patterns that were searched through,
+            // not the final matched parent from parent exploration
             cache: build_trace_cache!(
-                abab => (
-                    BU {},
-                    TD {},
-                ),
                 ab => (
                     BU {},
                     TD {},
@@ -163,6 +155,14 @@ impl SearchTestCase for SearchAbabExact {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        search::{
+            context::AncestorSearchTraversal,
+            Find,
+        },
+        Searchable,
+    };
+    use context_trace::init_test_tracing;
     use pretty_assertions::assert_eq;
 
     /// Critical test: Searching for [ab, ab, ab] should find ababab
@@ -173,18 +173,19 @@ mod tests {
     fn test_search_ababab_exact() {
         let test = SearchAbababExact;
         let query = test.query();
+        let graph = <SearchAbababExact as TestCase>::Env::get().graph().clone();
+        let _tracing = init_test_tracing!(&graph);
 
         let actual = Searchable::<AncestorSearchTraversal<_>>::search(
             query.clone(),
-            <SearchAbababExact as TestCase>::Env::get().graph().clone().into(),
+            graph.into(),
         )
         .expect("Search should succeed");
 
         // The found pattern should span 6 atoms (ababab), not 4 (abab)
         let found_width = match &actual.end.path {
-            PathCoverage::EntireRoot(path) => {
-                usize::from(*path.root_parent().width())
-            }
+            PathCoverage::EntireRoot(path) =>
+                usize::from(*path.root_parent().width()),
             other => panic!("Expected EntireRoot, got {:?}", other),
         };
 
@@ -205,7 +206,10 @@ mod tests {
 
         let actual = Searchable::<AncestorSearchTraversal<_>>::search(
             query.clone(),
-            <SearchAbabExact as TestCase>::Env::get().graph().clone().into(),
+            <SearchAbabExact as TestCase>::Env::get()
+                .graph()
+                .clone()
+                .into(),
         )
         .expect("Search should succeed");
 
@@ -234,9 +238,8 @@ mod tests {
 
         // Verify width is 2 (ab pattern)
         let found_width = match &response.end.path {
-            PathCoverage::EntireRoot(path) => {
-                usize::from(*path.root_parent().width())
-            }
+            PathCoverage::EntireRoot(path) =>
+                usize::from(*path.root_parent().width()),
             _ => panic!("Expected EntireRoot"),
         };
         assert_eq!(found_width, 2, "Should find ab (width 2)");

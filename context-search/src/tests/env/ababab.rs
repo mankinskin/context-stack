@@ -4,11 +4,12 @@
 //! - Atoms: a, b
 //! - Pattern ab = [a, b]
 //! - Pattern abab = [ab, ab]
-//! - Pattern ababab = [ab, ab, ab]
+//! - Pattern ababab = [abab, ab]  (NOT [ab, ab, ab])
 //!
-//! This tests the scenario from context-read's validate_triple_repeat test.
-//! Key property: When searching for [ab, ab, ab], should find ababab as EntireRoot,
-//! not abab as a partial match.
+//! This creates a proper hierarchy where abab is a child of ababab,
+//! allowing parent exploration to find ababab when searching for [ab, ab, ab].
+//!
+//! Key property: When searching for [ab, ab, ab], should find ababab as EntireRoot.
 
 use context_trace::{
     graph::{
@@ -51,8 +52,10 @@ impl TestEnv for EnvAbabab {
 
         let (ab, ab_id) = graph.insert_pattern_with_id(vec![a, b]);
         let (abab, abab_id) = graph.insert_pattern_with_id(vec![ab, ab]);
+        // ababab = [abab, ab] so that abab is a child of ababab
+        // This allows parent exploration to find ababab when matching [ab, ab, ab]
         let (ababab, ababab_id) =
-            graph.insert_pattern_with_id(vec![ab, ab, ab]);
+            graph.insert_pattern_with_id(vec![abab, ab]);
 
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);

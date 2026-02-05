@@ -37,5 +37,5 @@ pub use crate::{
         },
         Find,
     },
-    state::result::Response,
+    state::response::Response,
 };

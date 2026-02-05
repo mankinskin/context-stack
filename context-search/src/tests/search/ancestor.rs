@@ -15,7 +15,7 @@ use {
                 CheckpointedCursor,
                 MatchResult,
             },
-            result::Response,
+            response::Response,
         },
     },
     context_trace::*,

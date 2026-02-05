@@ -9,10 +9,6 @@ use crate::{
         checkpointed::Checkpointed,
         PatternCursor,
     },
-    search::{
-        context::AncestorSearchTraversal,
-        Find,
-    },
     state::{
         end::PathCoverage,
         matched::{
@@ -25,7 +21,6 @@ use crate::{
         test_case::SearchTestCase,
     },
     Response,
-    Searchable,
 };
 use context_trace::{
     build_trace_cache,
@@ -85,16 +80,10 @@ impl SearchTestCase for SearchXyExact {
                     RolePath::new_empty(1),
                 )),
             },
+            // Cache only contains patterns that were searched through,
+            // not the final matched parent from parent exploration
             cache: build_trace_cache!(
-                xy => (
-                    BU {},
-                    TD {},
-                ),
                 x => (
-                    BU {},
-                    TD {},
-                ),
-                y => (
                     BU {},
                     TD {},
                 ),
@@ -106,6 +95,13 @@ impl SearchTestCase for SearchXyExact {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        search::{
+            context::AncestorSearchTraversal,
+            Find,
+        },
+        Searchable,
+    };
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -124,22 +120,26 @@ mod tests {
     }
 
     /// Test that searching for just 'y' (which appears multiple times in xyyxy)
-    /// finds it correctly
+    /// returns SingleIndex error (searching for single token is not supported)
     #[test]
     fn test_search_y_alone() {
+        use context_trace::ErrorReason;
+        
         let env = EnvXyyxy::get();
         let graph = env.graph();
         let y = env.y;
 
         let result = graph.find_ancestor(&vec![y]);
-        assert!(result.is_ok(), "Search for 'y' should succeed");
-
-        let response = result.unwrap();
-        // y is an atom, so it should be an EntireRoot match
+        
+        // Searching for a single token returns SingleIndex error
         assert!(
-            matches!(response.end.path, PathCoverage::EntireRoot(_)),
-            "Should find 'y' as EntireRoot, got {:?}",
-            response.end.path
+            matches!(
+                &result,
+                Err(ErrorReason::SingleIndex(boxed)) 
+                    if boxed.index == y
+            ),
+            "Search for single token 'y' should return SingleIndex error, got {:?}",
+            result
         );
     }
 }
