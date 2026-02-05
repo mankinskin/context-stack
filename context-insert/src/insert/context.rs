@@ -15,7 +15,10 @@ use context_search::{
     SearchKind,
     Searchable,
 };
-use context_trace::*;
+use context_trace::{
+    PatternRoot,
+    *,
+};
 
 use crate::insert::result::InsertResult;
 
@@ -76,17 +79,49 @@ impl<R: InsertResult> InsertCtx<R> {
     ) -> Result<Result<R, R::Error>, ErrorState> {
         match searchable.search(self.graph.clone()) {
             Ok(result) => {
-                // Check if the query was exhausted and result is full token
-                if result.query_exhausted() && result.is_full_token() {
-                    // Extract the query pattern from the cursor and the root token from the complete path
+                // Check if result is a full token AND the query was exhausted
+                // EntireRoot + query_exhausted means the query exactly matches an existing token.
+                // In this case, no insertion needed - just return the token.
+                //
+                // If is_full_token() but NOT query_exhausted(), it means we found a token
+                // at the start of the query but there's more query remaining.
+                if result.is_full_token() && result.query_exhausted() {
+                    // Query fully matched an existing token - just return it
                     let query_path = result.query_cursor().path().clone();
                     let root_token = result.root_token();
                     Ok(R::try_init(IndexWithPath {
                         index: root_token,
                         path: query_path,
                     }))
+                } else if result.is_full_token() && !result.query_exhausted() {
+                    // EntireRoot + query not exhausted:
+                    // Found a complete token at the start of the query, but there's more query.
+                    // The cache won't have useful traversal data for splitting,
+                    // so directly insert the query as a new pattern.
+                    let query_path = result.query_cursor().path().clone();
+                    let query_pattern: Vec<Token> = query_path
+                        .pattern_root_pattern()
+                        .iter()
+                        .cloned()
+                        .collect();
+                    let new_token =
+                        self.graph.insert_pattern(query_pattern.clone());
+
+                    // Create a new path that indicates the entire query has been consumed
+                    // (both start and end at the last index of the pattern)
+                    let pattern_len = query_pattern.len();
+                    let exhausted_path = RootedRangePath::new(
+                        Pattern::from(query_pattern),
+                        RolePath::new_empty(pattern_len - 1),
+                        RolePath::new_empty(pattern_len - 1),
+                    );
+
+                    Ok(R::try_init(IndexWithPath {
+                        index: new_token,
+                        path: exhausted_path,
+                    }))
                 } else {
-                    // Query not exhausted - need to insert
+                    // Partial match (Range/Prefix/Postfix) - need to insert to resolve
                     self.insert_init(
                         <R::Extract as ResultExtraction>::extract_from(&result),
                         InitInterval::from(result),

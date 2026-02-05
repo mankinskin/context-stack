@@ -138,11 +138,13 @@ where
             );
             checkpoint
         } else {
-            // No matches found - create empty mismatch at position 0
-            debug!("No matches found, creating empty mismatch");
+            // No matches found - create EntireRoot at the token width position
+            // (cursor position should equal the entire matched token's width)
+            debug!("No matches found, creating EntireRoot at token width");
             let start_token = self.query.path_root()[0];
+            let token_width = *start_token.width();
             let raw_cursor = PatternCursor {
-                atom_position: AtomPosition::default(),
+                atom_position: AtomPosition::from(token_width),
                 path: self.query.clone(),
                 _state: PhantomData,
             };
@@ -155,10 +157,7 @@ where
                     PatternId::default(),
                 )),
             ));
-            MatchResult {
-                path,
-                cursor: CheckpointedCursor::AtCheckpoint(cursor),
-            }
+            MatchResult::new(path, CheckpointedCursor::AtCheckpoint(cursor))
         };
 
         trace!(end = %pretty(&end), "final matched state");
@@ -330,10 +329,7 @@ where
             CheckpointedCursor::HasCandidate(cursor_state)
         };
 
-        MatchResult {
-            cursor,
-            path: path_enum,
-        }
+        MatchResult::new(path_enum, cursor)
     }
 }
 impl<K: SearchKind> Iterator for SearchState<K>

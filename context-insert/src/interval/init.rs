@@ -18,7 +18,9 @@ pub struct InitInterval {
 impl From<Response> for InitInterval {
     fn from(state: Response) -> Self {
         let root = state.root_token();
-        let end_bound = state.checkpoint_position();
+        // Use cursor_position() - for EntireRoot matches, this equals the token width
+        // (guaranteed by MatchResult::new validation)
+        let end_bound = state.cursor_position();
         Self {
             cache: state.cache,
             root,
@@ -28,12 +30,10 @@ impl From<Response> for InitInterval {
 }
 
 /// Create IntervalGraph from a graph reference and InitInterval.
-/// 
+///
 /// With interior mutability, we only need `&G` since graph mutations
 /// happen through per-vertex locks inside the graph.
-impl<'a, G: HasGraph + 'a> From<(&'a G, InitInterval)>
-    for IntervalGraph
-{
+impl<'a, G: HasGraph + 'a> From<(&'a G, InitInterval)> for IntervalGraph {
     fn from((trav, init): (&'a G, InitInterval)) -> Self {
         let InitInterval {
             root,

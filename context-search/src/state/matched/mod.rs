@@ -72,6 +72,34 @@ impl GraphRoot for MatchResult {
     }
 }
 impl MatchResult {
+    /// Create a new MatchResult, validating invariants
+    ///
+    /// For EntireRoot paths, validates that cursor_position equals root token width.
+    pub fn new(
+        path: PathCoverage,
+        cursor: CheckpointedCursor,
+    ) -> Self {
+        let result = Self { path, cursor };
+        result.validate_entire_root_invariant();
+        result
+    }
+
+    /// Validate that EntireRoot cursor position equals root token width
+    #[inline]
+    fn validate_entire_root_invariant(&self) {
+        if let PathCoverage::EntireRoot(_) = &self.path {
+            let cursor_pos = *self.cursor.cursor().atom_position.as_ref();
+            let root_width: usize = (*self.path.root_parent().width()).into();
+            debug_assert_eq!(
+                cursor_pos,
+                root_width,
+                "EntireRoot cursor position ({}) must equal root token width ({})",
+                cursor_pos,
+                root_width
+            );
+        }
+    }
+
     /// Get the path
     pub fn path(&self) -> &PathCoverage {
         &self.path

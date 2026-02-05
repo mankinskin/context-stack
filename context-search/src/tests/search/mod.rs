@@ -188,3 +188,92 @@ fn find_pattern1() {
         }
     );
 }
+
+/// Test that EntireRoot matches have cursor_position equal to root token width.
+///
+/// When a search finds an EntireRoot match (complete token), the cursor position
+/// should be set to the width of the root token, not 0. This is important for
+/// consecutive insertion operations that use the cursor position.
+#[test]
+fn test_entire_root_cursor_position_equals_token_width() {
+    use crate::{
+        search::context::AncestorSearchTraversal,
+        Searchable,
+    };
+
+    let graph = HypergraphRef::default();
+    // Create a pattern that will result in an EntireRoot match
+    // ab exists as a complete token
+    insert_atoms!(graph, {a, b, c});
+    insert_patterns!(graph,
+        (ab, ab_id) => [a, b],
+        (abc, abc_id) => [ab, c]
+    );
+
+    // Search for "ab" - should find EntireRoot since "ab" is a complete token at the root
+    let response = Searchable::<AncestorSearchTraversal<_>>::search(vec![a, b], graph.into());
+
+    let response = response.expect("search should succeed");
+
+    // Verify cursor_position equals root token width for EntireRoot matches
+    if let PathCoverage::EntireRoot(_) = &response.end.path {
+        let cursor_pos = response.cursor_position();
+        let root_width = *response.end.root_parent().width();
+
+        assert_eq!(
+            *cursor_pos.as_ref(),
+            usize::from(root_width),
+            "EntireRoot cursor_position ({}) should equal root token width ({})",
+            *cursor_pos.as_ref(),
+            usize::from(root_width)
+        );
+    }
+}
+
+/// Test that searching for a non-existent pattern creates an EntireRoot with correct cursor position.
+///
+/// When no matches are found, the search creates an EntireRoot response for the query's first token.
+/// The cursor position should be set to that token's width.
+#[test]
+fn test_no_match_entire_root_cursor_position() {
+    use crate::{
+        search::context::AncestorSearchTraversal,
+        Searchable,
+    };
+
+    let graph = HypergraphRef::default();
+    // Create graph with some patterns
+    insert_atoms!(graph, {a, b, c, z});
+    insert_patterns!(graph,
+        (ab, _ab_id) => [a, b],
+        (bc, _bc_id) => [b, c]
+    );
+
+    // Search for a pattern "zz" that doesn't exist in the graph
+    let response = Searchable::<AncestorSearchTraversal<_>>::search(vec![z, z], graph.into());
+
+    let response = response.expect("search should succeed even with no match");
+
+    // This should be an EntireRoot (no match found)
+    match &response.end.path {
+        PathCoverage::EntireRoot(_) => {
+            let cursor_pos = response.cursor_position();
+            let root_width = *response.end.root_parent().width();
+
+            assert_eq!(
+                *cursor_pos.as_ref(),
+                usize::from(root_width),
+                "No-match EntireRoot cursor_position ({}) should equal root token width ({})",
+                *cursor_pos.as_ref(),
+                usize::from(root_width)
+            );
+        }
+        other => {
+            panic!(
+                "Expected EntireRoot for non-existent pattern, got {:?}",
+                other
+            );
+        }
+    }
+}
+

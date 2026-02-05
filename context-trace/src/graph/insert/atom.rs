@@ -47,10 +47,7 @@ impl<G: GraphKind> Hypergraph<G> {
         atom: Atom<G::Atom>,
     ) -> Token {
         let index = self.alloc_vertex_index();
-        let data = VertexData::new(Token::new(
-            index,
-            TokenWidth(1),
-        ));
+        let data = VertexData::new(Token::new(index, TokenWidth(1)));
         self.insert_atom_data(atom, data)
     }
 
