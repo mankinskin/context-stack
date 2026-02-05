@@ -153,6 +153,9 @@ impl<K: SearchKind> Searchable<K> for &'_ [Token] {
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
+        if self.is_empty() {
+            return Err(ErrorReason::EmptyPatterns.into());
+        }
         PatternRangePath::from(self).start_search(trav)
     }
 }
@@ -162,6 +165,9 @@ impl<K: SearchKind> Searchable<K> for Pattern {
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
+        if self.is_empty() {
+            return Err(ErrorReason::EmptyPatterns.into());
+        }
         PatternRangePath::from(self).start_search(trav)
     }
 }
@@ -171,6 +177,9 @@ impl<K: SearchKind> Searchable<K> for Vec<Token> {
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
+        if self.is_empty() {
+            return Err(ErrorReason::EmptyPatterns.into());
+        }
         Pattern::from(self).start_search(trav)
     }
 }

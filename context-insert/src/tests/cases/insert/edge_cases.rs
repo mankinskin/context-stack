@@ -7,20 +7,21 @@
 //! 1. InitInterval with end_bound = 0 (no atoms matched)
 //! 2. Empty patterns passed to search/insert
 //!
-//! NOTE: These tests are currently marked as #[ignore] because they document
-//! bugs that need to be fixed. Once the fixes are implemented:
-//! 1. Remove the #[ignore] attribute
-//! 2. Update tests to verify proper error handling instead of panics
+//! These tests verify proper error handling for invalid inputs.
 
 use crate::{
     insert::ToInsertCtx,
     interval::init::InitInterval,
 };
-use context_search::*;
+use context_search::{
+    ErrorState,
+    *,
+};
 use context_trace::{
     graph::{
         Hypergraph,
         HypergraphRef,
+        getters::ErrorReason,
         vertex::atom::Atom,
     },
     *,
@@ -33,10 +34,8 @@ use context_trace::{
 /// - But no atoms were confirmed as matching (checkpoint_position = 0)
 /// - context-read then tries to insert with end_bound = 0
 ///
-/// Expected behavior after fix: Return an error instead of panicking
-/// Current behavior: Panics at splits.rs:63 with "called `Option::unwrap()` on a `None` value"
+/// Expected behavior: Return InvalidEndBound error instead of panicking
 #[test]
-#[ignore = "Bug: InitInterval with end_bound=0 causes panic - needs fix to return error"]
 fn reject_init_interval_with_zero_end_bound() {
     let graph = Hypergraph::default();
     let [a, b, c, d] = graph.insert_atoms([
@@ -62,12 +61,14 @@ fn reject_init_interval_with_zero_end_bound() {
         end_bound: 0.into(),          // Zero end bound - invalid!
     };
 
-    // TODO: Once fixed, this should return an error, not panic
-    // For now, this test documents the panic behavior
-    let _token: Token = graph.insert_init((), invalid_init);
+    // Should return an error, not panic
+    let result: Result<Token, ErrorState> = graph.insert_init((), invalid_init);
 
-    // After fix: uncomment and verify error handling
-    // assert!(result.is_err(), "Expected error for InitInterval with end_bound=0");
+    assert!(
+        result.is_err(),
+        "Expected error for InitInterval with end_bound=0"
+    );
+    assert_eq!(result.unwrap_err().reason, ErrorReason::InvalidEndBound);
 }
 
 /// Test that empty patterns are rejected during search
@@ -76,10 +77,8 @@ fn reject_init_interval_with_zero_end_bound() {
 /// - context-read creates an ExpansionCtx with an empty pattern after processing
 /// - The empty pattern is passed to search
 ///
-/// Expected behavior after fix: Return an error instead of panicking
-/// Current behavior: Panics at pattern_range.rs:175 with "called `Option::unwrap()` on a `None` value"
+/// Expected behavior: Return EmptyPatterns error instead of panicking
 #[test]
-#[ignore = "Bug: Empty pattern search causes panic - needs fix to return error"]
 fn reject_empty_pattern_search() {
     let graph = Hypergraph::default();
     let [a, b] =
@@ -97,20 +96,20 @@ fn reject_empty_pattern_search() {
     // Create an empty pattern
     let empty_pattern: Pattern = Pattern::default();
 
-    // TODO: Once fixed, this should return an error, not panic
-    let _result: Result<Response, _> = graph.find_ancestor(empty_pattern);
+    // Should return an error, not panic
+    let result: Result<Response, ErrorReason> =
+        graph.find_ancestor(empty_pattern);
 
-    // After fix: uncomment and verify error handling
-    // assert!(result.is_err(), "Expected error for empty pattern search");
+    assert!(result.is_err(), "Expected error for empty pattern search");
+    assert_eq!(result.unwrap_err(), ErrorReason::EmptyPatterns);
 }
 
 /// Test that insert with empty pattern is rejected
 ///
 /// Similar to reject_empty_pattern_search but tests the insert path directly
 ///
-/// Expected behavior after fix: Return an error instead of panicking
+/// Expected behavior: Return EmptyPatterns error instead of panicking
 #[test]
-#[ignore = "Bug: Empty pattern insert causes panic - needs fix to return error"]
 fn reject_empty_pattern_insert() {
     let graph = Hypergraph::default();
     let [a, b] =
@@ -128,11 +127,11 @@ fn reject_empty_pattern_insert() {
     // Create an empty pattern
     let empty_pattern: Pattern = Pattern::default();
 
-    // TODO: Once fixed, this should return an error, not panic
-    let _result: Result<Token, _> = graph.insert(empty_pattern);
+    // Should return an error, not panic
+    let result: Result<Token, ErrorState> = graph.insert(empty_pattern);
 
-    // After fix: uncomment and verify error handling
-    // assert!(result.is_err(), "Expected error for empty pattern insert");
+    assert!(result.is_err(), "Expected error for empty pattern insert");
+    assert_eq!(result.unwrap_err().reason, ErrorReason::EmptyPatterns);
 }
 
 /// Integration test: Simulates the context-read failure scenario
@@ -143,10 +142,8 @@ fn reject_empty_pattern_insert() {
 /// - Search returns checkpoint_position = 0
 /// - insert_or_get_complete should handle this gracefully
 ///
-/// Expected behavior after fix: Return appropriate error/result without panicking
-/// Current behavior: Panics at splits.rs:63
+/// Expected behavior: Returns appropriate error/result without panicking
 #[test]
-#[ignore = "Bug: Partial match with no checkpoint causes panic in insert_or_get_complete"]
 fn integration_partial_match_no_checkpoint() {
     let graph = Hypergraph::default();
 
@@ -172,13 +169,20 @@ fn integration_partial_match_no_checkpoint() {
     // Search for [p, h] - p will be found in hypergra, but h won't match 'e'
     let query = vec![p, h];
 
-    // TODO: Once fixed, this should handle gracefully
     // This mimics what context-read does: insert_or_get_complete
-    let _result: Result<Result<IndexWithPath, _>, _> =
+    // Should handle gracefully without panicking
+    let result: Result<Result<IndexWithPath, _>, _> =
         graph.insert_or_get_complete(query);
 
-    // After fix: verify it returns an appropriate error or result
-    // without panicking
+    // The result should either be:
+    // - Ok(Ok(_)) if insertion succeeded
+    // - Ok(Err(_)) if pattern already exists
+    // - Err(_) if validation failed
+    // It should NOT panic
+    assert!(
+        result.is_ok() || result.is_err(),
+        "insert_or_get_complete should return a result, not panic"
+    );
 }
 
 /// Test: Single token pattern with mismatch at first position

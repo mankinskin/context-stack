@@ -65,6 +65,7 @@ pub enum ErrorReason {
     UnknownAtom,
     Unnecessary,
     EmptyRange,
+    InvalidEndBound,
 }
 
 impl<G: GraphKind> Hypergraph<G> {

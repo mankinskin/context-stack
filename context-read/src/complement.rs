@@ -39,7 +39,9 @@ impl ComplementBuilder {
             cache: complement_cache,
             end_bound: intersection_start.into(),
         };
+        // Safe to expect since we checked intersection_start != 0 above
         trav.insert_init((), init_interval)
+            .expect("complement insert_init should succeed with non-zero end_bound")
     }
 
     fn build_complement_trace_cache(

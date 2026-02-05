@@ -58,13 +58,17 @@ impl<R: InsertResult> InsertCtx<R> {
         &mut self,
         ext: R::Extract,
         init: InitInterval,
-    ) -> R {
+    ) -> Result<R, ErrorState> {
+        // Validate end_bound is not zero
+        if *init.end_bound.as_ref() == 0 {
+            return Err(ErrorReason::InvalidEndBound.into());
+        }
         // With interior mutability, we just pass a reference to the graph
         let interval = IntervalGraph::from((&*self.graph, init));
         let mut ctx =
             FrontierSplitIterator::from((self.graph.clone(), interval));
         let joined = ctx.find_map(|joined| joined).unwrap();
-        R::build_with_extract(joined, ext)
+        Ok(R::build_with_extract(joined, ext))
     }
     fn insert_result(
         &mut self,
@@ -83,10 +87,10 @@ impl<R: InsertResult> InsertCtx<R> {
                     }))
                 } else {
                     // Query not exhausted - need to insert
-                    Ok(Ok(self.insert_init(
+                    self.insert_init(
                         <R::Extract as ResultExtraction>::extract_from(&result),
                         InitInterval::from(result),
-                    )))
+                    ).map(Ok)
                 }
             },
             Err(err) => Err(err),

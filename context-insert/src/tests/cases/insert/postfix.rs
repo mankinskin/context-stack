@@ -50,7 +50,7 @@ fn insert_postfix1() {
         end_bound: 3.into(),
     };
 
-    let bcd: Token = graph.insert_init((), expected_init);
+    let bcd: Token = graph.insert_init((), expected_init).expect("insert_init should succeed");
     assert_indices!(graph, cd, abcd);
     assert_patterns! {
         graph,

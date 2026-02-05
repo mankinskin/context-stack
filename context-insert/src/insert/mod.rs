@@ -25,7 +25,7 @@ pub trait ToInsertCtx<R: InsertResult = Token>: HasGraph {
         &self,
         ext: R::Extract,
         init: InitInterval,
-    ) -> R {
+    ) -> Result<R, ErrorState> {
         self.insert_context().insert_init(ext, init)
     }
     fn insert_or_get_complete(
