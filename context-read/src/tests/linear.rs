@@ -328,6 +328,7 @@ fn repetition_abcxyzabc() {
 #[test]
 fn repetition_aabbaabb() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("aabbaabb").execute(&mut graph);
 
     expect_atoms!(graph, {a, b});
@@ -350,6 +351,7 @@ fn repetition_aabbaabb() {
 #[test]
 fn repetition_abcabc() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abcabc").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, c});
@@ -370,6 +372,7 @@ fn repetition_abcabc() {
 #[test]
 fn repetition_xyzxyzxyz() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("xyzxyzxyz").execute(&mut graph);
 
     expect_atoms!(graph, {x, y, z});
