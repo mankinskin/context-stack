@@ -27,15 +27,14 @@ pub struct BandChain {
 }
 impl BandChain {
     pub fn new(index: Token) -> Self {
-        debug!("New BandChain");
+        let band = Band {
+            pattern: Pattern::from(vec![index]),
+            start_bound: 0.into(),
+            end_bound: index.width().0.into(),
+        };
+        debug!(initial_band = ?band, "New BandChain");
         Self {
-            bands: Some(Band {
-                pattern: Pattern::from(vec![index]),
-                start_bound: 0.into(),
-                end_bound: index.width().0.into(),
-            })
-            .into_iter()
-            .collect(),
+            bands: Some(band).into_iter().collect(),
             //links: Default::default(),
         }
     }
@@ -43,11 +42,14 @@ impl BandChain {
         &self,
         bound: AtomPosition,
     ) -> Option<BandCtx<'_>> {
-        debug!("ends_at");
-        let band = self.bands.get(&bound)?;
-        debug!("Does end at {:?}", bound);
-
-        Some(BandCtx {
+        let band = self.bands.get(&bound);
+        debug!(
+            bound = ?bound,
+            found = ?band.is_some(),
+            band = ?band,
+            "ends_at check"
+        );
+        band.map(|band| BandCtx {
             band,
             //back_link: self.links.iter().last(),
             //front_link: None,
@@ -71,9 +73,14 @@ impl BandChain {
         complement: Token,
         exp: Token,
     ) {
-        debug!("append_front_complement");
         let pattern = Pattern::from(vec![complement, exp]);
         let band = Band::from((0.into(), pattern));
+        debug!(
+            complement = ?complement,
+            expansion = ?exp,
+            result_band = ?band,
+            "append_front_complement"
+        );
         self.append(band);
     }
     pub fn pop_first(&mut self) -> Option<Band> {

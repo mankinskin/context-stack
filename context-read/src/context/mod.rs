@@ -43,7 +43,7 @@ impl ReadCtx {
         seq: impl ToNewAtomIndices,
     ) -> Self {
         debug!("New ReadCtx");
-        let new_indices = seq.to_new_Atom_indices(&graph);
+        let new_indices = seq.to_new_atom_indices(&graph);
         Self {
             blocks: BlockIter::new(new_indices),
             root: RootManager::new(graph),
@@ -78,6 +78,13 @@ impl ReadCtx {
         block: NextBlock,
     ) {
         let NextBlock { unknown, known } = block;
+        debug!(
+            unknown_len = ?unknown.len(),
+            known_len = ?known.len(),
+            unknown = ?unknown,
+            known = ?known,
+            "read_block"
+        );
         self.append_pattern(unknown);
         if !known.is_empty() {
             self.read_known(known);

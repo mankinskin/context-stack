@@ -114,7 +114,7 @@ impl ReadRequestBuilder {
 struct PatternInput(Pattern);
 
 impl ToNewAtomIndices for PatternInput {
-    fn to_new_Atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
+    fn to_new_atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
         self,
         graph: &G,
     ) -> graph::vertex::atom::NewAtomIndices {

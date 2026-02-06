@@ -11,7 +11,6 @@ use crate::{
             band::Band,
             expand::ExpandCtx,
             link::{
-                BandCap,
                 BandExpansion,
                 ChainOp,
             },
@@ -44,16 +43,14 @@ impl Iterator for ExpansionCtx<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         ExpandCtx::try_new(self)
             .and_then(|mut ctx| {
+                // Find the next expansion or cap that can be applied at the current cursor position.
                 ctx.find_map(|op| match &op {
                     ChainOp::Expansion(_) => Some(op),
                     ChainOp::Cap(cap) =>
                         self.chain.ends_at(cap.start_bound).map(|_| op),
                 })
             })
-            .and_then(|op| match op {
-                ChainOp::Expansion(exp) => Some(self.apply_expansion(exp)),
-                ChainOp::Cap(cap) => self.apply_cap(cap),
-            })
+            .and_then(|op| self.apply_op(op))
     }
 }
 impl<'a> ExpansionCtx<'a> {
@@ -61,7 +58,7 @@ impl<'a> ExpansionCtx<'a> {
         trav: ReadCtx,
         cursor: &'a mut PatternRangePath,
     ) -> Self {
-        debug!("New ExpansionCtx");
+        debug!(cursor_root = ?cursor.path_root(), "New ExpansionCtx");
         let IndexWithPath { index: first, path } =
             match trav.insert_or_get_complete(cursor.clone()) {
                 Ok(Ok(root)) => root,
@@ -76,20 +73,13 @@ impl<'a> ExpansionCtx<'a> {
                     }
                 },
             };
+        debug!(first_index = ?first, path_root = ?path.path_root(), "ExpansionCtx initialized");
         *cursor = path;
 
         Self {
             chain: BandChain::new(first),
             cursor: CursorCtx::new(trav, cursor),
         }
-    }
-    pub fn last(&self) -> &Band {
-        self.chain.last().unwrap().band
-    }
-    pub fn find_largest_bundle(self) -> <Self as Iterator>::Item {
-        debug!("find_largest_bundle");
-        let first = self.chain.first().unwrap().postfix();
-        self.last().unwrap_or(first)
     }
     pub fn cursor_root_index(&self) -> &Token {
         self.chain
@@ -100,38 +90,61 @@ impl<'a> ExpansionCtx<'a> {
             .last()
             .expect("empty pattern")
     }
-    pub fn apply_expansion(
-        &mut self,
-        exp: BandExpansion,
-    ) -> <Self as Iterator>::Item {
-        debug!("apply_expansion");
-        *self.cursor.cursor = exp.expansion.path.clone();
-
-        // handle case where expansion can be inserted after stack head (first band in current stack)
-        let link = self.create_expansion_link(&exp);
-        let complement =
-            ComplementBuilder::new(link).build(&mut self.cursor.ctx);
-        // TODO: Change this to a stack (list of overlaps with back contexts)
-        self.chain
-            .append_front_complement(complement, exp.expansion.index);
-
-        exp.expansion.index
+    pub fn last(&self) -> &Band {
+        self.chain.last().unwrap().band
     }
-    pub fn apply_cap(
+    pub fn find_largest_bundle(self) -> <Self as Iterator>::Item {
+        debug!(chain_len = ?self.chain.len(), "find_largest_bundle");
+        let first = self.chain.first().unwrap().postfix();
+        self.last().unwrap_or(first)
+    }
+    pub fn apply_op(
         &mut self,
-        cap: BandCap,
+        op: ChainOp,
     ) -> Option<<Self as Iterator>::Item> {
-        debug!("apply_cap");
-        let mut first = self.chain.bands.pop_first().unwrap();
-        first.append(cap.expansion);
-        self.chain.append(first);
-        None
+        match op {
+            ChainOp::Expansion(exp) => {
+                debug!(
+                    expansion_index = ?exp.expansion.index,
+                    start_bound = ?exp.start_bound,
+                    postfix_path = ?exp.postfix_path,
+                    "apply_expansion"
+                );
+                *self.cursor.cursor = exp.expansion.path.clone();
+
+                // handle case where expansion can be inserted after stack head (first band in current stack)
+                let link = self.create_expansion_link(&exp);
+                let complement =
+                    ComplementBuilder::new(link).build(&mut self.cursor.ctx);
+                // TODO: Change this to a stack (list of overlaps with back contexts)
+                self.chain
+                    .append_front_complement(complement, exp.expansion.index);
+
+                Some(exp.expansion.index)
+            },
+            ChainOp::Cap(cap) => {
+                debug!(
+                    cap_expansion = ?cap.expansion,
+                    start_bound = ?cap.start_bound,
+                    postfix_path = ?cap.postfix_path,
+                    "apply_cap"
+                );
+                let mut first = self.chain.bands.pop_first().unwrap();
+                first.append(cap.expansion);
+                self.chain.append(first);
+                None
+            },
+        }
     }
     fn create_expansion_link(
         &self,
         exp: &BandExpansion,
     ) -> ExpansionLink {
-        debug!("create_expansion_link");
+        debug!(
+            expansion_index = ?exp.expansion.index,
+            start_bound = ?exp.start_bound,
+            "create_expansion_link"
+        );
         let BandExpansion {
             postfix_path,
             expansion:

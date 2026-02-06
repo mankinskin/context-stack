@@ -1,8 +1,8 @@
 pub mod block_iter;
 
 use context_trace::{
-    *,
     graph::vertex::atom::NewAtomIndices,
+    *,
 };
 
 use std::{
@@ -11,15 +11,15 @@ use std::{
 };
 
 pub trait ToNewAtomIndices: Debug {
-    #[allow(non_snake_case)]  // Follows NewAtom naming convention
-    fn to_new_Atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
+    #[allow(non_snake_case)] // Follows NewAtom naming convention
+    fn to_new_atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
         self,
         graph: &G,
     ) -> NewAtomIndices;
 }
 
 impl ToNewAtomIndices for NewAtomIndices {
-    fn to_new_Atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
+    fn to_new_atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
         self,
         _graph: &G,
     ) -> NewAtomIndices {
@@ -27,7 +27,7 @@ impl ToNewAtomIndices for NewAtomIndices {
     }
 }
 impl ToNewAtomIndices for Chars<'_> {
-    fn to_new_Atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
+    fn to_new_atom_indices<G: HasGraph<Kind = BaseGraphKind>>(
         self,
         graph: &G,
     ) -> NewAtomIndices {

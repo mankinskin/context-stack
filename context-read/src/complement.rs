@@ -16,6 +16,7 @@ impl ComplementBuilder {
         self,
         trav: &mut ReadCtx,
     ) -> Token {
+        use tracing::debug;
         // Get the root index from the postfix path
         use context_trace::GraphRootChild;
         let root = self.link.root_postfix.graph_root_child(trav);
@@ -24,8 +25,15 @@ impl ComplementBuilder {
         use context_trace::HasRootChildIndex;
         let intersection_start = self.link.root_postfix.root_child_index();
 
+        debug!(
+            root = ?root,
+            intersection_start = ?intersection_start,
+            "ComplementBuilder::build"
+        );
+
         if intersection_start == 0 {
             // If intersection is at the beginning, no complement exists
+            debug!("No complement needed (intersection at start)");
             return root;
         }
 
@@ -40,8 +48,10 @@ impl ComplementBuilder {
             end_bound: intersection_start.into(),
         };
         // Safe to expect since we checked intersection_start != 0 above
-        trav.insert_init((), init_interval)
-            .expect("complement insert_init should succeed with non-zero end_bound")
+        let complement = trav.insert_init((), init_interval)
+            .expect("complement insert_init should succeed with non-zero end_bound");
+        debug!(complement = ?complement, "Complement built");
+        complement
     }
 
     fn build_complement_trace_cache(
