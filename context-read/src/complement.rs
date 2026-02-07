@@ -4,8 +4,6 @@ use derive_new::new;
 
 use crate::expansion::link::ExpansionLink;
 
-use crate::context::ReadCtx;
-
 #[derive(Debug, new)]
 pub struct ComplementBuilder {
     link: ExpansionLink,
@@ -14,12 +12,12 @@ pub struct ComplementBuilder {
 impl ComplementBuilder {
     pub fn build(
         self,
-        trav: &mut ReadCtx,
+        graph: &HypergraphRef,
     ) -> Token {
         use tracing::debug;
         // Get the root index from the postfix path
         use context_trace::GraphRootChild;
-        let root = self.link.root_postfix.graph_root_child(trav);
+        let root = self.link.root_postfix.graph_root_child(graph);
 
         // Calculate the complement end bound from the postfix path
         use context_trace::HasRootChildIndex;
@@ -39,7 +37,7 @@ impl ComplementBuilder {
 
         // Build the trace cache for the complement path
         let complement_cache =
-            self.build_complement_trace_cache(trav, root, intersection_start);
+            self.build_complement_trace_cache(root, intersection_start);
 
         // Create InitInterval for the complement range
         let init_interval = InitInterval {
@@ -48,15 +46,15 @@ impl ComplementBuilder {
             end_bound: intersection_start.into(),
         };
         // Safe to expect since we checked intersection_start != 0 above
-        let complement = trav.insert_init((), init_interval)
-            .expect("complement insert_init should succeed with non-zero end_bound");
+        let complement = graph.insert_init((), init_interval).expect(
+            "complement insert_init should succeed with non-zero end_bound",
+        );
         debug!(complement = ?complement, "Complement built");
         complement
     }
 
     fn build_complement_trace_cache(
         &self,
-        _trav: &ReadCtx,
         root: Token,
         _end_bound: usize,
     ) -> TraceCache {

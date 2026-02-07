@@ -3,10 +3,6 @@ pub mod root;
 
 use context_insert::*;
 use context_trace::*;
-use derive_more::{
-    Deref,
-    DerefMut,
-};
 use tracing::debug;
 
 use crate::{
@@ -20,23 +16,28 @@ use crate::{
         ToNewAtomIndices,
     },
 };
-#[derive(Debug, Clone, Deref, DerefMut)]
+
+/// Context for reading sequences and building the hypergraph.
+#[derive(Debug)]
 pub struct ReadCtx {
-    #[deref]
-    #[deref_mut]
-    pub root: RootManager,
+    /// The root manager (Option to allow taking it for BlockExpansionCtx)
+    root: Option<RootManager>,
+    /// Iterator over segments of unknown/known atoms
     pub segments: SegmentIter,
 }
+
 pub enum ReadState {
     Continue(Token, PatternEndPath),
     Stop(PatternEndPath),
 }
+
 impl Iterator for ReadCtx {
     type Item = ();
     fn next(&mut self) -> Option<Self::Item> {
         self.segments.next().map(|block| self.read_segment(block))
     }
 }
+
 impl ReadCtx {
     pub fn new(
         graph: HypergraphRef,
@@ -46,13 +47,25 @@ impl ReadCtx {
         let new_indices = seq.to_new_atom_indices(&graph);
         Self {
             segments: SegmentIter::new(new_indices),
-            root: RootManager::new(graph),
+            root: Some(RootManager::new(graph)),
         }
     }
+
+    /// Get the graph reference.
+    pub fn graph(&self) -> &HypergraphRef {
+        &self.root.as_ref().expect("RootManager taken").graph
+    }
+
+    /// Get the current root token.
+    pub fn root_token(&self) -> Option<Token> {
+        self.root.as_ref().and_then(|r| r.root)
+    }
+
     pub fn read_sequence(&mut self) -> Option<Token> {
         self.find_map(|_| None as Option<()>);
-        self.root.root
+        self.root.as_ref().and_then(|r| r.root)
     }
+
     fn read_segment(
         &mut self,
         segment: NextSegment,
@@ -65,22 +78,35 @@ impl ReadCtx {
             known = ?known,
             "read_segment"
         );
-        self.append_pattern(unknown);
+
+        // Take RootManager to pass to BlockExpansionCtx
+        let mut root = self.root.take().expect("RootManager was taken");
+        
+        // Append unknown pattern first
+        root.append_pattern(unknown);
+
         if !known.is_empty() {
-            let block = BlockExpansionCtx::new(self.clone(), known).process();
-            self.append_block(block);
+            // Process known pattern through BlockExpansionCtx
+            let mut block_ctx = BlockExpansionCtx::new(root, known);
+            let block = block_ctx.process();
+            root = block_ctx.finish();
+            root.append_block(block);
         }
+
+        // Put RootManager back
+        self.root = Some(root);
     }
 }
 
-// ReadCtx derefs to RootManager which derefs to HypergraphRef
+// ReadCtx provides graph access through the root manager
 impl_has_graph! {
     impl for ReadCtx,
-    self => &***self;  // ReadCtx -> RootManager -> HypergraphRef -> Hypergraph
+    self => self.root.as_ref().expect("RootManager taken").graph.as_ref();
     <'a> &'a Hypergraph
 }
+
 impl<R: InsertResult> ToInsertCtx<R> for ReadCtx {
     fn insert_context(&self) -> InsertCtx<R> {
-        InsertCtx::from(self.graph.clone())
+        InsertCtx::from(self.root.as_ref().expect("RootManager taken").graph.clone())
     }
 }

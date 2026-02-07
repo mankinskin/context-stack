@@ -6,7 +6,6 @@ pub mod stack;
 
 use crate::{
     complement::ComplementBuilder,
-    context::ReadCtx,
     expansion::{
         chain::{
             band::Band,
@@ -36,7 +35,7 @@ pub struct ExpansionCtx<'a> {
     #[deref]
     #[deref_mut]
     cursor: CursorCtx<'a>,
-    chain: BandChain,
+    pub(crate) chain: BandChain,
 }
 impl Iterator for ExpansionCtx<'_> {
     type Item = Token;
@@ -56,12 +55,12 @@ impl Iterator for ExpansionCtx<'_> {
 }
 impl<'a> ExpansionCtx<'a> {
     pub fn new(
-        trav: ReadCtx,
+        graph: HypergraphRef,
         cursor: &'a mut PatternRangePath,
     ) -> Self {
         debug!(cursor_root = ?cursor.path_root(), "New ExpansionCtx");
         let IndexWithPath { index: first, path } =
-            match trav.insert_or_get_complete(cursor.clone()) {
+            match graph.insert_or_get_complete(cursor.clone()) {
                 Ok(Ok(root)) => root,
                 Ok(Err(root)) => root,
                 Err(ErrorReason::SingleIndex(c)) => *c,
@@ -79,7 +78,7 @@ impl<'a> ExpansionCtx<'a> {
 
         Self {
             chain: BandChain::new(first),
-            cursor: CursorCtx::new(trav, cursor),
+            cursor: CursorCtx::new(graph, cursor),
         }
     }
     pub fn last(&self) -> &Band {
@@ -102,7 +101,7 @@ impl<'a> ExpansionCtx<'a> {
                 // handle case where expansion can be inserted after stack head (first band in current stack)
                 let link = self.create_expansion_link(&exp);
                 let complement =
-                    ComplementBuilder::new(link).build(&mut self.cursor.ctx);
+                    ComplementBuilder::new(link).build(&self.cursor.graph);
                 // TODO: Change this to a stack (list of overlaps with back contexts)
                 self.chain
                     .append_front_complement(complement, exp.expansion.index);
@@ -141,10 +140,11 @@ impl<'a> ExpansionCtx<'a> {
             start_bound,
         } = exp;
         let start_bound = (*start_bound).into();
-        let overlap = postfix_path.role_leaf_token::<End, _>(&self.cursor.ctx);
+        let overlap =
+            postfix_path.role_leaf_token::<End, _>(&self.cursor.graph);
         use crate::bands::HasTokenRoleIters;
         let prefix_path = expansion
-            .prefix_path(&self.cursor.ctx, overlap.expect("overlap token"));
+            .prefix_path(&self.cursor.graph, overlap.expect("overlap token"));
 
         ExpansionLink {
             start_bound,

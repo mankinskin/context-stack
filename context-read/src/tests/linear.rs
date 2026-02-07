@@ -219,8 +219,8 @@ fn linear_read_cursor_advancement() {
     assert_eq!(root.width(), TokenWidth(4));
 
     // Verify the root is correctly stored in the context
-    assert!(ctx.root.root.is_some());
-    assert_eq!(ctx.root.root.unwrap(), root);
+    assert!(ctx.root_token().is_some());
+    assert_eq!(ctx.root_token().unwrap(), root);
 }
 
 /// Test reading a sequence that uses each letter exactly once (pangram-like but shorter).
@@ -391,7 +391,7 @@ fn repetition_ab_separated() {
 #[test]
 fn repetition_hello_separated() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
-    let result = ReadRequest::from_text("helloXXXhello").execute(&mut graph);
+    let result = ReadRequest::from_text("helloXXhello").execute(&mut graph);
 
     expect_atoms!(graph, {h, e, l, o, X});
 

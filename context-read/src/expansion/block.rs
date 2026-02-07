@@ -5,7 +5,7 @@
 //! to detect overlaps, with the BandChain tracking overlaps as an ordered map.
 
 use crate::{
-    context::ReadCtx,
+    context::root::RootManager,
     expansion::ExpansionCtx,
 };
 use context_trace::*;
@@ -13,27 +13,29 @@ use tracing::debug;
 
 /// Context for block-based expansion of patterns.
 ///
-/// Wraps ExpansionCtx to process a known pattern and find the largest
-/// bundled token through overlap detection.
+/// Contains the RootManager and processes known patterns to find the largest
+/// bundled token through overlap detection. Manages block commits directly.
 #[derive(Debug)]
 pub struct BlockExpansionCtx {
-    /// The graph context
-    ctx: ReadCtx,
+    /// The root manager (owns graph and root token)
+    root: RootManager,
     /// The known pattern to process
     known: Pattern,
 }
 
 impl BlockExpansionCtx {
-    /// Create a new block expansion context for a known pattern.
+    /// Create a new block expansion context.
+    /// Takes ownership of RootManager to manage block commits.
     pub fn new(
-        ctx: ReadCtx,
+        root: RootManager,
         known: Pattern,
     ) -> Self {
         debug!(known_len = known.len(), known = ?known, "BlockExpansionCtx::new");
-        Self { ctx, known }
+        Self { root, known }
     }
 
-    pub fn process(self) -> Token {
+    /// Process the known pattern and return the bundled token.
+    pub fn process(&mut self) -> Token {
         debug!(
             known_len = self.known.len(),
             "BlockExpansionCtx::process starting"
@@ -48,7 +50,7 @@ impl BlockExpansionCtx {
         let mut cursor = path.into_range(0);
 
         // Create expansion context and get bundled result
-        let ctx = ExpansionCtx::new(self.ctx.clone(), &mut cursor);
+        let ctx = ExpansionCtx::new(self.root.graph.clone(), &mut cursor);
 
         let first = ctx.chain.start_token();
         debug!(chain = ?ctx.chain, ?first, "expansion chain before processing");
@@ -56,5 +58,10 @@ impl BlockExpansionCtx {
 
         debug!(bundled = ?bundled, "BlockExpansionCtx::process complete");
         bundled
+    }
+
+    /// Finish processing and return the RootManager.
+    pub fn finish(self) -> RootManager {
+        self.root
     }
 }

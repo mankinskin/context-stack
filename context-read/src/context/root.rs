@@ -71,6 +71,15 @@ impl RootManager {
             self.root = Some(index);
         }
     }
+
+    /// Append a committed block token to the root.
+    /// The block is the result of expansion processing.
+    pub fn append_block(
+        &mut self,
+        block: Token,
+    ) {
+        self.append_index(block);
+    }
 }
 
 // RootManager derefs to HypergraphRef, which implements HasGraph
