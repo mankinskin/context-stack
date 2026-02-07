@@ -4,18 +4,18 @@ use perfect::*;
 
 use crate::*;
 use context_trace::*;
-pub mod perfect;
+pub(crate) mod perfect;
 
-pub mod trace;
+pub(crate) mod trace;
 
-pub mod info;
+pub(crate) mod info;
 
-pub struct BorderInfo {
-    pub sub_index: usize,
-    pub pattern_len: usize,
-    pub inner_offset: Option<NonZeroUsize>,
+pub(crate) struct BorderInfo {
+    pub(crate) sub_index: usize,
+    pub(crate) pattern_len: usize,
+    pub(crate) inner_offset: Option<NonZeroUsize>,
     /// start offset of index with border
-    pub start_offset: Option<NonZeroUsize>,
+    pub(crate) start_offset: Option<NonZeroUsize>,
 }
 impl BorderInfo {
     /// Create a BorderInfo by recalculating sub_index AND inner_offset from atom position.
@@ -26,7 +26,7 @@ impl BorderInfo {
     /// inner_offset from the cache no longer applies to the new token at sub_index.
     /// We must use the inner_offset calculated from trace_child_pos to get the
     /// correct position within the current pattern structure.
-    pub fn new_from_atom_pos(
+    pub(crate) fn new_from_atom_pos(
         pattern: &Pattern,
         atom_pos: NonZeroUsize,
     ) -> Self {
@@ -41,7 +41,7 @@ impl BorderInfo {
     /// Use this when you have delta-adjusted split positions, to avoid
     /// re-tracing from atom positions (which may be invalid after pattern
     /// modifications).
-    pub fn new_from_trace_pos(
+    pub(crate) fn new_from_trace_pos(
         pattern: &Pattern,
         trace_pos: &crate::TokenTracePos,
     ) -> Self {
@@ -61,7 +61,7 @@ impl HasInnerOffset for BorderInfo {
     }
 }
 
-pub trait PartitionBorder<R: RangeRole>: Sized {
+pub(crate) trait PartitionBorder<R: RangeRole>: Sized {
     fn perfect(&self) -> BooleanPerfectOf<R>;
     fn offsets(&self) -> OffsetsOf<R>;
 }

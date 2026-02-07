@@ -7,7 +7,7 @@ use context_trace::{
 
 use crate::Response;
 
-pub trait SearchTestCase: TestCase {
+pub(crate) trait SearchTestCase: TestCase {
     /// Input query tokens for search
     fn query(&self) -> Vec<Token>;
 

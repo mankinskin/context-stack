@@ -20,15 +20,15 @@ use derive_more::derive::{
 };
 
 #[derive(Debug, Deref, DerefMut)]
-pub struct SplitCacheCtx<G: HasGraph> {
+pub(crate) struct SplitCacheCtx<G: HasGraph> {
     #[deref]
     #[deref_mut]
-    pub states_ctx: SplitTraceStatesCtx<G>,
+    pub(crate) states_ctx: SplitTraceStatesCtx<G>,
 
-    pub cache: SplitCache,
+    pub(crate) cache: SplitCache,
 }
 impl<G: HasGraph> SplitCacheCtx<G> {
-    pub fn init(mut states_ctx: SplitTraceStatesCtx<G>) -> Self {
+    pub(crate) fn init(mut states_ctx: SplitTraceStatesCtx<G>) -> Self {
         let (offsets, root_mode) =
             states_ctx.completed_splits::<RootNode>(&states_ctx.ctx.root);
         let pos_splits = states_ctx
@@ -65,7 +65,7 @@ impl<G: HasGraph> SplitCacheCtx<G> {
 
         Self { states_ctx, cache }
     }
-    pub fn apply_trace_state(
+    pub(crate) fn apply_trace_state(
         &mut self,
         state: &SplitTraceState,
     ) {

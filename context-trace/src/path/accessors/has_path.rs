@@ -33,14 +33,14 @@ use auto_impl::auto_impl;
 ///
 /// # Design Note
 /// This trait is kept alongside PathAccessor because it allows role-generic code
-/// via generic parameters (HasPath<R>) rather than associated types (PathAccessor::Role = R).
+/// via generic parameters (HasChildPath<R>) rather than associated types (PathAccessor::Role = R).
 /// Some types (like RootedRangePath) cannot implement PathAccessor due to having two roles,
-/// but can implement HasPath<Start> and HasPath<End> separately.
+/// but can implement HasChildPath<Start> and HasChildPath<End> separately.
 #[auto_impl(& mut)]
-pub trait HasPath<R> {
+pub trait HasChildPath<R> {
     type Node;
-    fn path(&self) -> &Vec<Self::Node>;
-    fn path_mut(&mut self) -> &mut Vec<Self::Node>;
+    fn child_path(&self) -> &Vec<Self::Node>;
+    fn child_path_mut(&mut self) -> &mut Vec<Self::Node>;
 }
 
 /// access to a rooted path pointing to a descendant

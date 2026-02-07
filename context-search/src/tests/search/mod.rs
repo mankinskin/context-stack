@@ -1,7 +1,7 @@
-pub mod ancestor;
-pub mod consecutive;
-pub mod insert_scenarios;
-pub mod parent;
+pub(crate) mod ancestor;
+pub(crate) mod consecutive;
+pub(crate) mod insert_scenarios;
+pub(crate) mod parent;
 pub mod trace_cache;
 
 #[cfg(test)]

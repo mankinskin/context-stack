@@ -37,7 +37,7 @@ use context_trace::{
 };
 use pretty_assertions::assert_matches;
 /// Test case: Insert "byz" into pattern1 environment
-pub struct Pattern1Byz;
+pub(crate) struct Pattern1Byz;
 
 impl TestCase for Pattern1Byz {
     type Env = EnvInsertPattern1;
@@ -77,7 +77,7 @@ impl InsertTestCase for Pattern1Byz {
 }
 
 /// Test case: Insert "aby" into pattern1 environment
-pub struct Pattern1Aby;
+pub(crate) struct Pattern1Aby;
 
 impl TestCase for Pattern1Aby {
     type Env = EnvInsertPattern1;

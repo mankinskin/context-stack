@@ -96,7 +96,7 @@ impl Default for CdefghiTraceCase {
     }
 }
 impl CdefghiTraceCase {
-    pub fn verify_trace_cache(
+    pub(crate) fn verify_trace_cache(
         &self,
         actual_cache: &TraceCache,
     ) {

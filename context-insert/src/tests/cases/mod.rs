@@ -2,4 +2,4 @@
 //!
 //! Concrete implementations of InsertTestCase trait for different insertion scenarios.
 
-pub mod insert;
+pub(crate) mod insert;

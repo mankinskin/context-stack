@@ -142,7 +142,7 @@ pub trait RolePathUtils {
         )
         .is_none()
     }
-    fn child_path_mut<R: PathRole, Node: PathNode>(
+    fn role_path_mut_with<R: PathRole, Node: PathNode>(
         &mut self
     ) -> &mut RolePath<R, Node>
     where

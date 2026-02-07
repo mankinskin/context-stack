@@ -33,13 +33,13 @@ use derive_more::{
 /// With interior mutability, we only need `&Hypergraph` - mutations happen
 /// through per-vertex locks inside the graph.
 #[derive(Debug)]
-pub struct LockedFrontierCtx<'a> {
-    pub trav: &'a Hypergraph,
-    pub interval: &'a IntervalGraph,
-    pub splits: &'a mut SplitMap,
+pub(crate) struct LockedFrontierCtx<'a> {
+    pub(crate) trav: &'a Hypergraph,
+    pub(crate) interval: &'a IntervalGraph,
+    pub(crate) splits: &'a mut SplitMap,
 }
 impl<'a> LockedFrontierCtx<'a> {
-    pub fn new(ctx: &'a mut FrontierSplitIterator) -> Self {
+    pub(crate) fn new(ctx: &'a mut FrontierSplitIterator) -> Self {
         Self {
             trav: &*ctx.trav,
             interval: &ctx.frontier.interval,
@@ -48,11 +48,11 @@ impl<'a> LockedFrontierCtx<'a> {
     }
 }
 #[derive(Debug, Deref, DerefMut)]
-pub struct NodeJoinCtx<'a> {
+pub(crate) struct NodeJoinCtx<'a> {
     #[deref]
     #[deref_mut]
-    pub ctx: LockedFrontierCtx<'a>,
-    pub index: Token,
+    pub(crate) ctx: LockedFrontierCtx<'a>,
+    pub(crate) index: Token,
 }
 impl HasToken for NodeJoinCtx<'_> {
     fn token(&self) -> Token {
@@ -60,7 +60,7 @@ impl HasToken for NodeJoinCtx<'_> {
     }
 }
 impl<'a> NodeJoinCtx<'a> {
-    pub fn new(
+    pub(crate) fn new(
         index: Token,
         ctx: &'a mut FrontierSplitIterator,
     ) -> Self {
@@ -107,13 +107,13 @@ impl GetPatternCtx for NodeJoinCtx<'_> {
 impl NodeJoinCtx<'_> {
     /// Get the child patterns for the current node.
     /// Returns owned data since graph access returns owned values now.
-    pub fn patterns(&self) -> ChildPatterns {
+    pub(crate) fn patterns(&self) -> ChildPatterns {
         self.ctx.trav.expect_child_patterns(self.index)
     }
 }
 
 impl NodeJoinCtx<'_> {
-    pub fn vertex_cache(&self) -> &SplitVertexCache {
+    pub(crate) fn vertex_cache(&self) -> &SplitVertexCache {
         self.interval.cache.get(&self.index.vertex_index()).unwrap()
     }
 }

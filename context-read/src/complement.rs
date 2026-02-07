@@ -5,12 +5,12 @@ use derive_new::new;
 use crate::expansion::link::ExpansionLink;
 
 #[derive(Debug, new)]
-pub struct ComplementBuilder {
+pub(crate) struct ComplementBuilder {
     link: ExpansionLink,
 }
 
 impl ComplementBuilder {
-    pub fn build(
+    pub(crate) fn build(
         self,
         graph: &HypergraphRef,
     ) -> Token {

@@ -17,23 +17,23 @@ use context_trace::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SplitTraceState {
-    pub index: Token,
-    pub offset: Offset,
-    pub prev: PosKey,
+    pub(crate) index: Token,
+    pub(crate) offset: Offset,
+    pub(crate) prev: PosKey,
 }
 
 #[derive(Debug, Deref, DerefMut)]
-pub struct SplitTraceCtx<G: HasGraph> {
-    pub root: Token,
-    pub end_bound: AtomPosition,
+pub(crate) struct SplitTraceCtx<G: HasGraph> {
+    pub(crate) root: Token,
+    pub(crate) end_bound: AtomPosition,
 
     #[deref]
     #[deref_mut]
-    pub ctx: TraceCtx<G>,
+    pub(crate) ctx: TraceCtx<G>,
 }
 
 impl<G: HasGraph> SplitTraceCtx<G> {
-    pub fn get_node<'a, N: NodeType>(
+    pub(crate) fn get_node<'a, N: NodeType>(
         &'a self,
         index: &Token,
     ) -> Option<VertexSplitCtx<'a>> {
@@ -42,7 +42,7 @@ impl<G: HasGraph> SplitTraceCtx<G> {
             .get(&index.vertex_index())
             .map(VertexSplitCtx::new)
     }
-    pub fn completed_splits<N: NodeType>(
+    pub(crate) fn completed_splits<N: NodeType>(
         &self,
         index: &Token,
     ) -> N::CompleteSplitOutput {

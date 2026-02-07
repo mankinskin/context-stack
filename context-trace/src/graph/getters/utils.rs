@@ -102,6 +102,6 @@ impl<G: GraphKind> Hypergraph<G> {
             wrap = next.1;
         }
 
-        data.to_child()
+        data.to_token()
     }
 }

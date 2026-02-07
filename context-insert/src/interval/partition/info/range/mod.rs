@@ -20,16 +20,16 @@ use crate::{
     split::vertex::pattern::HasPatternTraceCtx,
 };
 
-pub mod role;
+pub(crate) mod role;
 
-pub mod children;
-pub mod mode;
-pub mod splits;
+pub(crate) mod children;
+pub(crate) mod mode;
+pub(crate) mod splits;
 
 #[derive(Debug)]
-pub struct PatternRangeInfo<R: RangeRole> {
-    pub pattern_id: PatternId,
-    pub info: PatternInfoOf<R>,
+pub(crate) struct PatternRangeInfo<R: RangeRole> {
+    pub(crate) pattern_id: PatternId,
+    pub(crate) info: PatternInfoOf<R>,
 }
 
 impl<R: RangeRole> From<PatternRangeInfo<R>> for (PatternId, PatternInfoOf<R>) {
@@ -38,7 +38,7 @@ impl<R: RangeRole> From<PatternRangeInfo<R>> for (PatternId, PatternInfoOf<R>) {
     }
 }
 
-pub trait ModeRangeInfo<R: RangeRole>: Debug {
+pub(crate) trait ModeRangeInfo<R: RangeRole>: Debug {
     fn info_pattern_range(
         borders: BordersOf<R>,
         ctx: &ModePatternCtxOf<R>,
@@ -67,17 +67,17 @@ impl<R: RangeRole<Mode = Trace>> ModeRangeInfo<R> for TraceRangeInfo<R> {
 }
 
 #[derive(Debug, Clone)]
-pub struct InnerRangeInfo<R: RangeRole> {
-    pub range: R::PatternRange,
-    pub offsets: R::Offsets,
+pub(crate) struct InnerRangeInfo<R: RangeRole> {
+    pub(crate) range: R::PatternRange,
+    pub(crate) offsets: R::Offsets,
 }
 impl<R: RangeRole> InnerRangeInfo<R> {
-    pub fn delta(&self) -> usize {
+    pub(crate) fn delta(&self) -> usize {
         self.range.clone().into().len().saturating_sub(1)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct TraceRangeInfo<R: RangeRole<Mode = Trace>> {
-    pub inner_range: Option<InnerRangeInfo<R>>,
+pub(crate) struct TraceRangeInfo<R: RangeRole<Mode = Trace>> {
+    pub(crate) inner_range: Option<InnerRangeInfo<R>>,
 }

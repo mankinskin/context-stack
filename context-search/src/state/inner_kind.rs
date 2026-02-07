@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use context_trace::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum InnerKind {
+pub(crate) enum InnerKind {
     ParentCandidate(ParentState),
     ChildQueue(ChildState),
 }
@@ -31,7 +31,7 @@ impl PartialOrd for InnerKind {
     }
 }
 //impl InnerKind {
-//    pub fn unwrap_parent(self) -> ParentState {
+//    pub(crate) fn unwrap_parent(self) -> ParentState {
 //        if let Self::ParentCandidate(p) = self {
 //            p
 //        } else {

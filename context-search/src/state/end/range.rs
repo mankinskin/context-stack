@@ -12,7 +12,7 @@ use context_trace::{
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RangeEnd {
+pub(crate) struct RangeEnd {
     pub(crate) path: IndexRangePath,
     pub(crate) target: DownKey,
     pub(crate) entry_pos: UpPosition,

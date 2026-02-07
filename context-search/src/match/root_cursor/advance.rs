@@ -362,8 +362,8 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         let exit_pos = checkpoint_child.child_state.exit_pos;
 
         // Simplify path to remove redundant segments
-        path.child_path_mut::<Start, _>().simplify(&self.trav);
-        path.child_path_mut::<End, _>().simplify(&self.trav);
+        path.role_path_mut_with::<Start, _>().simplify(&self.trav);
+        path.role_path_mut_with::<End, _>().simplify(&self.trav);
 
         let target_index = path.role_rooted_leaf_token::<End, _>(&self.trav);
 

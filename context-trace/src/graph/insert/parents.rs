@@ -57,7 +57,7 @@ impl<G: GraphKind> Hypergraph<G> {
         for (i, token) in pattern.into_iter().enumerate() {
             self.with_vertex_mut(token.vertex_index(), |node| {
                 node.add_parent(ChildLocation::new(
-                    parent.to_child(),
+                    parent.to_token(),
                     pattern_id,
                     i,
                 ));
@@ -80,7 +80,7 @@ impl<G: GraphKind> Hypergraph<G> {
                 let pos = start + pos;
                 self.with_vertex_mut(c.vertex_index(), |node| {
                     node.add_parent(ChildLocation::new(
-                        parent.to_child(),
+                        parent.to_token(),
                         pattern_id,
                         pos,
                     ));
@@ -97,9 +97,9 @@ impl<G: GraphKind> Hypergraph<G> {
         pattern_id: PatternId,
         new: impl IntoIterator<Item = impl ToToken>,
     ) -> Token {
-        let new: Vec<_> = new.into_iter().map(|c| c.to_child()).collect();
+        let new: Vec<_> = new.into_iter().map(|c| c.to_token()).collect();
         if new.is_empty() {
-            return parent.to_child();
+            return parent.to_token();
         }
         let width = pattern_width(&new);
         

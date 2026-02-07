@@ -13,7 +13,7 @@ use crate::split::{
 };
 use context_trace::*;
 
-pub mod borders;
+pub(crate) mod borders;
 
 /// Pattern join context that owns its data.
 /// 
@@ -21,12 +21,12 @@ pub mod borders;
 /// so this struct owns the pattern and split map data.
 #[derive(Debug, Clone, Deref, DerefMut, Derivative)]
 #[derivative(Hash, PartialEq, Eq)]
-pub struct PatternJoinCtx {
+pub(crate) struct PatternJoinCtx {
     #[deref]
     #[deref_mut]
-    pub ctx: PatternTraceCtx,
+    pub(crate) ctx: PatternTraceCtx,
     #[derivative(Hash = "ignore", PartialEq = "ignore")]
-    pub splits: SplitMap,
+    pub(crate) splits: SplitMap,
 }
 
 impl HasPatternTraceCtx for PatternJoinCtx {

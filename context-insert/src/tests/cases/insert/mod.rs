@@ -16,14 +16,14 @@
 //! - `repeat_patterns` - Tests for repeated token patterns
 
 // Core insertion tests
-pub mod infix;
-pub mod pattern;
-pub mod postfix;
-pub mod prefix;
+pub(crate) mod infix;
+pub(crate) mod pattern;
+pub(crate) mod postfix;
+pub(crate) mod prefix;
 
 // Validation & edge cases
-pub mod validation;
+pub(crate) mod validation;
 
 // Scenario tests
-pub mod context_read_scenarios;
-pub mod repeat_patterns;
+pub(crate) mod context_read_scenarios;
+pub(crate) mod repeat_patterns;

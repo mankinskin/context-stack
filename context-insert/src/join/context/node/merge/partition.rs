@@ -57,28 +57,28 @@ use tracing::debug;
 /// );
 /// let (token, delta) = ctx.merge();
 /// ```
-pub struct MergePartitionCtx<'a, 'b, R: RangeRole<Mode = Join>>
+pub(crate) struct MergePartitionCtx<'a, 'b, R: RangeRole<Mode = Join>>
 where
     R::Borders: JoinBorders<R>,
 {
     /// The partition being merged (contains offset splits)
-    pub partition: Partition<R>,
+    pub(crate) partition: Partition<R>,
     /// The merge context containing node context and offset cache
-    pub merge_ctx: &'a mut MergeCtx<'b>,
+    pub(crate) merge_ctx: &'a mut MergeCtx<'b>,
     /// Map of already-merged partition ranges to their tokens
-    pub range_map: &'a RangeMap,
+    pub(crate) range_map: &'a RangeMap,
     /// The range of partition indices being merged
-    pub partition_range: PartitionRange,
+    pub(crate) partition_range: PartitionRange,
 }
 
 /// Result of a partition merge operation.
-pub struct MergeResult {
+pub(crate) struct MergeResult {
     /// The merged token
-    pub token: Token,
+    pub(crate) token: Token,
     /// Pattern deltas (if any sub-indices changed)
-    pub delta: Option<PatternSubDeltas>,
+    pub(crate) delta: Option<PatternSubDeltas>,
     /// Whether replace_in_pattern was called (perfect pattern match)
-    pub had_pattern_replacement: bool,
+    pub(crate) had_pattern_replacement: bool,
 }
 
 impl<'a, 'b, R: RangeRole<Mode = Join> + 'b> MergePartitionCtx<'a, 'b, R>
@@ -89,7 +89,7 @@ where
     ///
     /// Returns `Ok(PartitionInfo)` if the partition needs to be created,
     /// or `Err(Token)` if a token already exists for this exact partition.
-    pub fn info_partition(&self) -> Result<PartitionInfo<R>, Token> {
+    pub(crate) fn info_partition(&self) -> Result<PartitionInfo<R>, Token> {
         self.partition.info_partition(&self.merge_ctx.ctx)
     }
 
@@ -97,7 +97,7 @@ where
     ///
     /// This handles pattern joining, token creation/lookup, and delta computation.
     /// If `skip_pattern_replacement` is true, patterns won't be modified.
-    pub fn join_partition_with_options(
+    pub(crate) fn join_partition_with_options(
         &mut self,
         info: PartitionInfo<R>,
         skip_pattern_replacement: bool,
@@ -110,7 +110,7 @@ where
     }
 
     /// Create a JoinedPartition from partition info (allows pattern replacement).
-    pub fn join_partition(
+    pub(crate) fn join_partition(
         &mut self,
         info: PartitionInfo<R>,
     ) -> JoinedPartition<R> {
@@ -121,7 +121,7 @@ where
     ///
     /// Sub-merge patterns are alternative decompositions of the merged token
     /// that were discovered during the partition merge process.
-    pub fn add_sub_merges(
+    pub(crate) fn add_sub_merges(
         &mut self,
         token: Token,
     ) {
@@ -216,7 +216,7 @@ where
     /// 2. Creates JoinedPartition with delta computation
     /// 3. Adds sub-merge patterns
     /// 4. Returns the token and any pattern deltas
-    pub fn merge(self) -> (Token, Option<PatternSubDeltas>) {
+    pub(crate) fn merge(self) -> (Token, Option<PatternSubDeltas>) {
         let result = self.merge_internal(false);
         (result.token, result.delta)
     }
@@ -224,7 +224,7 @@ where
     /// Merge the partition and return full result info.
     ///
     /// This includes whether a pattern replacement occurred.
-    pub fn merge_with_info(self) -> MergeResult {
+    pub(crate) fn merge_with_info(self) -> MergeResult {
         self.merge_internal(false)
     }
 
@@ -233,7 +233,7 @@ where
     /// This is used for edge partitions in ROOT mode where we only need
     /// the token, not pattern modifications. This avoids corrupting the
     /// root pattern when merging edge partitions.
-    pub fn merge_token_only(self) -> Token {
+    pub(crate) fn merge_token_only(self) -> Token {
         self.merge_internal(true).token
     }
 }
@@ -246,14 +246,14 @@ where
 /// The builder holds only the data needed to compute the partition,
 /// not the full MergeCtx, to avoid borrow conflicts.
 #[derive(Clone)]
-pub struct MergePartitionBuilder<'a> {
+pub(crate) struct MergePartitionBuilder<'a> {
     offsets: &'a crate::SplitVertexCache,
     partition_range: PartitionRange,
     num_partitions: usize,
 }
 
 impl<'a> MergePartitionBuilder<'a> {
-    pub fn new(
+    pub(crate) fn new(
         merge_ctx: &'a MergeCtx<'_>,
         partition_range: PartitionRange,
     ) -> Self {
@@ -331,7 +331,7 @@ where
     R::Borders: JoinBorders<R>,
     for<'c> MergePartitionBuilder<'c>: ToPartition<R>,
 {
-    pub fn from_merge_ctx(
+    pub(crate) fn from_merge_ctx(
         merge_ctx: &'a mut MergeCtx<'b>,
         range_map: &'a RangeMap,
         partition_range: PartitionRange,

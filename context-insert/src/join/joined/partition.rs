@@ -26,10 +26,10 @@ use std::borrow::Borrow;
 use tracing::debug;
 
 #[derive(Debug)]
-pub struct JoinedPartition<R: RangeRole> {
-    pub index: Token,
-    pub perfect: R::Perfect,
-    pub delta: PatternSubDeltas,
+pub(crate) struct JoinedPartition<R: RangeRole> {
+    pub(crate) index: Token,
+    pub(crate) perfect: R::Perfect,
+    pub(crate) delta: PatternSubDeltas,
 }
 
 impl<'a, 'c, R: RangeRole<Mode = Join> + 'a> JoinedPartition<R>
@@ -41,7 +41,7 @@ where
     /// If `skip_pattern_replacement` is true, the pattern will not be modified
     /// even if there's a perfect match. This is used for edge partitions in
     /// ROOT mode where we only need the token, not the pattern modification.
-    pub fn from_joined_patterns_with_options(
+    pub(crate) fn from_joined_patterns_with_options(
         pats: JoinedPatterns<R>,
         ctx: &'c mut NodeJoinCtx<'a>,
         skip_pattern_replacement: bool,
@@ -78,21 +78,21 @@ where
         }
     }
 
-    pub fn from_joined_patterns(
+    pub(crate) fn from_joined_patterns(
         pats: JoinedPatterns<R>,
         ctx: &'c mut NodeJoinCtx<'a>,
     ) -> Self {
         Self::from_joined_patterns_with_options(pats, ctx, false)
     }
 
-    pub fn from_partition_info(
+    pub(crate) fn from_partition_info(
         info: JoinPartitionInfo<R>,
         ctx: &'c mut NodeJoinCtx<'a>,
     ) -> Self {
         Self::from_partition_info_with_options(info, ctx, false)
     }
 
-    pub fn from_partition_info_with_options(
+    pub(crate) fn from_partition_info_with_options(
         info: JoinPartitionInfo<R>,
         ctx: &'c mut NodeJoinCtx<'a>,
         skip_pattern_replacement: bool,

@@ -1,3 +1,3 @@
-pub mod frontier;
-pub mod node;
-pub mod pattern;
+pub(crate) mod frontier;
+pub(crate) mod node;
+pub(crate) mod pattern;

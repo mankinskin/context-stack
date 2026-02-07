@@ -47,7 +47,7 @@ impl VertexData {
     }
 
     /// Convert to ChildLocation for this vertex
-    pub fn to_child(&self) -> Token {
+    pub fn to_token(&self) -> Token {
         self.token
     }
 

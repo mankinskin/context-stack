@@ -3,7 +3,7 @@ use crate::{
     DirectedKey,
     GraphRootChild,
     GraphRootPattern,
-    HasPath,
+    HasChildPath,
     PathNode,
     PathRole,
     RootPattern,
@@ -176,7 +176,7 @@ impl GraphRootChild<End> for ChildState<ChildLocation> {
 impl HasLeafToken<End> for ChildState<ChildLocation>
 where
     IndexRangePath<ChildLocation, ChildLocation>:
-        HasRootChildIndex<End> + HasPath<End, Node = ChildLocation>,
+        HasRootChildIndex<End> + HasChildPath<End, Node = ChildLocation>,
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         self.path.role_leaf_token_location::<End>()
@@ -184,20 +184,20 @@ where
 }
 
 // Note: Cannot implement LeafToken<End> for ChildState<PositionAnnotated<ChildLocation>>
-// because LeafToken requires HasPath<End, Node = ChildLocation>, but PositionAnnotated paths
-// have HasPath<End, Node = PositionAnnotated<ChildLocation>>.
+// because LeafToken requires HasChildPath<End, Node = ChildLocation>, but PositionAnnotated paths
+// have HasChildPath<End, Node = PositionAnnotated<ChildLocation>>.
 // Instead, PrefixStates is implemented directly for this type in context-search.
 
-impl<R: PathRole, EndNode: PathNode> HasPath<R> for ChildState<EndNode>
+impl<R: PathRole, EndNode: PathNode> HasChildPath<R> for ChildState<EndNode>
 where
     IndexRangePath<ChildLocation, EndNode>: HasRolePath<R>,
 {
     type Node =
         <IndexRangePath<ChildLocation, EndNode> as HasRolePath<R>>::Node;
-    fn path(&self) -> &Vec<Self::Node> {
+    fn child_path(&self) -> &Vec<Self::Node> {
         self.path.role_path().path()
     }
-    fn path_mut(&mut self) -> &mut Vec<Self::Node> {
+    fn child_path_mut(&mut self) -> &mut Vec<Self::Node> {
         self.path.role_path_mut().path_mut()
     }
 }

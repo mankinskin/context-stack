@@ -11,8 +11,8 @@ use derive_more::{
 use context_trace::*;
 
 #[derive(Debug, Default, IntoIterator, DerefMut)]
-pub struct PatternSubDeltas {
-    pub inner: PatternSubDeltasInner,
+pub(crate) struct PatternSubDeltas {
+    pub(crate) inner: PatternSubDeltasInner,
 }
 
 type PatternSubDeltasInner = HashMap<PatternId, usize>;

@@ -17,7 +17,7 @@
 /// # Type Parameters
 /// The Self type determines which cursor type is being transitioned.
 /// Associated types specify the result types for each transition.
-pub trait CursorStateMachine: Sized {
+pub(crate) trait CursorStateMachine: Sized {
     /// Candidate state version of this cursor
     type AsCandidate;
 

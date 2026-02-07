@@ -20,19 +20,19 @@ use crate::{
     },
 };
 
-pub mod delta;
-pub mod info;
+pub(crate) mod delta;
+pub(crate) mod info;
 
 #[derive(Debug, Clone)]
-pub struct Partition<R: RangeRole> {
-    pub offsets: R::Splits,
+pub(crate) struct Partition<R: RangeRole> {
+    pub(crate) offsets: R::Splits,
 }
 impl<R: RangeRole> Partition<R> {
-    pub fn new(offsets: impl ToPartition<R>) -> Self {
+    pub(crate) fn new(offsets: impl ToPartition<R>) -> Self {
         offsets.to_partition()
     }
 }
-pub trait ToPartition<R: RangeRole>: Clone {
+pub(crate) trait ToPartition<R: RangeRole>: Clone {
     fn to_partition(self) -> Partition<R>;
 }
 
@@ -75,7 +75,7 @@ impl<M: PostVisitMode, A: ToVertexSplits> ToPartition<Post<M>> for A {
 }
 
 #[allow(dead_code)]
-pub fn to_non_zero_range(
+pub(crate) fn to_non_zero_range(
     l: usize,
     r: usize,
 ) -> (NonZeroUsize, NonZeroUsize) {

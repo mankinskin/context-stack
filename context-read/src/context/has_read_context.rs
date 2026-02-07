@@ -2,11 +2,11 @@ use context_trace::*;
 
 use crate::{
     context::ReadCtx,
-    sequence::ToNewAtomIndices,
+    segment::ToNewAtomIndices,
 };
 
 /// Trait for types that can create or provide a ReadCtx for reading sequences.
-pub trait HasReadCtx {
+pub(crate) trait HasReadCtx {
     fn read_context(&'_ mut self) -> ReadCtx;
     fn read_sequence(&mut self) -> Option<Token> {
         self.read_context().read_sequence()

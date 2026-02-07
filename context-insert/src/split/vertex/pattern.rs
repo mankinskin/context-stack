@@ -11,7 +11,7 @@ use crate::split::vertex::node::NodeTraceCtx;
 /// so this struct owns the pattern data.
 #[derive(Debug, Clone, Derivative, new)]
 #[derivative(Hash, PartialEq, Eq)]
-pub struct PatternTraceCtx {
+pub(crate) struct PatternTraceCtx {
     pub(crate) loc: PatternLocation,
     #[derivative(Hash = "ignore", PartialEq = "ignore")]
     pub(crate) pattern: Pattern,
@@ -23,7 +23,7 @@ impl From<PatternTraceCtx> for PatternId {
     }
 }
 
-pub trait HasPatternTraceCtx {
+pub(crate) trait HasPatternTraceCtx {
     fn pattern_trace_context(&self) -> PatternTraceCtx;
 }
 impl HasPatternTraceCtx for PatternTraceCtx {
@@ -31,13 +31,13 @@ impl HasPatternTraceCtx for PatternTraceCtx {
         self.clone()
     }
 }
-pub trait GetPatternTraceCtx {
+pub(crate) trait GetPatternTraceCtx {
     fn get_pattern_trace_context(
         &self,
         pattern_id: &PatternId,
     ) -> PatternTraceCtx;
 }
-pub trait GetPatternCtx {
+pub(crate) trait GetPatternCtx {
     type PatternCtx: HasPatternTraceCtx;
     fn get_pattern_context(
         &self,

@@ -1,9 +1,9 @@
 use crate::{
     insert::ToInsertCtx,
     interval::init::InitInterval,
+    tests::env::EnvInsertPostfix1,
 };
 use context_search::{
-    tests::env::EnvInsertPostfix1,
     *,
 };
 use context_trace::{

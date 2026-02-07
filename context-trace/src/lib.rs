@@ -167,7 +167,7 @@ pub use crate::{
                 root::GraphRootChild,
             },
             has_path::{
-                HasPath,
+                HasChildPath,
                 IntoRolePath,
                 IntoRootedPath,
                 IntoRootedRolePath,

@@ -28,7 +28,7 @@ impl<G: GraphKind> Hypergraph<G> {
         let (c, id) = match indices.len() {
             0 => (None, None),
             1 => (
-                Some(self.to_child(indices.first().unwrap().vertex_index())),
+                Some(self.to_token(indices.first().unwrap().vertex_index())),
                 None,
             ),
             _ => {

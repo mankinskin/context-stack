@@ -16,7 +16,7 @@ use tracing::debug;
 /// Contains the RootManager and processes known patterns to find the largest
 /// bundled token through overlap detection. Manages block commits directly.
 #[derive(Debug)]
-pub struct BlockExpansionCtx {
+pub(crate) struct BlockExpansionCtx {
     /// The root manager (owns graph and root token)
     root: RootManager,
     /// The known pattern to process
@@ -26,7 +26,7 @@ pub struct BlockExpansionCtx {
 impl BlockExpansionCtx {
     /// Create a new block expansion context.
     /// Takes ownership of RootManager to manage block commits.
-    pub fn new(
+    pub(crate) fn new(
         root: RootManager,
         known: Pattern,
     ) -> Self {
@@ -36,7 +36,7 @@ impl BlockExpansionCtx {
 
     /// Process the known pattern and commit the result to the root.
     /// Uses overlap expansion and commits the full band chain with decompositions.
-    pub fn process(&mut self) {
+    pub(crate) fn process(&mut self) {
         debug!(
             known_len = self.known.len(),
             "BlockExpansionCtx::process starting"
@@ -55,7 +55,7 @@ impl BlockExpansionCtx {
 
         let first = ctx.chain.start_token();
         debug!(chain = ?ctx.chain, ?first, "expansion chain before processing");
-        
+
         // Process all expansions by consuming the iterator
         while ctx.next().is_some() {}
 
@@ -64,14 +64,14 @@ impl BlockExpansionCtx {
             final_token = ?ctx.chain.final_token(),
             "BlockExpansionCtx::process complete"
         );
-        
+
         // Take the chain and commit to root manager
         let chain = std::mem::take(&mut ctx.chain);
         self.root.commit_chain(chain);
     }
 
     /// Finish processing and return the RootManager.
-    pub fn finish(self) -> RootManager {
+    pub(crate) fn finish(self) -> RootManager {
         self.root
     }
 }

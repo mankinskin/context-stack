@@ -13,7 +13,7 @@ use context_trace::{
 };
 use itertools::Itertools;
 
-pub trait BandExpandingPolicy<G: HasGraph> {
+pub(crate) trait BandExpandingPolicy<G: HasGraph> {
     fn map_band(
         location: PatternLocation,
         pattern: &Pattern,
@@ -25,7 +25,7 @@ pub trait BandExpandingPolicy<G: HasGraph> {
     }
 }
 #[derive(Debug)]
-pub struct PostfixExpandingPolicy<D: PatternDirection> {
+pub(crate) struct PostfixExpandingPolicy<D: PatternDirection> {
     _ty: std::marker::PhantomData<D>,
 }
 impl<G: HasGraph, D: PatternDirection> BandExpandingPolicy<G>
@@ -52,7 +52,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct PrefixExpandingPolicy<D: Direction> {
+pub(crate) struct PrefixExpandingPolicy<D: Direction> {
     _ty: std::marker::PhantomData<D>,
 }
 impl<G: HasGraph, D: Direction> BandExpandingPolicy<G>

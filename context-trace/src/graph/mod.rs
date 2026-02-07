@@ -259,7 +259,7 @@ where
                     *idx,
                     Edge {
                         parent: parent.clone(),
-                        token: node.data.to_child(),
+                        token: node.data.to_token(),
                     },
                 );
             }

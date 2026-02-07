@@ -36,7 +36,7 @@ use context_trace::{
 ///
 /// This verifies that when searching for a pattern that exists exactly,
 /// we get EntireRoot (exact match) rather than finding it as a sub-part of xyyxy.
-pub struct SearchXyExact;
+pub(crate) struct SearchXyExact;
 
 impl TestCase for SearchXyExact {
     type Env = EnvXyyxy;

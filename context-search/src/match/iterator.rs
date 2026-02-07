@@ -64,7 +64,7 @@ impl<K: SearchKind> SearchIterator<K>
 where
     K::Trav: Clone,
 {
-    pub fn find_next_root_match(
+    pub(crate) fn find_next_root_match(
         &mut self
     ) -> Option<CompareState<Matched, Matched>> {
         debug!("finding next root match");

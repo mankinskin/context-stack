@@ -31,14 +31,14 @@ use std::sync::{
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EnvTripleRepeat {
-    pub graph: HypergraphRef,
-    pub a: Token,
-    pub b: Token,
-    pub ab: Token,
-    pub ab_id: PatternId,
-    pub ababab: Token,
-    pub ababab_id: PatternId,
+pub(crate) struct EnvTripleRepeat {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) a: Token,
+    pub(crate) b: Token,
+    pub(crate) ab: Token,
+    pub(crate) ab_id: PatternId,
+    pub(crate) ababab: Token,
+    pub(crate) ababab_id: PatternId,
 }
 
 impl TestEnv for EnvTripleRepeat {

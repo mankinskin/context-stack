@@ -5,7 +5,7 @@ use context_trace::*;
 use crate::expansion::chain::link::StartBound;
 
 #[derive(Debug, Clone)]
-pub enum StackLocation {
+pub(crate) enum StackLocation {
     Head,
     Nested {
         nested_index: usize,
@@ -13,27 +13,27 @@ pub enum StackLocation {
     },
 }
 //#[derive(Debug, Clone)]
-//pub struct NestedStack {
-//    pub stack: OverlapStack,
-//    pub back_context: Pattern,
-//    pub start_bound: usize,
+//pub(crate) struct NestedStack {
+//    pub(crate) stack: OverlapStack,
+//    pub(crate) back_context: Pattern,
+//    pub(crate) start_bound: usize,
 //}
 
 #[derive(Debug, Clone)]
-pub struct OverlapStack {
-    pub head: Pattern,
-    pub overlaps: VecDeque<StackBand>,
+pub(crate) struct OverlapStack {
+    pub(crate) head: Pattern,
+    pub(crate) overlaps: VecDeque<StackBand>,
 }
 
 #[derive(Debug, Clone)]
-pub enum StackBandEnd {
+pub(crate) enum StackBandEnd {
     Single(Token),
     Stack(OverlapStack),
 }
 #[derive(Debug, Clone)]
-pub struct StackBand {
-    pub back_context: Token,
-    pub expansion: StackBandEnd,
+pub(crate) struct StackBand {
+    pub(crate) back_context: Token,
+    pub(crate) expansion: StackBandEnd,
 }
 impl StartBound for StackBand {
     fn start_bound(&self) -> AtomPosition {
@@ -42,7 +42,7 @@ impl StartBound for StackBand {
 }
 
 impl OverlapStack {
-    pub fn new(head_index: Token) -> Self {
+    pub(crate) fn new(head_index: Token) -> Self {
         Self {
             head: Pattern::from(vec![head_index]),
             overlaps: VecDeque::default(),
@@ -50,7 +50,7 @@ impl OverlapStack {
     }
 
     ///// Find if an expansion can be appended to any band in this stack
-    //pub fn find_appendable_band(
+    //pub(crate) fn find_appendable_band(
     //    &self,
     //    expansion: &BandExpansion,
     //) -> Option<StackLocation> {

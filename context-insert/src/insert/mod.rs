@@ -5,7 +5,7 @@ use crate::interval::init::InitInterval;
 use context_search::*;
 use context_trace::*;
 pub mod context;
-pub mod direction;
+pub(crate) mod direction;
 pub mod result;
 
 /// Trait for types that can create an InsertCtx for graph insertions.

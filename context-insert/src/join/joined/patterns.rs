@@ -27,18 +27,18 @@ use crate::{
 use context_trace::*;
 
 #[derive(Debug)]
-pub struct JoinedPatterns<R: RangeRole> {
-    pub patterns: Vec<Pattern>,
-    pub perfect: R::Perfect,
-    pub range: Option<R::PatternRange>,
-    pub delta: PatternSubDeltas,
+pub(crate) struct JoinedPatterns<R: RangeRole> {
+    pub(crate) patterns: Vec<Pattern>,
+    pub(crate) perfect: R::Perfect,
+    pub(crate) range: Option<R::PatternRange>,
+    pub(crate) delta: PatternSubDeltas,
 }
 
 impl<'a, R: RangeRole<Mode = Join> + 'a> JoinedPatterns<R>
 where
     R::Borders: JoinBorders<R>,
 {
-    pub fn from_partition_info<'b>(
+    pub(crate) fn from_partition_info<'b>(
         info: JoinPartitionInfo<R>,
         ctx: &'b mut NodeJoinCtx<'a>,
     ) -> Self {
@@ -72,7 +72,7 @@ where
             delta,
         }
     }
-    //pub fn to_joined_partition(
+    //pub(crate) fn to_joined_partition(
     //    self,
     //    ctx: &'b mut NodeJoinCtx<'a>,
     //) -> JoinedPartition<R> {
@@ -80,7 +80,7 @@ where
     //}
 }
 //#[derive(Debug)]
-//pub enum JoinedPattern {
+//pub(crate) enum JoinedPattern {
 //    Trigram([Token; 3]),
 //    Bigram([Token; 2]),
 //}

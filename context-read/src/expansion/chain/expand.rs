@@ -19,13 +19,13 @@ use context_trace::*;
 use tracing::debug;
 
 #[derive(Debug)]
-pub struct ExpandCtx<'a> {
-    pub ctx: &'a ExpansionCtx<'a>,
-    pub postfix_path: IndexEndPath,
-    pub postfix_iter: PostfixIterator<'a, HypergraphRef>,
+pub(crate) struct ExpandCtx<'a> {
+    pub(crate) ctx: &'a ExpansionCtx<'a>,
+    pub(crate) postfix_path: IndexEndPath,
+    pub(crate) postfix_iter: PostfixIterator<'a, HypergraphRef>,
 }
 impl<'a> ExpandCtx<'a> {
-    pub fn try_new(ctx: &'a ExpansionCtx<'a>) -> Option<Self> {
+    pub(crate) fn try_new(ctx: &'a ExpansionCtx<'a>) -> Option<Self> {
         let last_end = ctx.last().last_token();
         debug!(last_end_postfix = ?last_end, "Try new ExpandCtx");
         let mut postfix_iter = last_end.postfix_iter(ctx.graph.clone());
@@ -72,7 +72,7 @@ impl Iterator for ExpandCtx<'_> {
                         postfix_location = ?postfix_location,
                         postfix = ?postfix,
                         start_bound = ?start_bound,
-                        "ExpandCtx::next -> Cap"
+                        "ExpandCtx::next -> Possible Cap"
                     );
                     ChainOp::Cap(BandCap {
                         postfix_path: self.postfix_path.clone(),

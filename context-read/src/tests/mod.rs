@@ -1,5 +1,5 @@
-pub mod grammar;
-pub mod linear;
-pub mod ngrams_validation;
-pub mod overlapping;
-pub mod read;
+pub(crate) mod grammar;
+pub(crate) mod linear;
+pub(crate) mod ngrams_validation;
+pub(crate) mod overlapping;
+pub(crate) mod read;

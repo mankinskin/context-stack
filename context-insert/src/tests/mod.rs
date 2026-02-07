@@ -8,10 +8,10 @@ use context_trace::*;
 
 use pretty_assertions::assert_eq;
 
-pub mod cases;
-pub mod env;
-pub mod interval;
-pub mod test_case;
+pub(crate) mod cases;
+pub(crate) mod env;
+pub(crate) mod interval;
+pub(crate) mod test_case;
 
 pub(crate) fn pattern_from_widths(
     widths: impl IntoIterator<Item = usize>

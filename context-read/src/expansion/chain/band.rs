@@ -4,10 +4,10 @@ use context_trace::*;
 use derivative::Derivative;
 use derive_more::Deref;
 
-pub struct BandCtx<'a> {
-    pub band: &'a Band,
-    //pub back_link: Option<&'a OverlapLink>,
-    //pub front_link: Option<&'a OverlapLink>,
+pub(crate) struct BandCtx<'a> {
+    pub(crate) band: &'a Band,
+    //pub(crate) back_link: Option<&'a OverlapLink>,
+    //pub(crate) front_link: Option<&'a OverlapLink>,
 }
 impl From<BandCtx<'_>> for Band {
     fn from(band: BandCtx<'_>) -> Self {
@@ -17,10 +17,10 @@ impl From<BandCtx<'_>> for Band {
 
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Ord, Eq, PartialEq, PartialOrd)]
-pub struct Band {
-    pub pattern: Pattern,
-    pub start_bound: AtomPosition,
-    pub end_bound: AtomPosition, // key for ordering
+pub(crate) struct Band {
+    pub(crate) pattern: Pattern,
+    pub(crate) start_bound: AtomPosition,
+    pub(crate) end_bound: AtomPosition, // key for ordering
 }
 impl Borrow<AtomPosition> for Band {
     fn borrow(&self) -> &AtomPosition {
@@ -28,10 +28,10 @@ impl Borrow<AtomPosition> for Band {
     }
 }
 impl Band {
-    pub fn last_token(&self) -> Token {
+    pub(crate) fn last_token(&self) -> Token {
         *self.pattern.last().unwrap()
     }
-    pub fn append(
+    pub(crate) fn append(
         &mut self,
         postfix: Token,
     ) {
@@ -41,11 +41,6 @@ impl Band {
         self.pattern.push(postfix);
     }
 }
-//impl From<(usize, Band)> for Band {
-//    fn from((_, band): (usize, Band)) -> Self {
-//        band
-//    }
-//}
 impl From<Token> for Band {
     fn from(first: Token) -> Self {
         Self {
@@ -68,13 +63,13 @@ impl From<(AtomPosition, Pattern)> for Band {
 
 #[derive(Clone, Debug, Eq, Derivative, Deref)]
 #[derivative(Ord, PartialOrd, PartialEq)]
-pub struct Overlap {
+pub(crate) struct Overlap {
     #[deref]
-    pub index: Token,
-    pub start_bound: usize, // key for ordering
+    pub(crate) index: Token,
+    pub(crate) start_bound: usize, // key for ordering
 }
 impl Overlap {
-    pub fn end_bound(&self) -> AtomPosition {
+    pub(crate) fn end_bound(&self) -> AtomPosition {
         (self.start_bound + self.width().0).into()
     }
 }

@@ -24,7 +24,7 @@ impl std::fmt::Display for EndReason {
 // - bottom up-no matching parents
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EndState {
+pub(crate) struct EndState {
     pub(crate) reason: EndReason,
     pub(crate) path: PathCoverage,
     pub(crate) cursor: PatternCursor,

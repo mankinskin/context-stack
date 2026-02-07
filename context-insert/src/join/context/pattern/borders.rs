@@ -23,7 +23,7 @@ use crate::{
     split::cache::position::PosKey,
 };
 
-pub trait JoinBorders<R: RangeRole<Mode = Join>>: TraceBorders<R> {
+pub(crate) trait JoinBorders<R: RangeRole<Mode = Join>>: TraceBorders<R> {
     fn get_child_splits(
         &self,
         ctx: &PatternJoinCtx,

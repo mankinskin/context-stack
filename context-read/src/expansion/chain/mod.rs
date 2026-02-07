@@ -1,6 +1,6 @@
-pub mod band;
-pub mod expand;
-pub mod link;
+pub(crate) mod band;
+pub(crate) mod expand;
+pub(crate) mod link;
 
 use std::collections::BTreeSet;
 
@@ -18,15 +18,15 @@ use crate::expansion::chain::{
 };
 
 #[derive(Default, Clone, Debug, Deref, DerefMut)]
-pub struct BandChain {
+pub(crate) struct BandChain {
     #[deref]
     #[deref_mut]
-    pub bands: BTreeSet<Band>,
+    pub(crate) bands: BTreeSet<Band>,
     // todo: use map for links
-    //pub links: VecDeque<OverlapLink>,
+    //pub(crate) links: VecDeque<OverlapLink>,
 }
 impl BandChain {
-    pub fn new(index: Token) -> Self {
+    pub(crate) fn new(index: Token) -> Self {
         let band = Band {
             pattern: Pattern::from(vec![index]),
             start_bound: 0.into(),
@@ -38,7 +38,7 @@ impl BandChain {
             //links: Default::default(),
         }
     }
-    pub fn ends_at(
+    pub(crate) fn ends_at(
         &self,
         bound: AtomPosition,
     ) -> Option<BandCtx<'_>> {
@@ -55,23 +55,23 @@ impl BandChain {
             //front_link: None,
         })
     }
-    pub fn start_token(&self) -> Token {
+    pub(crate) fn start_token(&self) -> Token {
         self.first().unwrap().last_token()
     }
-    pub fn last(&self) -> Option<BandCtx<'_>> {
+    pub(crate) fn last(&self) -> Option<BandCtx<'_>> {
         self.bands.iter().last().map(|band| BandCtx {
             band,
             //back_link: self.links.iter().last(),
             //front_link: None,
         })
     }
-    pub fn append(
+    pub(crate) fn append(
         &mut self,
         band: impl Into<Band>,
     ) {
         self.bands.insert(band.into());
     }
-    pub fn append_front_complement(
+    pub(crate) fn append_front_complement(
         &mut self,
         complement: Token,
         exp: Token,
@@ -86,19 +86,19 @@ impl BandChain {
         );
         self.append(band);
     }
-    pub fn pop_first(&mut self) -> Option<Band> {
+    pub(crate) fn pop_first(&mut self) -> Option<Band> {
         //self.links.pop_front();
         self.bands.pop_first()
     }
 
     /// Get the final bundled token from the last band.
-    pub fn final_token(&self) -> Token {
+    pub(crate) fn final_token(&self) -> Token {
         self.last().unwrap().band.last_token()
     }
 
     /// Iterate over overlap bands (all bands after the first one).
     /// These contain decompositions `[complement, expansion]`.
-    pub fn overlap_bands(&self) -> impl Iterator<Item = &Band> {
+    pub(crate) fn overlap_bands(&self) -> impl Iterator<Item = &Band> {
         self.bands.iter().skip(1)
     }
 }

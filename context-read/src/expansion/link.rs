@@ -1,8 +1,8 @@
 use context_trace::*;
 
 #[derive(Debug)]
-pub struct ExpansionLink {
-    pub expansion_prefix: IndexStartPath,
-    pub root_postfix: IndexEndPath,
-    pub start_bound: usize,
+pub(crate) struct ExpansionLink {
+    pub(crate) expansion_prefix: IndexStartPath,
+    pub(crate) root_postfix: IndexEndPath,
+    pub(crate) start_bound: usize,
 }

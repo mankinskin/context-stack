@@ -24,18 +24,18 @@ use std::sync::{
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EnvInsertPattern2 {
-    pub graph: HypergraphRef,
-    pub a: Token,
-    pub b: Token,
-    pub x: Token,
-    pub y: Token,
-    pub z: Token,
-    pub yz: Token,
-    pub xab: Token,
-    pub xyz: Token,
-    pub xabz: Token,
-    pub xabyz: Token,
+pub(crate) struct EnvInsertPattern2 {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) a: Token,
+    pub(crate) b: Token,
+    pub(crate) x: Token,
+    pub(crate) y: Token,
+    pub(crate) z: Token,
+    pub(crate) yz: Token,
+    pub(crate) xab: Token,
+    pub(crate) xyz: Token,
+    pub(crate) xabz: Token,
+    pub(crate) xabyz: Token,
 }
 
 impl TestEnv for EnvInsertPattern2 {

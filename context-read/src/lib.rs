@@ -11,16 +11,12 @@
 
 extern crate test;
 
-//pub mod bundle;
-pub mod bands;
-pub mod complement;
+pub(crate) mod bands;
+pub(crate) mod complement;
 pub mod context;
-pub mod expansion;
-//pub mod overlap;
-pub mod request;
-pub mod sequence;
-//#[cfg(test)]
-//mod tests;
+pub(crate) mod expansion;
+pub(crate) mod request;
+pub(crate) mod segment;
 
 #[cfg(test)]
 mod tests;

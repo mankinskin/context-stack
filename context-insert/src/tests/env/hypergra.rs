@@ -30,17 +30,17 @@ use std::sync::{
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EnvHypergra {
-    pub graph: HypergraphRef,
-    pub h: Token,
-    pub y: Token,
-    pub p: Token,
-    pub e: Token,
-    pub r: Token,
-    pub g: Token,
-    pub a: Token,
-    pub hypergra: Token,
-    pub hypergra_id: PatternId,
+pub(crate) struct EnvHypergra {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) h: Token,
+    pub(crate) y: Token,
+    pub(crate) p: Token,
+    pub(crate) e: Token,
+    pub(crate) r: Token,
+    pub(crate) g: Token,
+    pub(crate) a: Token,
+    pub(crate) hypergra: Token,
+    pub(crate) hypergra_id: PatternId,
 }
 
 impl TestEnv for EnvHypergra {

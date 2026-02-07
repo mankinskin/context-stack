@@ -46,13 +46,13 @@ impl Response {
     }
 
     /// Unwrap a complete response, panicking if incomplete
-    pub fn unwrap_complete(self) -> IndexRangePath {
+    pub(crate) fn unwrap_complete(self) -> IndexRangePath {
         self.expect_complete("Called unwrap_complete on incomplete Response")
     }
 
     /// Unwrap a complete response with a custom error message
     #[track_caller]
-    pub fn expect_entire_root(
+    pub(crate) fn expect_entire_root(
         self,
         msg: &str,
     ) -> IndexRangePath {
@@ -77,7 +77,7 @@ impl Response {
     }
 
     /// Try to get the complete path if the response is complete
-    pub fn as_complete(&self) -> Option<&IndexRangePath> {
+    pub(crate) fn as_complete(&self) -> Option<&IndexRangePath> {
         if !self.end.query_exhausted() {
             return None;
         }
@@ -107,7 +107,7 @@ impl Response {
     /// Get the checkpoint atom position
     /// Always returns the confirmed match position, never the exploratory candidate position.
     /// This should be used for insertion boundaries and other operations that need the confirmed match extent.
-    pub fn checkpoint_position(&self) -> AtomPosition {
+    pub(crate) fn checkpoint_position(&self) -> AtomPosition {
         self.end.checkpoint().atom_position
     }
 }

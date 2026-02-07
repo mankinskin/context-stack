@@ -13,15 +13,15 @@
 extern crate test;
 
 pub(crate) mod compare;
-pub(crate) mod container;
+pub mod container;
 pub(crate) mod cursor;
 pub(crate) mod r#match;
-pub(crate) mod policy;
-pub(crate) mod search;
-pub(crate) mod state;
+pub mod policy;
+pub mod search;
+pub mod state;
 
 /// Compact formatting for logging
-pub mod logging;
+pub(crate) mod logging;
 
 #[cfg(any(test, feature = "test-api"))]
 pub mod tests;

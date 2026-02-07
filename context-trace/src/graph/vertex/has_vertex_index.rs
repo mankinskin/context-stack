@@ -40,7 +40,7 @@ impl HasVertexIndex for Token {
 }
 
 pub trait ToToken: HasVertexIndex + Wide + Debug {
-    fn to_child(&self) -> Token {
+    fn to_token(&self) -> Token {
         Token::new(self.vertex_index(), self.width())
     }
 }

@@ -70,7 +70,7 @@ where
     result
 }
 
-pub trait PrefixStates: Sized + Clone {
+pub(crate) trait PrefixStates: Sized + Clone {
     fn decompose_into_prefixes<G: HasGraph>(
         &self,
         trav: &G,

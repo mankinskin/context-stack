@@ -6,17 +6,17 @@
 //! - `MergePartitionCtx`: Context for merging individual partitions
 //! - `RangeMap`: Maps partition ranges to merged tokens
 
-pub mod context;
+pub(crate) mod context;
 mod iter;
-pub mod partition;
+pub(crate) mod partition;
 mod partition_range;
 mod range_map;
 mod required;
 
-pub mod node;
+pub(crate) mod node;
 
-pub use iter::PartitionMergeIter;
-pub use partition::MergePartitionCtx;
-pub use partition_range::PartitionRange;
-pub use range_map::RangeMap;
-pub use required::RequiredPartitions;
+pub(crate) use iter::PartitionMergeIter;
+pub(crate) use partition::MergePartitionCtx;
+pub(crate) use partition_range::PartitionRange;
+pub(crate) use range_map::RangeMap;
+pub(crate) use required::RequiredPartitions;

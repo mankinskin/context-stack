@@ -158,7 +158,7 @@ pub trait IntoPattern: Sized
     //type Elem: ToToken;
 
     //fn into_pattern(self) -> Pattern {
-    //    self.into_iter().map(|x| x.to_child()).collect()
+    //    self.into_iter().map(|x| x.to_token()).collect()
     //}
     fn into_pattern(self) -> Pattern;
     fn is_empty(&self) -> bool;

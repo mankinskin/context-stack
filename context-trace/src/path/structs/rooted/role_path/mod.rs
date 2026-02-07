@@ -46,16 +46,16 @@ impl<Root: PathRoot, R: PathRole, N> From<Root> for RootedRolePath<R, Root, N> {
     }
 }
 
-impl<R: PathRole, Root: PathRoot> HasPath<R>
+impl<R: PathRole, Root: PathRoot> HasChildPath<R>
     for RootedRolePath<R, Root, ChildLocation>
 where
     Self: HasRolePath<R, Node = ChildLocation>,
 {
     type Node = ChildLocation;
-    fn path(&self) -> &Vec<ChildLocation> {
+    fn child_path(&self) -> &Vec<ChildLocation> {
         self.role_path().path()
     }
-    fn path_mut(&mut self) -> &mut Vec<ChildLocation> {
+    fn child_path_mut(&mut self) -> &mut Vec<ChildLocation> {
         self.role_path_mut().path_mut()
     }
 }
@@ -146,11 +146,11 @@ impl<R: PathRole> IndexRolePath<R> {
 impl<R: PathRole> HasLeafToken<R> for IndexRolePath<R>
 where
     Self:
-        HasRolePath<R, Node = ChildLocation> + HasPath<R, Node = ChildLocation>,
+        HasRolePath<R, Node = ChildLocation> + HasChildPath<R, Node = ChildLocation>,
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         Some(
-            R::bottom_up_iter(HasPath::<R>::path(self).iter())
+            R::bottom_up_iter(HasChildPath::<R>::child_path(self).iter())
                 .next()
                 .cloned()
                 .unwrap_or(
@@ -334,7 +334,7 @@ impl<Role: PathRole, Root: PathRoot> RootPattern
 //    }
 //}
 //impl<R: PathRole> LeafToken<R> for PatternRolePath<R> where
-//    Self: HasPath<R> + PatternRootChild<R>
+//    Self: HasChildPath<R> + PatternRootChild<R>
 //{
 //}
 //

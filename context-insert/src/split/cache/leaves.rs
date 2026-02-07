@@ -8,10 +8,10 @@ use derive_more::{
 use linked_hash_set::LinkedHashSet;
 
 #[derive(Default, Debug, Deref, DerefMut, From, Clone, PartialEq, Eq)]
-pub struct Leaves(LinkedHashSet<PosKey>);
+pub(crate) struct Leaves(LinkedHashSet<PosKey>);
 
 impl Leaves {
-    pub fn collect_leaves(
+    pub(crate) fn collect_leaves(
         &mut self,
         index: &Token,
         offsets: CompleteLocations,

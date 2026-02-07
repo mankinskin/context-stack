@@ -52,7 +52,7 @@ impl<P: StartFoldPath> IntoCursor for P {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum InputLocation {
+pub(crate) enum InputLocation {
     Location(PatternLocation),
     PatternChild { sub_index: usize, token: Token },
 }
@@ -84,7 +84,7 @@ impl GraphRoot for InputLocation {
     }
 }
 
-pub trait StartFoldPath:
+pub(crate) trait StartFoldPath:
     BaseQuery
     + PathAppend
     + PathPop

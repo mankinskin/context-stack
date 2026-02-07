@@ -57,7 +57,7 @@ impl<R: InsertResult> InsertCtx<R> {
         self.insert_result(searchable)
             .and_then(|res| res.map_err(|root| root.into()))
     }
-    pub fn insert_init(
+    pub(crate) fn insert_init(
         &mut self,
         ext: R::Extract,
         init: InitInterval,
@@ -132,7 +132,7 @@ impl<R: InsertResult> InsertCtx<R> {
             Err(err) => Err(err),
         }
     }
-    pub fn insert_or_get_complete(
+    pub(crate) fn insert_or_get_complete(
         &mut self,
         searchable: impl Searchable<InsertTraversal>,
     ) -> Result<Result<R, R::Error>, ErrorReason> {

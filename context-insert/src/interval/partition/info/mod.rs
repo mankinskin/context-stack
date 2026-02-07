@@ -32,24 +32,24 @@ use crate::{
 };
 use context_trace::*;
 
-pub mod border;
-pub mod borders;
-pub mod range;
+pub(crate) mod border;
+pub(crate) mod borders;
+pub(crate) mod range;
 
 #[derive(Debug, Default)]
-pub struct PartitionInfo<R: RangeRole> {
-    pub patterns: HashMap<PatternId, PatternInfoOf<R>>,
-    pub perfect: R::Perfect,
+pub(crate) struct PartitionInfo<R: RangeRole> {
+    pub(crate) patterns: HashMap<PatternId, PatternInfoOf<R>>,
+    pub(crate) perfect: R::Perfect,
 }
 
 /// Type alias for pattern contexts by pattern ID.
 /// With interior mutability, pattern contexts own their data.
-pub type PatternCtxs<R> = HashMap<PatternId, ModePatternCtxOf<R>>;
+pub(crate) type PatternCtxs<R> = HashMap<PatternId, ModePatternCtxOf<R>>;
 
-pub trait PartitionBorderKey: Hash + Eq {}
+pub(crate) trait PartitionBorderKey: Hash + Eq {}
 
 impl<T: Hash + Eq> PartitionBorderKey for T {}
-pub trait InfoPartition<R: RangeRole>: Sized + Clone + ToPartition<R> {
+pub(crate) trait InfoPartition<R: RangeRole>: Sized + Clone + ToPartition<R> {
     fn info_borders(
         &self,
         ctx: &PatternTraceCtx,

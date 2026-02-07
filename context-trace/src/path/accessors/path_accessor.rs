@@ -6,7 +6,7 @@ use crate::path::mutators::move_path::key::AtomPosition;
 
 /// Core path accessor trait - provides access to the path vector
 ///
-/// Replaces: `HasPath<R>`, `HasRolePath<R>` for most use cases
+/// Replaces: `HasChildPath<R>`, `HasRolePath<R>` for most use cases
 ///
 /// This trait provides mutable and immutable access to a path's node vector.
 /// It's parameterized by the path role (Start/End) through an associated type.
@@ -26,7 +26,7 @@ pub trait PathAccessor {
 
 /// Extension for rooted paths - provides access to the root
 ///
-/// Replaces: `RootedPath` + `HasPath` combinations
+/// Replaces: `RootedPath` + `HasChildPath` combinations
 ///
 /// This trait extends PathAccessor for paths that have a defined root token.
 /// It provides access to both the path and its root.

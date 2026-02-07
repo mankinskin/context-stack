@@ -39,18 +39,18 @@ use context_trace::{
     logging::format_utils::pretty,
     *,
 };
-pub use searchable::Searchable;
+pub(crate) use searchable::Searchable;
 
 use tracing::{
     debug,
     info,
     trace,
 };
-pub(crate) mod context;
+pub mod context;
 pub(crate) mod searchable;
 
 pub(crate) type SearchResult = Result<Response, ErrorReason>;
-#[allow(dead_code)]
+
 pub trait Find: HasGraph {
     fn ctx(&self) -> SearchCtx<Self>;
 

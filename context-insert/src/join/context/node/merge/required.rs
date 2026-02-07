@@ -26,23 +26,23 @@ use tracing::debug;
 
 /// Tracks which partition ranges require token creation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct RequiredPartitions {
+pub(crate) struct RequiredPartitions {
     required: HashSet<PartitionRange>,
 }
 
 impl RequiredPartitions {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Mark a partition range as required.
-    pub fn add(&mut self, range: PartitionRange) {
+    pub(crate) fn add(&mut self, range: PartitionRange) {
         debug!(?range, "RequiredPartitions: adding");
         self.required.insert(range);
     }
 
     /// Check if a partition range is required.
-    pub fn is_required(&self, range: &PartitionRange) -> bool {
+    pub(crate) fn is_required(&self, range: &PartitionRange) -> bool {
         self.required.contains(range)
     }
 
@@ -51,7 +51,7 @@ impl RequiredPartitions {
     ///
     /// This handles inner partitions: when target `aby` (1..=3) overlaps with
     /// wrapper `abyz` (1..=4), the overlap `ab` (1..=2) becomes required.
-    pub fn close_under_overlaps(&mut self) {
+    pub(crate) fn close_under_overlaps(&mut self) {
         loop {
             let current: Vec<_> = self.required.iter().cloned().collect();
             let before = self.required.len();
@@ -85,7 +85,7 @@ impl RequiredPartitions {
     /// For example, to build `aby` (1..=3) with pattern `[ab, y]`:
     /// - Need `ab` (1..=2) as left component
     /// - Need `y` (3..=3) as right component
-    pub fn close_under_subranges(&mut self) {
+    pub(crate) fn close_under_subranges(&mut self) {
         loop {
             let current: Vec<_> = self.required.iter().cloned().collect();
             let before = self.required.len();
@@ -128,17 +128,17 @@ impl RequiredPartitions {
     }
 
     /// Iterate over all required partition ranges.
-    pub fn iter(&self) -> impl Iterator<Item = &PartitionRange> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &PartitionRange> {
         self.required.iter()
     }
 
     /// Number of required partitions.
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.required.len()
     }
 
     /// Check if empty.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.required.is_empty()
     }
 }

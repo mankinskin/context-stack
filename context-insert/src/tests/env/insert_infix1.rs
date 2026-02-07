@@ -23,16 +23,16 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvInsertInfix1 {
-    pub graph: HypergraphRef,
-    pub a: Token,
-    pub b: Token,
-    pub w: Token,
-    pub x: Token,
-    pub y: Token,
-    pub z: Token,
-    pub yz: Token,
-    pub xxabyzw: Token,
+pub(crate) struct EnvInsertInfix1 {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) a: Token,
+    pub(crate) b: Token,
+    pub(crate) w: Token,
+    pub(crate) x: Token,
+    pub(crate) y: Token,
+    pub(crate) z: Token,
+    pub(crate) yz: Token,
+    pub(crate) xxabyzw: Token,
 }
 
 impl TestEnv for EnvInsertInfix1 {

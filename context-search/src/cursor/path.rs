@@ -99,18 +99,18 @@ impl<P: PathAppend, S: CursorState> PathAppend for PathCursor<P, S> {
 // No need for HasRootedPath trait - use `.path` field or `&*cursor`
 impl<
         R: PathRole,
-        P: StartFoldPath + HasRolePath<R> + HasPath<R>,
+        P: StartFoldPath + HasRolePath<R> + HasChildPath<R>,
         S: CursorState,
-    > HasPath<R> for PathCursor<P, S>
+    > HasChildPath<R> for PathCursor<P, S>
 where
-    <P as HasPath<R>>::Node: Clone,
+    <P as HasChildPath<R>>::Node: Clone,
 {
-    type Node = <P as HasPath<R>>::Node;
-    fn path(&self) -> &Vec<Self::Node> {
-        HasPath::<R>::path(&self.path)
+    type Node = <P as HasChildPath<R>>::Node;
+    fn child_path(&self) -> &Vec<Self::Node> {
+        HasChildPath::<R>::child_path(&self.path)
     }
-    fn path_mut(&mut self) -> &mut Vec<Self::Node> {
-        HasPath::<R>::path_mut(&mut self.path)
+    fn child_path_mut(&mut self) -> &mut Vec<Self::Node> {
+        HasChildPath::<R>::child_path_mut(&mut self.path)
     }
 }
 

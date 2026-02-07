@@ -14,7 +14,7 @@ use crate::{
 
 /// The type of a partition range based on its bounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PartitionType {
+pub(crate) enum PartitionType {
     Prefix,
     Postfix,
     Full,
@@ -22,43 +22,43 @@ pub enum PartitionType {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum MergeMode {
+pub(crate) enum MergeMode {
     Full,
     Root(RootMode),
 }
 #[allow(dead_code)]
 impl MergeMode {
-    pub fn is_prefix(&self) -> bool {
+    pub(crate) fn is_prefix(&self) -> bool {
         matches!(self, MergeMode::Root(RootMode::Prefix))
     }
-    pub fn is_postfix(&self) -> bool {
+    pub(crate) fn is_postfix(&self) -> bool {
         matches!(self, MergeMode::Root(RootMode::Postfix))
     }
-    pub fn is_full(&self) -> bool {
+    pub(crate) fn is_full(&self) -> bool {
         matches!(self, MergeMode::Full)
     }
-    pub fn is_infix(&self) -> bool {
+    pub(crate) fn is_infix(&self) -> bool {
         matches!(self, MergeMode::Root(RootMode::Infix))
     }
-    pub fn has_prefix(&self) -> bool {
+    pub(crate) fn has_prefix(&self) -> bool {
         matches!(self, MergeMode::Full | MergeMode::Root(RootMode::Prefix))
     }
-    pub fn has_postfix(&self) -> bool {
+    pub(crate) fn has_postfix(&self) -> bool {
         matches!(self, MergeMode::Full | MergeMode::Root(RootMode::Postfix))
     }
 }
 
 #[derive(Debug, Deref, DerefMut)]
-pub struct MergeCtx<'a> {
+pub(crate) struct MergeCtx<'a> {
     #[deref]
     #[deref_mut]
-    pub ctx: NodeJoinCtx<'a>,
-    pub offsets: SplitVertexCache,
-    pub mode: MergeMode,
+    pub(crate) ctx: NodeJoinCtx<'a>,
+    pub(crate) offsets: SplitVertexCache,
+    pub(crate) mode: MergeMode,
 }
 
 impl<'a> MergeCtx<'a> {
-    pub fn new(
+    pub(crate) fn new(
         ctx: NodeJoinCtx<'a>,
         mode: MergeMode,
     ) -> Self {
@@ -73,7 +73,7 @@ impl<'a> MergeCtx<'a> {
 
     /// Add a split to the shared splits map.
     /// This makes splits for merged tokens available to subsequent pattern operations.
-    pub fn add_split(
+    pub(crate) fn add_split(
         &mut self,
         key: crate::split::cache::position::PosKey,
         split: crate::split::Split,
@@ -84,12 +84,12 @@ impl<'a> MergeCtx<'a> {
 
 impl<'a> MergeCtx<'a> {
     /// Total number of partitions (num_offsets + 1)
-    pub fn num_partitions(&self) -> usize {
+    pub(crate) fn num_partitions(&self) -> usize {
         self.offsets.len() + 1
     }
 
     /// The operating partition range based on merge mode.
-    pub fn operating_partition_range(&self) -> PartitionRange {
+    pub(crate) fn operating_partition_range(&self) -> PartitionRange {
         let num_offsets = self.offsets.len();
         PartitionRange::from(match self.mode {
             MergeMode::Full => 0..=num_offsets,
@@ -102,7 +102,7 @@ impl<'a> MergeCtx<'a> {
     }
 
     /// Determine the partition type for a given partition range relative to the full node.
-    pub fn partition_type(
+    pub(crate) fn partition_type(
         &self,
         range: &PartitionRange,
     ) -> PartitionType {
@@ -125,7 +125,7 @@ impl<'a> MergeCtx<'a> {
     /// # Arguments
     /// - `target_range`: For root merges, the range containing the target token.
     ///   For intermediary merges, pass `None`.
-    pub fn merge_sub_partitions(
+    pub(crate) fn merge_sub_partitions(
         &mut self,
         target_range: Option<PartitionRange>,
     ) -> super::iter::MergeIterResult {

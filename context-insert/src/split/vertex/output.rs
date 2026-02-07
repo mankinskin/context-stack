@@ -7,11 +7,11 @@ use crate::split::vertex::position::{
     SubSplitLocation,
 };
 
-pub type OffsetLocations = HashMap<Offset, Vec<SubSplitLocation>>;
-pub type CompleteLocations =
+pub(crate) type OffsetLocations = HashMap<Offset, Vec<SubSplitLocation>>;
+pub(crate) type CompleteLocations =
     HashMap<Offset, Result<Vec<SubSplitLocation>, SubLocation>>;
 
-pub trait NodeSplitOutput<S>: Default {
+pub(crate) trait NodeSplitOutput<S>: Default {
     fn set_root_mode(
         &mut self,
         _root_mode: RootMode,
@@ -38,7 +38,7 @@ impl NodeSplitOutput<OffsetLocations> for (OffsetLocations, RootMode) {
     }
 }
 
-pub trait NodeType {
+pub(crate) trait NodeType {
     type GlobalSplitOutput: NodeSplitOutput<OffsetLocations>;
     type CompleteSplitOutput: Default;
     fn map(
@@ -55,7 +55,7 @@ pub enum RootMode {
     Infix,
 }
 
-pub struct RootNode;
+pub(crate) struct RootNode;
 
 impl NodeType for RootNode {
     type GlobalSplitOutput = (OffsetLocations, RootMode);
@@ -68,7 +68,7 @@ impl NodeType for RootNode {
     }
 }
 
-pub struct InnerNode;
+pub(crate) struct InnerNode;
 
 impl NodeType for InnerNode {
     type GlobalSplitOutput = OffsetLocations;

@@ -15,21 +15,21 @@ use crate::{
 use context_trace::*;
 
 #[derive(Debug)]
-pub struct SplitRunStep;
+pub(crate) struct SplitRunStep;
 
 #[derive(Debug)]
-pub struct SplitRun<G: HasGraph> {
+pub(crate) struct SplitRun<G: HasGraph> {
     ctx: SplitCacheCtx<G>,
     incomplete: BTreeSet<Token>,
 }
 impl<G: HasGraph> SplitRun<G> {
-    pub fn init(&mut self) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
+    pub(crate) fn init(&mut self) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
         self.ctx.cache.augment_root(
             &self.ctx.states_ctx.trav,
             self.ctx.states_ctx.ctx.root,
         )
     }
-    pub fn finish(mut self) -> SplitCacheCtx<G> {
+    pub(crate) fn finish(mut self) -> SplitCacheCtx<G> {
         self.ctx
             .cache
             .augment_nodes(&mut self.ctx.states_ctx, self.incomplete);

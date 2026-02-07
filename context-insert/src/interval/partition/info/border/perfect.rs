@@ -11,7 +11,7 @@ use derive_more::{
 
 use context_trace::*;
 
-pub trait BoolPerfect: Default + Debug + Clone {
+pub(crate) trait BoolPerfect: Default + Debug + Clone {
     type Result: BorderPerfect<Boolean = Self>;
     fn then_some(
         self,
@@ -46,7 +46,7 @@ impl BoolPerfect for (bool, bool) {
     }
 }
 
-pub trait BorderPerfect: Default + Debug + Clone + Extend<Self> {
+pub(crate) trait BorderPerfect: Default + Debug + Clone + Extend<Self> {
     type Boolean: BoolPerfect<Result = Self>;
     fn new(
         boolean: Self::Boolean,
@@ -58,10 +58,10 @@ pub trait BorderPerfect: Default + Debug + Clone + Extend<Self> {
 }
 
 #[derive(Debug, Default, Clone, Copy, From, Into, Deref)]
-pub struct SinglePerfect(pub Option<PatternId>);
+pub(crate) struct SinglePerfect(pub(crate) Option<PatternId>);
 
 #[derive(Debug, Default, Clone, Copy, From, Into)]
-pub struct DoublePerfect(pub Option<PatternId>, pub Option<PatternId>);
+pub(crate) struct DoublePerfect(pub(crate) Option<PatternId>, pub(crate) Option<PatternId>);
 
 impl std::ops::Add for SinglePerfect {
     type Output = Self;

@@ -22,7 +22,7 @@ use context_trace::*;
 /// This enum encodes whether the match has an advanced candidate (from parent exploration)
 /// or just a checkpoint (no further exploration).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CheckpointedCursor {
+pub(crate) enum CheckpointedCursor {
     /// At checkpoint - no candidate, only the confirmed match position
     AtCheckpoint(Checkpointed<PatternCursor<Matched>, AtCheckpoint>),
     /// Has candidate - advanced position from parent exploration
@@ -31,7 +31,7 @@ pub enum CheckpointedCursor {
 
 impl CheckpointedCursor {
     /// Get the checkpoint cursor (always available)
-    pub fn checkpoint(&self) -> &PatternCursor<Matched> {
+    pub(crate) fn checkpoint(&self) -> &PatternCursor<Matched> {
         match self {
             CheckpointedCursor::AtCheckpoint(c) => c.checkpoint(),
             CheckpointedCursor::HasCandidate(c) => c.checkpoint(),
@@ -42,7 +42,7 @@ impl CheckpointedCursor {
     ///
     /// Returns the candidate (advanced position) if available, otherwise the checkpoint.
     /// This allows consecutive searches to continue from where parent exploration left off.
-    pub fn cursor(&self) -> &PatternCursor<Matched> {
+    pub(crate) fn cursor(&self) -> &PatternCursor<Matched> {
         match self {
             CheckpointedCursor::AtCheckpoint(c) => c.checkpoint(),
             CheckpointedCursor::HasCandidate(c) => c.candidate(),
@@ -50,7 +50,7 @@ impl CheckpointedCursor {
     }
 
     /// Check if this has a candidate (advanced position from parent exploration)
-    pub fn has_candidate(&self) -> bool {
+    pub(crate) fn has_candidate(&self) -> bool {
         matches!(self, CheckpointedCursor::HasCandidate(_))
     }
 }
@@ -62,9 +62,9 @@ impl CheckpointedCursor {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MatchResult {
     /// The path in the graph where the match occurred
-    pub path: PathCoverage,
+    pub(crate) path: PathCoverage,
     /// The checkpointed cursor (either AtCheckpoint or HasCandidate)
-    pub cursor: CheckpointedCursor,
+    pub(crate) cursor: CheckpointedCursor,
 }
 impl GraphRoot for MatchResult {
     fn root_parent(&self) -> Token {
@@ -75,7 +75,7 @@ impl MatchResult {
     /// Create a new MatchResult, validating invariants
     ///
     /// For EntireRoot paths, validates that cursor_position equals root token width.
-    pub fn new(
+    pub(crate) fn new(
         path: PathCoverage,
         cursor: CheckpointedCursor,
     ) -> Self {
@@ -130,12 +130,12 @@ impl MatchResult {
     }
 
     /// Get the path
-    pub fn path(&self) -> &PathCoverage {
+    pub(crate) fn path(&self) -> &PathCoverage {
         &self.path
     }
 
     /// Get the checkpoint cursor (always the confirmed match position)
-    pub fn checkpoint(&self) -> &PatternCursor<Matched> {
+    pub(crate) fn checkpoint(&self) -> &PatternCursor<Matched> {
         self.cursor.checkpoint()
     }
 
@@ -143,30 +143,30 @@ impl MatchResult {
     ///
     /// Returns the candidate (advanced position) if available, otherwise the checkpoint.
     /// This allows consecutive searches to continue from where parent exploration left off.
-    pub fn cursor(&self) -> &PatternCursor<Matched> {
+    pub(crate) fn cursor(&self) -> &PatternCursor<Matched> {
         self.cursor.cursor()
     }
 
     /// Check if the query was fully matched
     /// Returns true if the cursor's path has reached the end of the pattern
     /// and there are no more tokens to traverse
-    pub fn query_exhausted(&self) -> bool {
+    pub(crate) fn query_exhausted(&self) -> bool {
         use context_trace::{
             path::accessors::role::End,
-            HasPath,
+            HasChildPath,
             HasRootChildIndex,
         };
         // Check checkpoint position
         let checkpoint = self.cursor.checkpoint();
         let at_end = checkpoint.path.is_at_pattern_end();
-        let path_empty = HasPath::path(checkpoint.path.end_path()).is_empty();
+        let path_empty = HasChildPath::child_path(checkpoint.path.end_path()).is_empty();
         let end_index =
             HasRootChildIndex::<End>::root_child_index(&checkpoint.path);
         tracing::debug!(
             at_end,
             path_empty,
             end_index,
-            end_path_len=%HasPath::path(checkpoint.path.end_path()).len(),
+            end_path_len=%HasChildPath::child_path(checkpoint.path.end_path()).len(),
             "query_exhausted check"
         );
         at_end && path_empty
@@ -175,7 +175,7 @@ impl MatchResult {
     /// Check if the result is a complete pre-existing token in the graph
     /// Returns true for PathCoverage::EntireRoot (full token match),
     /// false for Range/Prefix/Postfix (intersection paths within tokens)
-    pub fn is_full_token(&self) -> bool {
+    pub(crate) fn is_full_token(&self) -> bool {
         matches!(self.path, PathCoverage::EntireRoot(_))
     }
 
@@ -202,7 +202,7 @@ impl MatchResult {
     //}
 
     /// Get start path length for incremental tracing
-    pub fn start_len(&self) -> usize {
+    pub(crate) fn start_len(&self) -> usize {
         self.path().start_len()
     }
 }

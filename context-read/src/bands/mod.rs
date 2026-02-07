@@ -43,7 +43,7 @@ pub(crate) trait BandIterator<'a, G: HasGraph + 'a>:
         )
     }
 }
-pub trait HasTokenRoleIters: ToToken {
+pub(crate) trait HasTokenRoleIters: ToToken {
     fn postfix_iter<'a, G: HasGraph + 'a>(
         &self,
         trav: G,
@@ -51,13 +51,13 @@ pub trait HasTokenRoleIters: ToToken {
     where
         <TravDir<G> as Direction>::Opposite: PatternDirection,
     {
-        PostfixIterator::band_iter(trav, self.to_child())
+        PostfixIterator::band_iter(trav, self.to_token())
     }
     fn prefix_iter<'a, G: HasGraph + 'a>(
         &self,
         trav: G,
     ) -> PrefixIterator<'a, G> {
-        PrefixIterator::band_iter(trav, self.to_child())
+        PrefixIterator::band_iter(trav, self.to_token())
     }
 
     /// Calculate the prefix path from this token to the given advanced path
@@ -90,14 +90,14 @@ pub trait HasTokenRoleIters: ToToken {
 }
 impl<T: ToToken> HasTokenRoleIters for T {}
 
-pub type PostfixIterator<'a, G> =
+pub(crate) type PostfixIterator<'a, G> =
     BandExpandingIterator<'a, G, PostfixExpandingPolicy<TravDir<G>>>;
 
-pub type PrefixIterator<'a, G> =
+pub(crate) type PrefixIterator<'a, G> =
     BandExpandingIterator<'a, G, PrefixExpandingPolicy<TravDir<G>>>;
 
 #[derive(Debug)]
-pub struct BandExpandingIterator<'a, G, P>
+pub(crate) struct BandExpandingIterator<'a, G, P>
 where
     G: HasGraph + 'a,
     P: BandExpandingPolicy<G>,

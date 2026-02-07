@@ -19,7 +19,7 @@ use crate::{
 use context_trace::*;
 
 pub mod init;
-pub mod partition;
+pub(crate) mod partition;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IntervalGraph {
@@ -30,7 +30,7 @@ pub struct IntervalGraph {
     pub(crate) required: RequiredPartitions, // required partition ranges for selective merge
 }
 impl IntervalGraph {
-    pub fn get(
+    pub(crate) fn get(
         &self,
         key: &PosKey,
     ) -> Option<&SplitPositionCache> {
@@ -38,7 +38,7 @@ impl IntervalGraph {
             .get(&key.index.vertex_index())
             .and_then(|ve| ve.positions.get(&key.pos))
     }
-    pub fn get_mut(
+    pub(crate) fn get_mut(
         &mut self,
         key: &PosKey,
     ) -> Option<&mut SplitPositionCache> {
@@ -46,13 +46,13 @@ impl IntervalGraph {
             .get_mut(&key.index.vertex_index())
             .and_then(|ve| ve.positions.get_mut(&key.pos))
     }
-    pub fn expect(
+    pub(crate) fn expect(
         &self,
         key: &PosKey,
     ) -> &SplitPositionCache {
         self.get(key).unwrap()
     }
-    pub fn expect_mut(
+    pub(crate) fn expect_mut(
         &mut self,
         key: &PosKey,
     ) -> &mut SplitPositionCache {

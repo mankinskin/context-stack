@@ -16,14 +16,14 @@ use crate::interval::partition::info::range::{
 use context_trace::*;
 
 #[derive(Debug, Clone, Copy)]
-pub enum InfixChildren {
+pub(crate) enum InfixChildren {
     Both(Token, Token),
     Left(Token),
     Right(Token),
 }
 
 impl InfixChildren {
-    pub fn into_joined_pattern(self) -> Result<Pattern, Token> {
+    pub(crate) fn into_joined_pattern(self) -> Result<Pattern, Token> {
         match self {
             InfixChildren::Both(l, r) => Ok([l, r].into_pattern()),
             InfixChildren::Left(c) | InfixChildren::Right(c) => Err(c),
@@ -31,7 +31,7 @@ impl InfixChildren {
     }
 }
 
-pub trait RangeChildren<R: RangeRole>: Debug + Clone {
+pub(crate) trait RangeChildren<R: RangeRole>: Debug + Clone {
     fn insert_inner(
         self,
         inner: Option<Token>,

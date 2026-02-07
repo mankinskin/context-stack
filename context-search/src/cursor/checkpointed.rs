@@ -32,7 +32,7 @@ use std::{
 ///
 /// Controls whether the Checkpointed cursor has an advanced candidate or is at checkpoint.
 /// Uses an associated type to encode the presence/absence of candidate data in the type system.
-pub trait CandidateState: 'static {
+pub(crate) trait CandidateState: 'static {
     /// The type of candidate data stored
     /// - `()` for AtCheckpoint (no candidate)
     /// - `C` for HasCandidate (cursor stored)
@@ -43,7 +43,7 @@ pub trait CandidateState: 'static {
 ///
 /// Used for finalized results like MatchResult where we store only the confirmed checkpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct AtCheckpoint;
+pub(crate) struct AtCheckpoint;
 impl CandidateState for AtCheckpoint {
     type CandidateData<C> = ();
 }
@@ -52,7 +52,7 @@ impl CandidateState for AtCheckpoint {
 ///
 /// Used during active search/comparison when cursors are exploring ahead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HasCandidate;
+pub(crate) struct HasCandidate;
 impl CandidateState for HasCandidate {
     type CandidateData<C> = C;
 }
@@ -117,7 +117,7 @@ where
 /// - Updates to checkpoint only happen via `mark_match()`
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(private_bounds)]
-pub struct Checkpointed<C: HasCheckpoint, S: CandidateState = AtCheckpoint> {
+pub(crate) struct Checkpointed<C: HasCheckpoint, S: CandidateState = AtCheckpoint> {
     /// Last confirmed match position (always Matched state)
     /// This is updated only when `mark_match()` is called
     pub(crate) checkpoint: C::Checkpoint,

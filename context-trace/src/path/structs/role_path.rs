@@ -78,12 +78,12 @@ impl<R: PathRole, N> HasRootChildIndexMut<R> for RolePath<R, N> {
 //    }
 //}
 
-impl<R: PathRole> HasPath<R> for RolePath<R, ChildLocation> {
+impl<R: PathRole> HasChildPath<R> for RolePath<R, ChildLocation> {
     type Node = ChildLocation;
-    fn path(&self) -> &Vec<ChildLocation> {
+    fn child_path(&self) -> &Vec<ChildLocation> {
         &self.sub_path.path
     }
-    fn path_mut(&mut self) -> &mut Vec<ChildLocation> {
+    fn child_path_mut(&mut self) -> &mut Vec<ChildLocation> {
         &mut self.sub_path.path
     }
 }

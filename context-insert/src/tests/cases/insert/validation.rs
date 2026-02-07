@@ -71,7 +71,6 @@ fn reject_init_interval_with_zero_end_bound() {
 ///
 /// Expected behavior: Return error instead of panicking at splits.rs:63
 #[test]
-#[ignore = "Requires context-insert fix: validate that cache contains root token entry"]
 fn reject_init_interval_with_missing_root_entry() {
     let EnvAb { graph, a, ab, .. } = EnvAb::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);

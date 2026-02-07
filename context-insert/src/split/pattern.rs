@@ -6,7 +6,7 @@ use std::fmt::Debug;
 
 use crate::*;
 
-pub trait PatternSplits: Debug + Clone {
+pub(crate) trait PatternSplits: Debug + Clone {
     type Pos;
     type Offsets;
     /// The atom position type - NonZeroUsize for Pre/Post, (NonZeroUsize, NonZeroUsize) for In

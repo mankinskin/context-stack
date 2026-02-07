@@ -62,7 +62,6 @@ fn repeated_pattern_creates_intermediate_tokens() {
 /// The graph stores [a, aa] but searching for [aa, a] doesn't find it.
 /// This reveals that insert doesn't automatically create all equivalent decompositions.
 #[test]
-#[ignore = "Alternate decompositions: insert [a, aa] doesn't make [aa, a] searchable"]
 fn repeated_pattern_alternate_decomposition() {
     let EnvSingleAtom { graph, a } = EnvSingleAtom::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);

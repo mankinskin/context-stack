@@ -13,7 +13,7 @@ use context_trace::{
 /// Validates that insertion produces correct token structure,
 /// pattern relationships, and graph state.
 ///
-pub trait InsertTestCase: TestCase {
+pub(crate) trait InsertTestCase: TestCase {
     /// Get a fresh environment instance
     fn environment(&self) -> Self::Env {
         Self::Env::initialize()

@@ -27,14 +27,14 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvXyyxy {
-    pub graph: HypergraphRef,
-    pub x: Token,
-    pub y: Token,
-    pub xy: Token,
-    pub xy_id: PatternId,
-    pub xyyxy: Token,
-    pub xyyxy_id: PatternId,
+pub(crate) struct EnvXyyxy {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) x: Token,
+    pub(crate) y: Token,
+    pub(crate) xy: Token,
+    pub(crate) xy_id: PatternId,
+    pub(crate) xyyxy: Token,
+    pub(crate) xyyxy_id: PatternId,
 }
 
 impl TestEnv for EnvXyyxy {

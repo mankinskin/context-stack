@@ -27,9 +27,9 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-pub struct EnvSingleAtom {
-    pub graph: HypergraphRef,
-    pub a: Token,
+pub(crate) struct EnvSingleAtom {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) a: Token,
 }
 
 impl TestEnv for EnvSingleAtom {

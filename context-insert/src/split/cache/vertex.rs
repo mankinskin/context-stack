@@ -52,11 +52,11 @@ use tracing::debug;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut)]
 pub struct SplitVertexCache {
-    pub positions: BTreeMap<NonZeroUsize, SplitPositionCache>,
+    pub(crate) positions: BTreeMap<NonZeroUsize, SplitPositionCache>,
 }
 
 impl SplitVertexCache {
-    pub fn pos_ctx_by_index(
+    pub(crate) fn pos_ctx_by_index(
         &'_ self,
         index: usize,
     ) -> PosSplitCtx<'_> {
@@ -77,7 +77,7 @@ impl SplitVertexCache {
     /// A perfect split means the split position aligns exactly with child token
     /// boundaries in all patterns. Returns true if none of the patterns have
     /// an inner_offset at this position.
-    pub fn is_split_perfect_at_index(
+    pub(crate) fn is_split_perfect_at_index(
         &self,
         index: usize,
     ) -> bool {
@@ -105,7 +105,7 @@ impl SplitVertexCache {
     ///
     /// The inner_offsets parameter provides the offset within the merged token
     /// for each position inside the merged region, keyed by enumerate index.
-    pub fn apply_deltas_with_inner_offsets(
+    pub(crate) fn apply_deltas_with_inner_offsets(
         &mut self,
         deltas: &PatternSubDeltas,
         partition_start: usize,
@@ -156,7 +156,7 @@ impl SplitVertexCache {
     ///
     /// Offsets BEFORE from_offset_index (inside or before the merged region)
     /// should not have their sub_indices adjusted.
-    pub fn apply_deltas(
+    pub(crate) fn apply_deltas(
         &mut self,
         deltas: &PatternSubDeltas,
         from_offset_index: usize,
@@ -169,7 +169,7 @@ impl SplitVertexCache {
         }
     }
 
-    pub fn new(
+    pub(crate) fn new(
         pos: NonZeroUsize,
         entry: SplitPositionCache,
     ) -> Self {
@@ -177,7 +177,7 @@ impl SplitVertexCache {
             positions: BTreeMap::from_iter([(pos, entry)]),
         }
     }
-    pub fn node_augmentation(
+    pub(crate) fn node_augmentation(
         &mut self,
         ctx: NodeTraceCtx,
     ) -> Vec<SplitTraceState> {
@@ -198,7 +198,7 @@ impl SplitVertexCache {
         }
         states
     }
-    pub fn root_augmentation(
+    pub(crate) fn root_augmentation(
         &mut self,
         ctx: NodeTraceCtx,
         root_mode: RootMode,
@@ -398,19 +398,19 @@ impl SplitVertexCache {
         required
     }
 
-    pub fn pos_mut(
+    pub(crate) fn pos_mut(
         &mut self,
         pos: NonZeroUsize,
     ) -> &mut SplitPositionCache {
         self.positions.entry(pos).or_default()
     }
-    pub fn offset_range_partition<K: RangeRole>(
+    pub(crate) fn offset_range_partition<K: RangeRole>(
         &self,
         range: K::OffsetRange,
     ) -> Partition<K> {
         range.get_splits(self).to_partition()
     }
-    pub fn inner_offsets<R: RangeRole<Mode = Trace>, P: ToPartition<R>>(
+    pub(crate) fn inner_offsets<R: RangeRole<Mode = Trace>, P: ToPartition<R>>(
         ctx: NodeTraceCtx,
         part: P,
     ) -> Vec<NonZeroUsize> {
@@ -430,7 +430,7 @@ impl SplitVertexCache {
                     .collect())
             .unwrap_or_default()
     }
-    pub fn add_inner_offsets<K: RangeRole<Mode = Trace>, P: ToPartition<K>>(
+    pub(crate) fn add_inner_offsets<K: RangeRole<Mode = Trace>, P: ToPartition<K>>(
         ctx: NodeTraceCtx,
         part: P,
     ) -> (

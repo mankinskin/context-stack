@@ -46,7 +46,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .expect_child_offset(&loc.to_sub_location())
             .0
     }
-    pub(crate) fn to_child(
+    pub(crate) fn to_token(
         &self,
         index: impl HasVertexIndex,
     ) -> Token {
@@ -66,13 +66,13 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         index: impl HasVertexIndex,
     ) -> Token {
-        self.to_child(index)
+        self.to_token(index)
     }
     #[allow(dead_code)]
     pub(crate) fn to_children(
         &self,
         indices: impl IntoIterator<Item = impl HasVertexIndex>,
     ) -> Pattern {
-        indices.into_iter().map(|i| self.to_child(i)).collect()
+        indices.into_iter().map(|i| self.to_token(i)).collect()
     }
 }

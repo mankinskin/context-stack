@@ -43,7 +43,7 @@ use derive_more::{
     Into,
 };
 
-pub trait OffsetIndexRange<R: RangeRole>: RangeIndex {
+pub(crate) trait OffsetIndexRange<R: RangeRole>: RangeIndex {
     fn get_splits(
         &self,
         vertex: &SplitVertexCache,
@@ -89,11 +89,11 @@ impl<M: PreVisitMode> OffsetIndexRange<Pre<M>> for RangeTo<usize> {
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, Derivative, Deref, DerefMut, From, Into,
 )]
-pub struct PostfixRangeFrom {
+pub(crate) struct PostfixRangeFrom {
     range: Range<usize>, // end must be initialized from pattern
 }
 impl PostfixRangeFrom {
-    pub fn new(
+    pub(crate) fn new(
         start: usize,
         pattern_len: usize,
     ) -> Self {
@@ -139,7 +139,7 @@ impl<M: PostVisitMode> OffsetIndexRange<Post<M>> for RangeFrom<usize> {
         lo.to_vertex_splits()
     }
 }
-pub trait RangeOffsets<R: RangeRole>: Debug + Clone + Copy {
+pub(crate) trait RangeOffsets<R: RangeRole>: Debug + Clone + Copy {
     fn as_splits<C: AsNodeTraceCtx>(
         &self,
         ctx: C,

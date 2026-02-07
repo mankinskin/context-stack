@@ -26,18 +26,18 @@ use std::ops::{
 ///
 /// `PartitionRange(1..3)` refers to partitions 1 and 2, which span tokens between offsets 0 and 2.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut)]
-pub struct PartitionRange(pub RangeInclusive<usize>);
+pub(crate) struct PartitionRange(pub(crate) RangeInclusive<usize>);
 
 impl PartitionRange {
-    pub fn new(range: RangeInclusive<usize>) -> Self {
+    pub(crate) fn new(range: RangeInclusive<usize>) -> Self {
         Self(range)
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.end() - self.start()
     }
 
-    pub fn into_range(self) -> Range<usize> {
+    pub(crate) fn into_range(self) -> Range<usize> {
         *self.start()..(self.end() + 1)
     }
 
@@ -50,7 +50,7 @@ impl PartitionRange {
     ///
     /// This is used for computing inner partitions: when target and wrapper
     /// overlap, the overlapping portion becomes a required inner partition.
-    pub fn overlap(&self, other: &Self) -> Option<Self> {
+    pub(crate) fn overlap(&self, other: &Self) -> Option<Self> {
         let start = (*self.start()).max(*other.start());
         let end = (*self.end()).min(*other.end());
 

@@ -12,7 +12,7 @@ pub(crate) use checkpointed::{
 };
 pub(crate) use state_machine::CursorStateMachine;
 
-//pub trait CursorPath: GraphRoot {}
+//pub(crate) trait CursorPath: GraphRoot {}
 //impl<T: GraphRoot> CursorPath for T {}
 
 // State marker types for PathCursor
@@ -31,20 +31,20 @@ impl CursorState for Matched {}
 
 /// Candidate state: cursor has advanced to a position that needs comparison
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Candidate;
+pub(crate) struct Candidate;
 impl sealed::Sealed for Candidate {}
 impl CursorState for Candidate {}
 
 /// Mismatched state: cursor has scanned atoms but encountered a mismatch
 /// Behaves like Matched in terms of atom_position (includes scanned atoms)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Mismatched;
+pub(crate) struct Mismatched;
 impl sealed::Sealed for Mismatched {}
 impl CursorState for Mismatched {}
 
 ///// Exhausted state: cursor has reached the end of the pattern
 //#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-//pub struct Exhausted;
+//pub(crate) struct Exhausted;
 //impl sealed::Sealed for Exhausted {}
 //impl CursorState for Exhausted {}
 
@@ -54,12 +54,17 @@ pub struct PathCursor<P, State = Matched> {
     pub(crate) atom_position: AtomPosition,
     pub(crate) _state: PhantomData<State>,
 }
+impl<P, State> PathCursor<P, State> {
+    pub fn path(&self) -> &P {
+        &self.path
+    }
+}
 impl<P: GraphRoot, State: CursorState> GraphRoot for PathCursor<P, State> {
     fn root_parent(&self) -> Token {
         self.path.root_parent()
     }
 }
-pub(crate) type PatternCursor<State = Matched> =
+pub type PatternCursor<State = Matched> =
     PathCursor<PatternRangePath, State>;
 //pub(crate) type IndexCursor = PathCursor<IndexRangePath>;
 
@@ -107,10 +112,6 @@ impl<P> From<P> for PathCursor<P> {
 
 // State transition methods
 impl<P> PathCursor<P, Matched> {
-    /// Get a reference to the path
-    pub fn path(&self) -> &P {
-        &self.path
-    }
 
     /// Convert a Matched cursor to a Candidate by creating a copy
     /// This preserves the matched position for potential revert
@@ -127,7 +128,7 @@ impl<P> PathCursor<P, Matched> {
 }
 
 /// Trait for marking cursor/state as matched or mismatched
-pub trait MarkMatchState {
+pub(crate) trait MarkMatchState {
     type Matched;
     type Mismatched;
 

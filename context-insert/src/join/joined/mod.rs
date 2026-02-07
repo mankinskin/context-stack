@@ -1,2 +1,2 @@
-pub mod partition;
-pub mod patterns;
+pub(crate) mod partition;
+pub(crate) mod patterns;

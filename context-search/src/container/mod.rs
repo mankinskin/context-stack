@@ -1,7 +1,7 @@
 use crate::state::TraversalState;
 use std::fmt::Debug;
 
-pub(crate) mod bft;
+pub mod bft;
 //pub(crate) mod dft;
 pub(crate) mod order;
 //pub(crate) mod pruning;
@@ -12,5 +12,4 @@ pub trait StateContainer:
     + Debug
     + FromIterator<(usize, TraversalState)>
 {
-    //fn clear(&mut self);
 }

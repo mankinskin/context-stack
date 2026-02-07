@@ -31,7 +31,7 @@ use range::RangeEnd;
 //}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PathCoverage {
+pub(crate) enum PathCoverage {
     Range(RangeEnd),
     Postfix(PostfixEnd),
     Prefix(PrefixEnd),

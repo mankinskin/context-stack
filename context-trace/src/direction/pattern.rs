@@ -101,7 +101,7 @@ impl PatternDirection for Left {
 //        sub_index: usize,
 //    ) -> Option<Token> {
 //        Self::pattern_index_next(pattern.borrow(), sub_index)
-//            .and_then(|i| pattern.borrow().get(i).map(ToToken::to_child))
+//            .and_then(|i| pattern.borrow().get(i).map(ToToken::to_token))
 //    }
 //    fn compare_next_index_in_child_pattern(
 //        child_pattern: impl IntoPattern,
@@ -110,7 +110,7 @@ impl PatternDirection for Left {
 //    ) -> bool {
 //        Self::pattern_head(context.borrow())
 //            .and_then(|context_next| {
-//                let context_next: Token = context_next.to_child();
+//                let context_next: Token = context_next.to_token();
 //                Self::next_child(child_pattern, sub_index).map(|next| context_next == next)
 //            })
 //            .unwrap_or(false)

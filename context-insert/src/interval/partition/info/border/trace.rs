@@ -12,7 +12,7 @@ use crate::{
     split::vertex::pattern::HasPatternTraceCtx,
 };
 
-pub trait TraceBorders<R: RangeRole>: InfoBorder<R> {
+pub(crate) trait TraceBorders<R: RangeRole>: InfoBorder<R> {
     fn inner_info(
         &self,
         ctx: &ModePatternCtxOf<R>,

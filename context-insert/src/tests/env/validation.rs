@@ -38,14 +38,14 @@ use std::sync::{
 /// - Cache validation
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EnvAbcd {
-    pub graph: HypergraphRef,
-    pub a: Token,
-    pub b: Token,
-    pub c: Token,
-    pub d: Token,
-    pub abcd: Token,
-    pub abcd_id: PatternId,
+pub(crate) struct EnvAbcd {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) a: Token,
+    pub(crate) b: Token,
+    pub(crate) c: Token,
+    pub(crate) d: Token,
+    pub(crate) abcd: Token,
+    pub(crate) abcd_id: PatternId,
 }
 
 impl TestEnv for EnvAbcd {
@@ -115,12 +115,12 @@ thread_local! {
 /// - Empty pattern rejection in insert
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EnvAb {
-    pub graph: HypergraphRef,
-    pub a: Token,
-    pub b: Token,
-    pub ab: Token,
-    pub ab_id: PatternId,
+pub(crate) struct EnvAb {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) a: Token,
+    pub(crate) b: Token,
+    pub(crate) ab: Token,
+    pub(crate) ab_id: PatternId,
 }
 
 impl TestEnv for EnvAb {
@@ -185,13 +185,13 @@ thread_local! {
 /// - Query patterns that don't match graph structure
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EnvAbc {
-    pub graph: HypergraphRef,
-    pub a: Token,
-    pub b: Token,
-    pub c: Token,
-    pub ab: Token,
-    pub ab_id: PatternId,
+pub(crate) struct EnvAbc {
+    pub(crate) graph: HypergraphRef,
+    pub(crate) a: Token,
+    pub(crate) b: Token,
+    pub(crate) c: Token,
+    pub(crate) ab: Token,
+    pub(crate) ab_id: PatternId,
 }
 
 impl TestEnv for EnvAbc {

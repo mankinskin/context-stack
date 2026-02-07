@@ -26,7 +26,7 @@ use derive_more::derive::{
 use derive_new::new;
 
 #[derive(Debug, Clone, Deref, DerefMut, Into, From, new)]
-pub struct JoinInnerRangeInfo<R: RangeRole<Mode = Join>>(InnerRangeInfo<R>)
+pub(crate) struct JoinInnerRangeInfo<R: RangeRole<Mode = Join>>(InnerRangeInfo<R>)
 where
     R::Borders: JoinBorders<R>;
 
@@ -34,7 +34,7 @@ impl<R: RangeRole<Mode = Join>> JoinInnerRangeInfo<R>
 where
     R::Borders: JoinBorders<R>,
 {
-    pub fn insert_pattern_inner<'a: 'b, 'b: 'c, 'c>(
+    pub(crate) fn insert_pattern_inner<'a: 'b, 'b: 'c, 'c>(
         &self,
         ctx: &'c mut NodeJoinCtx<'a>,
     ) -> Token

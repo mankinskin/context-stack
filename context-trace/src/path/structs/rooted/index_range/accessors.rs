@@ -1,4 +1,4 @@
-//! Trait implementations for path accessors (HasPath, HasLeafToken, HasRootChildToken, etc.)
+//! Trait implementations for path accessors (HasChildPath, HasLeafToken, HasRootChildToken, etc.)
 
 use crate::{
     graph::vertex::{
@@ -12,7 +12,7 @@ use crate::{
                 root::GraphRootChild,
             },
             has_path::{
-                HasPath,
+                HasChildPath,
                 HasRolePath,
             },
             role::{
@@ -41,18 +41,18 @@ use crate::{
 
 use super::IndexRangePath;
 
-// Generic HasPath for all IndexRangePath types
-impl<R: PathRole, StartNode, EndNode> HasPath<R>
+// Generic HasChildPath for all IndexRangePath types
+impl<R: PathRole, StartNode, EndNode> HasChildPath<R>
     for IndexRangePath<StartNode, EndNode>
 where
     IndexRangePath<StartNode, EndNode>: HasRolePath<R>,
     <IndexRangePath<StartNode, EndNode> as HasRolePath<R>>::Node: Clone,
 {
     type Node = <Self as HasRolePath<R>>::Node;
-    fn path(&self) -> &Vec<Self::Node> {
+    fn child_path(&self) -> &Vec<Self::Node> {
         self.role_path().path()
     }
-    fn path_mut(&mut self) -> &mut Vec<Self::Node> {
+    fn child_path_mut(&mut self) -> &mut Vec<Self::Node> {
         self.role_path_mut().path_mut()
     }
 }
@@ -63,11 +63,11 @@ impl<R: PathRole, StartNode, EndNode> HasLeafToken<R>
 where
     IndexRangePath<StartNode, EndNode>: HasRolePath<R, Node = ChildLocation>
         + HasRootChildIndex<R>
-        + HasPath<R, Node = ChildLocation>,
+        + HasChildPath<R, Node = ChildLocation>,
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         Some(
-            R::bottom_up_iter(self.path().iter())
+            R::bottom_up_iter(self.child_path().iter())
                 .next()
                 .cloned()
                 .unwrap_or(

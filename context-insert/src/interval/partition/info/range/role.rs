@@ -52,32 +52,32 @@ use context_trace::*;
 use crate::interval::partition::info::range::splits::OffsetIndexRange;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Outer;
+pub(crate) struct Outer;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Inner;
+pub(crate) struct Inner;
 
-pub type OffsetsOf<R> = <R as RangeRole>::Offsets;
-pub type PerfectOf<R> = <R as RangeRole>::Perfect;
-pub type BooleanPerfectOf<R> = <PerfectOf<R> as BorderPerfect>::Boolean;
-pub type ChildrenOf<R> = <R as RangeRole>::Children;
-pub type PatternRangeOf<R> = <R as RangeRole>::PatternRange;
-pub type ModeOf<R> = <R as RangeRole>::Mode;
-pub type BordersOf<R> = <R as RangeRole>::Borders;
-pub type ModeChildrenOf<R> = <ModeOf<R> as ModeChildren<R>>::Result;
+pub(crate) type OffsetsOf<R> = <R as RangeRole>::Offsets;
+pub(crate) type PerfectOf<R> = <R as RangeRole>::Perfect;
+pub(crate) type BooleanPerfectOf<R> = <PerfectOf<R> as BorderPerfect>::Boolean;
+pub(crate) type ChildrenOf<R> = <R as RangeRole>::Children;
+pub(crate) type PatternRangeOf<R> = <R as RangeRole>::PatternRange;
+pub(crate) type ModeOf<R> = <R as RangeRole>::Mode;
+pub(crate) type BordersOf<R> = <R as RangeRole>::Borders;
+pub(crate) type ModeChildrenOf<R> = <ModeOf<R> as ModeChildren<R>>::Result;
 /// Type alias for the pattern context of a given range role's mode.
-pub type ModePatternCtxOf<R> =
+pub(crate) type ModePatternCtxOf<R> =
     <<R as RangeRole>::Mode as ModeCtx>::PatternResult;
-pub type ModeNodeCtxOf<'a, R> =
+pub(crate) type ModeNodeCtxOf<'a, R> =
     <<R as RangeRole>::Mode as ModeCtx>::NodeCtx<'a>;
 
-pub trait RangeKind: Debug + Clone {}
+pub(crate) trait RangeKind: Debug + Clone {}
 
 impl RangeKind for Inner {}
 
 impl RangeKind for Outer {}
 
-pub trait RangeRole: Debug + Clone + Copy {
+pub(crate) trait RangeRole: Debug + Clone + Copy {
     type Mode: ModeInfo<Self>; // todo: use to change join/trace
     type Perfect: BorderPerfect;
     type Offsets: RangeOffsets<Self>;
@@ -97,7 +97,7 @@ pub trait RangeRole: Debug + Clone + Copy {
 }
 
 #[derive(Debug, Clone, Default, Copy)]
-pub struct Pre<M: PreVisitMode>(std::marker::PhantomData<M>);
+pub(crate) struct Pre<M: PreVisitMode>(std::marker::PhantomData<M>);
 
 impl<M: PreVisitMode> RangeRole for Pre<M> {
     type Mode = M;
@@ -117,7 +117,7 @@ impl<M: PreVisitMode> RangeRole for Pre<M> {
 }
 
 #[derive(Debug, Clone, Default, Copy)]
-pub struct In<M: InVisitMode>(std::marker::PhantomData<M>);
+pub(crate) struct In<M: InVisitMode>(std::marker::PhantomData<M>);
 
 impl<M: InVisitMode> RangeRole for In<M> {
     type Mode = M;
@@ -137,7 +137,7 @@ impl<M: InVisitMode> RangeRole for In<M> {
 }
 
 #[derive(Debug, Clone, Default, Copy)]
-pub struct Post<M: PostVisitMode>(std::marker::PhantomData<M>);
+pub(crate) struct Post<M: PostVisitMode>(std::marker::PhantomData<M>);
 
 impl<M: PostVisitMode> RangeRole for Post<M> {
     type Mode = M;

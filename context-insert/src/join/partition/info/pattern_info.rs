@@ -34,19 +34,19 @@ use crate::{
 use context_trace::*;
 
 #[derive(Debug, Clone)]
-pub struct JoinPatternInfo<R: RangeRole<Mode = Join>> {
-    pub inner_range: Option<InnerRangeInfo<R>>,
-    pub range: R::PatternRange,
-    pub children: Option<ModeChildrenOf<R>>,
-    pub offsets: R::Offsets,
-    pub delta: usize,
+pub(crate) struct JoinPatternInfo<R: RangeRole<Mode = Join>> {
+    pub(crate) inner_range: Option<InnerRangeInfo<R>>,
+    pub(crate) range: R::PatternRange,
+    pub(crate) children: Option<ModeChildrenOf<R>>,
+    pub(crate) offsets: R::Offsets,
+    pub(crate) delta: usize,
 }
 
 impl<R: RangeRole<Mode = Join>> JoinPatternInfo<R>
 where
     R::Borders: JoinBorders<R>,
 {
-    pub fn join_pattern<'a: 'b, 'b: 'c, 'c>(
+    pub(crate) fn join_pattern<'a: 'b, 'b: 'c, 'c>(
         self,
         ctx: &'c mut NodeJoinCtx<'a>,
         pattern_id: &PatternId,

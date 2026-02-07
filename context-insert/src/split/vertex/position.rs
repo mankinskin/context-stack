@@ -3,11 +3,11 @@ use std::num::NonZeroUsize;
 use crate::*;
 use context_trace::*;
 use derive_new::new;
-pub type Offset = NonZeroUsize;
+pub(crate) type Offset = NonZeroUsize;
 
 /// optional offset inside of pattern sub location
 #[derive(Clone, Debug, PartialEq, Eq, new)]
-pub struct SubSplitLocation {
+pub(crate) struct SubSplitLocation {
     pub(crate) location: SubLocation,
     pub(crate) inner_offset: Option<Offset>,
 }

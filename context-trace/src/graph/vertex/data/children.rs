@@ -19,7 +19,7 @@ pub(crate) fn localized_children_iter_for_index(
     parent: impl ToToken,
     tokens: &ChildPatterns,
 ) -> impl IntoIterator<Item = (ChildLocation, &Token)> {
-    let parent = parent.to_child();
+    let parent = parent.to_token();
     tokens.iter().flat_map(move |(&pid, pat)| {
         pat.iter()
             .enumerate()
@@ -343,6 +343,6 @@ impl VertexData {
     pub fn all_localized_children_iter(
         &self
     ) -> impl IntoIterator<Item = (ChildLocation, &Token)> {
-        localized_children_iter_for_index(self.to_child(), &self.children)
+        localized_children_iter_for_index(self.to_token(), &self.children)
     }
 }

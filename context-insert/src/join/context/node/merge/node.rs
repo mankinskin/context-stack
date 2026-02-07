@@ -22,7 +22,7 @@ impl<'a> MergeCtx<'a> {
     ///
     /// Splits for merged tokens are added to the shared splits map during merging,
     /// so they're available for subsequent pattern operations.
-    pub fn merge_node(&mut self) -> LinkedHashMap<PosKey, Split> {
+    pub(crate) fn merge_node(&mut self) -> LinkedHashMap<PosKey, Split> {
         // Merge all sub-partitions - this handles all pattern creation
         // and adds splits for merged tokens to the shared map
         let result = self.merge_sub_partitions(None);
@@ -68,7 +68,7 @@ impl<'a> MergeCtx<'a> {
     ///
     /// After merging, adds a new pattern to the root node that includes
     /// the target token (for Prefix, Postfix, and Infix modes).
-    pub fn merge_root(&mut self) -> Token {
+    pub(crate) fn merge_root(&mut self) -> Token {
         let root_index = self.ctx.index;
         // Use the target range computed during split phase
         let target_range = self.ctx.ctx.interval.target_range.clone();

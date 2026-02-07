@@ -24,20 +24,20 @@ use derive_new::new;
 use std::fmt::Debug;
 use tracing::debug;
 
-pub mod vertex;
+pub(crate) mod vertex;
 
-pub mod leaves;
+pub(crate) mod leaves;
 pub mod position;
 
 #[derive(Debug, Deref, DerefMut, new, Clone, PartialEq, Eq)]
 pub struct SplitCache {
-    pub root_mode: RootMode,
+    pub(crate) root_mode: RootMode,
     #[deref]
     #[deref_mut]
-    pub entries: HashMap<VertexIndex, SplitVertexCache>,
+    pub(crate) entries: HashMap<VertexIndex, SplitVertexCache>,
 }
 impl SplitCache {
-    pub fn augment_node(
+    pub(crate) fn augment_node(
         &mut self,
         trav: impl HasGraph,
         index: Token,
@@ -49,7 +49,7 @@ impl SplitCache {
             .node_augmentation(ctx)
     }
     /// complete inner range offsets for root
-    pub fn augment_root(
+    pub(crate) fn augment_root(
         &mut self,
         trav: impl HasGraph,
         root: Token,
@@ -62,7 +62,7 @@ impl SplitCache {
             .unwrap()
             .root_augmentation(ctx, root_mode)
     }
-    pub fn augment_nodes<G: HasGraph, I: IntoIterator<Item = Token>>(
+    pub(crate) fn augment_nodes<G: HasGraph, I: IntoIterator<Item = Token>>(
         &mut self,
         ctx: &mut SplitTraceStatesCtx<G>,
         nodes: I,

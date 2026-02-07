@@ -5,7 +5,7 @@ use derive_more::derive::{
 };
 use std::fmt;
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub struct PostfixEnd {
+pub(crate) struct PostfixEnd {
     #[deref]
     #[deref_mut]
     pub(crate) path: IndexStartPath,

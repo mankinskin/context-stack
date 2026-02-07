@@ -1,3 +1,3 @@
-pub mod context;
-pub mod joined;
-pub mod partition;
+pub(crate) mod context;
+pub(crate) mod joined;
+pub(crate) mod partition;

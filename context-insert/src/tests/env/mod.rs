@@ -25,6 +25,7 @@ mod insert_infix1;
 mod insert_infix2;
 mod insert_pattern1;
 mod insert_pattern2;
+mod insert_postfix1;
 
 // Validation/edge case environments
 mod validation;
@@ -33,13 +34,14 @@ mod single_atom;
 mod hypergra;
 
 // Re-export core insertion environments
-pub use insert_infix1::EnvInsertInfix1;
-pub use insert_infix2::EnvInsertInfix2;
-pub use insert_pattern1::EnvInsertPattern1;
-pub use insert_pattern2::EnvInsertPattern2;
+pub(crate) use insert_infix1::EnvInsertInfix1;
+pub(crate) use insert_infix2::EnvInsertInfix2;
+pub(crate) use insert_pattern1::EnvInsertPattern1;
+pub(crate) use insert_pattern2::EnvInsertPattern2;
+pub use insert_postfix1::EnvInsertPostfix1;
 
 // Re-export validation environments
-pub use validation::{EnvAbcd, EnvAb, EnvAbc};
-pub use triple_repeat::EnvTripleRepeat;
-pub use single_atom::EnvSingleAtom;
-pub use hypergra::EnvHypergra;
+pub(crate) use validation::{EnvAbcd, EnvAb, EnvAbc};
+pub(crate) use triple_repeat::EnvTripleRepeat;
+pub(crate) use single_atom::EnvSingleAtom;
+pub(crate) use hypergra::EnvHypergra;

@@ -3,25 +3,19 @@
 //! Concrete implementations of SearchTestCase trait with expected Response values.
 
 use crate::{
-    cursor::{
-        checkpointed::Checkpointed,
-        PatternCursor,
-    },
-    state::{
+    Response, cursor::{
+        PatternCursor, checkpointed::Checkpointed
+    }, state::{
         end::{
-            prefix::PrefixEnd,
-            PathCoverage,
+            PathCoverage, prefix::PrefixEnd
         },
         matched::{
             CheckpointedCursor,
             MatchResult,
         },
-    },
-    tests::{
-        env::EnvInsertPrefix1,
-        test_case::SearchTestCase,
-    },
-    Response,
+    }, tests::{
+        env::EnvInsertPrefix1, test_case::SearchTestCase
+    }
 };
 use context_trace::{
     build_trace_cache,
@@ -34,7 +28,7 @@ use context_trace::{
 };
 
 /// Test case 1: Search for "hell" against "heldld" pattern - tests prefix matching
-pub struct Prefix1;
+pub(crate) struct Prefix1;
 
 impl TestCase for Prefix1 {
     type Env = EnvInsertPrefix1;

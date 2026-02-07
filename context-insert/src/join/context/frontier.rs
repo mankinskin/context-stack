@@ -17,7 +17,7 @@ use crate::{
 };
 use context_trace::*;
 
-pub struct FrontierIterator {
+pub(crate) struct FrontierIterator {
     pub(crate) frontier: LinkedHashSet<PosKey>,
     pub(crate) interval: IntervalGraph,
 }
@@ -46,7 +46,7 @@ impl Iterator for FrontierIterator {
         }
     }
 }
-pub struct FrontierSplitIterator {
+pub(crate) struct FrontierSplitIterator {
     pub(crate) frontier: FrontierIterator,
     pub(crate) splits: SplitMap,
     pub(crate) trav: HypergraphRef,

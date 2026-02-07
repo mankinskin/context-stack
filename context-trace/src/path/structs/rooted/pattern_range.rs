@@ -117,25 +117,25 @@ impl MoveRootIndex<Right, End>
 }
 
 impl<R: PathRole> HasLeafToken<R> for PatternRolePath<R> where
-    Self: HasPath<R, Node = ChildLocation> + PatternRootChild<R>
+    Self: HasChildPath<R, Node = ChildLocation> + PatternRootChild<R>
 {
 }
 impl<R: PathRole> HasLeafToken<R>
     for PatternRangePath<ChildLocation, ChildLocation>
 where
-    Self: HasPath<R, Node = ChildLocation> + PatternRootChild<R>,
+    Self: HasChildPath<R, Node = ChildLocation> + PatternRootChild<R>,
 {
 }
 
-impl<R: PathRole> HasPath<R> for PatternRangePath
+impl<R: PathRole> HasChildPath<R> for PatternRangePath
 where
     Self: HasRolePath<R, Node = ChildLocation>,
 {
     type Node = ChildLocation;
-    fn path(&self) -> &Vec<ChildLocation> {
+    fn child_path(&self) -> &Vec<ChildLocation> {
         self.role_path().path()
     }
-    fn path_mut(&mut self) -> &mut Vec<ChildLocation> {
+    fn child_path_mut(&mut self) -> &mut Vec<ChildLocation> {
         self.role_path_mut().path_mut()
     }
 }

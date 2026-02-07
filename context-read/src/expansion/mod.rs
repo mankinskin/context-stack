@@ -1,8 +1,8 @@
-pub mod block;
-pub mod chain;
-pub mod cursor;
-pub mod link;
-pub mod stack;
+pub(crate) mod block;
+pub(crate) mod chain;
+pub(crate) mod cursor;
+pub(crate) mod link;
+pub(crate) mod stack;
 
 use crate::{
     complement::ComplementBuilder,
@@ -31,7 +31,7 @@ use derive_more::{
 use tracing::debug;
 
 #[derive(Debug, Deref, DerefMut)]
-pub struct ExpansionCtx<'a> {
+pub(crate) struct ExpansionCtx<'a> {
     #[deref]
     #[deref_mut]
     cursor: CursorCtx<'a>,
@@ -54,7 +54,7 @@ impl Iterator for ExpansionCtx<'_> {
     }
 }
 impl<'a> ExpansionCtx<'a> {
-    pub fn new(
+    pub(crate) fn new(
         graph: HypergraphRef,
         cursor: &'a mut PatternRangePath,
     ) -> Self {
@@ -81,10 +81,10 @@ impl<'a> ExpansionCtx<'a> {
             cursor: CursorCtx::new(graph, cursor),
         }
     }
-    pub fn last(&self) -> &Band {
+    pub(crate) fn last(&self) -> &Band {
         self.chain.last().unwrap().band
     }
-    pub fn apply_op(
+    pub(crate) fn apply_op(
         &mut self,
         op: ChainOp,
     ) -> Option<<Self as Iterator>::Item> {

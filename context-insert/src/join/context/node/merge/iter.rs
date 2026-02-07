@@ -44,7 +44,7 @@ use crate::{
 /// - The range map of already-merged partitions
 /// - The target token being tracked (for root merges)
 /// - The operating range being processed
-pub struct PartitionMergeIter<'a, 'b> {
+pub(crate) struct PartitionMergeIter<'a, 'b> {
     /// The underlying merge context
     ctx: &'a mut MergeCtx<'b>,
     /// Map of merged partition ranges to their tokens
@@ -63,7 +63,7 @@ pub struct PartitionMergeIter<'a, 'b> {
 
 impl<'a, 'b> PartitionMergeIter<'a, 'b> {
     /// Create a new partition merge iterator.
-    pub fn new(
+    pub(crate) fn new(
         ctx: &'a mut MergeCtx<'b>,
         target_range: Option<PartitionRange>,
     ) -> Self {
@@ -96,7 +96,7 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
     ///
     /// This is the main iteration loop that processes partitions from smallest
     /// to largest, building up the range map.
-    pub fn merge_all(&mut self) {
+    pub(crate) fn merge_all(&mut self) {
         let op_start = *self.operating_range.start();
         let op_end = *self.operating_range.end();
         let op_len = op_end - op_start + 1;
@@ -452,7 +452,7 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
     ///
     /// Returns the target token, the completed range map, and whether
     /// a perfect pattern replacement occurred.
-    pub fn finalize(self) -> MergeIterResult {
+    pub(crate) fn finalize(self) -> MergeIterResult {
         let target_token = match self.target_range {
             Some(ref target_range) => self.target_token.unwrap_or_else(|| {
                 panic!(
@@ -476,13 +476,13 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
 }
 
 /// Result of a partition merge iteration.
-pub struct MergeIterResult {
+pub(crate) struct MergeIterResult {
     /// The target token that was merged
-    pub target_token: Token,
+    pub(crate) target_token: Token,
     /// Map of all merged partition ranges to their tokens
-    pub range_map: RangeMap,
+    pub(crate) range_map: RangeMap,
     /// Whether a perfect pattern replacement occurred during the operating range merge
-    pub had_perfect_replacement: bool,
+    pub(crate) had_perfect_replacement: bool,
 }
 
 /// Extension methods for MergeCtx to add root patterns.
@@ -500,7 +500,7 @@ impl<'a> MergeCtx<'a> {
     /// - target_range might be 2..=2 (just the new token "bcd")
     /// - operating_range is 1..=2 (includes wrapper, producing "abcd")
     /// - The root pattern uses the operating_range result: [prefix, abcd]
-    pub fn add_root_pattern(
+    pub(crate) fn add_root_pattern(
         &mut self,
         range_map: &RangeMap,
         _target_token: Token,

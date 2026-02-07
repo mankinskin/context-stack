@@ -40,7 +40,7 @@ use context_trace::{
 /// This is the critical test for the triple repeat bug.
 /// When searching for a pattern that exists exactly (ababab = [ab, ab, ab]),
 /// we should get EntireRoot for ababab, NOT a match within abab.
-pub struct SearchAbababExact;
+pub(crate) struct SearchAbababExact;
 
 impl TestCase for SearchAbababExact {
     type Env = EnvAbabab;
@@ -97,7 +97,7 @@ impl SearchTestCase for SearchAbababExact {
 }
 
 /// Test case: Search for [ab, ab] should find abab as EntireRoot (not as part of ababab)
-pub struct SearchAbabExact;
+pub(crate) struct SearchAbabExact;
 
 impl TestCase for SearchAbabExact {
     type Env = EnvAbabab;

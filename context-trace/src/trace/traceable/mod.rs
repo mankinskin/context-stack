@@ -185,7 +185,7 @@ impl IntoRootCommand<Start> for RangeCommand {
             
             // Find the parent that is on the path to target_root
             let next_parent: Option<(VertexIndex, Token, &Parent)> = parents.iter().find_map(|(parent_idx, parent_data)| {
-                let parent_token = graph.to_child(*parent_idx);
+                let parent_token = graph.to_token(*parent_idx);
                 
                 // Check if this parent is target_root
                 if parent_token == target_root {

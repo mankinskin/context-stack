@@ -15,7 +15,7 @@ use context_trace::*;
 /// This context owns the patterns data since with interior mutability
 /// we can't hold references across lock boundaries.
 #[derive(Debug, Clone)]
-pub struct NodeTraceCtx {
+pub(crate) struct NodeTraceCtx {
     pub(crate) patterns: ChildPatterns,
     pub(crate) index: Token,
 }
@@ -26,14 +26,14 @@ impl HasToken for NodeTraceCtx {
     }
 }
 impl NodeTraceCtx {
-    pub fn new(
+    pub(crate) fn new(
         patterns: ChildPatterns,
         index: Token,
     ) -> Self {
         Self { patterns, index }
     }
 
-    pub fn from_index<K: GraphKind>(
+    pub(crate) fn from_index<K: GraphKind>(
         graph: &Hypergraph<K>,
         index: Token,
     ) -> Self {
@@ -44,7 +44,7 @@ impl NodeTraceCtx {
     }
 }
 
-pub trait AsNodeTraceCtx {
+pub(crate) trait AsNodeTraceCtx {
     fn as_trace_context(&self) -> NodeTraceCtx;
 }
 

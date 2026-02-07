@@ -35,10 +35,10 @@ use crate::split::{
 /// - `PartitionRange(0..2)` → partitions 0+1 → "ab"
 /// - `PartitionRange(1..3)` → partitions 1+2 → merged token from "b" and "cd"
 #[derive(Debug, Default, Deref, DerefMut)]
-pub struct RangeMap {
+pub(crate) struct RangeMap {
     #[deref]
     #[deref_mut]
-    pub map: HashMap<PartitionRange, Token>,
+    pub(crate) map: HashMap<PartitionRange, Token>,
 }
 
 impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I> for RangeMap {
@@ -66,7 +66,7 @@ impl RangeMap {
     /// With selective partition merge, some sub-ranges may not exist in the
     /// range_map because they were skipped as non-required. This method
     /// gracefully handles missing sub-ranges by filtering them out.
-    pub fn range_sub_merges(
+    pub(crate) fn range_sub_merges(
         &self,
         range: &PartitionRange,
     ) -> impl IntoIterator<Item = Pattern> + '_ {
@@ -100,7 +100,7 @@ impl RangeMap {
     /// to the merged token's coordinate space.
     ///
     /// Returns a vector of (PosKey, Split) pairs that should be added to the SplitMap.
-    pub fn compute_splits_for_merged_token(
+    pub(crate) fn compute_splits_for_merged_token(
         &self,
         merged_token: Token,
         range: &PartitionRange,

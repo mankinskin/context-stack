@@ -33,33 +33,6 @@ impl TryInitWith<IndexWithPath> for IndexWithPath {
         Err(value)
     }
 }
-//impl<T, A: TryFrom<T>> TryInitWith<T> for A {
-//    type Error = <A as TryFrom<T>>::Error;
-//    fn try_init(value: T) -> Result<Self, Self::Error> {
-//        Self::try_from(value)
-//    }
-//}
-//impl TryInitWith<ErrorState> for Token {
-//    type Error = Token;
-//    fn try_init(value: ErrorState) -> Result<Self, Self::Error> {
-//        match value {
-//            ErrorState {
-//                reason: ErrorReason::SingleIndex(c),
-//                found: Some(ResponseKind::Complete(_)),
-//            } => Ok(c),
-//            ErrorState {
-//                reason: ErrorReason::SingleIndex(c),
-//                found: Some(ResponseKind::Complete(_)),
-//            } => Ok(c),
-//        }
-//    }
-//}
-//impl TryInitWith<ErrorState> for IndexWithPath {
-//    type Error = Token;
-//    fn try_init(value: ErrorState) -> Result<Self, Self::Error> {
-//        Err(value)
-//    }
-//}
 pub trait InsertResult:
     Debug
     + Borrow<Token>
@@ -94,10 +67,37 @@ impl InsertResult for IndexWithPath {
         }
     }
 }
+//impl<T, A: TryFrom<T>> TryInitWith<T> for A {
+//    type Error = <A as TryFrom<T>>::Error;
+//    fn try_init(value: T) -> Result<Self, Self::Error> {
+//        Self::try_from(value)
+//    }
+//}
+//impl TryInitWith<ErrorState> for Token {
+//    type Error = Token;
+//    fn try_init(value: ErrorState) -> Result<Self, Self::Error> {
+//        match value {
+//            ErrorState {
+//                reason: ErrorReason::SingleIndex(c),
+//                found: Some(ResponseKind::Complete(_)),
+//            } => Ok(c),
+//            ErrorState {
+//                reason: ErrorReason::SingleIndex(c),
+//                found: Some(ResponseKind::Complete(_)),
+//            } => Ok(c),
+//        }
+//    }
+//}
+//impl TryInitWith<ErrorState> for IndexWithPath {
+//    type Error = Token;
+//    fn try_init(value: ErrorState) -> Result<Self, Self::Error> {
+//        Err(value)
+//    }
+//}
 
 //#[derive(Debug, Clone)]
-//pub struct IndexSplitResult {
-//    pub inner: Token,
-//    pub location: ChildLocation,
-//    pub path: Vec<ChildLocation>,
+//pub(crate) struct IndexSplitResult {
+//    pub(crate) inner: Token,
+//    pub(crate) location: ChildLocation,
+//    pub(crate) path: Vec<ChildLocation>,
 //}

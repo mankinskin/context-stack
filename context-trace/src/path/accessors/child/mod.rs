@@ -8,7 +8,7 @@ use crate::{
     },
     path::{
         accessors::{
-            has_path::HasPath,
+            has_path::HasChildPath,
             role::PathRole,
         },
         structs::rooted::role_path::{
@@ -23,13 +23,13 @@ use crate::{
 ///
 /// This trait provides methods to access the leaf token's location and value.
 pub trait HasLeafToken<R: PathRole>:
-    HasRootChildIndex<R> + HasPath<R, Node = ChildLocation>
+    HasRootChildIndex<R> + HasChildPath<R, Node = ChildLocation>
 {
     fn leaf_token_location_mut(&mut self) -> Option<&mut ChildLocation> {
-        R::bottom_up_iter(self.path_mut().iter_mut()).next()
+        R::bottom_up_iter(self.child_path_mut().iter_mut()).next()
     }
     fn leaf_token_location(&self) -> Option<ChildLocation> {
-        R::bottom_up_iter(self.path().iter()).next().cloned() as Option<_>
+        R::bottom_up_iter(self.child_path().iter()).next().cloned() as Option<_>
     }
     fn leaf_token<G: HasGraph>(
         &self,

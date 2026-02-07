@@ -25,6 +25,7 @@ use pretty_assertions::assert_eq;
 #[test]
 fn linear_read_abc() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abc").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, c});
@@ -42,6 +43,7 @@ fn linear_read_abc() {
 #[test]
 fn linear_read_unique_chars() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abcdefgh").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, c, d, e, f, g, h});
@@ -59,6 +61,7 @@ fn linear_read_unique_chars() {
 #[test]
 fn linear_read_single_char() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("x").execute(&mut graph);
 
     let root = result.expect("should have root");
@@ -73,6 +76,7 @@ fn linear_read_single_char() {
 #[test]
 fn linear_read_two_chars() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("xy").execute(&mut graph);
 
     expect_atoms!(graph, {x, y});
@@ -90,6 +94,8 @@ fn linear_read_two_chars() {
 #[test]
 fn linear_read_empty() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+
     let result = ReadRequest::from_text("").execute(&mut graph);
 
     assert!(result.is_none(), "empty string should produce no root");
@@ -99,6 +105,8 @@ fn linear_read_empty() {
 #[test]
 fn linear_read_with_space() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+
     let result = ReadRequest::from_text("a b c").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, c});
@@ -119,6 +127,7 @@ fn linear_read_with_space() {
 #[test]
 fn linear_read_multiple_sequences() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
 
     let first = ReadRequest::from_text("abc").execute(&mut graph);
     let second = ReadRequest::from_text("xyz").execute(&mut graph);
@@ -145,6 +154,7 @@ fn linear_read_multiple_sequences() {
 #[test]
 fn linear_read_same_sequence_twice() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
 
     let first = ReadRequest::from_text("abc").execute(&mut graph);
     let second = ReadRequest::from_text("abc").execute(&mut graph);
@@ -160,6 +170,8 @@ fn linear_read_same_sequence_twice() {
 #[test]
 fn linear_read_digits() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+
     let result = ReadRequest::from_text("12345").execute(&mut graph);
 
     let root = result.expect("should have root");
@@ -183,6 +195,7 @@ fn linear_read_digits() {
 #[test]
 fn linear_read_special_chars() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("!@#$%").execute(&mut graph);
 
     let root = result.expect("should have root");
@@ -209,6 +222,8 @@ fn linear_read_cursor_advancement() {
     use crate::context::ReadCtx;
 
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+
     let input = "abcd";
 
     // Use ReadCtx directly to observe cursor behavior
@@ -227,6 +242,7 @@ fn linear_read_cursor_advancement() {
 #[test]
 fn linear_read_no_letter_repeats() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
 
     // A short sequence where no character repeats
     let result = ReadRequest::from_text("qwerty").execute(&mut graph);
@@ -246,6 +262,7 @@ fn linear_read_no_letter_repeats() {
 #[test]
 fn linear_read_single_pattern_only() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("wxyz").execute(&mut graph);
 
     let root = result.expect("should have root");
@@ -266,6 +283,7 @@ fn linear_read_with_builder() {
     use crate::request::ReadRequestBuilder;
 
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
 
     let request = ReadRequestBuilder::default()
         .text("builder")
@@ -287,6 +305,7 @@ fn linear_read_with_builder() {
 #[test]
 fn repetition_abab() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abab").execute(&mut graph);
 
     expect_atoms!(graph, {a, b});
@@ -308,6 +327,7 @@ fn repetition_abab() {
 fn repetition_abcxyzabc() {
     let _tracing = init_test_tracing!();
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abcxyzabc").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, c, x, y, z});
@@ -369,8 +389,10 @@ fn repetition_abcabc() {
 }
 /// Test "abXXab" - "ab" repeated with different content between.
 #[test]
+#[allow(non_snake_case)]
 fn repetition_ab_separated() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abXXab").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, X});
@@ -389,8 +411,10 @@ fn repetition_ab_separated() {
 
 /// Test "helloXXXhello" - longer pattern repeated with separator.
 #[test]
+#[allow(non_snake_case)]
 fn repetition_hello_separated() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("helloXXhello").execute(&mut graph);
 
     expect_atoms!(graph, {h, e, l, o, X});

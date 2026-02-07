@@ -1,5 +1,5 @@
-pub mod has_read_context;
-pub mod root;
+pub(crate) mod has_read_context;
+pub(crate) mod root;
 
 use context_insert::*;
 use context_trace::*;
@@ -8,11 +8,9 @@ use tracing::debug;
 use crate::{
     context::root::RootManager,
     expansion::block::BlockExpansionCtx,
-    sequence::{
-        segment_iter::{
-            NextSegment,
-            SegmentIter,
-        },
+    segment::{
+        NextSegment,
+        SegmentIter,
         ToNewAtomIndices,
     },
 };
@@ -23,13 +21,13 @@ pub struct ReadCtx {
     /// The root manager (Option to allow taking it for BlockExpansionCtx)
     root: Option<RootManager>,
     /// Iterator over segments of unknown/known atoms
-    pub segments: SegmentIter,
+    pub(crate) segments: SegmentIter,
 }
 
-pub enum ReadState {
-    Continue(Token, PatternEndPath),
-    Stop(PatternEndPath),
-}
+//pub(crate) enum ReadState {
+//    Continue(Token, PatternEndPath),
+//    Stop(PatternEndPath),
+//}
 
 impl Iterator for ReadCtx {
     type Item = ();
@@ -52,16 +50,16 @@ impl ReadCtx {
     }
 
     /// Get the graph reference.
-    pub fn graph(&self) -> &HypergraphRef {
+    pub(crate) fn graph(&self) -> &HypergraphRef {
         &self.root.as_ref().expect("RootManager taken").graph
     }
 
     /// Get the current root token.
-    pub fn root_token(&self) -> Option<Token> {
+    pub(crate) fn root_token(&self) -> Option<Token> {
         self.root.as_ref().and_then(|r| r.root)
     }
 
-    pub fn read_sequence(&mut self) -> Option<Token> {
+    pub(crate) fn read_sequence(&mut self) -> Option<Token> {
         self.find_map(|_| None as Option<()>);
         self.root.as_ref().and_then(|r| r.root)
     }
@@ -81,7 +79,7 @@ impl ReadCtx {
 
         // Take RootManager to pass to BlockExpansionCtx
         let mut root = self.root.take().expect("RootManager was taken");
-        
+
         // Append unknown pattern first
         root.append_pattern(unknown);
 
@@ -107,6 +105,8 @@ impl_has_graph! {
 
 impl<R: InsertResult> ToInsertCtx<R> for ReadCtx {
     fn insert_context(&self) -> InsertCtx<R> {
-        InsertCtx::from(self.root.as_ref().expect("RootManager taken").graph.clone())
+        InsertCtx::from(
+            self.root.as_ref().expect("RootManager taken").graph.clone(),
+        )
     }
 }
