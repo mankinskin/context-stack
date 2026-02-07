@@ -9,8 +9,6 @@
 #![feature(associated_type_defaults)]
 //#![feature(return_position_impl_trait_in_trait)]
 
-extern crate test;
-
 pub(crate) mod bands;
 pub(crate) mod complement;
 pub mod context;
@@ -18,5 +16,5 @@ pub(crate) mod expansion;
 pub(crate) mod request;
 pub(crate) mod segment;
 
-#[cfg(test)]
-mod tests;
+#[cfg(any(test, feature = "test-api"))]
+pub mod tests;

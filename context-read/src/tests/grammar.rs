@@ -12,7 +12,7 @@ use context_trace::*;
 type BuildKey = RangeInclusive<usize>;
 
 //#[test]
-pub(crate) fn test_grammar() {
+pub fn test_grammar() {
     let N: usize = 100; // total length
     let k: usize = 20; // alphabet size
                        //let mut graph = HypergraphRef::<BaseGraphKind>::default();

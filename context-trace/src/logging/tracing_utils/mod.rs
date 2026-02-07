@@ -176,13 +176,13 @@ macro_rules! init_test_tracing {
     (@detect $test_name:expr, $arg:expr) => {{
         // This is a bit of a hack, but we try to call init_with_graph
         // and if that fails to compile, the user should use the two-arg form
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-api"))]
         {
             $crate::logging::tracing_utils::TestTracing::init_with_graph(
                 $test_name, $arg
             )
         }
-        #[cfg(not(test))]
+        #[cfg(not(any(test, feature = "test-api")))]
         {
             // Fallback to config-based init if test_graph is not available
             $crate::logging::tracing_utils::TestTracing::init_with_config(
