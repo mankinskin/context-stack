@@ -13,9 +13,9 @@ use crate::{
     context::root::RootManager,
     expansion::block::BlockExpansionCtx,
     sequence::{
-        block_iter::{
-            BlockIter,
-            NextBlock,
+        segment_iter::{
+            NextSegment,
+            SegmentIter,
         },
         ToNewAtomIndices,
     },
@@ -25,7 +25,7 @@ pub struct ReadCtx {
     #[deref]
     #[deref_mut]
     pub root: RootManager,
-    pub blocks: BlockIter,
+    pub segments: SegmentIter,
 }
 pub enum ReadState {
     Continue(Token, PatternEndPath),
@@ -34,7 +34,7 @@ pub enum ReadState {
 impl Iterator for ReadCtx {
     type Item = ();
     fn next(&mut self) -> Option<Self::Item> {
-        self.blocks.next().map(|block| self.read_block(block))
+        self.segments.next().map(|block| self.read_segment(block))
     }
 }
 impl ReadCtx {
@@ -45,7 +45,7 @@ impl ReadCtx {
         debug!("New ReadCtx");
         let new_indices = seq.to_new_atom_indices(&graph);
         Self {
-            blocks: BlockIter::new(new_indices),
+            segments: SegmentIter::new(new_indices),
             root: RootManager::new(graph),
         }
     }
@@ -53,28 +53,22 @@ impl ReadCtx {
         self.find_map(|_| None as Option<()>);
         self.root.root
     }
-    pub fn read_known(
+    fn read_segment(
         &mut self,
-        known: Pattern,
+        segment: NextSegment,
     ) {
-        let minified = BlockExpansionCtx::new(self.clone(), known).process();
-        self.append_pattern(minified);
-    }
-    fn read_block(
-        &mut self,
-        block: NextBlock,
-    ) {
-        let NextBlock { unknown, known } = block;
+        let NextSegment { unknown, known } = segment;
         debug!(
             unknown_len = ?unknown.len(),
             known_len = ?known.len(),
             unknown = ?unknown,
             known = ?known,
-            "read_block"
+            "read_segment"
         );
         self.append_pattern(unknown);
         if !known.is_empty() {
-            self.read_known(known);
+            let block = BlockExpansionCtx::new(self.clone(), known).process();
+            self.append_block(block);
         }
     }
 }

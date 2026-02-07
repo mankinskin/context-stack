@@ -85,10 +85,6 @@ impl<'a> ExpansionCtx<'a> {
     pub fn last(&self) -> &Band {
         self.chain.last().unwrap().band
     }
-    pub fn find_largest_bundle(self) -> Token {
-        debug!(chain_len = ?self.chain.len(), "find_largest_bundle");
-        self.chain.last().unwrap().band.last_token()
-    }
     pub fn apply_op(
         &mut self,
         op: ChainOp,

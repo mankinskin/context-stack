@@ -1,6 +1,9 @@
 use context_trace::{
+    graph::vertex::atom::{
+        NewAtomIndex,
+        NewAtomIndices,
+    },
     *,
-    graph::vertex::atom::{NewAtomIndex, NewAtomIndices},
 };
 use derive_more::{
     Deref,
@@ -11,29 +14,29 @@ use itertools::Itertools;
 use std::fmt::Debug;
 
 #[derive(Debug, Deref, DerefMut, Clone)]
-pub struct BlockIter {
+pub struct SegmentIter {
     iter: std::iter::Peekable<std::vec::IntoIter<NewAtomIndex>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct NextBlock {
+pub struct NextSegment {
     pub known: Pattern,
     pub unknown: Pattern,
 }
-impl Iterator for BlockIter {
-    type Item = NextBlock;
+impl Iterator for SegmentIter {
+    type Item = NextSegment;
     fn next(&mut self) -> Option<Self::Item> {
         let unknown = self.next_pattern_where(|t| t.is_new());
         let known = self.next_pattern_where(|t| t.is_known());
         if unknown.is_empty() && known.is_empty() {
             None
         } else {
-            Some(NextBlock { unknown, known })
+            Some(NextSegment { unknown, known })
         }
     }
 }
 
-impl BlockIter {
+impl SegmentIter {
     pub fn new(sequence: NewAtomIndices) -> Self {
         Self {
             iter: sequence.into_iter().peekable(),

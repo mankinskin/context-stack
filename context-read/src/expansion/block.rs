@@ -33,11 +33,7 @@ impl BlockExpansionCtx {
         Self { ctx, known }
     }
 
-    /// Process the known pattern and return the minified pattern.
-    ///
-    /// Calls find_largest_bundle on an ExpansionCtx and includes any remainder.
-    /// The BandChain within ExpansionCtx tracks overlaps as an ordered map.
-    pub fn process(self) -> Pattern {
+    pub fn process(self) -> Token {
         debug!(
             known_len = self.known.len(),
             "BlockExpansionCtx::process starting"
@@ -52,20 +48,13 @@ impl BlockExpansionCtx {
         let mut cursor = path.into_range(0);
 
         // Create expansion context and get bundled result
-        let expansion = ExpansionCtx::new(self.ctx.clone(), &mut cursor)
-            .find_largest_bundle();
+        let ctx = ExpansionCtx::new(self.ctx.clone(), &mut cursor);
 
-        assert!(cursor.end_path().is_empty());
+        let first = ctx.chain.start_token();
+        debug!(chain = ?ctx.chain, ?first, "expansion chain before processing");
+        let bundled = ctx.last().unwrap_or(first);
 
-        // Build result: [bundled_token, ...remainder]
-        let result: Pattern = [
-            &[expansion],
-            &cursor.path_root()[cursor.role_root_child_index::<End>() + 1..],
-        ]
-        .concat()
-        .into();
-
-        debug!(result = ?result, "BlockExpansionCtx::process complete");
-        result
+        debug!(bundled = ?bundled, "BlockExpansionCtx::process complete");
+        bundled
     }
 }

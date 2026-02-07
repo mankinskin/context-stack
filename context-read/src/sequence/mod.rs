@@ -1,4 +1,4 @@
-pub mod block_iter;
+pub mod segment_iter;
 
 use context_trace::{
     graph::vertex::atom::NewAtomIndices,
