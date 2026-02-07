@@ -34,8 +34,9 @@ impl BlockExpansionCtx {
         Self { root, known }
     }
 
-    /// Process the known pattern and return the bundled token.
-    pub fn process(&mut self) -> Token {
+    /// Process the known pattern and commit the result to the root.
+    /// Uses overlap expansion and commits the full band chain with decompositions.
+    pub fn process(&mut self) {
         debug!(
             known_len = self.known.len(),
             "BlockExpansionCtx::process starting"
@@ -49,15 +50,24 @@ impl BlockExpansionCtx {
         let path = PatternEndPath::new(self.known.clone(), Default::default());
         let mut cursor = path.into_range(0);
 
-        // Create expansion context and get bundled result
-        let ctx = ExpansionCtx::new(self.root.graph.clone(), &mut cursor);
+        // Create expansion context
+        let mut ctx = ExpansionCtx::new(self.root.graph.clone(), &mut cursor);
 
         let first = ctx.chain.start_token();
         debug!(chain = ?ctx.chain, ?first, "expansion chain before processing");
-        let bundled = ctx.last().unwrap_or(first);
+        
+        // Process all expansions by consuming the iterator
+        while ctx.next().is_some() {}
 
-        debug!(bundled = ?bundled, "BlockExpansionCtx::process complete");
-        bundled
+        debug!(
+            final_chain = ?ctx.chain,
+            final_token = ?ctx.chain.final_token(),
+            "BlockExpansionCtx::process complete"
+        );
+        
+        // Take the chain and commit to root manager
+        let chain = std::mem::take(&mut ctx.chain);
+        self.root.commit_chain(chain);
     }
 
     /// Finish processing and return the RootManager.

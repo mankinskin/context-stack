@@ -90,4 +90,15 @@ impl BandChain {
         //self.links.pop_front();
         self.bands.pop_first()
     }
+
+    /// Get the final bundled token from the last band.
+    pub fn final_token(&self) -> Token {
+        self.last().unwrap().band.last_token()
+    }
+
+    /// Iterate over overlap bands (all bands after the first one).
+    /// These contain decompositions `[complement, expansion]`.
+    pub fn overlap_bands(&self) -> impl Iterator<Item = &Band> {
+        self.bands.iter().skip(1)
+    }
 }

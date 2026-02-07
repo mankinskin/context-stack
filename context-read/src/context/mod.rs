@@ -87,10 +87,10 @@ impl ReadCtx {
 
         if !known.is_empty() {
             // Process known pattern through BlockExpansionCtx
+            // process() commits the chain to the root manager internally
             let mut block_ctx = BlockExpansionCtx::new(root, known);
-            let block = block_ctx.process();
+            block_ctx.process();
             root = block_ctx.finish();
-            root.append_block(block);
         }
 
         // Put RootManager back
