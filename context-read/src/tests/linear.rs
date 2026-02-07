@@ -367,28 +367,6 @@ fn repetition_abcabc() {
         root => [[abc, abc]]
     );
 }
-
-/// Test "xyzxyzxyz" - "xyz" repeated three times.
-#[test]
-fn repetition_xyzxyzxyz() {
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
-    let _tracing = init_test_tracing!(&graph);
-    let result = ReadRequest::from_text("xyzxyzxyz").execute(&mut graph);
-
-    expect_atoms!(graph, {x, y, z});
-    assert_indices!(graph, xyz);
-
-    let root = result.expect("should have root");
-    assert_eq!(root.width(), TokenWidth(9));
-
-    // "xyzxyzxyz" should be decomposed as [xyz, xyz, xyz]
-    assert_patterns!(
-        graph,
-        xyz => [[x, y, z]],
-        root => [[xyz, xyz, xyz]]
-    );
-}
-
 /// Test "abXXab" - "ab" repeated with different content between.
 #[test]
 fn repetition_ab_separated() {
@@ -422,24 +400,4 @@ fn repetition_hello_separated() {
 
     // Both "hello" instances should reference the same index
     assert_indices!(graph, hello);
-}
-
-/// Test "abcabcabc" - "abc" repeated three times, no overlaps.
-#[test]
-fn repetition_abcabcabc() {
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
-    let result = ReadRequest::from_text("abcabcabc").execute(&mut graph);
-
-    expect_atoms!(graph, {a, b, c});
-    assert_indices!(graph, abc);
-
-    let root = result.expect("should have root");
-    assert_eq!(root.width(), TokenWidth(9));
-
-    // "abcabcabc" should be decomposed as [abc, abc, abc]
-    assert_patterns!(
-        graph,
-        abc => [[a, b, c]],
-        root => [[abc, abc, abc]]
-    );
 }

@@ -28,14 +28,14 @@ impl Borrow<AtomPosition> for Band {
     }
 }
 impl Band {
-    pub fn postfix(&self) -> Token {
+    pub fn last_token(&self) -> Token {
         *self.pattern.last().unwrap()
     }
     pub fn append(
         &mut self,
         postfix: Token,
     ) {
-        let width = self.postfix().width();
+        let width = self.last_token().width();
         self.start_bound += width.0;
         self.end_bound += width.0;
         self.pattern.push(postfix);

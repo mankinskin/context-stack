@@ -27,7 +27,7 @@ pub struct ExpandCtx<'a> {
 }
 impl<'a> ExpandCtx<'a> {
     pub fn try_new(ctx: &'a ExpansionCtx<'a>) -> Option<Self> {
-        let last_end = ctx.last().postfix();
+        let last_end = ctx.last().last_token();
         debug!(last_end_postfix = ?last_end, "Try new ExpandCtx");
         let mut postfix_iter = last_end.postfix_iter(ctx.ctx.clone());
         if let Some((postfix_location, _)) = postfix_iter.next() {

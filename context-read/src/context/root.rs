@@ -49,6 +49,7 @@ impl RootManager {
             },
         }
     }
+
     #[context_trace::instrument_sig(skip(self, index))]
     pub fn append_index(
         &mut self,

@@ -55,6 +55,9 @@ impl BandChain {
             //front_link: None,
         })
     }
+    pub fn start_token(&self) -> Token {
+        self.first().unwrap().last_token()
+    }
     pub fn last(&self) -> Option<BandCtx<'_>> {
         self.bands.iter().last().map(|band| BandCtx {
             band,

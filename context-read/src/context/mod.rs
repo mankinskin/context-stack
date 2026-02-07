@@ -11,7 +11,7 @@ use tracing::debug;
 
 use crate::{
     context::root::RootManager,
-    expansion::ExpansionCtx,
+    expansion::block::BlockExpansionCtx,
     sequence::{
         block_iter::{
             BlockIter,
@@ -57,20 +57,7 @@ impl ReadCtx {
         &mut self,
         known: Pattern,
     ) {
-        let path = PatternEndPath::new(known.clone(), Default::default());
-        let minified = {
-            let mut cursor = path.into_range(0);
-            let expansion = ExpansionCtx::new(self.clone(), &mut cursor)
-                .find_largest_bundle();
-            assert!(cursor.end_path().is_empty());
-            [
-                &[expansion],
-                &cursor.path_root()
-                    [cursor.role_root_child_index::<End>() + 1..],
-            ]
-            .concat()
-        }
-        .into();
+        let minified = BlockExpansionCtx::new(self.clone(), known).process();
         self.append_pattern(minified);
     }
     fn read_block(

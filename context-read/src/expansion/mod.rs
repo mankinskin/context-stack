@@ -1,3 +1,4 @@
+pub mod block;
 pub mod chain;
 pub mod cursor;
 pub mod link;
@@ -81,22 +82,12 @@ impl<'a> ExpansionCtx<'a> {
             cursor: CursorCtx::new(trav, cursor),
         }
     }
-    pub fn cursor_root_index(&self) -> &Token {
-        self.chain
-            .bands
-            .first()
-            .expect("no overlaps in chain")
-            .pattern
-            .last()
-            .expect("empty pattern")
-    }
     pub fn last(&self) -> &Band {
         self.chain.last().unwrap().band
     }
-    pub fn find_largest_bundle(self) -> <Self as Iterator>::Item {
+    pub fn find_largest_bundle(self) -> Token {
         debug!(chain_len = ?self.chain.len(), "find_largest_bundle");
-        let first = self.chain.first().unwrap().postfix();
-        self.last().unwrap_or(first)
+        self.chain.last().unwrap().band.last_token()
     }
     pub fn apply_op(
         &mut self,
