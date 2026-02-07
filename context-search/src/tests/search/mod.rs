@@ -206,8 +206,8 @@ fn test_entire_root_cursor_position_equals_token_width() {
     // ab exists as a complete token
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph,
-        (ab, ab_id) => [a, b],
-        (abc, abc_id) => [ab, c]
+        (ab, _ab_id) => [a, b],
+        (_abc, _abc_id) => [ab, c]
     );
 
     // Search for "ab" - should find EntireRoot since "ab" is a complete token at the root
@@ -245,8 +245,8 @@ fn test_no_match_entire_root_cursor_position() {
     // Create graph with some patterns
     insert_atoms!(graph, {a, b, c, z});
     insert_patterns!(graph,
-        (ab, _ab_id) => [a, b],
-        (bc, _bc_id) => [b, c]
+        (_ab, _ab_id) => [a, b],
+        (_bc, _bc_id) => [b, c]
     );
 
     // Search for a pattern "zz" that doesn't exist in the graph

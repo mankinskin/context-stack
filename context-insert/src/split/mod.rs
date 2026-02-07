@@ -186,6 +186,8 @@ pub(crate) trait SplitInner: Debug + Clone {}
 
 impl<T: Debug + Clone> SplitInner for T {}
 
+pub(crate) type SplitMap = HashMap<PosKey, Split>;
+
 #[derive(Debug, Clone)]
 pub(crate) struct Split<T: SplitInner = Token> {
     pub(crate) left: T,
@@ -201,18 +203,17 @@ impl<T: SplitInner> Split<T> {
     }
 }
 
-impl<I, T: SplitInner + Extend<I> + IntoIterator<Item = I>> Split<T> {
-    pub(crate) fn infix(
-        &mut self,
-        mut inner: Split<T>,
-    ) {
-        self.left.extend(inner.left);
-        inner.right.extend(self.right.clone());
-        self.right = inner.right;
-    }
-}
+//impl<I, T: SplitInner + Extend<I> + IntoIterator<Item = I>> Split<T> {
+//    pub(crate) fn infix(
+//        &mut self,
+//        mut inner: Split<T>,
+//    ) {
+//        self.left.extend(inner.left);
+//        inner.right.extend(self.right.clone());
+//        self.right = inner.right;
+//    }
+//}
 
-pub(crate) type SplitMap = HashMap<PosKey, Split>;
 //pub(crate) trait HasSplitMap {
 //    fn split_map(&self) -> &SplitMap;
 //}

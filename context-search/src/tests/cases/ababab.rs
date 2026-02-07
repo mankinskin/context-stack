@@ -224,6 +224,8 @@ mod tests {
         let graph = env.graph();
         let a = env.a;
         let b = env.b;
+        let ab = env.ab;
+        let _ab_id = env.ab_id; // Use ab_id to silence unused field warning
 
         let result = graph.find_ancestor(&vec![a, b]);
         assert!(result.is_ok(), "Search for [a, b] should succeed");
@@ -231,8 +233,9 @@ mod tests {
         let response = result.unwrap();
         // Should find ab pattern as EntireRoot
         assert!(
-            matches!(response.end.path, PathCoverage::EntireRoot(_)),
-            "Should find [a, b] as EntireRoot (matching ab pattern), got {:?}",
+            matches!(&response.end.path, PathCoverage::EntireRoot(path)
+                if path.root_parent() == ab),
+            "Should find [a, b] as EntireRoot matching ab, got {:?}",
             response.end.path
         );
 

@@ -5,8 +5,7 @@ use context_trace::{
     },
     *,
 };
-use pretty_assertions::assert_eq;
-use std::collections::HashSet;
+use crate::search::Find;
 
 /// Test case for query [d, e, f, g, h] finding ancestor in graph with cdefghi patterns
 pub struct CdefghiTraceCase {
@@ -95,69 +94,19 @@ impl Default for CdefghiTraceCase {
         }
     }
 }
+
 impl CdefghiTraceCase {
     pub(crate) fn verify_trace_cache(
         &self,
         actual_cache: &TraceCache,
     ) {
-        // Verify number of entries
-        if actual_cache.entries.len() != self.expected_cache.entries.len() {
-            let actual_keys: HashSet<_> = actual_cache.entries.keys().collect();
-            let expected_keys: HashSet<_> =
-                self.expected_cache.entries.keys().collect();
-            let extra_in_actual: Vec<_> =
-                actual_keys.difference(&expected_keys).collect();
-            let missing_from_actual: Vec<_> =
-                expected_keys.difference(&actual_keys).collect();
-
-            let mut msg = format!(
-                "Trace cache entry count mismatch. Actual: {}, Expected: {}",
-                actual_cache.entries.len(),
-                self.expected_cache.entries.len()
-            );
-
-            if !extra_in_actual.is_empty() {
-                msg.push_str(&format!(
-                    "\nExtra entries in actual: {:?}",
-                    extra_in_actual
-                        .iter()
-                        .map(|&&idx| {
-                            actual_cache.entries.get(idx).map(|e| &e.index)
-                        })
-                        .collect::<Vec<_>>()
-                ));
-            }
-
-            if !missing_from_actual.is_empty() {
-                msg.push_str(&format!(
-                    "\nMissing from actual: {:#?}",
-                    missing_from_actual
-                        .iter()
-                        .map(|&&idx| { self.expected_cache.entries.get(idx) })
-                        .collect::<Vec<_>>()
-                ));
-            }
-
-            panic!("{}", msg);
-        }
-
-        // Check each entry
-        for (idx, expected_entry) in self.expected_cache.entries.iter() {
-            let actual_entry =
-                actual_cache.entries.get(idx).unwrap_or_else(|| {
-                    panic!("Missing entry for {:?}", expected_entry.index)
-                });
-            assert_eq!(
-                actual_entry, expected_entry,
-                "Trace entry mismatch for {:?}",
-                expected_entry.index
-            );
-        }
+        assert_eq!(
+            actual_cache,
+            &self.expected_cache,
+            "Trace cache mismatch"
+        );
     }
 }
-
-#[cfg(test)]
-use crate::Find;
 
 #[test]
 fn test_cdefghi_trace_cache() {
@@ -173,7 +122,7 @@ fn test_cdefghi_trace_cache() {
 
     assert_eq!(res.root_token(), test_case.expected_root);
     assert_eq!(
-        res.checkpoint_position(),
+        res.cursor_position(),
         test_case.expected_end_bound.into()
     );
 

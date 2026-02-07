@@ -5,8 +5,10 @@
 mod ababab;
 mod xyyxy;
 mod insert_prefix1;
+mod insert_postfix1;
 
 // Re-export all environments
 pub(crate) use ababab::EnvAbabab;
 pub(crate) use xyyxy::EnvXyyxy;
 pub use insert_prefix1::EnvInsertPrefix1;
+pub use insert_postfix1::EnvInsertPostfix1;

@@ -14,7 +14,6 @@ use crate::{
     SearchKind,
 };
 use context_trace::{
-    graph::vertex::data::VertexData,
     logging::format_utils::pretty,
     path::{
         accessors::child::HasRootedLeafToken,
@@ -26,7 +25,6 @@ use std::marker::PhantomData;
 use tracing::{
     debug,
     trace,
-    warn,
 };
 
 pub(crate) trait IntoCursor: StartFoldPath {
@@ -51,39 +49,6 @@ impl<P: StartFoldPath> IntoCursor for P {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) enum InputLocation {
-    Location(PatternLocation),
-    PatternChild { sub_index: usize, token: Token },
-}
-
-impl std::fmt::Display for InputLocation {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        match self {
-            InputLocation::Location(loc) => write!(f, "Location({})", loc),
-            InputLocation::PatternChild { sub_index, token } => {
-                write!(
-                    f,
-                    "PatternChild{{ sub_index: {}, token: {} }}",
-                    sub_index, token
-                )
-            },
-        }
-    }
-}
-
-impl GraphRoot for InputLocation {
-    fn root_parent(&self) -> Token {
-        match self {
-            InputLocation::Location(loc) => loc.parent,
-            InputLocation::PatternChild { token, .. } => *token,
-        }
-    }
-}
-
 pub(crate) trait StartFoldPath:
     BaseQuery
     + PathAppend
@@ -95,44 +60,6 @@ pub(crate) trait StartFoldPath:
 {
     fn to_range_path(self) -> PatternRangePath;
 
-    fn input_location<G: HasGraph>(
-        &self,
-        trav: &G,
-    ) -> InputLocation {
-        trace!("determining input_location for path");
-
-        if let Some(loc) = self.role_leaf_token_location::<End>() {
-            debug!(location = %pretty(&loc), "found leaf token location");
-            let pattern_loc = loc.into_pattern_location();
-            debug!(pattern_location = %pretty(&pattern_loc), "converted to pattern location");
-            InputLocation::Location(pattern_loc)
-        } else {
-            debug!("no leaf token location, getting pattern child");
-            let sub_index = self.role_root_child_index::<End>();
-            let token = self.role_rooted_leaf_token::<End, _>(trav);
-            debug!(token = %pretty(&token), sub_index, "pattern child");
-
-            // This is where the panic will happen - when we try to use this token
-            // and it doesn't have children
-            trace!("checking token vertex data in graph");
-            if let Ok(vertex_data) =
-                trav.graph().get_vertex_data(token.vertex_index())
-            {
-                trace!(vertex_data = %pretty::<VertexData>(&vertex_data), "token vertex data");
-                let child_patterns = vertex_data.child_patterns();
-                if child_patterns.is_empty() {
-                    warn!(
-                        token = %pretty(&token),
-                        "token has no child patterns - will cause panic"
-                    );
-                    warn!("typically means searching atoms directly without pattern");
-                    warn!("atoms can be searched with find_ancestor() via Searchable trait");
-                }
-            }
-
-            InputLocation::PatternChild { sub_index, token }
-        }
-    }
 }
 
 impl StartFoldPath for PatternRangePath {

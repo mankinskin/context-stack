@@ -1,13 +1,10 @@
 use std::fmt::Display;
 
-use dashmap::mapref::one::Ref;
-
 use crate::graph::{
     Hypergraph,
     getters::ErrorReason,
     kind::GraphKind,
     vertex::{
-        VertexEntry,
         VertexIndex,
         data::VertexData,
         has_vertex_index::HasVertexIndex,
@@ -101,24 +98,6 @@ impl<T: GetVertexIndex> GetVertexIndex for &'_ T {
         g: &Hypergraph<G>,
     ) -> VertexIndex {
         (*self).get_vertex_index(g)
-    }
-}
-
-/// A read guard for vertex data from the concurrent graph.
-///
-/// This holds both the DashMap ref and the RwLock read guard.
-pub struct VertexReadGuard<'a> {
-    _entry_ref: Ref<'a, VertexKey, VertexEntry>,
-    // We store a raw pointer because we can't express the lifetime properly
-    // The RwLockReadGuard is logically borrowed from entry_ref
-    data_ptr: *const VertexData,
-}
-
-impl<'a> std::ops::Deref for VertexReadGuard<'a> {
-    type Target = VertexData;
-    fn deref(&self) -> &Self::Target {
-        // SAFETY: The pointer is valid as long as _entry_ref is held
-        unsafe { &*self.data_ptr }
     }
 }
 

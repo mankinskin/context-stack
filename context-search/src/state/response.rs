@@ -45,11 +45,6 @@ impl Response {
         self.end.is_full_token()
     }
 
-    /// Unwrap a complete response, panicking if incomplete
-    pub(crate) fn unwrap_complete(self) -> IndexRangePath {
-        self.expect_complete("Called unwrap_complete on incomplete Response")
-    }
-
     /// Unwrap a complete response with a custom error message
     #[track_caller]
     pub(crate) fn expect_entire_root(
@@ -76,17 +71,6 @@ impl Response {
         self.expect_entire_root(msg)
     }
 
-    /// Try to get the complete path if the response is complete
-    pub(crate) fn as_complete(&self) -> Option<&IndexRangePath> {
-        if !self.end.query_exhausted() {
-            return None;
-        }
-        match &self.end.path {
-            PathCoverage::EntireRoot(path) => Some(path),
-            _ => None,
-        }
-    }
-
     /// Get the query pattern cursor from the response
     pub fn query_cursor(&self) -> &PatternCursor<Matched> {
         self.end.cursor()
@@ -104,11 +88,18 @@ impl Response {
         self.end.cursor().atom_position
     }
 
-    /// Get the checkpoint atom position
-    /// Always returns the confirmed match position, never the exploratory candidate position.
-    /// This should be used for insertion boundaries and other operations that need the confirmed match extent.
-    pub(crate) fn checkpoint_position(&self) -> AtomPosition {
-        self.end.checkpoint().atom_position
+    /// Unwrap a complete response, panicking if not complete
+    #[track_caller]
+    pub(crate) fn unwrap_complete(self) -> IndexRangePath {
+        self.expect_entire_root("unwrap_complete called on incomplete Response")
+    }
+
+    /// Get as complete if the path is EntireRoot
+    pub(crate) fn as_complete(&self) -> Option<&IndexRangePath> {
+        match &self.end.path {
+            PathCoverage::EntireRoot(path) => Some(path),
+            _ => None,
+        }
     }
 }
 

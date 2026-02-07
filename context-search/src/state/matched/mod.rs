@@ -38,6 +38,11 @@ impl CheckpointedCursor {
         }
     }
 
+    /// Check if cursor has an advanced candidate position
+    pub(crate) fn has_candidate(&self) -> bool {
+        matches!(self, CheckpointedCursor::HasCandidate(_))
+    }
+
     /// Get the cursor for consecutive searches
     ///
     /// Returns the candidate (advanced position) if available, otherwise the checkpoint.
@@ -47,11 +52,6 @@ impl CheckpointedCursor {
             CheckpointedCursor::AtCheckpoint(c) => c.checkpoint(),
             CheckpointedCursor::HasCandidate(c) => c.candidate(),
         }
-    }
-
-    /// Check if this has a candidate (advanced position from parent exploration)
-    pub(crate) fn has_candidate(&self) -> bool {
-        matches!(self, CheckpointedCursor::HasCandidate(_))
     }
 }
 
@@ -134,11 +134,6 @@ impl MatchResult {
         &self.path
     }
 
-    /// Get the checkpoint cursor (always the confirmed match position)
-    pub(crate) fn checkpoint(&self) -> &PatternCursor<Matched> {
-        self.cursor.checkpoint()
-    }
-
     /// Get the cursor for consecutive searches
     ///
     /// Returns the candidate (advanced position) if available, otherwise the checkpoint.
@@ -200,11 +195,6 @@ impl MatchResult {
     //        PathCoverage::Prefix(_) => None, // Defer complex path type
     //    }
     //}
-
-    /// Get start path length for incremental tracing
-    pub(crate) fn start_len(&self) -> usize {
-        self.path().start_len()
-    }
 }
 
 impl Traceable for &MatchResult {

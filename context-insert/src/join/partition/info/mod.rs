@@ -10,7 +10,6 @@ use crate::{
         context::pattern::borders::JoinBorders,
         joined::{
             partition::JoinedPartition,
-            patterns::JoinedPatterns,
         },
         partition::Join,
     },
@@ -35,15 +34,6 @@ impl<R: RangeRole<Mode = Join>> JoinPartitionInfo<R>
 where
     R::Borders: JoinBorders<R>,
 {
-    pub(crate) fn into_joined_patterns<'a>(
-        self,
-        ctx: &mut ModeNodeCtxOf<'a, R>,
-    ) -> JoinedPatterns<R>
-    where
-        R: 'a,
-    {
-        JoinedPatterns::from_partition_info(self, ctx)
-    }
     pub(crate) fn into_joined_partition<'a>(
         self,
         ctx: &mut ModeNodeCtxOf<'a, R>,

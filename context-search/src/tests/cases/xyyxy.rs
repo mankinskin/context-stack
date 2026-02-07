@@ -120,6 +120,38 @@ mod tests {
         assert_eq!(actual, expected, "Response should match expected");
     }
 
+    /// Test that searching for [xy, y, xy] finds xyyxy as EntireRoot
+    #[test]
+    fn test_search_xyyxy_exact() {
+        let env = EnvXyyxy::get();
+        let graph = env.graph();
+        let _tracing = init_test_tracing!(graph);
+
+        // Use xyyxy and xyyxy_id to silence unused field warnings
+        let xy = env.xy;
+        let y = env.y;
+        let xyyxy = env.xyyxy;
+        let _xyyxy_id = env.xyyxy_id;
+
+        let result = graph.find_ancestor(&vec![xy, y, xy]);
+        assert!(result.is_ok(), "Search should succeed");
+
+        let response = result.unwrap();
+        assert!(response.query_exhausted(), "Query should be exhausted");
+
+        // Should find xyyxy as EntireRoot
+        match &response.end.path {
+            PathCoverage::EntireRoot(path) => {
+                assert_eq!(
+                    path.root_parent(),
+                    xyyxy,
+                    "Should find xyyxy pattern"
+                );
+            }
+            other => panic!("Expected EntireRoot, got {:?}", other),
+        }
+    }
+
     /// Test that searching for just 'y' (which appears multiple times in xyyxy)
     /// returns SingleIndex error (searching for single token is not supported)
     #[test]

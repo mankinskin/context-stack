@@ -45,7 +45,6 @@ use derive_more::derive::{
 use itertools::Itertools;
 use std::{
     collections::BTreeMap,
-    iter::FromIterator,
     num::NonZeroUsize,
 };
 use tracing::debug;
@@ -398,12 +397,6 @@ impl SplitVertexCache {
         required
     }
 
-    pub(crate) fn pos_mut(
-        &mut self,
-        pos: NonZeroUsize,
-    ) -> &mut SplitPositionCache {
-        self.positions.entry(pos).or_default()
-    }
     pub(crate) fn offset_range_partition<K: RangeRole>(
         &self,
         range: K::OffsetRange,

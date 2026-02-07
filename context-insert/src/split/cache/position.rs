@@ -119,13 +119,6 @@ impl SplitPositionCache {
             pattern_splits: subs.into_iter().map(Into::into).collect(),
         }
     }
-    pub(crate) fn find_clean_split(&self) -> Option<SubLocation> {
-        self.pattern_splits.iter().find_map(|(pid, s)| {
-            s.inner_offset
-                .is_none()
-                .then_some(SubLocation::new(*pid, s.sub_index))
-        })
-    }
     
     /// Apply delta adjustment with inner_offset for positions inside a merged region.
     ///

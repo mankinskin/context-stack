@@ -38,7 +38,7 @@ pub(crate) struct JoinPatternInfo<R: RangeRole<Mode = Join>> {
     pub(crate) inner_range: Option<InnerRangeInfo<R>>,
     pub(crate) range: R::PatternRange,
     pub(crate) children: Option<ModeChildrenOf<R>>,
-    pub(crate) offsets: R::Offsets,
+    //pub(crate) offsets: R::Offsets,
     pub(crate) delta: usize,
 }
 
@@ -83,7 +83,7 @@ where
     ) -> Result<PatternRangeInfo<R>, Token> {
         let perfect = borders.perfect();
         let range = borders.outer_range();
-        let offsets = borders.offsets();
+        //let offsets = borders.offsets();
         let inner = borders.inner_info(ctx);
         let pctx = ctx.pattern_trace_context();
         let delta = inner
@@ -115,7 +115,7 @@ where
                 info: JoinPatternInfo {
                     inner_range: inner,
                     delta,
-                    offsets,
+                    //offsets,
                     range,
                     children,
                 },

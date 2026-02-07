@@ -33,13 +33,13 @@ impl PartitionRange {
         Self(range)
     }
 
-    pub(crate) fn len(&self) -> usize {
-        self.end() - self.start()
-    }
+    //pub(crate) fn len(&self) -> usize {
+    //    self.end() - self.start()
+    //}
 
-    pub(crate) fn into_range(self) -> Range<usize> {
-        *self.start()..(self.end() + 1)
-    }
+    //pub(crate) fn into_range(self) -> Range<usize> {
+    //    *self.start()..(self.end() + 1)
+    //}
 
     /// Compute the overlap of two partition ranges.
     ///

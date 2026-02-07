@@ -171,24 +171,6 @@ impl PathCoverage {
             }),
         }
     }
-
-    /// Get the start path length for incremental tracing
-    pub(crate) fn start_len(&self) -> usize {
-        match self {
-            PathCoverage::Range(p) => p.path.start_path().len(),
-            PathCoverage::Postfix(p) => p.path.start_path().len(),
-            PathCoverage::Prefix(_) | PathCoverage::EntireRoot(_) => 0,
-        }
-    }
-
-    ///// Get the start path if it exists (safe version that returns Option)
-    //pub(crate) fn try_start_path(&self) -> Option<&StartPath> {
-    //    match self {
-    //        PathCoverage::Range(p) => Some(p.path.start_path()),
-    //        PathCoverage::Postfix(p) => Some(p.path.start_path()),
-    //        PathCoverage::Prefix(_) | PathCoverage::EntireRoot(_) => None,
-    //    }
-    //}
 }
 
 impl std::fmt::Display for PathCoverage {

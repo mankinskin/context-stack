@@ -78,12 +78,12 @@ where
         }
     }
 
-    pub(crate) fn from_joined_patterns(
-        pats: JoinedPatterns<R>,
-        ctx: &'c mut NodeJoinCtx<'a>,
-    ) -> Self {
-        Self::from_joined_patterns_with_options(pats, ctx, false)
-    }
+    //pub(crate) fn from_joined_patterns(
+    //    pats: JoinedPatterns<R>,
+    //    ctx: &'c mut NodeJoinCtx<'a>,
+    //) -> Self {
+    //    Self::from_joined_patterns_with_options(pats, ctx, false)
+    //}
 
     pub(crate) fn from_partition_info(
         info: JoinPartitionInfo<R>,
