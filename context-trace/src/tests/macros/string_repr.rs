@@ -280,6 +280,7 @@ mod tests {
     use super::*;
     use crate::{
         HypergraphRef,
+        init_test_tracing,
         insert_atoms,
         insert_patterns,
         trace::has_graph::HasGraph,
@@ -289,6 +290,7 @@ mod tests {
     fn test_check_token_string_repr() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
+        let _tracing = init_test_tracing!(&graph);
 
         let g = graph.graph();
         assert!(check_token_string_repr(g, a, "a"));
@@ -305,6 +307,7 @@ mod tests {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
         insert_patterns!(graph, abc => [a, b, c]);
+        let _tracing = init_test_tracing!(&graph);
 
         let g = graph.graph();
         assert_token_string_repr(g, a, "a");
@@ -317,6 +320,7 @@ mod tests {
     fn test_assert_token_string_repr_fails() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b});
+        let _tracing = init_test_tracing!(&graph);
 
         let g = graph.graph();
         assert_token_string_repr(g, a, "b");
@@ -330,6 +334,7 @@ mod tests {
             _ab => [a, b],
             _cd => [c, d]
         );
+        let _tracing = init_test_tracing!(&graph);
 
         let g = graph.graph();
         let (is_unique, duplicates) = check_all_vertices_unique(g);
@@ -345,6 +350,7 @@ mod tests {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
         insert_patterns!(graph, _abc => [a, b, c]);
+        let _tracing = init_test_tracing!(&graph);
 
         let g = graph.graph();
         assert_all_vertices_unique(g);
@@ -358,6 +364,7 @@ mod tests {
             ab => [a, b],
             cd => [c, d]
         );
+        let _tracing = init_test_tracing!(&graph);
 
         let g = graph.graph();
         let (is_unique, duplicates) = check_tokens_unique(g, &[ab, cd]);

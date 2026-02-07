@@ -3,6 +3,7 @@ use {
     crate::search::Find,
     crate::state::end::PathCoverage,
     context_trace::{
+        init_test_tracing,
         tests::{
             env::Env1,
             test_case::TestEnv,
@@ -30,6 +31,7 @@ fn find_parent1() {
         abc,
         ..
     } = &*Env1::get();
+    let _tracing = init_test_tracing!(graph);
     //let a_bc_pattern = [Token::new(a, 1), Token::new(bc, 2)];
     let ab_c_pattern = [Token::new(ab, 2), Token::new(c, 1)];
     //let a_bc_d_pattern =

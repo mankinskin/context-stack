@@ -4,6 +4,7 @@
 
 #[cfg(test)]
 use crate::{
+    init_test_tracing,
     path::accessors::path_accessor::PathAccessor,
     *,
 };
@@ -124,6 +125,7 @@ fn test_rooted_path_macro_range() {
     let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph, (abc, abc_id) => [a, b, c]);
+    let _tracing = init_test_tracing!(&graph);
 
     // Test IndexRangePath
     let root = IndexRoot::from(
@@ -178,6 +180,7 @@ fn test_rooted_path_macro_single_role() {
     let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
     insert_patterns!(graph, (abc, abc_id) => [a, b, c]);
+    let _tracing = init_test_tracing!(&graph);
 
     let root = IndexRoot::from(
         ChildLocation::new(abc, abc_id, 0).into_pattern_location(),

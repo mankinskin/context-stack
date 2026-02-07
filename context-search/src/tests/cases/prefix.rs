@@ -120,6 +120,7 @@ use crate::{
 };
 #[test]
 fn test_search_1() {
+    let _tracing = init_test_tracing!();
     let test = Prefix1;
     let query = test.query();
 

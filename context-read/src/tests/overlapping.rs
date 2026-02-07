@@ -23,7 +23,7 @@ use pretty_assertions::assert_eq;
 #[test]
 fn repetition_abcabcabc() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
-    let _tracing = init_test_tracing!(graph);
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abcabcabc").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, c});
@@ -46,7 +46,7 @@ fn repetition_abcabcabc() {
 #[test]
 fn repetition_xyzxyzxyz() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
-    let _tracing = init_test_tracing!(graph);
+    let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("xyzxyzxyz").execute(&mut graph);
 
     expect_atoms!(graph, {x, y, z});

@@ -159,10 +159,12 @@ impl ReadResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use context_trace::init_test_tracing;
 
     #[test]
     fn read_request_from_text() {
         let mut graph = HypergraphRef::<BaseGraphKind>::default();
+        let _tracing = init_test_tracing!(&graph);
         let request = ReadRequest::from_text("abc");
         let result = request.execute(&mut graph);
 
@@ -174,6 +176,7 @@ mod tests {
     #[test]
     fn read_request_empty_text() {
         let mut graph = HypergraphRef::<BaseGraphKind>::default();
+        let _tracing = init_test_tracing!(&graph);
         let request = ReadRequest::from_text("");
         let result = request.execute(&mut graph);
 
@@ -183,6 +186,7 @@ mod tests {
     #[test]
     fn read_request_builder() {
         let mut graph = HypergraphRef::<BaseGraphKind>::default();
+        let _tracing = init_test_tracing!(&graph);
 
         let request =
             ReadRequestBuilder::default().text("hello").build().unwrap();

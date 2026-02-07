@@ -3,6 +3,7 @@ use crate::{
         Hypergraph,
         kind::BaseGraphKind,
     },
+    init_test_tracing,
     insert_atoms,
     insert_patterns,
 };
@@ -11,6 +12,7 @@ use std::fs;
 #[test]
 fn test_to_petgraph() {
     let graph = Hypergraph::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     insert_atoms!(graph, {a, b, c, d});
     // ab cd
     // abc d

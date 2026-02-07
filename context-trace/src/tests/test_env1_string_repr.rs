@@ -1,12 +1,16 @@
 //! Test that Env1 tokens show string representations
 
-use crate::tests::{
-    env::Env1,
-    test_case::TestEnv,
+use crate::{
+    init_test_tracing,
+    tests::{
+        env::Env1,
+        test_case::TestEnv,
+    },
 };
 
 #[test]
 fn test_env1_tokens_have_string_repr() {
+    let _tracing = init_test_tracing!();
     let env = Env1::get();
 
     // Check if token 'a' shows its string representation

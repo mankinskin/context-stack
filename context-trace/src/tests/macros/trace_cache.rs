@@ -3,7 +3,7 @@
 //! Provides macro for building TraceCache structures with a declarative syntax.
 
 #[cfg(test)]
-use crate::*;
+use crate::{init_test_tracing, *};
 
 /// Build a TraceCache with declarative syntax
 ///
@@ -117,6 +117,7 @@ fn test_build_trace_cache1() {
         (ld, ld_id) => [l, d],
         (heldld, heldld_id) => [h, e, ld, ld]
     );
+    let _tracing = init_test_tracing!(&graph);
     let cache = build_trace_cache!(
         heldld => (
             BU {},
@@ -216,6 +217,7 @@ fn test_build_trace_cache2() {
         (ab, ab_id) => [a, b],
         (ababcd, ababcd_id) => [ab, ab, c, d]
     );
+    let _tracing = init_test_tracing!(&graph);
     let cache = build_trace_cache!(
         ababcd => (
             BU { 1 => ab -> (ababcd_id, 1) },

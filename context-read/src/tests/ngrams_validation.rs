@@ -12,6 +12,7 @@ use context_trace::{
         vertex::has_vertex_index::HasVertexIndex,
         Hypergraph,
     },
+    init_test_tracing,
     *,
 };
 use ngrams::{
@@ -70,8 +71,9 @@ impl CanonicalGraph {
 
 /// Build a graph using context-read from a single input string
 fn build_context_read_graph(input: &str) -> Hypergraph {
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
-    let _result = (&mut graph, input.chars()).read_sequence().unwrap();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    let _result = (&mut graph.clone(), input.chars()).read_sequence().unwrap();
     // HypergraphRef derefs to Hypergraph, clone it
     let g: &Hypergraph = &*graph;
     g.clone()
@@ -167,52 +169,62 @@ fn assert_graphs_equivalent(input: &str) {
 
 #[test]
 fn validate_single_char() {
+    let _tracing = init_test_tracing!();
     // Single char: ngrams may fail, just verify context-read works
     assert_graphs_equivalent("a");
 }
 
 #[test]
 fn validate_two_chars() {
+    let _tracing = init_test_tracing!();
     // Two different chars: no repeats, just verify both work
     assert_graphs_equivalent("ab");
 }
 
 #[test]
 fn validate_repeated_char() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("aa");
 }
 
 #[test]
 fn validate_three_repeated() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("aaa");
 }
 
 #[test]
 fn validate_simple_repeat() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("abab");
 }
 
 #[test]
 fn validate_overlap() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("aba");
 }
 
 #[test]
 fn validate_complex_short() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("abcabc");
 }
 
 #[test]
 fn validate_mixed_pattern() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("aabb");
 }
 
 #[test]
 fn validate_palindrome() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("abba");
 }
 
 #[test]
 fn validate_triple_repeat() {
+    let _tracing = init_test_tracing!();
     assert_graphs_equivalent("ababab");
 }

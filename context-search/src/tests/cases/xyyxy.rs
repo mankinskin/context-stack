@@ -106,6 +106,7 @@ mod tests {
 
     #[test]
     fn test_search_xy_exact() {
+        let _tracing = init_test_tracing!();
         let test = SearchXyExact;
         let query = test.query();
 
@@ -127,6 +128,7 @@ mod tests {
         
         let env = EnvXyyxy::get();
         let graph = env.graph();
+        let _tracing = init_test_tracing!(graph);
         let y = env.y;
 
         let result = graph.find_ancestor(&vec![y]);
