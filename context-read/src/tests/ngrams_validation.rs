@@ -33,8 +33,8 @@ use std::collections::{
 /// Uses string representations of vertices and patterns for comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CanonicalGraph {
-    /// Map from vertex string to set of pattern strings (each pattern is a joined string of children)
-    vertices: BTreeMap<String, BTreeSet<String>>,
+    /// Map from vertex string to set of patterns (each pattern is a Vec of child strings)
+    vertices: BTreeMap<String, BTreeSet<Vec<String>>>,
 }
 
 impl CanonicalGraph {
@@ -46,18 +46,17 @@ impl CanonicalGraph {
             let vertex_string = graph.vertex_key_string(&key);
             let patterns = graph.expect_child_patterns(&key);
 
-            let pattern_strings: BTreeSet<String> = patterns
+            let pattern_vecs: BTreeSet<Vec<String>> = patterns
                 .values()
                 .map(|pattern| {
                     pattern
                         .iter()
                         .map(|token| graph.index_string(token.vertex_index()))
                         .collect::<Vec<_>>()
-                        .join("")
                 })
                 .collect();
 
-            vertices.insert(vertex_string, pattern_strings);
+            vertices.insert(vertex_string, pattern_vecs);
         }
 
         Self { vertices }
@@ -69,14 +68,9 @@ impl CanonicalGraph {
     }
 }
 
-/// Build a graph using context-read from a single input string
-fn build_context_read_graph(input: &str) -> Hypergraph {
-    let graph = HypergraphRef::<BaseGraphKind>::default();
-    let _tracing = init_test_tracing!(&graph);
+/// Populate a graph using context-read from a single input string
+fn populate_context_read_graph(graph: &HypergraphRef, input: &str) {
     let _result = (&mut graph.clone(), input.chars()).read_sequence().unwrap();
-    // HypergraphRef derefs to Hypergraph, clone it
-    let g: &Hypergraph = &*graph;
-    g.clone()
 }
 
 /// Build a graph using ngrams from a single input string
@@ -104,8 +98,9 @@ fn build_ngrams_graph(input: &str) -> Option<Hypergraph> {
 /// Validate that context-read and ngrams produce equivalent graphs for the given input.
 ///
 /// Returns Ok if the graphs are equivalent, Err with a description of the differences otherwise.
-fn validate_graphs_equivalent(input: &str) -> Result<(), String> {
-    let cr_graph = build_context_read_graph(input);
+fn validate_graphs_equivalent(graph: &HypergraphRef, input: &str) -> Result<(), String> {
+    populate_context_read_graph(graph, input);
+    let cr_graph: &Hypergraph = &*graph;
 
     let ngrams_graph = match build_ngrams_graph(input) {
         Some(g) => g,
@@ -118,6 +113,11 @@ fn validate_graphs_equivalent(input: &str) -> Result<(), String> {
 
     let cr_canonical = CanonicalGraph::from_hypergraph(&cr_graph);
     let ngrams_canonical = CanonicalGraph::from_hypergraph(&ngrams_graph);
+
+    // Debug: print full canonical representations
+    eprintln!("\n=== Input: '{}' ===", input);
+    eprintln!("context-read canonical: {:#?}", cr_canonical);
+    eprintln!("ngrams canonical: {:#?}", ngrams_canonical);
 
     let cr_vertices = cr_canonical.vertex_strings();
     let ngrams_vertices = ngrams_canonical.vertex_strings();
@@ -158,8 +158,8 @@ fn validate_graphs_equivalent(input: &str) -> Result<(), String> {
 }
 
 /// Run validation on an input and panic with detailed comparison on failure
-fn assert_graphs_equivalent(input: &str) {
-    if let Err(msg) = validate_graphs_equivalent(input) {
+fn assert_graphs_equivalent(graph: &HypergraphRef, input: &str) {
+    if let Err(msg) = validate_graphs_equivalent(graph, input) {
         panic!("{}", msg);
     }
 }
@@ -169,62 +169,72 @@ fn assert_graphs_equivalent(input: &str) {
 
 #[test]
 fn validate_single_char() {
-    let _tracing = init_test_tracing!();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     // Single char: ngrams may fail, just verify context-read works
-    assert_graphs_equivalent("a");
+    assert_graphs_equivalent(&graph, "a");
 }
 
 #[test]
 fn validate_two_chars() {
-    let _tracing = init_test_tracing!();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
     // Two different chars: no repeats, just verify both work
-    assert_graphs_equivalent("ab");
+    assert_graphs_equivalent(&graph, "ab");
 }
 
 #[test]
 fn validate_repeated_char() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("aa");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "aa");
 }
 
 #[test]
 fn validate_three_repeated() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("aaa");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "aaa");
 }
 
 #[test]
 fn validate_simple_repeat() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("abab");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "abab");
 }
 
 #[test]
 fn validate_overlap() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("aba");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "aba");
 }
 
 #[test]
 fn validate_complex_short() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("abcabc");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "abcabc");
 }
 
 #[test]
 fn validate_mixed_pattern() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("aabb");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "aabb");
 }
 
 #[test]
 fn validate_palindrome() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("abba");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "abba");
 }
 
 #[test]
 fn validate_triple_repeat() {
-    let _tracing = init_test_tracing!();
-    assert_graphs_equivalent("ababab");
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    assert_graphs_equivalent(&graph, "ababab");
 }
