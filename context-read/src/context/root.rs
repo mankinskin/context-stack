@@ -120,7 +120,7 @@ impl RootManager {
         );
 
         // Collect overlap bands (all bands after the first)
-        let overlap_patterns: Vec<Pattern> = chain
+        let mut overlap_patterns: Vec<Pattern> = chain
             .overlap_bands()
             .map(|band| band.pattern.clone())
             .collect();

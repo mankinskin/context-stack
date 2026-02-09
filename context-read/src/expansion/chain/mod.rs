@@ -91,9 +91,11 @@ impl BandChain {
         self.bands.pop_first()
     }
 
-    /// Get the final bundled token from the last band.
+    /// Get the final bundled token from the first band (main sequential bundle).
+    /// The first band contains the sequential expansion result.
+    /// Overlap bands (after the first) contain alternate decompositions.
     pub(crate) fn final_token(&self) -> Token {
-        self.last().unwrap().band.last_token()
+        self.first().unwrap().last_token()
     }
 
     /// Iterate over overlap bands (all bands after the first one).

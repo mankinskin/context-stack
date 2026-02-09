@@ -5,6 +5,7 @@
 //! to detect overlaps, with the BandChain tracking overlaps as an ordered map.
 
 use crate::{
+    bands::HasTokenRoleIters,
     context::root::RootManager,
     expansion::ExpansionCtx,
 };
@@ -58,6 +59,44 @@ impl BlockExpansionCtx {
 
         // Process all expansions by consuming the iterator
         while ctx.next().is_some() {}
+
+        // After processing known, check for overlaps with root.
+        // If postfixes of final_token match the root, add overlap band.
+        // For "aaa" with root="a" and known=[a,a] bundled to "aa":
+        // - Postfix of "aa" is "a" which matches root
+        // - Add [aa, a] as overlap band
+        if let Some(root_token) = self.root.root {
+            let final_token = ctx.chain.final_token();
+
+            // Check if any postfix of final_token matches root
+            for (_, postfix) in final_token.postfix_iter(self.root.graph.clone())
+            {
+                if postfix.vertex_index() == root_token.vertex_index() {
+                    // Verify the overlap is valid: swapped order must produce same string
+                    use context_trace::graph::vertex::has_vertex_index::HasVertexIndex;
+                    let root_str =
+                        self.root.graph.index_string(root_token.vertex_index());
+                    let final_str =
+                        self.root.graph.index_string(final_token.vertex_index());
+
+                    // Check if final + root == root + final (i.e., commutative)
+                    let forward = format!("{}{}", root_str, final_str);
+                    let swapped = format!("{}{}", final_str, root_str);
+
+                    if forward == swapped {
+                        debug!(
+                            overlap_band = ?[final_token, root_token],
+                            postfix = ?postfix,
+                            "adding overlap band via postfix match with root"
+                        );
+                        // Add [final_token, root_token] as overlap band
+                        ctx.chain
+                            .append_front_complement(final_token, root_token);
+                    }
+                    break;
+                }
+            }
+        }
 
         debug!(
             final_chain = ?ctx.chain,
