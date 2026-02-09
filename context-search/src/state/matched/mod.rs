@@ -38,11 +38,6 @@ impl CheckpointedCursor {
         }
     }
 
-    /// Check if cursor has an advanced candidate position
-    pub(crate) fn has_candidate(&self) -> bool {
-        matches!(self, CheckpointedCursor::HasCandidate(_))
-    }
-
     /// Get the cursor for consecutive searches
     ///
     /// Returns the candidate (advanced position) if available, otherwise the checkpoint.

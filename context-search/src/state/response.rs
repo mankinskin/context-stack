@@ -87,20 +87,6 @@ impl Response {
     pub fn cursor_position(&self) -> AtomPosition {
         self.end.cursor().atom_position
     }
-
-    /// Unwrap a complete response, panicking if not complete
-    #[track_caller]
-    pub(crate) fn unwrap_complete(self) -> IndexRangePath {
-        self.expect_entire_root("unwrap_complete called on incomplete Response")
-    }
-
-    /// Get as complete if the path is EntireRoot
-    pub(crate) fn as_complete(&self) -> Option<&IndexRangePath> {
-        match &self.end.path {
-            PathCoverage::EntireRoot(path) => Some(path),
-            _ => None,
-        }
-    }
 }
 
 impl TargetKey for Response {
