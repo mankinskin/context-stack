@@ -30,7 +30,7 @@ use range::RangeEnd;
 //    Located(MatchResult),
 //}
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, strum::AsRefStr)]
 pub(crate) enum PathCoverage {
     Range(RangeEnd),
     Postfix(PostfixEnd),

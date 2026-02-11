@@ -396,16 +396,15 @@ fn repetition_ab_separated() {
     let result = ReadRequest::from_text("abXXab").execute(&mut graph);
 
     expect_atoms!(graph, {a, b, X});
-    assert_indices!(graph, ab, XX);
 
-    let root = result.expect("should have root");
-    assert_eq!(root.width(), TokenWidth(6));
+    let abXXab = result.expect("should have root");
+    assert_eq!(abXXab.width(), TokenWidth(6));
+    assert_indices!(graph, ab, abXXab);
 
     assert_patterns!(
         graph,
         ab => [[a, b]],
-        XX => [[X, X]],
-        root => [[ab, XX, ab]]
+        abXXab => [[ab, X, X, ab]]
     );
 }
 
@@ -419,9 +418,13 @@ fn repetition_hello_separated() {
 
     expect_atoms!(graph, {h, e, l, o, X});
 
-    let root = result.expect("should have root");
-    assert_eq!(root.width(), TokenWidth(13));
+    let helloXXhello = result.expect("should have root");
+    assert_eq!(helloXXhello.width(), TokenWidth(12));
 
-    // Both "hello" instances should reference the same index
-    assert_indices!(graph, hello);
+    assert_indices!(graph, hello, helloXXhello);
+    assert_patterns!(
+        graph,
+        hello => [[h, e, l, l, o]],
+        helloXXhello => [[hello, X, X, hello]]
+    );
 }

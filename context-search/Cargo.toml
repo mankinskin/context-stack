@@ -33,6 +33,7 @@ one-of = "0.2"
 maplit = "1.0"
 
 context-trace = { path = "../context-trace", features = ["test-api"] }
+strum = {version="0.27.2", features=["derive"]}
 
 [dependencies.pretty_assertions]
 features = ["unstable"]

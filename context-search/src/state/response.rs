@@ -54,8 +54,8 @@ impl Response {
         match self.end.path {
             PathCoverage::EntireRoot(path) => path,
             _ => panic!(
-                "{}: Complete response has non-EntireRoot path: {:#?}",
-                msg, self
+                "{}: Expected EntireRoot path. Got PathCoverage::{}:\nend: {:#?},\n##### TRACE CACHE #####\n{:#?}##### END #####",
+                msg, self.end.path.as_ref(), self.end, self.cache
             ),
         }
     }
