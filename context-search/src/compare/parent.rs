@@ -17,7 +17,7 @@ use std::{
     fmt::Debug,
     marker::PhantomData,
 };
-use tracing::debug;
+use tracing::trace;
 
 use crate::compare::state::PathPairMode::GraphMajor;
 use context_trace::trace::cache::key::directed::down::{
@@ -52,7 +52,7 @@ impl StateAdvance for ParentCompareState {
         match self.parent_state.advance_state(trav) {
             Ok(next) => {
                 // Keep the cursor as a range path to properly track start/end positions
-                debug!(
+                trace!(
                     child_cursor=%next.child_state,
                     "Created child_cursor from parent_state"
                 );

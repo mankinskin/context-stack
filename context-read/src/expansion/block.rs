@@ -7,7 +7,10 @@
 use crate::{
     bands::HasTokenRoleIters,
     context::root::RootManager,
-    expansion::ExpansionCtx,
+    expansion::{
+        chain::band,
+        ExpansionCtx,
+    },
 };
 use context_trace::*;
 use tracing::debug;
@@ -60,49 +63,49 @@ impl BlockExpansionCtx {
         // Process all expansions by consuming the iterator
         while ctx.next().is_some() {}
 
-        // After processing known, check for overlaps with root.
-        // If postfixes of final_token match the root, add overlap band.
-        // For "aaa" with root="a" and known=[a,a] bundled to "aa":
-        // - Postfix of "aa" is "a" which matches root
-        // - Add [aa, a] as overlap band
-        if let Some(root_token) = self.root.root {
-            let final_token = ctx.chain.final_token();
+        debug!(
+            final_chain = ?ctx.chain,
+            "BlockExpansionCtx::process complete"
+        );
 
-            // Check if any postfix of final_token matches root
-            for (_, postfix) in final_token.postfix_iter(self.root.graph.clone())
+        // Check for overlaps with root.
+        // If postfixes of the last token in the first band match the root, add overlap band.
+        // For "ababab" with root="ab" and known processed to [ab, ab]:
+        // - Postfix of "ab" (last element) matches root "ab"
+        // - Add overlap band
+        if let Some(root_token) = self.root.root {
+            let first_band = ctx.chain.bands.first().unwrap();
+            let last_in_band = *first_band.pattern.last().unwrap();
+
+            // Check if any postfix of last_in_band matches root
+            for (_, postfix) in last_in_band.postfix_iter(self.root.graph.clone())
             {
                 if postfix.vertex_index() == root_token.vertex_index() {
                     // Verify the overlap is valid: swapped order must produce same string
                     use context_trace::graph::vertex::has_vertex_index::HasVertexIndex;
                     let root_str =
                         self.root.graph.index_string(root_token.vertex_index());
-                    let final_str =
-                        self.root.graph.index_string(final_token.vertex_index());
+                    let last_str =
+                        self.root.graph.index_string(last_in_band.vertex_index());
 
-                    // Check if final + root == root + final (i.e., commutative)
-                    let forward = format!("{}{}", root_str, final_str);
-                    let swapped = format!("{}{}", final_str, root_str);
+                    // Check if last + root == root + last (i.e., commutative)
+                    let forward = format!("{}{}", root_str, last_str);
+                    let swapped = format!("{}{}", last_str, root_str);
 
                     if forward == swapped {
                         debug!(
-                            overlap_band = ?[final_token, root_token],
+                            overlap_band = ?[last_in_band, root_token],
                             postfix = ?postfix,
                             "adding overlap band via postfix match with root"
                         );
-                        // Add [final_token, root_token] as overlap band
+                        // Add [last_in_band, root_token] as overlap band
                         ctx.chain
-                            .append_front_complement(final_token, root_token);
+                            .append_front_complement(last_in_band, root_token);
                     }
                     break;
                 }
             }
         }
-
-        debug!(
-            final_chain = ?ctx.chain,
-            final_token = ?ctx.chain.final_token(),
-            "BlockExpansionCtx::process complete"
-        );
 
         // Take the chain and commit to root manager
         let chain = std::mem::take(&mut ctx.chain);

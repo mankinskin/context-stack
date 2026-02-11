@@ -42,7 +42,8 @@ impl Iterator for ExpansionCtx<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        ExpandCtx::try_new(self)
+        // First try to find overlaps via postfix expansion
+        let overlap_result = ExpandCtx::try_new(self)
             .and_then(|mut ctx| {
                 // Find the next expansion or cap that can be applied at the current cursor position.
                 ctx.find_map(|op| match &op {
@@ -51,7 +52,66 @@ impl Iterator for ExpansionCtx<'_> {
                         self.chain.ends_at(cap.start_bound).map(|_| op),
                 })
             })
-            .and_then(|op| self.apply_op(op))
+            .and_then(|op| self.apply_op(op));
+
+        if overlap_result.is_some() {
+            return overlap_result;
+        }
+
+        // No overlap found. Check if we've consumed all atoms yet.
+        // Use the chain's end_bound to track how many atoms have been processed.
+        let atoms_consumed = *self.chain.bands.first().unwrap().end_bound;
+        let original_pattern = self.cursor.cursor.path_root();
+        let total_atoms: usize = original_pattern.iter().map(|t| *t.width()).sum();
+        
+        if atoms_consumed < total_atoms {
+            // There are still atoms to process. Find the remaining pattern elements.
+            let mut acc_atoms = 0;
+            let mut remaining_start_idx = 0;
+            for (i, token) in original_pattern.iter().enumerate() {
+                if acc_atoms >= atoms_consumed {
+                    remaining_start_idx = i;
+                    break;
+                }
+                acc_atoms += *token.width();
+            }
+            
+            if remaining_start_idx >= original_pattern.len() {
+                // All elements consumed
+                return None;
+            }
+            
+            // Create a pattern from the remaining elements
+            let remaining: Pattern = original_pattern[remaining_start_idx..].to_vec().into();
+            let remaining_path = PatternRangePath::from(remaining.clone());
+            
+            // Search for the next block
+            let result: Result<Result<IndexWithPath, _>, _> = 
+                self.cursor.graph.insert_or_get_complete(remaining_path);
+            let next_block = match result {
+                Ok(Ok(root)) => root.index,
+                Ok(Err(root)) => root.index,
+                Err(ErrorReason::SingleIndex(c)) => c.index,
+                Err(_) => return None,
+            };
+
+            debug!(
+                next_block = ?next_block,
+                remaining = ?remaining,
+                atoms_consumed = atoms_consumed,
+                "Found next sequential block"
+            );
+
+            // Extend the first (main sequential) band with the new block
+            let mut first = self.chain.bands.pop_first().unwrap();
+            first.pattern.push(next_block);
+            first.end_bound += *next_block.width();
+            self.chain.bands.insert(first);
+
+            return Some(next_block);
+        }
+
+        None
     }
 }
 impl<'a> ExpansionCtx<'a> {

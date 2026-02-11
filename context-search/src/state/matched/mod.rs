@@ -152,7 +152,7 @@ impl MatchResult {
         let path_empty = HasChildPath::child_path(checkpoint.path.end_path()).is_empty();
         let end_index =
             HasRootChildIndex::<End>::root_child_index(&checkpoint.path);
-        tracing::debug!(
+        tracing::trace!(
             at_end,
             path_empty,
             end_index,
@@ -165,7 +165,7 @@ impl MatchResult {
     /// Check if the result is a complete pre-existing token in the graph
     /// Returns true for PathCoverage::EntireRoot (full token match),
     /// false for Range/Prefix/Postfix (intersection paths within tokens)
-    pub(crate) fn is_full_token(&self) -> bool {
+    pub(crate) fn is_entire_root(&self) -> bool {
         matches!(self.path, PathCoverage::EntireRoot(_))
     }
 

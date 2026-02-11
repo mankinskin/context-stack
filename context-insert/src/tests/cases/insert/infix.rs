@@ -70,7 +70,7 @@ fn insert_infix1() {
     let aby_found = graph.find_ancestor(&query);
     assert_matches!(
         aby_found,
-        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
+        Ok(ref response) if response.query_exhausted() && response.is_entire_root() && response.root_token() == aby,
         "aby"
     );
     let abyz = graph

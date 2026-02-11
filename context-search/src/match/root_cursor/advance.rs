@@ -225,7 +225,7 @@ where
             QueryAdvanceResult::Advanced(query_advanced) => {
                 let query_pos_after =
                     *query_advanced.query.current().atom_position.as_ref();
-                debug!(
+                trace!(
                     root = %root_parent,
                     query_pos_before = query_pos_before,
                     query_pos_after = query_pos_after,
@@ -321,7 +321,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
         // Try to advance index cursor
         match state.advance_index_cursor(&trav) {
             IndexAdvanceResult::Advanced(both_advanced) => {
-                debug!(
+                trace!(
                     root = %root_parent,
                     "    → advance_child: SUCCESS - child cursor advanced"
                 );
@@ -332,7 +332,7 @@ impl<K: SearchKind> RootCursor<K, Candidate, Matched> {
                 })
             },
             IndexAdvanceResult::Exhausted(query_only_advanced) => {
-                debug!(
+                trace!(
                     root = %root_parent,
                     "    → advance_child: CHILD ENDED - need parent exploration"
                 );

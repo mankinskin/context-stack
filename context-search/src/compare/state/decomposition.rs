@@ -194,7 +194,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
         let cursor_end_index = HasRootChildIndex::<End>::root_child_index(
             &self.query.current().path,
         );
-        debug!(
+        trace!(
             path_leaf = %path_leaf,
             query_leaf = %query_leaf,
             path_width = *path_leaf.width(),
@@ -207,7 +207,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
         );
 
         if path_leaf == query_leaf {
-            debug!(
+            trace!(
                 token = *path_leaf.index,
                 width = *path_leaf.width(),
                 "tokens matched"

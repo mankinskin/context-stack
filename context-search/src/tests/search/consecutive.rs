@@ -1,3 +1,4 @@
+use {crate::{cursor::Checkpointed, state::matched::CheckpointedCursor}};
 #[cfg(test)]
 use {
     crate::{
@@ -66,7 +67,7 @@ fn find_consecutive1() {
 
     // Test candidate state - THIS IS THE KEY ASSERTION
     assert!(
-        fin1.end.cursor.has_candidate(),
+        matches!(fin1.end.cursor, CheckpointedCursor::HasCandidate(_)),
         "Cursor should have a candidate (advanced position) after parent exploration"
     );
 

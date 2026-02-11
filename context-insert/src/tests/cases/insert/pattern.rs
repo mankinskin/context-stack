@@ -140,7 +140,7 @@ fn insert_pattern1() {
     let found = env.graph.find_ancestor(&query);
     assert_matches!(
         found,
-        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == result_token,
+        Ok(ref response) if response.query_exhausted() && response.is_entire_root() && response.root_token() == result_token,
         "byz"
     );
 
@@ -160,7 +160,7 @@ fn insert_pattern1() {
     let found2 = env.graph.find_parent(&query2);
     assert_matches!(
         found2,
-        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == result_token2,
+        Ok(ref response) if response.query_exhausted() && response.is_entire_root() && response.root_token() == result_token2,
         "aby"
     );
 }
@@ -210,7 +210,7 @@ fn insert_pattern2() {
     let aby_found = graph.find_ancestor(&query);
     assert_matches!(
         aby_found,
-        Ok(ref response) if response.query_exhausted() && response.is_full_token() && response.root_token() == aby,
+        Ok(ref response) if response.query_exhausted() && response.is_entire_root() && response.root_token() == aby,
         "aby"
     );
 }

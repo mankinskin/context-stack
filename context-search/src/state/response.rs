@@ -41,8 +41,8 @@ impl Response {
 
     /// Check if the result is a complete pre-existing token in the graph
     /// Returns true for PathCoverage::EntireRoot, false for Range/Prefix/Postfix
-    pub fn is_full_token(&self) -> bool {
-        self.end.is_full_token()
+    pub fn is_entire_root(&self) -> bool {
+        self.end.is_entire_root()
     }
 
     /// Unwrap a complete response with a custom error message

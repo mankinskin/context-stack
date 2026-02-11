@@ -90,7 +90,7 @@ impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
         mut self,
         trav: &G,
     ) -> QueryAdvanceResult<EndNode> {
-        debug!(
+        trace!(
             cursor = %self.query.candidate(),
             "advancing query cursor only"
         );

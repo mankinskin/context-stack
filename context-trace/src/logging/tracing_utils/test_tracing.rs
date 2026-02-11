@@ -140,6 +140,7 @@ impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
 /// The guard holds a tracing dispatcher that's active for the lifetime of the test.
 pub struct TestTracing {
     log_file_path: Option<PathBuf>,
+    keep_logs: bool,
     clear_test_graph_on_drop: bool,
     _dispatcher: Dispatch,
     _guard: tracing::dispatcher::DefaultGuard,
@@ -376,6 +377,7 @@ impl TestTracing {
 
         Self {
             log_file_path,
+            keep_logs: config.keep_logs,
             clear_test_graph_on_drop,
             _dispatcher: dispatcher,
             _guard: guard,
@@ -391,7 +393,7 @@ impl TestTracing {
     ///
     /// Useful if you want to preserve logs even for passing tests
     pub fn keep_log(mut self) -> Self {
-        self.log_file_path = None;
+        self.keep_logs = true;
         self
     }
 
@@ -409,18 +411,8 @@ impl Drop for TestTracing {
         // Check if we're unwinding (test panicked/failed)
         let is_panicking = std::thread::panicking();
 
-        // Check if KEEP_LOGS is enabled
-        let keep_logs = std::env::var("KEEP_LOGS")
-            .ok()
-            .map(|v| {
-                v == "1"
-                    || v.eq_ignore_ascii_case("true")
-                    || v.eq_ignore_ascii_case("yes")
-            })
-            .unwrap_or(false);
-
-        if !is_panicking && !keep_logs {
-            // Test passed and KEEP_LOGS not set - clean up log file
+        if !is_panicking && !self.keep_logs {
+            // Test passed and keep_logs disabled - clean up log file
             if let Some(ref path) = self.log_file_path {
                 tracing::info!(
                     log_file = %path.display(),
@@ -429,14 +421,14 @@ impl Drop for TestTracing {
                 fs::remove_file(path).ok();
             }
         } else {
-            // Test failed or KEEP_LOGS enabled - keep log file
+            // Test failed or keep_logs enabled - keep log file
             if let Some(ref path) = self.log_file_path {
                 if is_panicking {
                     eprintln!(
                         "\n❌ Test failed! Log file preserved at: {}",
                         path.display()
                     );
-                } else if keep_logs {
+                } else if self.keep_logs {
                     eprintln!(
                         "\n📝 Test passed! Log file kept at: {}",
                         path.display()

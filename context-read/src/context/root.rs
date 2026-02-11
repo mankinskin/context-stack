@@ -111,16 +111,19 @@ impl RootManager {
     ) {
         use tracing::debug;
 
-        let final_token = chain.final_token();
+        // Get the first band's pattern - this is what we need to append
+        let first_band = chain.bands.first().unwrap();
+        let append_pattern = first_band.pattern.clone();
+        
         debug!(
-            final_token = ?final_token,
+            append_pattern = ?append_pattern,
             num_bands = chain.bands.len(),
             is_fresh = self.is_fresh,
             "commit_chain"
         );
 
         // Collect overlap bands (all bands after the first)
-        let mut overlap_patterns: Vec<Pattern> = chain
+        let overlap_patterns: Vec<Pattern> = chain
             .overlap_bands()
             .map(|band| band.pattern.clone())
             .collect();
@@ -130,21 +133,21 @@ impl RootManager {
             let root = self.root.unwrap();
             let vertex = root.vertex(&self.graph);
 
-            // Check if we can extend the pattern (same logic as append_token):
-            // - final_token must be different vertex from root
+            // Check if we can extend the pattern:
             // - root must have single child pattern and no parents
-            let can_extend = final_token.vertex_index() != root.vertex_index()
-                && vertex.child_patterns().len() == 1
+            let can_extend = vertex.child_patterns().len() == 1
                 && vertex.parents().is_empty();
 
             if can_extend {
                 let (&pid, _) = vertex.expect_any_child_pattern();
+                // Append the entire pattern (may be multiple tokens like [b, a])
                 self.root =
-                    Some(self.graph.append_to_pattern(root, pid, final_token));
+                    Some(self.graph.append_to_pattern(root, pid, append_pattern));
             } else {
-                // Same vertex or can't extend - create new combined pattern
-                self.root =
-                    Some(self.graph.insert_pattern(vec![root, final_token]));
+                // Can't extend - create new combined pattern [root, ...append_pattern]
+                let mut combined = vec![root];
+                combined.extend(append_pattern.iter().cloned());
+                self.root = Some(self.graph.insert_pattern(combined));
             }
 
             // Add overlap decompositions as additional child patterns
@@ -161,8 +164,10 @@ impl RootManager {
         } else {
             // Create new combined root
             if let Some(old_root) = self.root {
-                let new_root =
-                    self.graph.insert_pattern(vec![old_root, final_token]);
+                // Create pattern [old_root, ...append_pattern]
+                let mut combined = vec![old_root];
+                combined.extend(append_pattern.iter().cloned());
+                let new_root = self.graph.insert_pattern(combined);
 
                 // Add overlap decompositions as additional child patterns
                 if !overlap_patterns.is_empty() {
@@ -176,13 +181,18 @@ impl RootManager {
 
                 self.root = Some(new_root);
             } else {
-                // No previous root, just set final token as root
-                self.root = Some(final_token);
+                // No previous root - the append_pattern becomes the root
+                if append_pattern.len() == 1 {
+                    self.root = Some(append_pattern[0]);
+                } else {
+                    self.root = Some(self.graph.insert_pattern(append_pattern.to_vec()));
+                }
+                self.is_fresh = true;
 
                 // Add overlap decompositions if any
-                if !overlap_patterns.is_empty() {
+                if !overlap_patterns.is_empty() && self.root.is_some() {
                     self.graph.add_patterns_with_update(
-                        final_token,
+                        self.root.unwrap(),
                         overlap_patterns,
                     );
                 }

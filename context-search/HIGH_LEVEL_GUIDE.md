@@ -49,13 +49,13 @@ pub struct Response {
 
 **Why unified?** Whether a search fully matches or partially matches, you get back a `Response`. Two orthogonal properties:
 - **Query exhausted**: `response.query_exhausted() == true` - entire query was matched
-- **Full token**: `response.is_full_token() == true` - result is complete pre-existing token
+- **Full token**: `response.is_entire_root() == true` - result is complete pre-existing token
 
 **Key accessor methods:**
 ```rust
 // Check query and match status (two independent properties)
 response.query_exhausted() -> bool   // Has entire query been matched?
-response.is_full_token() -> bool     // Is result a complete token?
+response.is_entire_root() -> bool     // Is result a complete token?
 response.as_complete() -> Option<&IndexRangePath>  // Some if both true
 
 // Get data (works for all result types)
@@ -64,7 +64,7 @@ response.query_pattern() -> &PatternRangePath
 response.query_cursor() -> &PatternCursor
 response.cursor_position() -> AtomPosition
 
-// Unwrap complete (panics if not query_exhausted && is_full_token)
+// Unwrap complete (panics if not query_exhausted && is_entire_root)
 response.expect_complete(msg) -> IndexRangePath
 response.unwrap_complete() -> IndexRangePath
 ```
@@ -227,7 +227,7 @@ let result: Result<Response, ErrorState> =
 
 // Handle result - check both properties
 if result.query_exhausted() {
-    if result.is_full_token() {
+    if result.is_entire_root() {
         println!("Found exact match!");
         let path = result.expect_complete("query exhausted and full token");
         let root = path.root_parent();
@@ -252,7 +252,7 @@ let query = vec![a, b, c];
 let result = graph.find_ancestor(query)?;
 
 // Check if query was exhausted and result is full token
-if result.query_exhausted() && result.is_full_token() {
+if result.query_exhausted() && result.is_entire_root() {
     let path = result.as_complete().unwrap();
     println!("Found exact ancestor: {:?}", path.root_parent());
 } else if result.query_exhausted() {
@@ -333,7 +333,7 @@ if !result.query_exhausted() {
 
 ```rust
 // ✅ Safe pattern - check both properties
-if response.query_exhausted() && response.is_full_token() {
+if response.query_exhausted() && response.is_entire_root() {
     let path = response.expect_complete("checked both above");
     let token = path.root_parent();
     // Use token
@@ -358,7 +358,7 @@ let path = response.expect_complete("msg");  // Consumes response
 
 ```rust
 // ✅ Comprehensive handling
-match (response.query_exhausted(), response.is_full_token()) {
+match (response.query_exhausted(), response.is_entire_root()) {
     (true, true) => {
         // Perfect match: query exhausted and exact token
         println!("Exact: {:?}", response.as_complete().unwrap().root_parent());
@@ -485,19 +485,19 @@ Input Tokens → Fold to Context → Traverse Graph
 
 ## Common Gotchas
 
-### 1. Forgetting to Check query_exhausted() and is_full_token()
+### 1. Forgetting to Check query_exhausted() and is_entire_root()
 
 ```rust
 // ❌ Wrong - might panic
 let path = response.expect_complete("found");
 
 // ✅ Correct - check both properties
-if response.query_exhausted() && response.is_full_token() {
+if response.query_exhausted() && response.is_entire_root() {
     let path = response.expect_complete("checked");
 }
 // Or handle all cases
 if response.query_exhausted() {
-    if response.is_full_token() {
+    if response.is_entire_root() {
         // Exact token match
     } else {
         // Query exhausted but intersection path
@@ -579,7 +579,7 @@ fn test_pattern_search() {
     
     // Assert expectations
     assert!(result.query_exhausted());
-    assert!(result.is_full_token());
+    assert!(result.is_entire_root());
     assert_eq!(result.root_token(), abc);
 }
 ```
@@ -671,7 +671,7 @@ eprintln!("Cache: {}", pretty(&response.cache));
 - Check if pattern hierarchy is as expected
 
 **Search panics on expect_complete():**
-- Always check `query_exhausted() && is_full_token()` first
+- Always check `query_exhausted() && is_entire_root()` first
 - Use `as_complete()` for safe Option handling
 - Add logging to see why not exhausted or not full token
 
