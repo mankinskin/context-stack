@@ -266,7 +266,7 @@ pub struct TracingConfig {
     /// Formatting configuration
     pub format: FormatConfig,
     /// Keep log files even when tests pass
-    pub keep_logs: bool,
+    pub keep_success_logs: bool,
 }
 
 impl Default for TracingConfig {
@@ -303,14 +303,14 @@ impl Default for TracingConfig {
             .or_else(|| format.log_filter.clone());
 
         // Check for keep logs: env var takes precedence over config file
-        let keep_logs = env::var("KEEP_LOGS")
+        let keep_success_logs = env::var("KEEP_SUCCESS_LOGS")
             .ok()
             .map(|v| {
                 v == "1"
                     || v.eq_ignore_ascii_case("true")
                     || v.eq_ignore_ascii_case("yes")
             })
-            .or(format.keep_logs)
+            .or(format.keep_success_logs)
             .unwrap_or(false);
 
         Self {
@@ -323,7 +323,7 @@ impl Default for TracingConfig {
             file_filter_directives,
             span_events: FmtSpan::ENTER | FmtSpan::CLOSE,
             format,
-            keep_logs,
+            keep_success_logs,
         }
     }
 }

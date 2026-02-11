@@ -182,9 +182,9 @@ pub struct FormatConfig {
     /// Overrides LOG_FILE_FILTER env var and log_filter if present
     #[serde(default)]
     pub file_log_filter: Option<String>,
-    /// Keep log files even when tests pass (overrides KEEP_LOGS env var if present)
+    /// Keep log files even when tests pass (overrides KEEP_SUCCESS_LOGS env var if present)
     #[serde(default)]
-    pub keep_logs: Option<bool>,
+    pub keep_success_logs: Option<bool>,
 }
 
 impl Default for FormatConfig {
@@ -202,7 +202,7 @@ impl Default for FormatConfig {
             log_filter: None,
             stdout_log_filter: None,
             file_log_filter: None,
-            keep_logs: None,
+            keep_success_logs: None,
         }
     }
 }
