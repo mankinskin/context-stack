@@ -6,8 +6,6 @@ use derive_more::Deref;
 
 pub(crate) struct BandCtx<'a> {
     pub(crate) band: &'a Band,
-    //pub(crate) back_link: Option<&'a OverlapLink>,
-    //pub(crate) front_link: Option<&'a OverlapLink>,
 }
 impl From<BandCtx<'_>> for Band {
     fn from(band: BandCtx<'_>) -> Self {

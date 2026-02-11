@@ -13,6 +13,7 @@ use crate::{
             link::{
                 BandExpansion,
                 ChainOp,
+                OverlapLink,
             },
         },
         cursor::CursorCtx,
@@ -98,13 +99,20 @@ impl<'a> ExpansionCtx<'a> {
                 );
                 *self.cursor.cursor = exp.expansion.path.clone();
 
-                // handle case where expansion can be inserted after stack head (first band in current stack)
-                let link = self.create_expansion_link(&exp);
+                // Create expansion link with paths representing the overlap
+                let expansion_link = self.create_expansion_link(&exp);
+                
+                // Create overlap link for the band chain
+                let overlap_link = self.create_overlap_link(&expansion_link);
+                
                 let complement =
-                    ComplementBuilder::new(link).build(&self.cursor.graph);
-                // TODO: Change this to a stack (list of overlaps with back contexts)
+                    ComplementBuilder::new(expansion_link).build(&self.cursor.graph);
+                
                 self.chain
                     .append_front_complement(complement, exp.expansion.index);
+                
+                // Store the overlap link
+                self.chain.append_overlap_link(overlap_link);
 
                 Some(exp.expansion.index)
             },
@@ -150,6 +158,27 @@ impl<'a> ExpansionCtx<'a> {
             start_bound,
             root_postfix: postfix_path.clone(),
             expansion_prefix: prefix_path,
+        }
+    }
+    
+    /// Create an overlap link from an expansion link.
+    /// 
+    /// The overlap link contains:
+    /// - child_path: top-down path from starting root to expandable postfix (overlap region)
+    /// - search_path: bottom-up then top-down path from expansion (overlap region from expansion's view)
+    /// - start_bound: position where the overlap starts
+    fn create_overlap_link(&self, expansion_link: &ExpansionLink) -> OverlapLink {
+        debug!(
+            root_postfix = ?expansion_link.root_postfix,
+            expansion_prefix = ?expansion_link.expansion_prefix,
+            start_bound = ?expansion_link.start_bound,
+            "create_overlap_link"
+        );
+        
+        OverlapLink {
+            child_path: expansion_link.root_postfix.clone(),
+            search_path: expansion_link.expansion_prefix.clone(),
+            start_bound: expansion_link.start_bound,
         }
     }
 }
