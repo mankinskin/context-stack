@@ -91,11 +91,10 @@ impl<K: SearchKind> std::fmt::Display for StartCtx<K> {
 }
 impl<K: SearchKind> StartCtx<K> {
     pub(crate) fn into_search(self) -> Result<SearchState<K>, ErrorState> {
-        debug!("creating search from start context");
-        trace!(start_token = %self.start_token, cursor = %self.cursor, "start context details");
+        trace!(start_token = %self.start_token, cursor = %self.cursor, "creating search from start context");
         match self.get_parent_batch() {
             Ok(p) => {
-                debug!(
+                trace!(
                     batch_len = p.batch.len(),
                     "first parent batch obtained"
                 );
@@ -110,7 +109,7 @@ impl<K: SearchKind> StartCtx<K> {
                 })
             },
             Err(err) => {
-                debug!(error = %pretty(&err), "failed to get parent batch");
+                trace!(error = %pretty(&err), "failed to get parent batch");
                 Err(err)
             },
         }
@@ -119,7 +118,7 @@ impl<K: SearchKind> StartCtx<K> {
         &self
     ) -> Result<CompareParentBatch, ErrorState> {
         let mut cursor = self.cursor.clone();
-        debug!(cursor_path = %cursor.path, "get_parent_batch - cursor path before root_child_token");
+        trace!(cursor_path = %cursor.path, "get_parent_batch called");
         let start = self.start_token;
         let checkpoint = cursor.clone();
         if cursor.advance(&self.trav).is_continue() {

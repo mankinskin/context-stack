@@ -24,6 +24,7 @@ use crate::{
     },
     SearchKind,
 };
+use tracing::trace;
 use std::fmt::Debug;
 
 //pub(crate) type FoldResult = Result<Response, ErrorState>;
@@ -47,13 +48,13 @@ impl From<IndexWithPath> for ErrorState {
     }
 }
 
-pub trait Searchable<K: SearchKind = AncestorSearchTraversal>: Sized {
+pub trait Searchable<K: SearchKind = AncestorSearchTraversal>: Sized + Debug {
     fn start_search(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState>;
 
-    #[context_trace::instrument_sig(level = "debug", skip(self, trav))]
+    #[context_trace::instrument_sig(level = "trace", skip(self, trav))]
     fn search(
         self,
         trav: K::Trav,
@@ -61,10 +62,9 @@ pub trait Searchable<K: SearchKind = AncestorSearchTraversal>: Sized {
     where
         K::Trav: Clone,
     {
-        debug!("starting search");
         match self.start_search(trav) {
             Ok(ctx) => {
-                debug!("start search successful, beginning fold");
+                trace!("start search successful, beginning fold");
                 Ok(ctx.search())
             },
             Err(err) => {
@@ -76,7 +76,7 @@ pub trait Searchable<K: SearchKind = AncestorSearchTraversal>: Sized {
 }
 
 impl<K: SearchKind> Searchable<K> for PatternCursor {
-    #[context_trace::instrument_sig(level = "debug", skip(self, trav))]
+    #[context_trace::instrument_sig(level = "trace", skip(self, trav))]
     fn start_search(
         self,
         trav: K::Trav,
@@ -114,21 +114,21 @@ where
     }
 }
 
-impl<K: SearchKind, I> Searchable<K> for std::iter::Map<I, fn(&str) -> char>
-where
-    I: Iterator<Item = &'static str>,
-    char: AsAtom<AtomOf<TravKind<K::Trav>>>,
-{
-    fn start_search(
-        self,
-        trav: K::Trav,
-    ) -> Result<SearchState<K>, ErrorState> {
-        // Pass the iterator directly to get_atom_children
-        let pattern = trav.graph().get_atom_children(self)?;
-
-        pattern.start_search(trav)
-    }
-}
+//impl<K: SearchKind, I> Searchable<K> for std::iter::Map<I, fn(&str) -> char>
+//where
+//    I: Iterator<Item = &'static str>,
+//    char: AsAtom<AtomOf<TravKind<K::Trav>>>,
+//{
+//    fn start_search(
+//        self,
+//        trav: K::Trav,
+//    ) -> Result<SearchState<K>, ErrorState> {
+//        // Pass the iterator directly to get_atom_children
+//        let pattern = trav.graph().get_atom_children(self)?;
+//
+//        pattern.start_search(trav)
+//    }
+//}
 
 impl<K: SearchKind, T: Searchable<K> + Clone> Searchable<K> for &T {
     fn start_search(

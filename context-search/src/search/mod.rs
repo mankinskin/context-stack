@@ -63,11 +63,11 @@ pub trait Find: HasGraph {
     where
         Self: Clone,
     {
-        debug!("starting parent search");
+        trace!("starting parent search");
         let result = searchable.search(self.ctx()).map_err(|err| err.reason);
 
         match &result {
-            Ok(_response) => debug!("parent search succeeded"),
+            Ok(_response) => trace!("parent search succeeded"),
             Err(reason) =>
                 debug!(reason = %pretty(reason), "parent search failed"),
         }
@@ -83,11 +83,11 @@ pub trait Find: HasGraph {
     where
         Self: Clone,
     {
-        debug!("starting ancestor search");
+        trace!("starting ancestor search");
         let result = searchable.search(self.ctx()).map_err(|err| err.reason);
 
         match &result {
-            Ok(_response) => debug!("ancestor search succeeded"),
+            Ok(_response) => trace!("ancestor search succeeded"),
             Err(reason) =>
                 debug!(reason = %pretty(reason), "ancestor search failed"),
         }
@@ -119,9 +119,8 @@ impl<K: SearchKind> SearchState<K>
 where
     K::Trav: Clone,
 {
-    #[context_trace::instrument_sig(level = "info", skip(self))]
     pub(crate) fn search(mut self) -> Response {
-        debug!(queue = %&self.matches.queue, "initial state");
+        trace!(queue = %&self.matches.queue, "initial state");
 
         let mut best_match = None;
         for item in self.by_ref() {
@@ -130,7 +129,7 @@ where
 
         // Get the final matched state from best_match
         let end = if let Some(checkpoint) = best_match.take() {
-            debug!(
+            trace!(
                 root = %checkpoint.root_parent(),
                 checkpoint_pos = *checkpoint.cursor().atom_position.as_ref(),
                 query_exhausted = checkpoint.query_exhausted(),
@@ -140,7 +139,7 @@ where
         } else {
             // No matches found - create EntireRoot at the token width position
             // (cursor position should equal the entire matched token's width)
-            debug!("No matches found, creating EntireRoot at token width");
+            trace!("No matches found, creating EntireRoot at token width");
             let start_token = self.query.path_root()[0];
             let token_width = *start_token.width();
             let raw_cursor = PatternCursor {
@@ -170,7 +169,7 @@ where
             end,
         };
 
-        info!("search complete");
+        info!(end=?response.end, "search complete");
         response
     }
     fn finish_root_cursor(
@@ -179,7 +178,7 @@ where
     ) -> MatchResult {
         // Set initial root match as baseline for this root
         let mut last_match = init_state;
-        debug!(
+        trace!(
             root = %last_match.child.current().child_state.root_parent(),
             checkpoint_pos = *last_match.query.current().atom_position.as_ref(),
             "New root match - finishing root cursor"
@@ -204,7 +203,7 @@ where
                         .current()
                         .atom_position
                         .as_ref();
-                    debug!(
+                    trace!(
                         root = %next_match.state.child.current().child_state.root_parent(),
                         checkpoint_pos,
                         "Match advanced - updating best_match"
@@ -222,14 +221,14 @@ where
                                 ConclusiveEnd::Mismatch(_candidate_cursor) => {
                                     // Found mismatch after progress - create final MatchResult
                                     // Clone the state before consuming
-                                    debug!(
+                                    trace!(
                                         "Conclusive end: Mismatch - keeping best match"
                                     );
                                     // Continue searching from queue (no parent exploration for mismatch)
                                 },
                                 ConclusiveEnd::Exhausted => {
                                     // Query exhausted - best_match should have the final result
-                                    debug!("Conclusive end: Exhausted - keeping best match");
+                                    trace!("Conclusive end: Exhausted - keeping best match");
                                     // Return a clone so best_match remains set for the search layer
                                 },
                             }
@@ -242,7 +241,7 @@ where
                                 .cursor()
                                 .atom_position
                                 .as_ref();
-                            debug!(
+                            trace!(
                                 checkpoint_root = %checkpoint_state.root_parent(),
                                 checkpoint_pos,
                                 "Inconclusive end - updating best_match"
@@ -261,7 +260,7 @@ where
                                     );
                                 },
                                 _ => {
-                                    debug!("No parents available - search exhausted");
+                                    trace!("No parents available - search exhausted");
                                 },
                             }
                             // Store the MatchResult with advanced query candidate
@@ -345,7 +344,7 @@ where
                 let checkpoint_pos =
                     *matched_state.cursor().atom_position.as_ref();
 
-                debug!(
+                trace!(
                     query_exhausted = matched_state.query_exhausted(),
                     checkpoint_pos = checkpoint_pos,
                     "found matched state"

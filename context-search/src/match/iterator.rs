@@ -67,7 +67,7 @@ where
     pub(crate) fn find_next_root_match(
         &mut self
     ) -> Option<CompareState<Matched, Matched>> {
-        debug!("finding next root match");
+        trace!("finding next root match");
         loop {
             match self.queue.nodes.pop().and_then(|node| {
                 NodeConsumer::<'_, K>::new(node, &self.trace_ctx.trav).consume()

@@ -50,12 +50,20 @@ impl<R: InsertResult> From<HypergraphRef> for InsertCtx<R> {
 }
 
 impl<R: InsertResult> InsertCtx<R> {
+    #[context_trace::instrument_sig(level = "info", skip(self))]
     pub fn insert(
         &mut self,
-        searchable: impl Searchable<InsertTraversal>,
+        searchable: impl Searchable<InsertTraversal> + Debug,
     ) -> Result<R, ErrorState> {
-        self.insert_result(searchable)
+        self.insert_impl(searchable)
             .and_then(|res| res.map_err(|root| root.into()))
+    }
+    #[context_trace::instrument_sig(level = "info", skip(self))]
+    pub(crate) fn insert_or_get_complete(
+        &mut self,
+        searchable: impl Searchable<InsertTraversal> + Debug,
+    ) -> Result<Result<R, R::Error>, ErrorReason> {
+        self.insert_impl(searchable).map_err(|err| err.reason)
     }
     pub(crate) fn insert_init(
         &mut self,
@@ -73,7 +81,7 @@ impl<R: InsertResult> InsertCtx<R> {
         let joined = ctx.find_map(|joined| joined).unwrap();
         Ok(R::build_with_extract(joined, ext))
     }
-    fn insert_result(
+    fn insert_impl(
         &mut self,
         searchable: impl Searchable<InsertTraversal>,
     ) -> Result<Result<R, R::Error>, ErrorState> {
@@ -115,12 +123,6 @@ impl<R: InsertResult> InsertCtx<R> {
             },
             Err(err) => Err(err),
         }
-    }
-    pub(crate) fn insert_or_get_complete(
-        &mut self,
-        searchable: impl Searchable<InsertTraversal>,
-    ) -> Result<Result<R, R::Error>, ErrorReason> {
-        self.insert_result(searchable).map_err(|err| err.reason)
     }
 }
 
