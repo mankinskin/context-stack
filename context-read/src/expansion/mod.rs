@@ -69,7 +69,43 @@ impl Iterator for ExpansionCtx<'_> {
             return overlap_result;
         }
 
-        // No overlap found. Check if we've consumed all atoms yet.
+        // No overlap found. 
+        // If we had an external anchor (from existing root), overlap detection failed.
+        // Use insert_or_get_complete to find longest prefix match from cursor.
+        if self.state.has_external_anchor() {
+            debug!("External anchor overlap detection failed, using insert_or_get_complete");
+            
+            // Clear the external anchor
+            self.state.clear_external_anchor();
+            
+            // Find longest prefix match from cursor's current position
+            let result: Result<Result<IndexWithPath, _>, _> = 
+                self.cursor.graph.insert_or_get_complete(self.cursor.cursor.clone());
+            
+            let IndexWithPath { index: first, path } = match result {
+                Ok(Ok(found)) => found,
+                Ok(Err(found)) => found,
+                Err(ErrorReason::SingleIndex(c)) => *c,
+                Err(_) => {
+                    // No match at all - use first cursor token
+                    let first = self.cursor.cursor.path_root()[0];
+                    debug!(first_cursor_token = ?first, "Cursor fallback: using first cursor token");
+                    self.state.append(first);
+                    return Some(first);
+                }
+            };
+            
+            debug!(first_token = ?first, "insert_or_get_complete returned");
+            
+            // Update cursor to the advanced position
+            *self.cursor.cursor = path;
+            
+            // Set this as the first token in the band
+            self.state.append(first);
+            return Some(first);
+        }
+
+        // No external anchor - check if we've consumed all atoms yet.
         let atoms_consumed = *self.state.end_bound();
         let original_pattern = self.cursor.cursor.path_root();
         let total_atoms: usize = original_pattern.iter().map(|t| *t.width()).sum();
@@ -122,26 +158,56 @@ impl Iterator for ExpansionCtx<'_> {
     }
 }
 impl<'a> ExpansionCtx<'a> {
+    /// Create a new ExpansionCtx.
+    /// 
+    /// If `root_last_token` is provided, it will be used as the starting point
+    /// for overlap detection. This allows finding overlaps between the existing
+    /// root and the new cursor pattern.
+    /// 
+    /// If no root token is provided, the first token is created from the cursor pattern.
     pub(crate) fn new(
         graph: HypergraphRef,
         cursor: &'a mut PatternRangePath,
+        root_last_token: Option<Token>,
     ) -> Self {
-        debug!(cursor_root = ?cursor.path_root(), "New ExpansionCtx");
-        let IndexWithPath { index: first, path } =
-            match graph.insert_or_get_complete(cursor.clone()) {
-                Ok(Ok(root)) => root,
-                Ok(Err(root)) => root,
-                Err(ErrorReason::SingleIndex(c)) => *c,
-                Err(_) => {
-                    // Get the first token from cursor's root pattern
-                    let first = cursor.path_root()[0];
-                    IndexWithPath {
-                        index: first,
-                        path: cursor.clone(),
-                    }
-                },
+        debug!(
+            cursor_root = ?cursor.path_root(),
+            root_last_token = ?root_last_token,
+            "New ExpansionCtx"
+        );
+        
+        // If we have a root token, use it as the start for overlap detection
+        if let Some(start_token) = root_last_token {
+            debug!(start_token = ?start_token, "Using root's last token for overlap detection");
+            return Self {
+                // Use external anchor - tracks postfix iteration but no cursor atoms consumed
+                state: BandState::with_external_anchor(start_token),
+                cursor: CursorCtx::new(graph, cursor),
             };
-        debug!(first_index = ?first, path_root = ?path.path_root(), "ExpansionCtx initialized");
+        }
+        
+        // No root - use insert_or_get_complete to find longest prefix match
+        let result: Result<Result<IndexWithPath, _>, _> = 
+            graph.insert_or_get_complete(cursor.clone());
+        
+        let IndexWithPath { index: first, path } = match result {
+            Ok(Ok(found)) => found,
+            Ok(Err(found)) => found,
+            Err(ErrorReason::SingleIndex(c)) => *c,
+            Err(_) => {
+                // No match - use first cursor token
+                let first = cursor.path_root()[0];
+                debug!(first_index = ?first, "No match, using first cursor token");
+                return Self {
+                    state: BandState::new(first),
+                    cursor: CursorCtx::new(graph, cursor),
+                };
+            }
+        };
+        
+        debug!(first_index = ?first, "ExpansionCtx initialized with insert_or_get_complete result");
+        
+        // Update cursor to the advanced position
         *cursor = path;
 
         Self {

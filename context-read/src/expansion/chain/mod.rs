@@ -17,7 +17,13 @@ use crate::expansion::chain::link::OverlapLink;
 #[derive(Clone, Debug)]
 pub(crate) enum BandState {
     /// Single band, no overlap found (or after commit)
-    Single(Band),
+    /// Optional external_anchor for overlap detection with existing root
+    Single {
+        band: Band,
+        /// External anchor token from existing root (used for postfix iteration)
+        /// Not included in the band pattern - only used for overlap detection
+        external_anchor: Option<Token>,
+    },
     /// Two bands with overlap link, ready for commit
     WithOverlap {
         /// Primary band: sequential expansion (appended tokens)
@@ -32,16 +38,20 @@ pub(crate) enum BandState {
 impl Default for BandState {
     fn default() -> Self {
         // Default is a single empty band - should not normally be used
-        BandState::Single(Band {
-            pattern: Pattern::default(),
-            start_bound: 0.into(),
-            end_bound: 0.into(),
-        })
+        BandState::Single {
+            band: Band {
+                pattern: Pattern::default(),
+                start_bound: 0.into(),
+                end_bound: 0.into(),
+            },
+            external_anchor: None,
+        }
     }
 }
 
 impl BandState {
-    /// Create a new BandState with a single token
+    /// Create a new BandState with a single token from the cursor.
+    /// The token's width is tracked as consumed atoms.
     pub(crate) fn new(index: Token) -> Self {
         let band = Band {
             pattern: Pattern::from(vec![index]),
@@ -49,13 +59,26 @@ impl BandState {
             end_bound: index.width().0.into(),
         };
         debug!(initial_band = ?band, "New BandState");
-        BandState::Single(band)
+        BandState::Single { band, external_anchor: None }
+    }
+
+    /// Create a BandState with an external anchor token (e.g., from existing root).
+    /// The anchor is used for overlap detection but doesn't consume cursor atoms.
+    /// The band starts empty (no cursor atoms consumed yet).
+    pub(crate) fn with_external_anchor(anchor: Token) -> Self {
+        let band = Band {
+            pattern: Pattern::default(),
+            start_bound: 0.into(),
+            end_bound: 0.into(),
+        };
+        debug!(anchor = ?anchor, initial_band = ?band, "New BandState with external anchor");
+        BandState::Single { band, external_anchor: Some(anchor) }
     }
 
     /// Get the primary/single band reference
     pub(crate) fn primary(&self) -> &Band {
         match self {
-            BandState::Single(band) => band,
+            BandState::Single { band, .. } => band,
             BandState::WithOverlap { primary, .. } => primary,
         }
     }
@@ -63,14 +86,40 @@ impl BandState {
     /// Get the primary/single band mutably
     pub(crate) fn primary_mut(&mut self) -> &mut Band {
         match self {
-            BandState::Single(band) => band,
+            BandState::Single { band, .. } => band,
             BandState::WithOverlap { primary, .. } => primary,
         }
     }
 
+    /// Get the token to use for postfix iteration (overlap detection).
+    /// Returns the external anchor if present, otherwise the last token of the band.
+    pub(crate) fn anchor_token(&self) -> Option<Token> {
+        match self {
+            BandState::Single { band, external_anchor } => {
+                external_anchor.or_else(|| band.pattern.last().copied())
+            }
+            BandState::WithOverlap { primary, .. } => {
+                primary.pattern.last().copied()
+            }
+        }
+    }
+
+    /// Check if this state has an external anchor (from existing root)
+    pub(crate) fn has_external_anchor(&self) -> bool {
+        matches!(self, BandState::Single { external_anchor: Some(_), .. })
+    }
+
+    /// Clear the external anchor (when overlap detection failed)
+    pub(crate) fn clear_external_anchor(&mut self) {
+        if let BandState::Single { external_anchor, .. } = self {
+            *external_anchor = None;
+        }
+    }
+
     /// Get the start token from the primary band
-    pub(crate) fn start_token(&self) -> Token {
-        self.primary().last_token()
+    /// For external anchors, returns the anchor. Otherwise returns last band token.
+    pub(crate) fn start_token(&self) -> Option<Token> {
+        self.anchor_token()
     }
 
     /// Get the end bound of the primary band
@@ -83,11 +132,16 @@ impl BandState {
         matches!(self, BandState::WithOverlap { .. })
     }
 
+    /// Check if the band pattern is empty (no cursor tokens consumed)
+    pub(crate) fn is_empty(&self) -> bool {
+        self.primary().pattern.is_empty()
+    }
+
     /// Append a token to the single band.
     /// Panics if called on WithOverlap state.
     pub(crate) fn append(&mut self, token: Token) {
         match self {
-            BandState::Single(band) => {
+            BandState::Single { band, .. } => {
                 band.pattern.push(token);
                 band.end_bound += token.width().0;
             }
@@ -104,7 +158,7 @@ impl BandState {
         link: OverlapLink,
     ) -> Self {
         match self {
-            BandState::Single(primary) => {
+            BandState::Single { band: primary, .. } => {
                 debug!(
                     primary = ?primary,
                     overlap = ?overlap_band,
@@ -124,11 +178,11 @@ impl BandState {
 
     /// Collapse the band state into a single pattern.
     /// 
-    /// For Single: returns the band's pattern directly
+    /// For Single: returns the band's pattern directly (no bundling)
     /// For WithOverlap: builds complements, creates bundled token with both decompositions
     pub(crate) fn collapse(self, graph: &mut HypergraphRef) -> Pattern {
         match self {
-            BandState::Single(band) => {
+            BandState::Single { band, .. } => {
                 debug!(pattern = ?band.pattern, "Collapsing Single band");
                 band.pattern
             }

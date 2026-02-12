@@ -53,8 +53,16 @@ impl BlockExpansionCtx {
         let path = PatternEndPath::new(self.known.clone(), Default::default());
         let mut cursor = path.into_range(0);
 
-        // Create expansion context
-        let mut ctx = ExpansionCtx::new(self.root.graph.clone(), &mut cursor);
+        // Get the last token from the existing root (if any) to use as overlap anchor
+        let root_last_token = self.root.last_child_token();
+        debug!(
+            has_root = self.root.root.is_some(),
+            root_last_token = ?root_last_token,
+            "Starting block expansion"
+        );
+
+        // Create expansion context with root's last token for overlap detection
+        let mut ctx = ExpansionCtx::new(self.root.graph.clone(), &mut cursor, root_last_token);
 
         let first = ctx.state.start_token();
         debug!(state = ?ctx.state, ?first, "expansion state before processing");
@@ -86,8 +94,8 @@ impl BlockExpansionCtx {
             "BlockExpansionCtx::process complete"
         );
 
-        // Commit any remaining state
-        if !matches!(ctx.state, BandState::Single(ref b) if b.pattern.is_empty()) {
+        // Commit any remaining state (but not if band is empty - e.g., only external anchor, no cursor tokens)
+        if !ctx.state.is_empty() {
             let state = std::mem::take(&mut ctx.state);
             self.root.commit_state(state);
         }

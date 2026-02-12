@@ -24,7 +24,8 @@ pub(crate) struct ExpandCtx<'a> {
 }
 impl<'a> ExpandCtx<'a> {
     pub(crate) fn try_new(ctx: &'a ExpansionCtx<'a>) -> Option<Self> {
-        let last_end = ctx.last().last_token();
+        // Use anchor_token which returns external anchor if present, else last band token
+        let last_end = ctx.state.anchor_token()?;
         debug!(last_end_postfix = ?last_end, "Try new ExpandCtx");
         let mut postfix_iter = last_end.postfix_iter(ctx.graph.clone());
         if let Some((postfix_location, _)) = postfix_iter.next() {
