@@ -4,11 +4,9 @@ use crate::{
         PostfixIterator,
     },
     expansion::{
-        chain::{
-            link::{
-                BandCap,
-                BandExpansion,
-            },
+        chain::link::{
+            BandCap,
+            BandExpansion,
             ChainOp,
         },
         ExpansionCtx,

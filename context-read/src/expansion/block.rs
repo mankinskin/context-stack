@@ -2,13 +2,12 @@
 //!
 //! This module provides BlockExpansionCtx which wraps ExpansionCtx for
 //! processing blocks of known patterns. It uses the expansion mechanism
-//! to detect overlaps, with the BandChain tracking overlaps as an ordered map.
+//! to detect overlaps, with the BandState tracking the current expansion state.
 
 use crate::{
-    bands::HasTokenRoleIters,
     context::root::RootManager,
     expansion::{
-        chain::band,
+        chain::BandState,
         ExpansionCtx,
     },
 };
@@ -39,7 +38,7 @@ impl BlockExpansionCtx {
     }
 
     /// Process the known pattern and commit the result to the root.
-    /// Uses overlap expansion and commits the full band chain with decompositions.
+    /// Uses overlap expansion and commits when an overlap is found.
     pub(crate) fn process(&mut self) {
         debug!(
             known_len = self.known.len(),
@@ -57,59 +56,41 @@ impl BlockExpansionCtx {
         // Create expansion context
         let mut ctx = ExpansionCtx::new(self.root.graph.clone(), &mut cursor);
 
-        let first = ctx.chain.start_token();
-        debug!(chain = ?ctx.chain, ?first, "expansion chain before processing");
+        let first = ctx.state.start_token();
+        debug!(state = ?ctx.state, ?first, "expansion state before processing");
 
-        // Process all expansions by consuming the iterator
-        while ctx.next().is_some() {}
-
-        debug!(
-            final_chain = ?ctx.chain,
-            "BlockExpansionCtx::process complete"
-        );
-
-        // Check for overlaps with root.
-        // If postfixes of the last token in the first band match the root, add overlap band.
-        // For "ababab" with root="ab" and known processed to [ab, ab]:
-        // - Postfix of "ab" (last element) matches root "ab"
-        // - Add overlap band
-        if let Some(root_token) = self.root.root {
-            let first_band = ctx.chain.bands.first().unwrap();
-            let last_in_band = *first_band.pattern.last().unwrap();
-
-            // Check if any postfix of last_in_band matches root
-            for (_, postfix) in last_in_band.postfix_iter(self.root.graph.clone())
-            {
-                if postfix.vertex_index() == root_token.vertex_index() {
-                    // Verify the overlap is valid: swapped order must produce same string
-                    use context_trace::graph::vertex::has_vertex_index::HasVertexIndex;
-                    let root_str =
-                        self.root.graph.index_string(root_token.vertex_index());
-                    let last_str =
-                        self.root.graph.index_string(last_in_band.vertex_index());
-
-                    // Check if last + root == root + last (i.e., commutative)
-                    let forward = format!("{}{}", root_str, last_str);
-                    let swapped = format!("{}{}", last_str, root_str);
-
-                    if forward == swapped {
-                        debug!(
-                            overlap_band = ?[last_in_band, root_token],
-                            postfix = ?postfix,
-                            "adding overlap band via postfix match with root"
-                        );
-                        // Add [last_in_band, root_token] as overlap band
-                        ctx.chain
-                            .append_front_complement(last_in_band, root_token);
+        // Process expansions - when overlap found, commit and continue
+        loop {
+            match ctx.next() {
+                Some(_token) => {
+                    // Check if we now have an overlap - if so, commit it
+                    if ctx.state.has_overlap() {
+                        debug!("Overlap found, committing state");
+                        let state = std::mem::take(&mut ctx.state);
+                        self.root.commit_state(state);
+                        
+                        // For now, break after first overlap commit
+                        // TODO: Continue processing remaining pattern
+                        break;
                     }
+                }
+                None => {
+                    // No more expansions - commit final state
                     break;
                 }
             }
         }
 
-        // Take the chain and commit to root manager
-        let chain = std::mem::take(&mut ctx.chain);
-        self.root.commit_chain(chain);
+        debug!(
+            final_state = ?ctx.state,
+            "BlockExpansionCtx::process complete"
+        );
+
+        // Commit any remaining state
+        if !matches!(ctx.state, BandState::Single(ref b) if b.pattern.is_empty()) {
+            let state = std::mem::take(&mut ctx.state);
+            self.root.commit_state(state);
+        }
     }
 
     /// Finish processing and return the RootManager.

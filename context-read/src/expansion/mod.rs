@@ -15,12 +15,12 @@ use crate::{
                 ChainOp,
                 OverlapLink,
             },
+            BandState,
         },
         cursor::CursorCtx,
         link::ExpansionLink,
     },
 };
-use chain::BandChain;
 
 use context_insert::*;
 use context_trace::*;
@@ -36,20 +36,31 @@ pub(crate) struct ExpansionCtx<'a> {
     #[deref]
     #[deref_mut]
     cursor: CursorCtx<'a>,
-    pub(crate) chain: BandChain,
+    pub(crate) state: BandState,
 }
 impl Iterator for ExpansionCtx<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // If we already have an overlap, signal completion (must commit first)
+        if self.state.has_overlap() {
+            return None;
+        }
+
         // First try to find overlaps via postfix expansion
         let overlap_result = ExpandCtx::try_new(self)
             .and_then(|mut ctx| {
                 // Find the next expansion or cap that can be applied at the current cursor position.
                 ctx.find_map(|op| match &op {
                     ChainOp::Expansion(_) => Some(op),
-                    ChainOp::Cap(cap) =>
-                        self.chain.ends_at(cap.start_bound).map(|_| op),
+                    ChainOp::Cap(cap) => {
+                        // Check if cap's start_bound matches state's end_bound
+                        if cap.start_bound == self.state.end_bound() {
+                            Some(op)
+                        } else {
+                            None
+                        }
+                    }
                 })
             })
             .and_then(|op| self.apply_op(op));
@@ -59,8 +70,7 @@ impl Iterator for ExpansionCtx<'_> {
         }
 
         // No overlap found. Check if we've consumed all atoms yet.
-        // Use the chain's end_bound to track how many atoms have been processed.
-        let atoms_consumed = *self.chain.bands.first().unwrap().end_bound;
+        let atoms_consumed = *self.state.end_bound();
         let original_pattern = self.cursor.cursor.path_root();
         let total_atoms: usize = original_pattern.iter().map(|t| *t.width()).sum();
         
@@ -102,11 +112,8 @@ impl Iterator for ExpansionCtx<'_> {
                 "Found next sequential block"
             );
 
-            // Extend the first (main sequential) band with the new block
-            let mut first = self.chain.bands.pop_first().unwrap();
-            first.pattern.push(next_block);
-            first.end_bound += *next_block.width();
-            self.chain.bands.insert(first);
+            // Append token to the primary band
+            self.state.append(next_block);
 
             return Some(next_block);
         }
@@ -138,12 +145,12 @@ impl<'a> ExpansionCtx<'a> {
         *cursor = path;
 
         Self {
-            chain: BandChain::new(first),
+            state: BandState::new(first),
             cursor: CursorCtx::new(graph, cursor),
         }
     }
     pub(crate) fn last(&self) -> &Band {
-        self.chain.last().unwrap().band
+        self.state.primary()
     }
     pub(crate) fn apply_op(
         &mut self,
@@ -162,17 +169,21 @@ impl<'a> ExpansionCtx<'a> {
                 // Create expansion link with paths representing the overlap
                 let expansion_link = self.create_expansion_link(&exp);
                 
-                // Create overlap link for the band chain
+                // Create overlap link for the band state
                 let overlap_link = self.create_overlap_link(&expansion_link);
                 
                 let complement =
                     ComplementBuilder::new(expansion_link).build(&self.cursor.graph);
                 
-                self.chain
-                    .append_front_complement(complement, exp.expansion.index);
+                // Create overlap band [complement, expansion]
+                let overlap_band = Band::from((
+                    0.into(),
+                    Pattern::from(vec![complement, exp.expansion.index]),
+                ));
                 
-                // Store the overlap link
-                self.chain.append_overlap_link(overlap_link);
+                // Transition to WithOverlap state
+                let old_state = std::mem::take(&mut self.state);
+                self.state = old_state.set_overlap(overlap_band, overlap_link);
 
                 Some(exp.expansion.index)
             },
@@ -183,9 +194,8 @@ impl<'a> ExpansionCtx<'a> {
                     postfix_path = ?cap.postfix_path,
                     "apply_cap"
                 );
-                let mut first = self.chain.bands.pop_first().unwrap();
-                first.append(cap.expansion);
-                self.chain.append(first);
+                // Append to the primary band
+                self.state.append(cap.expansion);
                 None
             },
         }
