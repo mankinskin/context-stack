@@ -20,9 +20,6 @@ pub(crate) enum BandState {
     /// Optional external_anchor for overlap detection with existing root
     Single {
         band: Band,
-        /// External anchor token from existing root (used for postfix iteration)
-        /// Not included in the band pattern - only used for overlap detection
-        external_anchor: Option<Token>,
     },
     /// Two bands with overlap link, ready for commit
     WithOverlap {
@@ -44,7 +41,6 @@ impl Default for BandState {
                 start_bound: 0.into(),
                 end_bound: 0.into(),
             },
-            external_anchor: None,
         }
     }
 }
@@ -59,21 +55,21 @@ impl BandState {
             end_bound: index.width().0.into(),
         };
         debug!(initial_band = ?band, "New BandState");
-        BandState::Single { band, external_anchor: None }
+        BandState::Single { band }
     }
 
-    /// Create a BandState with an external anchor token (e.g., from existing root).
-    /// The anchor is used for overlap detection but doesn't consume cursor atoms.
-    /// The band starts empty (no cursor atoms consumed yet).
-    pub(crate) fn with_external_anchor(anchor: Token) -> Self {
-        let band = Band {
-            pattern: Pattern::default(),
-            start_bound: 0.into(),
-            end_bound: 0.into(),
-        };
-        debug!(anchor = ?anchor, initial_band = ?band, "New BandState with external anchor");
-        BandState::Single { band, external_anchor: Some(anchor) }
-    }
+    ///// Create a BandState with an external anchor token (e.g., from existing root).
+    ///// The anchor is used for overlap detection but doesn't consume cursor atoms.
+    ///// The band starts empty (no cursor atoms consumed yet).
+    //pub(crate) fn with_external_anchor(anchor: Token) -> Self {
+    //    let band = Band {
+    //        pattern: Pattern::default(),
+    //        start_bound: 0.into(),
+    //        end_bound: 0.into(),
+    //    };
+    //    debug!(anchor = ?anchor, initial_band = ?band, "New BandState with external anchor");
+    //    BandState::Single { band, external_anchor: Some(anchor) }
+    //}
 
     /// Get the primary/single band reference
     pub(crate) fn primary(&self) -> &Band {
@@ -95,31 +91,13 @@ impl BandState {
     /// Returns the external anchor if present, otherwise the last token of the band.
     pub(crate) fn anchor_token(&self) -> Option<Token> {
         match self {
-            BandState::Single { band, external_anchor } => {
-                external_anchor.or_else(|| band.pattern.last().copied())
+            BandState::Single { band } => {
+                band.pattern.last().copied()
             }
             BandState::WithOverlap { primary, .. } => {
                 primary.pattern.last().copied()
             }
         }
-    }
-
-    /// Check if this state has an external anchor (from existing root)
-    pub(crate) fn has_external_anchor(&self) -> bool {
-        matches!(self, BandState::Single { external_anchor: Some(_), .. })
-    }
-
-    /// Clear the external anchor (when overlap detection failed)
-    pub(crate) fn clear_external_anchor(&mut self) {
-        if let BandState::Single { external_anchor, .. } = self {
-            *external_anchor = None;
-        }
-    }
-
-    /// Get the start token from the primary band
-    /// For external anchors, returns the anchor. Otherwise returns last band token.
-    pub(crate) fn start_token(&self) -> Option<Token> {
-        self.anchor_token()
     }
 
     /// Get the end bound of the primary band

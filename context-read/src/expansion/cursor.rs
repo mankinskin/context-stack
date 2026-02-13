@@ -6,17 +6,17 @@ use derive_more::{
 use tracing::debug;
 
 #[derive(Debug, Deref, DerefMut)]
-pub(crate) struct CursorCtx<'a> {
+pub(crate) struct CursorCtx {
     #[deref]
     #[deref_mut]
     pub(crate) graph: HypergraphRef,
-    pub(crate) cursor: &'a mut PatternRangePath,
+    pub(crate) cursor: PatternRangePath,
 }
 
-impl<'a> CursorCtx<'a> {
+impl CursorCtx {
     pub(crate) fn new(
         graph: HypergraphRef,
-        cursor: &'a mut PatternRangePath,
+        cursor: PatternRangePath,
     ) -> Self {
         debug!(
             cursor_root = ?cursor.path_root(),

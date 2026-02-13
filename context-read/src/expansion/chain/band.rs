@@ -58,16 +58,3 @@ impl From<(AtomPosition, Pattern)> for Band {
         }
     }
 }
-
-#[derive(Clone, Debug, Eq, Derivative, Deref)]
-#[derivative(Ord, PartialOrd, PartialEq)]
-pub(crate) struct Overlap {
-    #[deref]
-    pub(crate) index: Token,
-    pub(crate) start_bound: usize, // key for ordering
-}
-impl Overlap {
-    pub(crate) fn end_bound(&self) -> AtomPosition {
-        (self.start_bound + self.width().0).into()
-    }
-}
