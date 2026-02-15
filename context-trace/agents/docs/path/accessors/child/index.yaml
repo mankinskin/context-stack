@@ -1,0 +1,16 @@
+name: child
+description: Child element access for paths
+
+files:
+  - name: mod.rs
+    description: Module root, exports HasLeafToken and related traits
+    
+  - name: root.rs
+    description: PatternRootChild, GraphRootChild traits
+
+key_types:
+  - HasLeafToken: Types with accessible leaf tokens
+  - HasRootedLeafToken: Rooted types with leaf tokens
+  - HasRootedLeafTokenLocation: Location-aware leaf token access
+  - PatternRootChild: Root child in pattern context
+  - GraphRootChild: Root child in graph context

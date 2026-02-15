@@ -1,0 +1,33 @@
+name: move_path
+description: Path movement operations (advance, retract, etc.)
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: advance.rs
+    description: Advance, CanAdvance traits for forward movement
+    
+  - name: key.rs
+    description: MoveKey, AdvanceKey, AtomPosition types
+    
+  - name: leaf.rs
+    description: Leaf-level movement
+    
+  - name: path.rs
+    description: MovePath trait for general path movement
+    
+  - name: retract.rs
+    description: Retraction operations
+    
+  - name: root.rs
+    description: MoveRootIndex for root movement
+
+key_types:
+  - Advance: Trait for forward movement
+  - CanAdvance: Check if advance is possible
+  - MoveKey: Key type for movement operations
+  - AdvanceKey: Key for advance operations
+  - AtomPosition: Position tracking for atoms
+  - MovePath: General movement trait
+  - MoveRootIndex: Root index movement

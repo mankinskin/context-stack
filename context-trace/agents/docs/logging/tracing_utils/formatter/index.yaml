@@ -1,0 +1,21 @@
+name: formatter
+description: Custom tracing formatters for context-engine
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: core.rs
+    description: Core formatting logic
+    
+  - name: event.rs
+    description: Event formatting
+    
+  - name: fields.rs
+    description: Field formatting
+    
+  - name: helpers.rs
+    description: Formatting helper functions
+    
+  - name: span.rs
+    description: Span formatting

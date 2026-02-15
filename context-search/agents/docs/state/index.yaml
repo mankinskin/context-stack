@@ -1,0 +1,28 @@
+name: state
+description: Search state management and response types
+
+submodules:
+  - name: end
+    path: end/
+    description: End state handling
+    
+  - name: matched
+    path: matched/
+    description: Matched state handling
+    
+  - name: start
+    path: start/
+    description: Start state handling
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: inner_kind.rs
+    description: Inner state kind enumeration
+    
+  - name: response.rs
+    description: Response type - unified search result API
+
+key_types:
+  - Response: Unified API for search results

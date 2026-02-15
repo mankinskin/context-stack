@@ -1,0 +1,21 @@
+name: cache
+description: Caching for split operations
+
+files:
+  - name: mod.rs
+    description: Module root, exports SplitCache
+    
+  - name: leaves.rs
+    description: Leaf caching
+    
+  - name: position.rs
+    description: SplitPositionCache, PosKey
+    
+  - name: vertex.rs
+    description: SplitVertexCache
+
+key_types:
+  - SplitCache: Main split cache
+  - SplitPositionCache: Position cache for splits
+  - SplitVertexCache: Vertex cache for splits
+  - PosKey: Position key

@@ -1,0 +1,18 @@
+name: end
+description: End state handling for search
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: postfix.rs
+    description: Postfix end state
+    
+  - name: prefix.rs
+    description: Prefix end state
+    
+  - name: range.rs
+    description: Range end state
+    
+  - name: state.rs
+    description: End state type

@@ -1,0 +1,29 @@
+name: getters
+description: Graph query operations for retrieving data
+
+files:
+  - name: mod.rs
+    description: Module root, exports query traits and error types
+    
+  - name: atom.rs
+    description: Atom retrieval operations
+    
+  - name: child.rs
+    description: Child element retrieval
+    
+  - name: parent.rs
+    description: Parent element retrieval
+    
+  - name: pattern.rs
+    description: Pattern retrieval operations
+    
+  - name: utils.rs
+    description: Utility functions for getters
+    
+  - name: vertex.rs
+    description: Vertex retrieval operations
+
+key_types:
+  - ErrorReason: Error type for failed lookups
+  - IndexWithPath: Index paired with its path
+  - VertexSet: Set of vertex indices

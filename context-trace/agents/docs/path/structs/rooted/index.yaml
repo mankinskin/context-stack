@@ -1,0 +1,34 @@
+name: rooted
+description: Rooted path structures
+
+submodules:
+  - name: index_range
+    path: index_range/
+    description: Index-based range paths
+    
+  - name: role_path
+    path: role_path/
+    description: Role-based rooted paths
+
+files:
+  - name: mod.rs
+    description: Module root, exports PathNode, IntoChildLocation
+    
+  - name: pattern_range.rs
+    description: PatternPrefixPath, PatternPostfixPath, PatternRangePath
+    
+  - name: root.rs
+    description: RootedPath, IndexRoot, PathRoot
+    
+  - name: split_path.rs
+    description: Split path type for bifurcation
+
+key_types:
+  - RootedPath: Path anchored at a root
+  - PathNode: Node in a path
+  - RootedRangePath: Rooted path with range
+  - PatternPrefixPath: Prefix portion of a pattern
+  - PatternPostfixPath: Postfix portion of a pattern
+  - PatternRangePath: Full pattern range
+  - IndexRoot: Index-based root
+  - PathRoot: Path root marker

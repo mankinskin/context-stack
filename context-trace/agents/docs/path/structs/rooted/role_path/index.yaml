@@ -1,0 +1,22 @@
+name: role_path
+description: Role-based rooted path structures
+
+files:
+  - name: mod.rs
+    description: Module root, exports RootedRolePath and accessor traits
+    
+  - name: range.rs
+    description: StartPath, EndPath, HasStartPath, HasEndPath
+
+key_types:
+  - RootedRolePath: Rooted path with role
+  - IndexStartPath: Start path by index
+  - IndexEndPath: End path by index
+  - PatternStartPath: Pattern-based start path
+  - PatternEndPath: Pattern-based end path
+  - StartPath: Generic start path
+  - EndPath: Generic end path
+  - HasStartPath: Types with start path access
+  - HasEndPath: Types with end path access
+  - HasRootChildIndex: Types with root child index
+  - HasRootChildToken: Types with root child token

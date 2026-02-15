@@ -1,0 +1,24 @@
+name: index_range
+description: Index-based range path structures
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: accessors.rs
+    description: Accessor implementations
+    
+  - name: lower.rs
+    description: Lower operation for index ranges
+    
+  - name: movement.rs
+    description: Movement operations
+    
+  - name: position.rs
+    description: Position tracking
+    
+  - name: type_def.rs
+    description: IndexRangePath type definition
+
+key_types:
+  - IndexRangePath: Path defined by index range

@@ -1,0 +1,18 @@
+name: traceable
+description: Traceable trait and trace commands
+
+files:
+  - name: mod.rs
+    description: Module root, exports Traceable, PrefixCommand, PostfixCommand, RangeCommand
+    
+  - name: role.rs
+    description: Role-specific tracing
+    
+  - name: root.rs
+    description: Root-level tracing
+
+key_types:
+  - Traceable: Trait for types that can be traced in the graph
+  - PrefixCommand: Command for prefix tracing
+  - PostfixCommand: Command for postfix tracing
+  - RangeCommand: Command for range tracing

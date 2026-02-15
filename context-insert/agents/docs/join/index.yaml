@@ -1,0 +1,19 @@
+name: join
+description: Join operations for merging split results
+
+submodules:
+  - name: context
+    path: context/
+    description: Join context and node handling
+    
+  - name: joined
+    path: joined/
+    description: Joined result structures
+    
+  - name: partition
+    path: partition/
+    description: Partition handling during join
+
+files:
+  - name: mod.rs
+    description: Module root

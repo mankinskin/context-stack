@@ -1,0 +1,9 @@
+name: pattern
+description: Pattern handling during join
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: borders.rs
+    description: Pattern border handling

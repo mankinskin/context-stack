@@ -1,0 +1,23 @@
+name: key
+description: Cache key types for trace caching
+
+submodules:
+  - name: directed
+    path: directed/
+    description: Direction-aware cache keys
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: prev.rs
+    description: Previous key tracking
+    
+  - name: props.rs
+    description: CursorPosition, LeafKey, RootKey, TargetKey types
+
+key_types:
+  - CursorPosition: Position of cursor in traversal
+  - LeafKey: Key for leaf nodes
+  - RootKey: Key for root nodes
+  - TargetKey: Key for target positions

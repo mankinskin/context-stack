@@ -1,0 +1,34 @@
+name: split
+description: Split operations for decomposing patterns
+
+submodules:
+  - name: cache
+    path: cache/
+    description: Caching for split operations
+    
+  - name: trace
+    path: trace/
+    description: Tracing during split
+    
+  - name: vertex
+    path: vertex/
+    description: Vertex-level split handling
+
+files:
+  - name: mod.rs
+    description: Module root, exports TraceBack, TraceFront, TraceSide, cleaned_position_splits
+    
+  - name: context.rs
+    description: Split context
+    
+  - name: pattern.rs
+    description: Pattern split handling
+    
+  - name: run.rs
+    description: Split execution
+
+key_types:
+  - TraceBack: Backward tracing trait
+  - TraceFront: Forward tracing trait
+  - TraceSide: Side tracing trait
+  - TokenTracePos: Token trace position

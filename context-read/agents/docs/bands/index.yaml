@@ -1,0 +1,9 @@
+name: bands
+description: Band-based context representation and policies
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: policy.rs
+    description: Band expansion policies

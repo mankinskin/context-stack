@@ -1,0 +1,58 @@
+name: context-search
+version: 0.1.0
+description: >
+  Pattern matching and search functionality for the context-engine. Provides a unified
+  Response API for search results and various search algorithms for finding patterns
+  in the hypergraph.
+
+modules:
+  - name: compare
+    description: Comparison and iteration logic for search states
+    path: src/compare/
+    
+  - name: container
+    description: Container types for search queues (BFT, DFT)
+    path: src/container/
+    
+  - name: cursor
+    description: Cursor types for tracking search position
+    path: src/cursor/
+    
+  - name: match
+    description: Match handling and root cursor operations
+    path: src/match/
+    
+  - name: policy
+    description: Search policy configuration
+    path: src/policy.rs
+    
+  - name: search
+    description: Core search algorithms and entry points
+    path: src/search/
+    
+  - name: state
+    description: Search state management and response types
+    path: src/state/
+    
+  - name: logging
+    description: Search-specific logging and formatting
+    path: src/logging/
+
+exported_items:
+  types:
+    - Response: Unified API for search results
+    - BftQueue: Breadth-first traversal queue
+    - ErrorState: Error state from search operations
+    - SearchKind: Configuration for search type
+
+  traits:
+    - Searchable: Types that can be searched
+    - Find: Entry point for search operations
+    - AncestorPolicy: Policy for ancestor handling during search
+
+dependencies:
+  - context-trace: Foundation crate
+
+features:
+  - default: Standard feature set
+  - test-api: Testing utilities

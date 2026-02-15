@@ -1,0 +1,26 @@
+name: vertex
+description: Vertex-level split handling
+
+files:
+  - name: mod.rs
+    description: Module root, exports VertexSplits, TokenTracePositions, ToVertexSplitPos
+    
+  - name: node.rs
+    description: Node handling during vertex split
+    
+  - name: output.rs
+    description: CompleteLocations, InnerNode, RootMode
+    
+  - name: pattern.rs
+    description: Pattern handling for vertex splits
+    
+  - name: position.rs
+    description: HasInnerOffset, Offset, SubSplitLocation
+
+key_types:
+  - VertexSplits: Splits at vertex level
+  - TokenTracePositions: Token positions during trace
+  - CompleteLocations: Complete location output
+  - InnerNode: Inner node type
+  - RootMode: Mode for root handling
+  - SubSplitLocation: Sub-location for splits

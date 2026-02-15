@@ -1,0 +1,49 @@
+name: context-insert
+version: 0.1.0
+description: >
+  Insertion operations for the context-engine using split-join architecture.
+  Handles graph modifications by splitting existing patterns, performing insertions,
+  and joining results back together.
+
+modules:
+  - name: insert
+    description: High-level insertion API and context
+    path: src/insert/
+    
+  - name: interval
+    description: Interval-based graph representation and initialization
+    path: src/interval/
+    
+  - name: join
+    description: Join operations for merging split results
+    path: src/join/
+    
+  - name: split
+    description: Split operations for decomposing patterns
+    path: src/split/
+
+exported_items:
+  types:
+    - InsertCtx: Context for insertion operations
+    - InsertResult: Result of an insertion operation
+    - InitInterval: Initial interval for graph setup
+    - IntervalGraph: Graph with interval representation
+    - SplitCache: Cache for split operations
+    - SplitPositionCache: Position cache for splits
+    - SplitVertexCache: Vertex cache for splits
+    - SplitStates: States during split operation
+    - RootMode: Mode for root handling
+
+  traits:
+    - ToInsertCtx: Conversion to insertion context
+    - TraceBack: Backward tracing during split
+    - TraceFront: Forward tracing during split
+    - TraceSide: Side tracing utilities
+
+dependencies:
+  - context-trace: Foundation crate
+  - context-search: Search functionality
+
+features:
+  - default: Standard feature set
+  - test-api: Testing utilities

@@ -1,0 +1,17 @@
+name: compare
+description: Comparison and iteration logic for search states
+
+submodules:
+  - name: state
+    path: state/
+    description: State comparison implementations
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: iterator.rs
+    description: Iterator for comparison operations
+    
+  - name: parent.rs
+    description: Parent comparison logic

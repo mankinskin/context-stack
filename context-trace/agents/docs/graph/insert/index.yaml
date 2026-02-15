@@ -1,0 +1,27 @@
+name: insert
+description: Graph insertion operations
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: atom.rs
+    description: Atom insertion
+    
+  - name: parents.rs
+    description: Parent relationship insertion
+    
+  - name: pattern.rs
+    description: Single pattern insertion
+    
+  - name: patterns.rs
+    description: Multiple pattern insertion
+    
+  - name: range.rs
+    description: Range insertion operations
+    
+  - name: replace.rs
+    description: Replacement operations
+    
+  - name: vertex.rs
+    description: Vertex insertion

@@ -1,0 +1,18 @@
+name: data
+description: Vertex data structures
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: core.rs
+    description: Core vertex data type
+    
+  - name: children.rs
+    description: Children data management
+    
+  - name: parents.rs
+    description: Parents data management
+
+key_types:
+  - VertexData: Container for all vertex-associated data

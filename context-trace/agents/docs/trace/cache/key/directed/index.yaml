@@ -1,0 +1,21 @@
+name: directed
+description: Direction-aware cache keys
+
+files:
+  - name: mod.rs
+    description: Module root, exports DirectedKey, DirectedPosition, HasAtomPosition
+    
+  - name: down.rs
+    description: DownKey, DownPosition for downward traversal
+    
+  - name: up.rs
+    description: UpKey, UpPosition for upward traversal
+
+key_types:
+  - DirectedKey: Key with direction information
+  - DirectedPosition: Position with direction
+  - HasAtomPosition: Types with atom position
+  - DownKey: Key for downward traversal
+  - DownPosition: Position for downward traversal
+  - UpKey: Key for upward traversal
+  - UpPosition: Position for upward traversal

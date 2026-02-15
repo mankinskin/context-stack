@@ -1,0 +1,30 @@
+name: context-trace-macros
+version: 0.1.0
+description: >
+  Procedural macro crate providing instrumentation macros for the context-engine.
+  These macros enhance tracing by automatically capturing function signatures
+  and type information.
+
+modules:
+  - name: lib
+    description: Main library containing all procedural macros
+    path: src/lib.rs
+
+exported_items:
+  macros:
+    - instrument_sig: >
+        Procedural macro attribute that wraps #[tracing::instrument] and automatically
+        adds function signature information to the tracing span fields. Detects trait
+        implementation context and adds Self type information.
+        
+    - instrument_trait_impl: >
+        Procedural macro for instrumenting entire trait implementations, applying
+        instrument_sig to all methods within the impl block.
+
+dependencies:
+  - syn: Rust syntax parsing
+  - quote: Quasi-quoting for code generation
+  - proc-macro2: Procedural macro utilities
+  - tracing-attributes: Tracing attribute utilities
+
+features: []

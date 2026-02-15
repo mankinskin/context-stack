@@ -1,0 +1,14 @@
+name: match
+description: Match handling and root cursor operations
+
+submodules:
+  - name: root_cursor
+    path: root_cursor/
+    description: Root cursor management
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: iterator.rs
+    description: Match iteration

@@ -1,0 +1,6 @@
+name: matched
+description: Matched state handling for search
+
+files:
+  - name: mod.rs
+    description: Module root, matched state type

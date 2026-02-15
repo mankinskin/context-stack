@@ -1,0 +1,18 @@
+name: container
+description: Container types for search queues
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: bft.rs
+    description: BftQueue - Breadth-first traversal queue
+    
+  - name: dft.rs
+    description: DFT container for depth-first traversal
+    
+  - name: order.rs
+    description: Ordering utilities for search containers
+
+key_types:
+  - BftQueue: Breadth-first traversal queue

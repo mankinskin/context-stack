@@ -1,0 +1,39 @@
+name: tracing_utils
+description: Tracing setup and configuration utilities
+
+submodules:
+  - name: config
+    path: config/
+    description: Tracing configuration loading and building
+    
+  - name: formatter
+    path: formatter/
+    description: Custom tracing formatters
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: field_visitor.rs
+    description: Custom visitor for tracing fields
+    
+  - name: panic.rs
+    description: Panic handling in tracing context
+    
+  - name: path.rs
+    description: Path utilities for trace output
+    
+  - name: span_fields.rs
+    description: Span field handling
+    
+  - name: string_utils.rs
+    description: String manipulation utilities
+    
+  - name: syntax.rs
+    description: Syntax highlighting for output
+    
+  - name: test_tracing.rs
+    description: Test tracing initialization (init_test_tracing! macro)
+    
+  - name: timer.rs
+    description: Timing utilities for spans

@@ -1,0 +1,18 @@
+name: context
+description: Join context and node handling
+
+submodules:
+  - name: node
+    path: node/
+    description: Node handling during join
+    
+  - name: pattern
+    path: pattern/
+    description: Pattern handling during join
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: frontier.rs
+    description: Join frontier management

@@ -1,0 +1,14 @@
+name: node
+description: Node handling during join operations
+
+submodules:
+  - name: merge
+    path: merge/
+    description: Node merge operations
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: context.rs
+    description: Node context

@@ -88,7 +88,6 @@ impl ExpansionCtx {
         if let Some(band) = band {
             debug!(band = ?band, "Using root's last token for overlap detection");
             Self {
-                // Use external anchor - tracks postfix iteration but no cursor atoms consumed
                 state: band,
                 cursor: CursorCtx::new(graph, cursor),
             }

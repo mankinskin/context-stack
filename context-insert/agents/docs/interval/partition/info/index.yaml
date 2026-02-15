@@ -1,0 +1,18 @@
+name: info
+description: Partition information structures
+
+submodules:
+  - name: border
+    path: border/
+    description: Border information
+    
+  - name: range
+    path: range/
+    description: Range information
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: borders.rs
+    description: Borders collection

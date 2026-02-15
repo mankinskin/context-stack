@@ -1,0 +1,25 @@
+name: cache
+description: Caching for trace operations
+
+submodules:
+  - name: key
+    path: key/
+    description: Cache key types
+    
+  - name: vertex
+    path: vertex/
+    description: Vertex-level caching
+
+files:
+  - name: mod.rs
+    description: Module root, exports TraceCache
+    
+  - name: new.rs
+    description: Cache construction
+    
+  - name: position.rs
+    description: PositionCache for position caching
+
+key_types:
+  - TraceCache: Main cache container
+  - PositionCache: Cache for positions

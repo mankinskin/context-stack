@@ -1,0 +1,23 @@
+name: logging
+description: Logging utilities including tracing configuration and formatting
+
+submodules:
+  - name: tracing_utils
+    path: tracing_utils/
+    description: Tracing setup and configuration utilities
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: compact_format.rs
+    description: CompactFormat trait for condensed output
+    
+  - name: format_utils.rs
+    description: Formatting utilities (pretty function)
+    
+  - name: path_format.rs
+    description: Path formatting for display
+
+key_types:
+  - CompactFormat: Trait for types supporting compact output

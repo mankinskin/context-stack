@@ -1,0 +1,25 @@
+name: path
+description: Path data structures and operations for graph traversal
+
+submodules:
+  - name: accessors
+    path: accessors/
+    description: Traits for reading path properties
+    
+  - name: mutators
+    path: mutators/
+    description: Traits and operations for modifying paths
+    
+  - name: structs
+    path: structs/
+    description: Path data structure definitions
+
+files:
+  - name: mod.rs
+    description: Module root, exports RolePathUtils
+
+key_types:
+  - RolePath: Path with associated role (Start/End)
+  - RootedPath: Path rooted at a specific vertex
+  - RootedRolePath: Rooted path with role
+  - SubPath: Sub-path representation

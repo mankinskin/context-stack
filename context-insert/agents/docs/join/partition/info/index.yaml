@@ -1,0 +1,12 @@
+name: info
+description: Partition information for join operations
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: inner_range.rs
+    description: Inner range information
+    
+  - name: pattern_info.rs
+    description: Pattern information for join

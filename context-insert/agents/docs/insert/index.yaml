@@ -1,0 +1,20 @@
+name: insert
+description: High-level insertion API and context
+
+files:
+  - name: mod.rs
+    description: Module root, exports ToInsertCtx
+    
+  - name: context.rs
+    description: InsertCtx - insertion context
+    
+  - name: direction.rs
+    description: Direction handling for insertions
+    
+  - name: result.rs
+    description: InsertResult type
+
+key_types:
+  - InsertCtx: Context for insertion operations
+  - InsertResult: Result of insertion
+  - ToInsertCtx: Trait for converting to InsertCtx

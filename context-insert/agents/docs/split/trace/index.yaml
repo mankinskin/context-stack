@@ -1,0 +1,11 @@
+name: trace
+description: Tracing during split operations
+
+submodules:
+  - name: states
+    path: states/
+    description: Split trace states
+
+files:
+  - name: mod.rs
+    description: Module root, exports SplitTraceCtx

@@ -1,0 +1,23 @@
+name: expansion
+description: Context expansion operations and chain handling
+
+submodules:
+  - name: chain
+    path: chain/
+    description: Expansion chain management
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: block.rs
+    description: Expansion block handling
+    
+  - name: cursor.rs
+    description: Expansion cursor
+    
+  - name: link.rs
+    description: Expansion links
+    
+  - name: stack.rs
+    description: Expansion stack management

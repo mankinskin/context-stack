@@ -1,0 +1,18 @@
+name: cursor
+description: Cursor types for tracking search position
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: checkpointed.rs
+    description: Checkpointed cursor for backtracking
+    
+  - name: path.rs
+    description: Path cursor
+    
+  - name: position.rs
+    description: Position cursor
+    
+  - name: state_machine.rs
+    description: State machine for cursor transitions

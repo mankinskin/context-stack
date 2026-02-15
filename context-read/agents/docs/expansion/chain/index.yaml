@@ -1,0 +1,18 @@
+name: chain
+description: Expansion chain management
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: band.rs
+    description: Chain band handling
+    
+  - name: expand.rs
+    description: Chain expansion logic
+    
+  - name: link.rs
+    description: Chain link structures
+    
+  - name: op.rs
+    description: Chain operations

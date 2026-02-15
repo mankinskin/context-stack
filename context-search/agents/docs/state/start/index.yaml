@@ -1,0 +1,9 @@
+name: start
+description: Start state handling for search
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: core.rs
+    description: Core start state implementation

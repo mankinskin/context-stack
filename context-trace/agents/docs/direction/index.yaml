@@ -1,0 +1,18 @@
+name: direction
+description: Direction types and pattern direction handling for bidirectional traversal
+
+files:
+  - name: mod.rs
+    description: Module root, exports Direction, Left, Right types
+    
+  - name: merge.rs
+    description: Merge operations for direction-aware data structures
+    
+  - name: pattern.rs
+    description: PatternDirection type for pattern-specific direction handling
+
+key_types:
+  - Direction: Enum representing traversal direction (Left or Right)
+  - Left: Type marker for left direction
+  - Right: Type marker for right direction
+  - PatternDirection: Direction handling specific to patterns

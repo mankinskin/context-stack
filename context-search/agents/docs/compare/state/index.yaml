@@ -1,0 +1,15 @@
+name: state
+description: State comparison implementations
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: core.rs
+    description: Core comparison logic
+    
+  - name: decomposition.rs
+    description: State decomposition for comparison
+    
+  - name: transitions.rs
+    description: State transition handling

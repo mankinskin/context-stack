@@ -1,0 +1,16 @@
+name: state
+description: Trace state management
+
+files:
+  - name: mod.rs
+    description: Module root, exports BaseState, StateAdvance, IntoParentState
+    
+  - name: parent.rs
+    description: ParentState, ParentBatch types
+
+key_types:
+  - BaseState: Base state for tracing
+  - StateAdvance: State advancement trait
+  - IntoParentState: Conversion to parent state
+  - ParentState: State at parent level
+  - ParentBatch: Batch of parent states

@@ -1,0 +1,15 @@
+name: root_cursor
+description: Root cursor management for match handling
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: advance.rs
+    description: Cursor advancement logic
+    
+  - name: core.rs
+    description: Core root cursor implementation
+    
+  - name: state.rs
+    description: Root cursor state

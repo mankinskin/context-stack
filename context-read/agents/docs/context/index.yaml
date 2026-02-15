@@ -1,0 +1,12 @@
+name: context
+description: Read context management
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: has_read_context.rs
+    description: HasReadContext trait
+    
+  - name: root.rs
+    description: Root context handling

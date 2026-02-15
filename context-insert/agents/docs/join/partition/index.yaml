@@ -1,0 +1,11 @@
+name: partition
+description: Partition handling during join
+
+submodules:
+  - name: info
+    path: info/
+    description: Partition information for join
+
+files:
+  - name: mod.rs
+    description: Module root

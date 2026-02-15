@@ -1,0 +1,47 @@
+name: context-read
+version: 0.1.0
+description: >
+  Context reading and expansion operations for the context-engine. Provides
+  functionality for reading context around positions in the hypergraph and
+  expanding results based on configurable policies.
+
+modules:
+  - name: bands
+    description: Band-based context representation and policies
+    path: src/bands/
+    
+  - name: complement
+    description: Complement operations for context
+    path: src/complement.rs
+    
+  - name: context
+    description: Read context management
+    path: src/context/
+    
+  - name: expansion
+    description: Context expansion operations and chain handling
+    path: src/expansion/
+    
+  - name: request
+    description: Context request handling
+    path: src/request.rs
+    
+  - name: segment
+    description: Segment representation for context
+    path: src/segment.rs
+
+exported_items:
+  types:
+    - ReadContext: Main context for reading operations
+    
+  traits: []
+
+dependencies:
+  - context-trace: Foundation crate
+  - context-search: Search functionality
+  - context-insert: Insertion operations
+
+features:
+  - default: Standard feature set
+  - test-api: Testing utilities
+  - test-hashing: Deterministic hashing for tests

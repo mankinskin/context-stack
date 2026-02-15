@@ -1,0 +1,12 @@
+name: joined
+description: Joined result structures
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: partition.rs
+    description: Joined partition
+    
+  - name: patterns.rs
+    description: Joined patterns

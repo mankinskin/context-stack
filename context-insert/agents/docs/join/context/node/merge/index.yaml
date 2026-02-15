@@ -1,0 +1,27 @@
+name: merge
+description: Node merge operations during join
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: context.rs
+    description: Merge context
+    
+  - name: iter.rs
+    description: Merge iteration
+    
+  - name: node.rs
+    description: Node merge handling
+    
+  - name: partition.rs
+    description: Partition merge
+    
+  - name: partition_range.rs
+    description: Partition range merge
+    
+  - name: range_map.rs
+    description: Range map for merging
+    
+  - name: required.rs
+    description: Required merge indicators

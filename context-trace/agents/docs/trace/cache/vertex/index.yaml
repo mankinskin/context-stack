@@ -1,0 +1,13 @@
+name: vertex
+description: Vertex-level caching
+
+files:
+  - name: mod.rs
+    description: Module root, exports VertexCache
+    
+  - name: positions.rs
+    description: DirectedPositions type
+
+key_types:
+  - VertexCache: Cache per vertex
+  - DirectedPositions: Direction-indexed positions

@@ -1,0 +1,24 @@
+name: range
+description: Range information for partitions
+
+files:
+  - name: mod.rs
+    description: Module root, exports range types and roles
+    
+  - name: children.rs
+    description: Children range handling
+    
+  - name: mode.rs
+    description: InVisitMode for range modes
+    
+  - name: role.rs
+    description: RangeRole, Pre, Post, In roles, OffsetsOf, BooleanPerfectOf
+    
+  - name: splits.rs
+    description: Split handling for ranges
+
+key_types:
+  - RangeRole: Role of a range (Pre/Post/In)
+  - InVisitMode: Visit mode within ranges
+  - OffsetsOf: Offset calculations
+  - BooleanPerfectOf: Boolean perfect indicators

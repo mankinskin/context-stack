@@ -1,0 +1,22 @@
+name: structs
+description: Path data structure definitions
+
+submodules:
+  - name: rooted
+    path: rooted/
+    description: Rooted path structures
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: role_path.rs
+    description: RolePath type definition
+    
+  - name: sub_path.rs
+    description: SubPath, PositionAnnotated types
+
+key_types:
+  - RolePath: Path with Start/End role
+  - SubPath: Sub-section of a path
+  - PositionAnnotated: Path with position information

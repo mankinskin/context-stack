@@ -1,0 +1,34 @@
+name: trace
+description: Tracing infrastructure, cache management, and state tracking
+
+submodules:
+  - name: cache
+    path: cache/
+    description: Caching for trace operations
+    
+  - name: child
+    path: child/
+    description: Child iteration and state
+    
+  - name: state
+    path: state/
+    description: Trace state management
+    
+  - name: traceable
+    path: traceable/
+    description: Traceable trait and commands
+
+files:
+  - name: mod.rs
+    description: Module root, exports TraceCtx
+    
+  - name: has_graph.rs
+    description: HasGraph, HasGraphMut, TravDir, TravKind traits
+
+key_types:
+  - TraceCtx: Context for tracing operations
+  - TraceCache: Cache for trace results
+  - HasGraph: Types holding graph reference
+  - HasGraphMut: Types holding mutable graph reference
+  - TravDir: Traversal direction
+  - TravKind: Kind of traversal

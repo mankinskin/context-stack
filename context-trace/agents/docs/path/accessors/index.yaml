@@ -1,0 +1,38 @@
+name: accessors
+description: Traits for reading path properties
+
+submodules:
+  - name: child
+    path: child/
+    description: Child element access
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: border.rs
+    description: PathBorder trait for border access
+    
+  - name: calc.rs
+    description: CalcOffset, CalcWidth traits for calculations
+    
+  - name: has_path.rs
+    description: HasRolePath, HasChildPath, IntoRolePath, IntoRootedPath traits
+    
+  - name: path_accessor.rs
+    description: PathAccessor, RootedPathAccessor, StatePosition traits
+    
+  - name: range_accessor.rs
+    description: RangePathAccessor, StartPathAccessor, EndPathAccessor traits
+    
+  - name: role.rs
+    description: PathRole trait, Start, End types
+    
+  - name: root.rs
+    description: GraphRoot, PatternRoot, RootPattern traits
+
+key_types:
+  - PathAccessor: Core trait for path property access
+  - RootedPathAccessor: Accessor for rooted paths
+  - RangePathAccessor: Accessor for range-based paths
+  - PathRole: Role marker (Start/End)

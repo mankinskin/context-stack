@@ -1,0 +1,14 @@
+name: partition
+description: Interval partitioning logic
+
+submodules:
+  - name: info
+    path: info/
+    description: Partition information structures
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: delta.rs
+    description: PatternSubDeltas for delta tracking

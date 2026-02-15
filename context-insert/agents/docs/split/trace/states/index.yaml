@@ -1,0 +1,12 @@
+name: states
+description: Split trace states
+
+files:
+  - name: mod.rs
+    description: Module root, exports SplitStates
+    
+  - name: context.rs
+    description: State context during split
+
+key_types:
+  - SplitStates: States during split operation

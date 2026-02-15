@@ -1,0 +1,18 @@
+name: location
+description: Vertex location types for indexing into patterns
+
+files:
+  - name: mod.rs
+    description: Module root, exports SubLocation, SubRangeLocation
+    
+  - name: child.rs
+    description: ChildLocation, HasSubIndex, HasSubIndexMut
+    
+  - name: pattern.rs
+    description: PatternLocation, HasPatternLocation, IntoPatternLocation
+
+key_types:
+  - SubLocation: Sub-location within a pattern
+  - SubRangeLocation: Range location within a pattern
+  - ChildLocation: Location of a child element
+  - PatternLocation: Location within a pattern

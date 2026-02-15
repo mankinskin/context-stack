@@ -1,0 +1,38 @@
+name: graph
+description: Hypergraph data structures, vertex types, and graph operations
+
+submodules:
+  - name: getters
+    path: getters/
+    description: Graph query operations
+    
+  - name: insert
+    path: insert/
+    description: Graph insertion operations
+    
+  - name: vertex
+    path: vertex/
+    description: Vertex types and vertex-related data structures
+
+files:
+  - name: mod.rs
+    description: Module root, exports Hypergraph, HypergraphRef
+    
+  - name: child_strings.rs
+    description: String conversion for child elements
+    
+  - name: kind.rs
+    description: GraphKind trait and associated types (AtomOf, BaseGraphKind)
+    
+  - name: test_graph.rs
+    description: Test utilities for graph construction
+    
+  - name: validation.rs
+    description: Graph validation utilities
+
+key_types:
+  - Hypergraph: Core hypergraph container storing vertices and patterns
+  - HypergraphRef: Arc-wrapped reference to Hypergraph
+  - GraphKind: Trait defining graph type parameters
+  - BaseGraphKind: Trait for base graph functionality
+  - AtomOf: Associated type for atom extraction

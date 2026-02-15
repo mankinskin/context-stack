@@ -1,0 +1,15 @@
+name: config
+description: Tracing configuration loading and building
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: builder.rs
+    description: Configuration builder
+    
+  - name: loader.rs
+    description: Configuration file loading
+    
+  - name: types.rs
+    description: Configuration type definitions

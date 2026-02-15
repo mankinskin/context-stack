@@ -1,0 +1,15 @@
+name: border
+description: Border information structures
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: info.rs
+    description: Border info type
+    
+  - name: perfect.rs
+    description: Perfect border handling
+    
+  - name: trace.rs
+    description: Border tracing

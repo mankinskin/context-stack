@@ -1,0 +1,33 @@
+name: mutators
+description: Traits and operations for modifying paths
+
+submodules:
+  - name: move_path
+    path: move_path/
+    description: Path movement operations
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: append.rs
+    description: PathAppend trait for extending paths
+    
+  - name: lower.rs
+    description: PathLower trait for descending in hierarchy
+    
+  - name: pop.rs
+    description: PathPop trait for removing path elements
+    
+  - name: raise.rs
+    description: PathRaise trait for ascending in hierarchy
+    
+  - name: simplify.rs
+    description: PathSimplify trait for path reduction
+
+key_types:
+  - PathAppend: Extend paths
+  - PathLower: Move down hierarchy
+  - PathRaise: Move up hierarchy
+  - PathPop: Remove elements
+  - PathSimplify: Reduce complexity

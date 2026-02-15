@@ -1,0 +1,57 @@
+name: vertex
+description: Vertex types and vertex-related data structures
+
+submodules:
+  - name: data
+    path: data/
+    description: Vertex data structures
+    
+  - name: location
+    path: location/
+    description: Vertex location types
+    
+  - name: pattern
+    path: pattern/
+    description: Pattern-related vertex types
+
+files:
+  - name: mod.rs
+    description: Module root, exports core vertex types
+    
+  - name: atom.rs
+    description: Atom type and conversions (AsAtom, Atom, atomizing_iter)
+    
+  - name: entry.rs
+    description: Vertex entry type
+    
+  - name: has_vertex_data.rs
+    description: HasVertexData trait
+    
+  - name: has_vertex_index.rs
+    description: HasVertexIndex, ToToken traits
+    
+  - name: has_vertex_key.rs
+    description: HasVertexKey trait
+    
+  - name: key.rs
+    description: VertexKey type
+    
+  - name: parent.rs
+    description: Parent type, HasPatternId trait
+    
+  - name: token.rs
+    description: Token, HasToken, TokenWidth types
+    
+  - name: vertex_index.rs
+    description: VertexIndex type
+    
+  - name: wide.rs
+    description: Wide trait for width calculations
+
+key_types:
+  - VertexIndex: Unique identifier for vertices
+  - VertexKey: Key for vertex lookup
+  - Token: Token representation
+  - Atom: Atomic element type
+  - Parent: Parent relationship type
+  - Wide: Trait for types with width

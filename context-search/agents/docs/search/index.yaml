@@ -1,0 +1,21 @@
+name: search
+description: Core search algorithms and entry points
+
+files:
+  - name: mod.rs
+    description: Module root, exports Find trait
+    
+  - name: bft.rs
+    description: Breadth-first traversal search algorithm
+    
+  - name: context.rs
+    description: Search context, AncestorPolicy
+    
+  - name: searchable.rs
+    description: Searchable trait, ErrorState
+
+key_types:
+  - Find: Trait providing search entry point
+  - Searchable: Trait for searchable types
+  - ErrorState: Search error state
+  - AncestorPolicy: Ancestor handling policy

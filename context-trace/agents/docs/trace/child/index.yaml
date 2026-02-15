@@ -1,0 +1,19 @@
+name: child
+description: Child iteration and child state management
+
+files:
+  - name: mod.rs
+    description: Module root
+    
+  - name: iterator.rs
+    description: ChildIterator, ChildQueue, TraceKind
+    
+  - name: state.rs
+    description: ChildState, RootChildState
+
+key_types:
+  - ChildIterator: Iterator over children
+  - ChildQueue: Queue for BFS child traversal
+  - TraceKind: Kind of trace operation
+  - ChildState: State for a child during trace
+  - RootChildState: State for root child
