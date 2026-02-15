@@ -5,22 +5,29 @@ description: >
   Handles graph modifications by splitting existing patterns, performing insertions,
   and joining results back together.
 
+source_files:
+  - src/lib.rs
+  - src/insert/
+  - src/interval/
+  - src/join/
+  - src/split/
+
 modules:
   - name: insert
     description: High-level insertion API and context
-    path: src/insert/
+    path: insert/
     
   - name: interval
     description: Interval-based graph representation and initialization
-    path: src/interval/
+    path: interval/
     
   - name: join
     description: Join operations for merging split results
-    path: src/join/
+    path: join/
     
   - name: split
     description: Split operations for decomposing patterns
-    path: src/split/
+    path: split/
 
 exported_items:
   types:

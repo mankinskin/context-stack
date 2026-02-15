@@ -5,10 +5,10 @@ description: >
   These macros enhance tracing by automatically capturing function signatures
   and type information.
 
-modules:
-  - name: lib
-    description: Main library containing all procedural macros
-    path: src/lib.rs
+source_files:
+  - src/lib.rs
+
+modules: []
 
 exported_items:
   macros:

@@ -5,38 +5,45 @@ description: >
   Response API for search results and various search algorithms for finding patterns
   in the hypergraph.
 
+source_files:
+  - src/lib.rs
+  - src/compare/
+  - src/container/
+  - src/cursor/
+  - src/match/
+  - src/policy.rs
+  - src/search/
+  - src/state/
+  - src/logging/
+
 modules:
   - name: compare
     description: Comparison and iteration logic for search states
-    path: src/compare/
+    path: compare/
     
   - name: container
     description: Container types for search queues (BFT, DFT)
-    path: src/container/
+    path: container/
     
   - name: cursor
     description: Cursor types for tracking search position
-    path: src/cursor/
+    path: cursor/
     
   - name: match
     description: Match handling and root cursor operations
-    path: src/match/
-    
-  - name: policy
-    description: Search policy configuration
-    path: src/policy.rs
+    path: match/
     
   - name: search
     description: Core search algorithms and entry points
-    path: src/search/
+    path: search/
     
   - name: state
     description: Search state management and response types
-    path: src/state/
+    path: state/
     
   - name: logging
     description: Search-specific logging and formatting
-    path: src/logging/
+    path: logging/
 
 exported_items:
   types:

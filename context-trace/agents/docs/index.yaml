@@ -5,26 +5,34 @@ description: >
   and bidirectional tracing capabilities. This crate forms the base layer upon which
   context-search, context-insert, and context-read are built.
 
+source_files:
+  - src/lib.rs
+  - src/direction/
+  - src/graph/
+  - src/logging/
+  - src/path/
+  - src/trace/
+
 modules:
   - name: direction
     description: Direction types and pattern direction handling for bidirectional traversal
-    path: src/direction/
+    path: direction/
     
   - name: graph
     description: Hypergraph data structures, vertex types, and graph operations
-    path: src/graph/
+    path: graph/
     
   - name: logging
     description: Logging utilities including tracing configuration and formatting
-    path: src/logging/
+    path: logging/
     
   - name: path
     description: Path data structures and operations for graph traversal
-    path: src/path/
+    path: path/
     
   - name: trace
     description: Tracing infrastructure, cache management, and state tracking
-    path: src/trace/
+    path: trace/
 
 exported_items:
   types:
