@@ -3,6 +3,7 @@
 //! This module provides BlockExpansionCtx which wraps ExpansionCtx for
 //! processing blocks of known patterns. It uses the expansion mechanism
 //! to detect overlaps, with the BandState tracking the current expansion state.
+//!
 
 use crate::{
     context::root::RootManager,
