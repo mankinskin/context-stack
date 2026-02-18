@@ -1,3 +1,4 @@
+pub(crate) mod cursor;
 pub mod grammar;
 pub(crate) mod linear;
 #[cfg(test)] // ngrams is a dev-dependency, only available in tests

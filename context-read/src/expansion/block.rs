@@ -22,8 +22,6 @@ use tracing::debug;
 pub(crate) struct BlockExpansionCtx {
     /// The root manager (owns graph and root token)
     root: RootManager,
-    /// The known pattern to process
-    known: Pattern,
     ctx: ExpansionCtx,
 }
 
@@ -35,13 +33,6 @@ impl<'a> BlockExpansionCtx {
         known: Pattern,
     ) -> Self {
         debug!(known_len = known.len(), known = ?known, "BlockExpansionCtx::new");
-
-        debug!(
-            known_len = known.len(),
-            "BlockExpansionCtx::process starting"
-        );
-
-        assert!(!known.is_empty(), "Cannot process empty pattern");
 
         // Set up cursor for the known pattern
         let path = PatternEndPath::new(known.clone(), Default::default());
@@ -56,11 +47,10 @@ impl<'a> BlockExpansionCtx {
         );
 
         // Create expansion context with root's last token for overlap detection
-        let graph = root.graph.clone();
+        let expansion_ctx = ExpansionCtx::new(root.graph.clone(), cursor, root_last_token.map(BandState::new));
         Self {
             root,
-            known,
-            ctx: ExpansionCtx::new(graph, cursor, root_last_token.map(BandState::new)),
+            ctx: expansion_ctx,
         }
     }
 

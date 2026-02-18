@@ -19,6 +19,10 @@
 //!
 //! ### Context-Read Scenario Environments
 //! - `EnvHypergra` - Partial match scenarios
+//!
+//! ### Expanded Overlap Environments
+//! - `EnvExpandedOverlap` - Postfix overlap scenarios (abc, insert bc)
+//! - `EnvMultiOverlap` - Multiple overlapping patterns
 
 // Core insertion test environments
 mod insert_infix1;
@@ -33,6 +37,9 @@ mod triple_repeat;
 mod single_atom;
 mod hypergra;
 
+// Expanded overlap environments
+mod expanded_overlap;
+
 // Re-export core insertion environments
 pub(crate) use insert_infix1::EnvInsertInfix1;
 pub(crate) use insert_infix2::EnvInsertInfix2;
@@ -45,3 +52,6 @@ pub(crate) use validation::{EnvAbcd, EnvAb, EnvAbc};
 pub(crate) use triple_repeat::EnvTripleRepeat;
 pub(crate) use single_atom::EnvSingleAtom;
 pub(crate) use hypergra::EnvHypergra;
+
+// Re-export expanded overlap environments
+pub(crate) use expanded_overlap::{EnvExpandedOverlap, EnvMultiOverlap};
