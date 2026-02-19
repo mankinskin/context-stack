@@ -1,6 +1,7 @@
 //! Panic hook installation
 
 use super::config::PanicConfig;
+use std::backtrace::Backtrace;
 use std::sync::Once;
 
 static PANIC_HOOK_INIT: Once = Once::new();
@@ -10,12 +11,19 @@ pub(super) fn install_panic_hook(config: PanicConfig) {
     PANIC_HOOK_INIT.call_once(|| {
         let default_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |panic_info| {
+            // Capture backtrace immediately
+            let backtrace = Backtrace::force_capture();
+            
             // Log panic before unwinding closes spans (if enabled)
             if config.show {
                 if config.show_message {
                     // Format panic info to string and include in message
                     let panic_msg = format!("{}", panic_info);
-                    tracing::error!("PANIC: {}", panic_msg);
+                    let bt_str = format!("{}", backtrace);
+                    tracing::error!(
+                        backtrace = %bt_str,
+                        "PANIC: {}", panic_msg
+                    );
                 } else {
                     tracing::error!("PANIC occurred!");
                 }
@@ -24,6 +32,7 @@ pub(super) fn install_panic_hook(config: PanicConfig) {
             // Also write to stderr for visibility (if enabled)
             if config.show_stderr {
                 eprintln!("\n🔥 PANIC: {}", panic_info);
+                eprintln!("Backtrace:\n{}", backtrace);
             }
 
             // Call the default hook (which prints to stderr) if enabled
