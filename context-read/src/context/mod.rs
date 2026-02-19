@@ -70,8 +70,8 @@ impl ReadCtx {
     ) {
         let NextSegment { unknown, known } = segment;
         debug!(
-            unknown_len = ?unknown.len(),
-            known_len = ?known.len(),
+            unknown_len = unknown.len(),
+            known_len = known.len(),
             unknown = ?unknown,
             known = ?known,
             "read_segment"
