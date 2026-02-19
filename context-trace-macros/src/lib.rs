@@ -6,6 +6,7 @@ use quote::{
 };
 use syn::{
     parse_macro_input,
+    DeriveInput,
     ItemFn,
 };
 
@@ -492,5 +493,153 @@ fn inject_trait_name_into_attr(
     } else {
         // If parsing fails, return original
         attr.clone()
+    }
+}
+
+/// Derive macro that generates a Debug implementation including the full type path.
+///
+/// This is useful for tracing/logging where you want to see the full module path
+/// of a type (e.g., `context_search::response::MatchResult`) rather than just
+/// the short name (`MatchResult`).
+///
+/// # Example
+///
+/// ```ignore
+/// use context_trace_macros::TypedDebug;
+///
+/// #[derive(TypedDebug)]
+/// struct MyResult {
+///     value: i32,
+///     name: String,
+/// }
+///
+/// let r = MyResult { value: 42, name: "test".into() };
+/// // Output: "my_crate::MyResult { value: 42, name: \"test\" }"
+/// println!("{:?}", r);
+/// ```
+#[proc_macro_derive(TypedDebug)]
+pub fn typed_debug_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let debug_body = generate_debug_body(&input);
+
+    let expanded = quote! {
+        impl #impl_generics std::fmt::Debug for #name #ty_generics #where_clause {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                // First write the full type path
+                let type_name = std::any::type_name::<Self>();
+                #debug_body
+            }
+        }
+    };
+
+    expanded.into()
+}
+
+/// Generate the debug body based on the data structure
+fn generate_debug_body(input: &DeriveInput) -> TokenStream2 {
+    match &input.data {
+        syn::Data::Struct(data) => generate_struct_debug(&input.ident, data),
+        syn::Data::Enum(data) => generate_enum_debug(&input.ident, data),
+        syn::Data::Union(_) => {
+            quote! {
+                write!(f, "{}", type_name)
+            }
+        }
+    }
+}
+
+/// Generate debug implementation for a struct
+fn generate_struct_debug(name: &syn::Ident, data: &syn::DataStruct) -> TokenStream2 {
+    match &data.fields {
+        syn::Fields::Named(fields) => {
+            let field_names: Vec<_> = fields.named.iter()
+                .map(|f| f.ident.as_ref().unwrap())
+                .collect();
+            let field_strs: Vec<_> = field_names.iter()
+                .map(|n| n.to_string())
+                .collect();
+
+            quote! {
+                f.debug_struct(type_name)
+                    #(.field(#field_strs, &self.#field_names))*
+                    .finish()
+            }
+        }
+        syn::Fields::Unnamed(fields) => {
+            let indices: Vec<_> = (0..fields.unnamed.len())
+                .map(syn::Index::from)
+                .collect();
+
+            quote! {
+                f.debug_tuple(type_name)
+                    #(.field(&self.#indices))*
+                    .finish()
+            }
+        }
+        syn::Fields::Unit => {
+            let _ = name;
+            quote! {
+                write!(f, "{}", type_name)
+            }
+        }
+    }
+}
+
+/// Generate debug implementation for an enum
+fn generate_enum_debug(name: &syn::Ident, data: &syn::DataEnum) -> TokenStream2 {
+    let _ = name;
+    let variants: Vec<_> = data.variants.iter().map(|variant| {
+        let variant_name = &variant.ident;
+        let variant_str = variant_name.to_string();
+
+        match &variant.fields {
+            syn::Fields::Named(fields) => {
+                let field_names: Vec<_> = fields.named.iter()
+                    .map(|f| f.ident.as_ref().unwrap())
+                    .collect();
+                let field_strs: Vec<_> = field_names.iter()
+                    .map(|n| n.to_string())
+                    .collect();
+
+                quote! {
+                    Self::#variant_name { #(#field_names),* } => {
+                        let variant_type = format!("{}::{}", type_name, #variant_str);
+                        f.debug_struct(&variant_type)
+                            #(.field(#field_strs, #field_names))*
+                            .finish()
+                    }
+                }
+            }
+            syn::Fields::Unnamed(fields) => {
+                let bindings: Vec<_> = (0..fields.unnamed.len())
+                    .map(|i| syn::Ident::new(&format!("__field{}", i), proc_macro2::Span::call_site()))
+                    .collect();
+
+                quote! {
+                    Self::#variant_name(#(#bindings),*) => {
+                        let variant_type = format!("{}::{}", type_name, #variant_str);
+                        f.debug_tuple(&variant_type)
+                            #(.field(#bindings))*
+                            .finish()
+                    }
+                }
+            }
+            syn::Fields::Unit => {
+                quote! {
+                    Self::#variant_name => {
+                        write!(f, "{}::{}", type_name, #variant_str)
+                    }
+                }
+            }
+        }
+    }).collect();
+
+    quote! {
+        match self {
+            #(#variants)*
+        }
     }
 }

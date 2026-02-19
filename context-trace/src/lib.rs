@@ -21,6 +21,7 @@ pub mod logging;
 
 // Re-export proc macros
 pub use context_trace_macros::{
+    TypedDebug,
     instrument_sig,
     instrument_trait_impl,
 };
