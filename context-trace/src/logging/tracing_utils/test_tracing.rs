@@ -246,6 +246,15 @@ fn parse_token_value(s: &str) -> Option<serde_json::Value> {
     Some(serde_json::Value::Object(obj))
 }
 
+/// Map of known enum variants to their parent enum type
+fn get_enum_parent(variant: &str) -> Option<&'static str> {
+    match variant {
+        "Some" | "None" => Some("Option"),
+        "Ok" | "Err" => Some("Result"),
+        _ => None,
+    }
+}
+
 /// Try to parse a Rust Debug-formatted struct, e.g., "StructName { field: value }"
 fn parse_rust_debug(s: &str) -> Option<serde_json::Value> {
     let s = s.trim();
@@ -253,6 +262,14 @@ fn parse_rust_debug(s: &str) -> Option<serde_json::Value> {
     // Don't try to parse arrays as structs
     if s.starts_with('[') {
         return None;
+    }
+    
+    // Handle unit variants like "None" without braces
+    if s == "None" {
+        let mut obj = serde_json::Map::new();
+        obj.insert("_type".to_string(), serde_json::Value::String("Option".to_string()));
+        obj.insert("_variant".to_string(), serde_json::Value::String("None".to_string()));
+        return Some(serde_json::Value::Object(obj));
     }
     
     // Check if it looks like "Name { ... }" or "Name(...)" 
@@ -294,13 +311,14 @@ fn parse_rust_debug(s: &str) -> Option<serde_json::Value> {
     
     let mut obj = serde_json::Map::new();
     
-    // Only include _type if it's a full path (contains ::)
-    // Partial type names without full paths are not useful
-    if struct_name.contains("::") {
-        obj.insert("_type".to_string(), serde_json::Value::String(struct_name.to_string()));
+    // Check if this is a known enum variant (e.g., Some, Ok, Err)
+    // If so, use the parent enum as _type and add _variant
+    if let Some(parent_enum) = get_enum_parent(struct_name) {
+        obj.insert("_type".to_string(), serde_json::Value::String(parent_enum.to_string()));
+        obj.insert("_variant".to_string(), serde_json::Value::String(struct_name.to_string()));
     } else {
-        // Include the short name as _struct for reference, but mark it as incomplete
-        obj.insert("_struct".to_string(), serde_json::Value::String(struct_name.to_string()));
+        // Regular struct/enum - use the name directly as _type
+        obj.insert("_type".to_string(), serde_json::Value::String(struct_name.to_string()));
     }
     
     // Parse fields
@@ -477,13 +495,34 @@ fn try_parse_value(s: &str) -> serde_json::Value {
     serde_json::Value::String(s.to_string())
 }
 
-/// Keys that should have their string values parsed as structured data
-const STRUCTURED_FIELD_KEYS: &[&str] = &["fn_sig", "searchable", "end", "start_token", "self_type"];
+/// Check if a string looks like it might be a parseable Rust debug value
+fn looks_like_rust_debug(s: &str) -> bool {
+    let s = s.trim();
+    // Struct/Enum patterns: Name { ... }, Name(...), Name
+    // Array pattern: [...]
+    // Token pattern: "text"(num)
+    // Option/Result: Some(...), None, Ok(...), Err(...)
+    // With path: path::Name { ... }
+    s.starts_with('[')
+        || s.starts_with('"') && s.contains('(')
+        || s.starts_with("Some(")
+        || s.starts_with("None")
+        || s.starts_with("Ok(")
+        || s.starts_with("Err(")
+        || s.starts_with("PhantomData")
+        || (s.chars().next().map(|c| c.is_ascii_uppercase()).unwrap_or(false)
+            && (s.contains('{') || s.contains('(') || s.contains("::")))
+}
 
-/// Transform certain string fields into structured JSON objects
+/// Transform ALL string fields that look like Rust debug values into structured JSON objects
 fn transform_structured_fields(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(obj) => {
+            // Check if this is the "fields" object - if so, parse all its string values
+            let is_fields_obj = obj.contains_key("message") || obj.keys().any(|k| {
+                obj.get(k).map(|v| matches!(v, serde_json::Value::String(s) if looks_like_rust_debug(s))).unwrap_or(false)
+            });
+            
             // Process each key-value pair
             let keys: Vec<String> = obj.keys().cloned().collect();
             for key in keys {
@@ -491,16 +530,19 @@ fn transform_structured_fields(value: &mut serde_json::Value) {
                     // First, recursively transform nested objects
                     transform_structured_fields(val);
                     
-                    // Then, check if this key should have its string value parsed
-                    if STRUCTURED_FIELD_KEYS.contains(&key.as_str()) {
-                        if let serde_json::Value::String(s) = val {
-                            // Try to parse function signature
-                            if key == "fn_sig" {
-                                if let Some(parsed) = parse_fn_signature(s) {
-                                    *val = parsed;
-                                }
-                            } else {
-                                // Try to parse as Rust debug output or array
+                    // Parse string values that look like Rust debug output
+                    if let serde_json::Value::String(s) = val {
+                        // Special handling for fn_sig
+                        if key == "fn_sig" {
+                            if let Some(parsed) = parse_fn_signature(s) {
+                                *val = parsed;
+                                continue;
+                            }
+                        }
+                        
+                        // For fields objects or known field keys, try to parse the value
+                        if is_fields_obj || key == "fields" {
+                            if looks_like_rust_debug(s) {
                                 let parsed = try_parse_value(s);
                                 if !matches!(parsed, serde_json::Value::String(_)) {
                                     *val = parsed;
