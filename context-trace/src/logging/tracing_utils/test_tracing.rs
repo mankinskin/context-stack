@@ -74,6 +74,69 @@ impl Write for FlushingWriter {
     }
 }
 
+/// A writer that pretty-prints JSON output with indentation
+/// 
+/// Wraps another writer and buffers JSON objects. When a complete JSON
+/// object is detected, it's parsed and re-serialized with indentation.
+#[derive(Clone)]
+struct PrettyJsonWriter<W> {
+    inner: W,
+    buffer: std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
+}
+
+impl<W: Clone> PrettyJsonWriter<W> {
+    fn new(writer: W) -> Self {
+        Self {
+            inner: writer,
+            buffer: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+        }
+    }
+}
+
+impl<W: Write + Clone> Write for PrettyJsonWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut buffer = self.buffer.lock().map_err(|_| {
+            std::io::Error::other("Failed to acquire buffer lock")
+        })?;
+        
+        // Add incoming data to buffer
+        buffer.extend_from_slice(buf);
+        
+        // Check if we have a complete JSON object (ends with newline)
+        if buffer.ends_with(b"\n") {
+            // Try to parse and pretty-print the JSON
+            if let Ok(json_str) = std::str::from_utf8(&buffer) {
+                let trimmed = json_str.trim();
+                if !trimmed.is_empty() {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                        // Write pretty-printed JSON
+                        let pretty = serde_json::to_string_pretty(&value)
+                            .unwrap_or_else(|_| trimmed.to_string());
+                        let mut inner = self.inner.clone();
+                        inner.write_all(pretty.as_bytes())?;
+                        inner.write_all(b"\n\n")?; // Double newline between entries
+                        inner.flush()?;
+                        buffer.clear();
+                        return Ok(buf.len());
+                    }
+                }
+            }
+            
+            // Fallback: write raw data if JSON parsing fails
+            let mut inner = self.inner.clone();
+            inner.write_all(&buffer)?;
+            inner.flush()?;
+            buffer.clear();
+        }
+        
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.clone().flush()
+    }
+}
+
 /// Trait for types that can provide access to a Hypergraph for test graph registration
 #[cfg(any(test, feature = "test-api"))]
 pub trait AsGraphRef<G: crate::graph::kind::GraphKind> {
@@ -274,12 +337,11 @@ impl TestTracing {
         let span_events = config.span_events;
         let log_to_stdout = config.log_to_stdout;
         let format_config = config.format.clone();
-        let mut format_config_file = format_config.clone();
-        format_config_file.enable_ansi = false; // File output should not have ANSI
 
         // Build layers based on configuration
         // Timestamp display is controlled by the formatter's show_timestamp config,
         // so we always use CompactTimer and let the formatter decide whether to call format_time.
+        // For file output, we use JSON format for easy parsing by the log viewer
         // Create dispatcher based on configuration
         let dispatcher = match (log_to_stdout, log_file_path.as_ref()) {
             (true, Some(path)) => {
@@ -287,6 +349,7 @@ impl TestTracing {
                 let file =
                     fs::File::create(path).expect("Failed to create log file");
                 let flushing_writer = FlushingWriter::new(file);
+                let pretty_writer = PrettyJsonWriter::new(flushing_writer);
 
                 let stdout_layer = tracing_subscriber::fmt::layer()
                     .with_writer(std::io::stdout)
@@ -303,19 +366,16 @@ impl TestTracing {
                     .fmt_fields(super::SpanFieldFormatter)
                     .with_filter(stdout_filter);
 
+                // File layer uses pretty-printed JSON format for human readability
                 let file_layer = tracing_subscriber::fmt::layer()
-                    .with_writer(move || flushing_writer.clone())
+                    .with_writer(move || pretty_writer.clone())
                     .with_span_events(span_events)
-                    .with_target(false)
-                    .with_file(false)
-                    .with_line_number(false)
-                    .with_level(false)
+                    .with_target(true)
+                    .with_file(true)
+                    .with_line_number(true)
+                    .with_level(true)
                     .with_ansi(false)
-                    .with_timer(CompactTimer::new())
-                    .event_format(CompactFieldsFormatter::new(
-                        format_config_file.clone(),
-                    ))
-                    .fmt_fields(super::SpanFieldFormatter)
+                    .json()
                     .with_filter(file_filter);
 
                 Dispatch::new(registry.with(stdout_layer).with(file_layer))
@@ -338,24 +398,21 @@ impl TestTracing {
                 Dispatch::new(registry.with(stdout_layer))
             },
             (false, Some(path)) => {
-                // Only file
+                // Only file - use pretty-printed JSON format for human readability
                 let file =
                     fs::File::create(path).expect("Failed to create log file");
                 let flushing_writer = FlushingWriter::new(file);
+                let pretty_writer = PrettyJsonWriter::new(flushing_writer);
 
                 let file_layer = tracing_subscriber::fmt::layer()
-                    .with_writer(move || flushing_writer.clone())
+                    .with_writer(move || pretty_writer.clone())
                     .with_span_events(span_events)
-                    .with_target(false)
-                    .with_file(false)
-                    .with_line_number(false)
-                    .with_level(false)
+                    .with_target(true)
+                    .with_file(true)
+                    .with_line_number(true)
+                    .with_level(true)
                     .with_ansi(false)
-                    .with_timer(CompactTimer::new())
-                    .event_format(CompactFieldsFormatter::new(
-                        format_config_file,
-                    ))
-                    .fmt_fields(super::SpanFieldFormatter)
+                    .json()
                     .with_filter(file_filter);
 
                 Dispatch::new(registry.with(file_layer))
