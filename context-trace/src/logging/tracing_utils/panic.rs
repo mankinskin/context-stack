@@ -17,13 +17,32 @@ pub(super) fn install_panic_hook(config: PanicConfig) {
             // Log panic before unwinding closes spans (if enabled)
             if config.show {
                 if config.show_message {
-                    // Format panic info to string and include in message
-                    let panic_msg = format!("{}", panic_info);
+                    // Extract panic message from payload
+                    let panic_msg = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+                        (*s).to_string()
+                    } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+                        s.clone()
+                    } else {
+                        format!("{}", panic_info)
+                    };
+                    
                     let bt_str = format!("{}", backtrace);
-                    tracing::error!(
-                        backtrace = %bt_str,
-                        "PANIC: {}", panic_msg
-                    );
+                    
+                    // Extract location info for structured logging
+                    if let Some(location) = panic_info.location() {
+                        tracing::error!(
+                            panic_file = %location.file(),
+                            panic_line = location.line(),
+                            panic_column = location.column(),
+                            backtrace = %bt_str,
+                            "PANIC: {}", panic_msg
+                        );
+                    } else {
+                        tracing::error!(
+                            backtrace = %bt_str,
+                            "PANIC: {}", panic_msg
+                        );
+                    }
                 } else {
                     tracing::error!("PANIC occurred!");
                 }
