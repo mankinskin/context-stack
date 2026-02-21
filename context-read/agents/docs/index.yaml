@@ -14,24 +14,17 @@ modules:
   path: expansion/
 exported_items:
   types:
-  - name: ReadContext
-    description: Main context for reading operations
+    - ReadContext: Main context for reading operations
   traits: []
   macros: []
 dependencies:
-- name: context-trace
-  description: Foundation crate
-- name: context-search
-  description: Search functionality
-- name: context-insert
-  description: Insertion operations
+  - context-trace: Foundation crate
+  - context-search: Search functionality
+  - context-insert: Insertion operations
 features:
-- name: default
-  description: Standard feature set
-- name: test-api
-  description: Testing utilities
-- name: test-hashing
-  description: Deterministic hashing for tests
+  - default: Standard feature set
+  - test-api: Testing utilities
+  - test-hashing: Deterministic hashing for tests
 source_files:
 - src/lib.rs
 - src/bands/

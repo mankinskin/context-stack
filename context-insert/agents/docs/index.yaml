@@ -17,44 +17,27 @@ modules:
   path: split/
 exported_items:
   types:
-  - name: InsertCtx
-    description: Context for insertion operations
-  - name: InsertResult
-    description: Result of an insertion operation
-  - name: InitInterval
-    description: Initial interval for graph setup
-  - name: IntervalGraph
-    description: Graph with interval representation
-  - name: SplitCache
-    description: Cache for split operations
-  - name: SplitPositionCache
-    description: Position cache for splits
-  - name: SplitVertexCache
-    description: Vertex cache for splits
-  - name: SplitStates
-    description: States during split operation
-  - name: RootMode
-    description: Mode for root handling
+    - InsertCtx: Context for insertion operations
+    - InsertResult: Result of an insertion operation
+    - InitInterval: Initial interval for graph setup
+    - IntervalGraph: Graph with interval representation
+    - SplitCache: Cache for split operations
+    - SplitPositionCache: Position cache for splits
+    - SplitVertexCache: Vertex cache for splits
+    - SplitStates: States during split operation
+    - RootMode: Mode for root handling
   traits:
-  - name: ToInsertCtx
-    description: Conversion to insertion context
-  - name: TraceBack
-    description: Backward tracing during split
-  - name: TraceFront
-    description: Forward tracing during split
-  - name: TraceSide
-    description: Side tracing utilities
+    - ToInsertCtx: Conversion to insertion context
+    - TraceBack: Backward tracing during split
+    - TraceFront: Forward tracing during split
+    - TraceSide: Side tracing utilities
   macros: []
 dependencies:
-- name: context-trace
-  description: Foundation crate
-- name: context-search
-  description: Search functionality
+  - context-trace: Foundation crate
+  - context-search: Search functionality
 features:
-- name: default
-  description: Standard feature set
-- name: test-api
-  description: Testing utilities
+  - default: Standard feature set
+  - test-api: Testing utilities
 source_files:
 - src/lib.rs
 - src/insert/

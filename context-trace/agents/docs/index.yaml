@@ -20,82 +20,46 @@ modules:
   path: trace/
 exported_items:
   types:
-  - name: Hypergraph
-    description: Core hypergraph data structure
-  - name: HypergraphRef
-    description: Reference-counted hypergraph handle
-  - name: VertexIndex
-    description: Index type for vertices
-  - name: VertexKey
-    description: Key type for vertex lookup
-  - name: VertexData
-    description: Data container for vertex properties
-  - name: Token
-    description: Token representation in the graph
-  - name: Pattern
-    description: Pattern representation for sequences
-  - name: PatternId
-    description: Identifier for patterns
-  - name: Atom
-    description: Atomic element type
-  - name: Direction
-    description: Direction enum (Left/Right)
-  - name: Left
-    description: Left direction marker type
-  - name: Right
-    description: Right direction marker type
-  - name: RolePath
-    description: Path with role information
-  - name: RootedPath
-    description: Path rooted at a specific node
-  - name: RootedRolePath
-    description: Rooted path with role
-  - name: TraceCache
-    description: Cache for tracing operations
-  - name: TraceCtx
-    description: Tracing context
+    - Hypergraph: Core hypergraph data structure
+    - HypergraphRef: Reference-counted hypergraph handle
+    - VertexIndex: Index type for vertices
+    - VertexKey: Key type for vertex lookup
+    - VertexData: Data container for vertex properties
+    - Token: Token representation in the graph
+    - Pattern: Pattern representation for sequences
+    - PatternId: Identifier for patterns
+    - Atom: Atomic element type
+    - Direction: Direction enum (Left/Right)
+    - Left: Left direction marker type
+    - Right: Right direction marker type
+    - RolePath: Path with role information
+    - RootedPath: Path rooted at a specific node
+    - RootedRolePath: Rooted path with role
+    - TraceCache: Cache for tracing operations
+    - TraceCtx: Tracing context
   traits:
-  - name: HasVertexIndex
-    description: Types that have a vertex index
-  - name: HasVertexKey
-    description: Types that have a vertex key
-  - name: HasVertexData
-    description: Types that have vertex data
-  - name: HasGraph
-    description: Types that hold a graph reference
-  - name: HasGraphMut
-    description: Types that hold a mutable graph reference
-  - name: HasToken
-    description: Types that have an associated token
-  - name: HasRolePath
-    description: Types that have a role path
-  - name: Traceable
-    description: Types that can be traced in the graph
-  - name: PathAccessor
-    description: Access path properties
-  - name: RootedPathAccessor
-    description: Access rooted path properties
-  - name: RangePathAccessor
-    description: Access range path properties
-  - name: Advance
-    description: Types that support advance operations
-  - name: CanAdvance
-    description: Types that can be checked for advance capability
-  - name: CompactFormat
-    description: Types supporting compact formatting
+    - HasVertexIndex: Types that have a vertex index
+    - HasVertexKey: Types that have a vertex key
+    - HasVertexData: Types that have vertex data
+    - HasGraph: Types that hold a graph reference
+    - HasGraphMut: Types that hold a mutable graph reference
+    - HasToken: Types that have an associated token
+    - HasRolePath: Types that have a role path
+    - Traceable: Types that can be traced in the graph
+    - PathAccessor: Access path properties
+    - RootedPathAccessor: Access rooted path properties
+    - RangePathAccessor: Access range path properties
+    - Advance: Types that support advance operations
+    - CanAdvance: Types that can be checked for advance capability
+    - CompactFormat: Types supporting compact formatting
   macros:
-  - name: instrument_sig
-    description: Proc macro for function signature instrumentation
-  - name: instrument_trait_impl
-    description: Proc macro for trait implementation instrumentation
+    - instrument_sig: Proc macro for function signature instrumentation
+    - instrument_trait_impl: Proc macro for trait implementation instrumentation
 dependencies:
-- name: context-trace-macros
-  description: Procedural macros for instrumentation
+  - context-trace-macros: Procedural macros for instrumentation
 features:
-- name: default
-  description: Standard feature set
-- name: test-api
-  description: Enables testing utilities and deterministic hashing
+  - default: Standard feature set
+  - test-api: Enables testing utilities and deterministic hashing
 source_files:
 - src/lib.rs
 - src/direction/

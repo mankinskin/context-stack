@@ -26,30 +26,20 @@ modules:
   path: logging/
 exported_items:
   types:
-  - name: Response
-    description: Unified API for search results
-  - name: BftQueue
-    description: Breadth-first traversal queue
-  - name: ErrorState
-    description: Error state from search operations
-  - name: SearchKind
-    description: Configuration for search type
+    - Response: Unified API for search results
+    - BftQueue: Breadth-first traversal queue
+    - ErrorState: Error state from search operations
+    - SearchKind: Configuration for search type
   traits:
-  - name: Searchable
-    description: Types that can be searched
-  - name: Find
-    description: Entry point for search operations
-  - name: AncestorPolicy
-    description: Policy for ancestor handling during search
+    - Searchable: Types that can be searched
+    - Find: Entry point for search operations
+    - AncestorPolicy: Policy for ancestor handling during search
   macros: []
 dependencies:
-- name: context-trace
-  description: Foundation crate
+  - context-trace: Foundation crate
 features:
-- name: default
-  description: Standard feature set
-- name: test-api
-  description: Testing utilities
+  - default: Standard feature set
+  - test-api: Testing utilities
 source_files:
 - src/lib.rs
 - src/compare/
