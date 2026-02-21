@@ -1,56 +1,64 @@
 name: context-insert
 version: 0.1.0
-description: >
-  Insertion operations for the context-engine using split-join architecture.
-  Handles graph modifications by splitting existing patterns, performing insertions,
-  and joining results back together.
-
-source_files:
-  - src/lib.rs
-  - src/insert/
-  - src/interval/
-  - src/join/
-  - src/split/
-
+description: |
+  Insertion operations for the context-engine using split-join architecture. Handles graph modifications by splitting existing patterns, performing insertions, and joining results back together.
 modules:
-  - name: insert
-    description: High-level insertion API and context
-    path: insert/
-    
-  - name: interval
-    description: Interval-based graph representation and initialization
-    path: interval/
-    
-  - name: join
-    description: Join operations for merging split results
-    path: join/
-    
-  - name: split
-    description: Split operations for decomposing patterns
-    path: split/
-
+- name: insert
+  description: High-level insertion API and context
+  path: insert/
+- name: interval
+  description: Interval-based graph representation and initialization
+  path: interval/
+- name: join
+  description: Join operations for merging split results
+  path: join/
+- name: split
+  description: Split operations for decomposing patterns
+  path: split/
 exported_items:
   types:
-    - InsertCtx: Context for insertion operations
-    - InsertResult: Result of an insertion operation
-    - InitInterval: Initial interval for graph setup
-    - IntervalGraph: Graph with interval representation
-    - SplitCache: Cache for split operations
-    - SplitPositionCache: Position cache for splits
-    - SplitVertexCache: Vertex cache for splits
-    - SplitStates: States during split operation
-    - RootMode: Mode for root handling
-
+  - name: InsertCtx
+    description: Context for insertion operations
+  - name: InsertResult
+    description: Result of an insertion operation
+  - name: InitInterval
+    description: Initial interval for graph setup
+  - name: IntervalGraph
+    description: Graph with interval representation
+  - name: SplitCache
+    description: Cache for split operations
+  - name: SplitPositionCache
+    description: Position cache for splits
+  - name: SplitVertexCache
+    description: Vertex cache for splits
+  - name: SplitStates
+    description: States during split operation
+  - name: RootMode
+    description: Mode for root handling
   traits:
-    - ToInsertCtx: Conversion to insertion context
-    - TraceBack: Backward tracing during split
-    - TraceFront: Forward tracing during split
-    - TraceSide: Side tracing utilities
-
+  - name: ToInsertCtx
+    description: Conversion to insertion context
+  - name: TraceBack
+    description: Backward tracing during split
+  - name: TraceFront
+    description: Forward tracing during split
+  - name: TraceSide
+    description: Side tracing utilities
+  macros: []
 dependencies:
-  - context-trace: Foundation crate
-  - context-search: Search functionality
-
+- name: context-trace
+  description: Foundation crate
+- name: context-search
+  description: Search functionality
 features:
-  - default: Standard feature set
-  - test-api: Testing utilities
+- name: default
+  description: Standard feature set
+- name: test-api
+  description: Testing utilities
+source_files:
+- src/lib.rs
+- src/insert/
+- src/interval/
+- src/join/
+- src/split/
+last_synced: "2026-02-21T00:00:00Z"

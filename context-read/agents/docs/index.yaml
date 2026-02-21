@@ -1,44 +1,43 @@
 name: context-read
 version: 0.1.0
-description: >
-  Context reading and expansion operations for the context-engine. Provides
-  functionality for reading context around positions in the hypergraph and
-  expanding results based on configurable policies.
-
-source_files:
-  - src/lib.rs
-  - src/bands/
-  - src/complement.rs
-  - src/context/
-  - src/expansion/
-  - src/request.rs
-  - src/segment.rs
-
+description: |
+  Context reading and expansion operations for the context-engine. Provides functionality for reading context around positions in the hypergraph and expanding results based on configurable policies.
 modules:
-  - name: bands
-    description: Band-based context representation and policies
-    path: bands/
-    
-  - name: context
-    description: Read context management
-    path: context/
-    
-  - name: expansion
-    description: Context expansion operations and chain handling
-    path: expansion/
-
+- name: bands
+  description: Band-based context representation and policies
+  path: bands/
+- name: context
+  description: Read context management
+  path: context/
+- name: expansion
+  description: Context expansion operations and chain handling
+  path: expansion/
 exported_items:
   types:
-    - ReadContext: Main context for reading operations
-    
+  - name: ReadContext
+    description: Main context for reading operations
   traits: []
-
+  macros: []
 dependencies:
-  - context-trace: Foundation crate
-  - context-search: Search functionality
-  - context-insert: Insertion operations
-
+- name: context-trace
+  description: Foundation crate
+- name: context-search
+  description: Search functionality
+- name: context-insert
+  description: Insertion operations
 features:
-  - default: Standard feature set
-  - test-api: Testing utilities
-  - test-hashing: Deterministic hashing for tests
+- name: default
+  description: Standard feature set
+- name: test-api
+  description: Testing utilities
+- name: test-hashing
+  description: Deterministic hashing for tests
+source_files:
+- src/lib.rs
+- src/bands/
+- src/complement.rs
+- src/context/
+- src/expansion/
+- src/request.rs
+- src/segment.rs
+last_synced: "2026-02-21T00:00:00Z"

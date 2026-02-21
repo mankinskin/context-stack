@@ -1,65 +1,63 @@
 name: context-search
 version: 0.1.0
-description: >
-  Pattern matching and search functionality for the context-engine. Provides a unified
-  Response API for search results and various search algorithms for finding patterns
-  in the hypergraph.
-
-source_files:
-  - src/lib.rs
-  - src/compare/
-  - src/container/
-  - src/cursor/
-  - src/match/
-  - src/policy.rs
-  - src/search/
-  - src/state/
-  - src/logging/
-
+description: |
+  Pattern matching and search functionality for the context-engine. Provides a unified Response API for search results and various search algorithms for finding patterns in the hypergraph.
 modules:
-  - name: compare
-    description: Comparison and iteration logic for search states
-    path: compare/
-    
-  - name: container
-    description: Container types for search queues (BFT, DFT)
-    path: container/
-    
-  - name: cursor
-    description: Cursor types for tracking search position
-    path: cursor/
-    
-  - name: match
-    description: Match handling and root cursor operations
-    path: match/
-    
-  - name: search
-    description: Core search algorithms and entry points
-    path: search/
-    
-  - name: state
-    description: Search state management and response types
-    path: state/
-    
-  - name: logging
-    description: Search-specific logging and formatting
-    path: logging/
-
+- name: compare
+  description: Comparison and iteration logic for search states
+  path: compare/
+- name: container
+  description: Container types for search queues (BFT, DFT)
+  path: container/
+- name: cursor
+  description: Cursor types for tracking search position
+  path: cursor/
+- name: match
+  description: Match handling and root cursor operations
+  path: match/
+- name: search
+  description: Core search algorithms and entry points
+  path: search/
+- name: state
+  description: Search state management and response types
+  path: state/
+- name: logging
+  description: Search-specific logging and formatting
+  path: logging/
 exported_items:
   types:
-    - Response: Unified API for search results
-    - BftQueue: Breadth-first traversal queue
-    - ErrorState: Error state from search operations
-    - SearchKind: Configuration for search type
-
+  - name: Response
+    description: Unified API for search results
+  - name: BftQueue
+    description: Breadth-first traversal queue
+  - name: ErrorState
+    description: Error state from search operations
+  - name: SearchKind
+    description: Configuration for search type
   traits:
-    - Searchable: Types that can be searched
-    - Find: Entry point for search operations
-    - AncestorPolicy: Policy for ancestor handling during search
-
+  - name: Searchable
+    description: Types that can be searched
+  - name: Find
+    description: Entry point for search operations
+  - name: AncestorPolicy
+    description: Policy for ancestor handling during search
+  macros: []
 dependencies:
-  - context-trace: Foundation crate
-
+- name: context-trace
+  description: Foundation crate
 features:
-  - default: Standard feature set
-  - test-api: Testing utilities
+- name: default
+  description: Standard feature set
+- name: test-api
+  description: Testing utilities
+source_files:
+- src/lib.rs
+- src/compare/
+- src/container/
+- src/cursor/
+- src/match/
+- src/policy.rs
+- src/search/
+- src/state/
+- src/logging/
+last_synced: "2026-02-21T00:00:00Z"
