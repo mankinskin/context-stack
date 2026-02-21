@@ -28,5 +28,3 @@ dependencies:
   - tracing-attributes: Tracing attribute utilities
 
 features: []
-
-last_synced: "2026-02-21T00:00:00Z"
