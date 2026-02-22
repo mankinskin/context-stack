@@ -74,6 +74,7 @@ fn reject_init_interval_with_zero_end_bound() {
 fn reject_init_interval_with_missing_root_entry() {
     let EnvAb { graph, a, ab, .. } = EnvAb::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Create an InitInterval where:
     // - root is ab (T2)

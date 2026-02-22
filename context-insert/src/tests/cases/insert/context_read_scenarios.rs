@@ -148,6 +148,7 @@ fn insert_same_token_repeated() {
     
     let EnvSingleAtom { graph, a } = EnvSingleAtom::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Insert [a, a] - same token repeated
     let query = vec![a, a];

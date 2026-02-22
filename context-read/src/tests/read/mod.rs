@@ -14,6 +14,7 @@ fn sync_read_text1() {
     let result = (&mut graph, "heldldo world!".chars())
         .read_sequence()
         .unwrap();
+    graph.emit_graph_snapshot();
     expect_atoms!(graph, {h, e, l, d, o, w, r});
     let g = graph.graph();
     let space = g.expect_atom_child(' ');
@@ -35,6 +36,7 @@ fn sync_read_text2() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let heldld = (&mut graph, "heldld".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
     expect_atoms!(graph, {h, e, l, d});
     assert_indices!(graph, ld);
     assert_not_indices!(graph, held, he, hel);
@@ -63,6 +65,7 @@ fn read_sequence1() {
     let _tracing = init_test_tracing!(&graph);
     let ind_hypergraph =
         (&mut graph, "hypergraph".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
 
     expect_atoms!(graph, {h, y, p, e, r, g, a});
     {
@@ -132,6 +135,7 @@ fn read_sequence2() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let ind_abab = (&mut graph, "abab".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
     expect_atoms!(graph, {a, b});
     assert_indices!(graph, ab);
     {
@@ -169,6 +173,7 @@ fn read_infix1() {
     let _tracing = init_test_tracing!(&graph);
     let subdivision =
         (&mut graph, "subdivision".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
     assert_eq!(subdivision.width(), 11);
     expect_atoms!(graph, {s, u, b, d, i, v, o, n});
     {
@@ -232,6 +237,7 @@ fn read_infix2() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let subvisu = (&mut graph, "subvisu".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
     assert_eq!(subvisu.width(), 7);
     expect_atoms!(graph, {s, u, b, v, i});
 
@@ -263,6 +269,7 @@ fn read_loose_sequence1() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let abxaxxb = (&mut graph, "abxaxxb".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
     assert_eq!(abxaxxb.width(), 7);
     expect_atoms!(graph, {a, b, x});
 
@@ -278,6 +285,7 @@ fn read_repeating_known1() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let xyyxy = (&mut graph, "xyyxy".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
     assert_eq!(xyyxy.width(), 5);
     expect_atoms!(graph, {x, y});
     assert_indices!(graph, xy);
@@ -293,6 +301,7 @@ fn read_multiple_overlaps1() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let abcde = (&mut graph, "abcde".chars()).read_sequence().unwrap();
+    graph.emit_graph_snapshot();
     // abcde
     //  bcde
     //  bcdea

@@ -157,8 +157,13 @@ fn validate_graphs_equivalent(graph: &HypergraphRef, input: &str) -> Result<(), 
     Ok(())
 }
 
-/// Run validation on an input and panic with detailed comparison on failure
+/// Run validation on an input and panic with detailed comparison on failure.
+/// Emits a graph snapshot after populating the graph (before assertions that could panic).
 fn assert_graphs_equivalent(graph: &HypergraphRef, input: &str) {
+    // Populate graph first so we can snapshot before validation assertions
+    populate_context_read_graph(graph, input);
+    graph.emit_graph_snapshot();
+    // Now validate (populate_context_read_graph inside validate is idempotent)
     if let Err(msg) = validate_graphs_equivalent(graph, input) {
         panic!("{}", msg);
     }

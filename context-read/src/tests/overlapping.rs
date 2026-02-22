@@ -25,6 +25,7 @@ fn repetition_abcabcabc() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("abcabcabc").execute(&mut graph);
+    graph.emit_graph_snapshot();
 
     expect_atoms!(graph, {a, b, c});
     assert_indices!(graph, abc, abcabc);
@@ -48,6 +49,7 @@ fn repetition_xyzxyzxyz() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
     let result = ReadRequest::from_text("xyzxyzxyz").execute(&mut graph);
+    graph.emit_graph_snapshot();
 
     expect_atoms!(graph, {x, y, z});
     assert_indices!(graph, xyz, xyzxyz);

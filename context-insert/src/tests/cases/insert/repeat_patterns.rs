@@ -33,6 +33,7 @@ use context_trace::{
 fn repeated_pattern_creates_intermediate_tokens() {
     let EnvSingleAtom { graph, a } = EnvSingleAtom::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // First insert "aa"
     let query_aa = vec![a, a];
@@ -65,6 +66,7 @@ fn repeated_pattern_creates_intermediate_tokens() {
 fn repeated_pattern_alternate_decomposition() {
     let EnvSingleAtom { graph, a } = EnvSingleAtom::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // First insert "aa"
     let query_aa = vec![a, a];
@@ -95,6 +97,7 @@ fn repeated_pattern_alternate_decomposition() {
 fn four_repeated_atoms_hierarchical() {
     let EnvSingleAtom { graph, a } = EnvSingleAtom::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Insert aa
     let aa: Token = graph.insert(vec![a, a]).expect("Should insert aa");
