@@ -65,6 +65,8 @@ impl TestEnv for EnvAbcd {
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
 
+        graph.emit_graph_snapshot();
+
         Self {
             graph: HypergraphRef::from(graph),
             a,
@@ -136,6 +138,8 @@ impl TestEnv for EnvAb {
 
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
+
+        graph.emit_graph_snapshot();
 
         Self {
             graph: HypergraphRef::from(graph),
@@ -209,6 +213,8 @@ impl TestEnv for EnvAbc {
 
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
+
+        graph.emit_graph_snapshot();
 
         Self {
             graph: HypergraphRef::from(graph),

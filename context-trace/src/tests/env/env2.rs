@@ -98,6 +98,8 @@ impl TestEnv for Env2 {
         let (abcdefghijk, abcdefghijk_id) =
             graph.insert_pattern_with_id([a, b, cdefghi, j, k]);
 
+        graph.emit_graph_snapshot();
+
         let graph = graph.to_ref();
 
         Self {

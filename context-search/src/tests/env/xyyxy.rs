@@ -52,6 +52,8 @@ impl TestEnv for EnvXyyxy {
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
 
+        graph.emit_graph_snapshot();
+
         Self {
             graph: HypergraphRef::from(graph),
             x,

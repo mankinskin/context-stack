@@ -54,7 +54,9 @@ fn setup_abc_ab() -> (HypergraphRef, Token, Token, Token, Token) {
     
     // Insert "ab" pattern BEFORE wrapping in HypergraphRef
     let (ab, _ab_id) = graph.insert_pattern_with_id(vec![a, b]);
-    
+
+    graph.emit_graph_snapshot();
+
     // Wrap in HypergraphRef for test graph support
     let graph = HypergraphRef::from(graph);
     
@@ -81,6 +83,9 @@ fn setup_aa_pattern() -> (HypergraphRef, Token, Token) {
     };
     // Pre-build the aa pattern
     let (aa, _) = graph.insert_pattern_with_id(vec![a, a]);
+
+    graph.emit_graph_snapshot();
+
     let graph = HypergraphRef::from(graph);
     (graph, a, aa)
 }
@@ -93,6 +98,9 @@ fn setup_aaa_pattern() -> (HypergraphRef, Token, Token, Token) {
     };
     let (aa, _) = graph.insert_pattern_with_id(vec![a, a]);
     let (aaa, _) = graph.insert_pattern_with_id(vec![aa, a]);
+
+    graph.emit_graph_snapshot();
+
     let graph = HypergraphRef::from(graph);
     (graph, a, aa, aaa)
 }
@@ -106,6 +114,9 @@ fn setup_aaaa_pattern() -> (HypergraphRef, Token, Token, Token, Token) {
     let (aa, _) = graph.insert_pattern_with_id(vec![a, a]);
     let (aaa, _) = graph.insert_pattern_with_id(vec![aa, a]);
     let (aaaa, _) = graph.insert_pattern_with_id(vec![aa, aa]);
+
+    graph.emit_graph_snapshot();
+
     let graph = HypergraphRef::from(graph);
     (graph, a, aa, aaa, aaaa)
 }

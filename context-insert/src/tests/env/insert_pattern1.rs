@@ -68,6 +68,8 @@ impl TestEnv for EnvInsertPattern1 {
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
 
+        graph.emit_graph_snapshot();
+
         let graph = HypergraphRef::from(graph);
         // Verify all vertices have unique string representations before insertion
         {
