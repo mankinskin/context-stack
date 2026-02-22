@@ -45,6 +45,7 @@ pub mod child_strings;
 pub mod getters;
 pub mod insert;
 pub mod kind;
+pub mod snapshot;
 pub mod validation;
 
 pub mod vertex;

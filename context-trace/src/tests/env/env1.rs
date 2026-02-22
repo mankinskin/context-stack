@@ -192,6 +192,9 @@ impl TestEnv for Env1 {
         #[cfg(any(test, feature = "test-api"))]
         crate::graph::test_graph::register_test_graph(&graph);
 
+        // Emit graph snapshot for log-viewer 3D visualization
+        graph.emit_graph_snapshot();
+
         Env1 {
             graph: HypergraphRef::from(graph),
             a,

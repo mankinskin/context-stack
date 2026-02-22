@@ -10,6 +10,31 @@ use crate::{
 use std::fs;
 
 #[test]
+fn test_graph_snapshot() {
+    let graph = Hypergraph::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph).keep_log();
+    insert_atoms!(graph, {a, b, c, d, e});
+
+    insert_patterns!(graph,
+        ab => [a, b],
+        bc => [b, c],
+        cd => [c, d],
+        de => [d, e],
+    );
+    insert_patterns!(graph,
+        abc => [[ab, c], [a, bc]],
+        bcd => [[bc, d], [b, cd]],
+        cde => [[cd, e], [c, de]],
+    );
+    insert_patterns!(graph,
+        _abcd => [[abc, d], [a, bcd]],
+        _bcde => [[bcd, e], [b, cde]],
+    );
+
+    graph.emit_graph_snapshot();
+}
+
+#[test]
 fn test_to_petgraph() {
     let graph = Hypergraph::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
@@ -28,6 +53,10 @@ fn test_to_petgraph() {
         bcd => [[bc, d], [b, cd]],
         _abcd => [[abc, d], [a, bcd]]
     );
+
+    // Emit graph snapshot for log-viewer 3D visualization
+    graph.emit_graph_snapshot();
+
     let pg = graph.to_petgraph();
 
     // Create temporary directory and file
