@@ -106,6 +106,8 @@ impl<K: SearchKind> StartCtx<K> {
                         self.start_token,
                         p,
                     ),
+                    step_counter: 0,
+                    start_node: self.start_token.index.0,
                 })
             },
             Err(err) => {

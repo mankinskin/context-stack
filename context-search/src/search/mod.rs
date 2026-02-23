@@ -18,6 +18,7 @@ use crate::{
             RootCursor,
             RootEndResult,
         },
+        SearchNode,
         SearchNode::ParentCandidate,
     },
     state::{
@@ -36,6 +37,7 @@ use context::{
     SearchCtx,
 };
 use context_trace::{
+    graph::snapshot::{SearchPhase, SearchStateSnapshot},
     logging::format_utils::pretty,
     *,
 };
@@ -113,14 +115,78 @@ pub struct SearchState<K: SearchKind> {
     pub(crate) matches: SearchIterator<K>,
     /// The query pattern we're searching for
     pub(crate) query: PatternRangePath,
+    /// Monotonically increasing step counter for search visualisation.
+    pub(crate) step_counter: usize,
+    /// Vertex index of the token where the search started.
+    pub(crate) start_node: usize,
 }
 
 impl<K: SearchKind> SearchState<K>
 where
     K::Trav: Clone,
 {
+    /// Build and emit a [`SearchStateSnapshot`] for the current algorithm state.
+    fn emit_search_state(
+        &mut self,
+        phase: SearchPhase,
+        description: impl Into<String>,
+        cursor_position: usize,
+        matched_nodes: Vec<usize>,
+        partial_node: Option<usize>,
+        current_root: Option<usize>,
+    ) {
+        let query_pattern = self.query.path_root();
+        let query_tokens: Vec<usize> =
+            query_pattern.iter().map(|t| t.index.0).collect();
+
+        let (candidate_parents, candidate_children) =
+            self.queue_candidates();
+
+        let step = self.step_counter;
+        self.step_counter += 1;
+
+        let snapshot = SearchStateSnapshot {
+            step,
+            description: description.into(),
+            phase,
+            query_tokens,
+            cursor_position,
+            start_node: self.start_node,
+            matched_nodes,
+            partial_node,
+            candidate_parents,
+            candidate_children,
+            current_root,
+        };
+        snapshot.emit();
+    }
+
+    /// Extract parent and child candidate vertex indices from the BFS queue.
+    fn queue_candidates(&self) -> (Vec<usize>, Vec<usize>) {
+        let mut parents = Vec::new();
+        let mut children = Vec::new();
+        for node in self.matches.queue.nodes.iter() {
+            let idx = node.root_parent().index.0;
+            match node {
+                SearchNode::ParentCandidate(_) => parents.push(idx),
+                SearchNode::ChildCandidate(_) => children.push(idx),
+            }
+        }
+        (parents, children)
+    }
+
     pub(crate) fn search(mut self) -> Response {
         trace!(queue = %&self.matches.queue, "initial state");
+
+        // Emit Init snapshot
+        self.emit_search_state(
+            SearchPhase::Init,
+            "Search started — initial queue populated",
+            0,
+            vec![],
+            None,
+            None,
+        );
 
         let mut best_match = None;
         for item in self.by_ref() {
@@ -161,6 +227,18 @@ where
 
         trace!(end = %pretty(&end), "final matched state");
 
+        // Emit Done snapshot
+        let cursor_pos = *end.cursor().atom_position.as_ref();
+        let matched_root = end.root_parent().index.0;
+        self.emit_search_state(
+            SearchPhase::Done,
+            "Search complete",
+            cursor_pos,
+            vec![matched_root],
+            None,
+            Some(matched_root),
+        );
+
         let trace_ctx = &mut self.matches.trace_ctx;
         end.trace(trace_ctx);
 
@@ -178,10 +256,22 @@ where
     ) -> MatchResult {
         // Set initial root match as baseline for this root
         let mut last_match = init_state;
+        let root_idx = last_match.child.current().child_state.root_parent().index.0;
+        let init_cursor_pos = *last_match.query.current().atom_position.as_ref();
         trace!(
             root = %last_match.child.current().child_state.root_parent(),
-            checkpoint_pos = *last_match.query.current().atom_position.as_ref(),
+            checkpoint_pos = init_cursor_pos,
             "New root match - finishing root cursor"
+        );
+
+        // Emit RootExplore snapshot
+        self.emit_search_state(
+            SearchPhase::RootExplore,
+            format!("Root match found at node {root_idx}"),
+            init_cursor_pos,
+            vec![root_idx],
+            None,
+            Some(root_idx),
         );
 
         // Advance the root cursor step by step, updating best_match after each step
@@ -203,10 +293,21 @@ where
                         .current()
                         .atom_position
                         .as_ref();
+                    let adv_root = next_match.state.child.current().child_state.root_parent().index.0;
                     trace!(
                         root = %next_match.state.child.current().child_state.root_parent(),
                         checkpoint_pos,
                         "Match advanced - updating best_match"
+                    );
+
+                    // Emit MatchAdvance snapshot
+                    self.emit_search_state(
+                        SearchPhase::MatchAdvance,
+                        format!("Match advanced in root {adv_root} to pos {checkpoint_pos}"),
+                        checkpoint_pos,
+                        vec![adv_root],
+                        None,
+                        Some(adv_root),
                     );
 
                     // Continue with the new matched cursor
@@ -241,6 +342,7 @@ where
                                 .cursor()
                                 .atom_position
                                 .as_ref();
+                            let checkpoint_root_idx = checkpoint_state.root_parent().index.0;
                             trace!(
                                 checkpoint_root = %checkpoint_state.root_parent(),
                                 checkpoint_pos,
@@ -263,6 +365,17 @@ where
                                     trace!("No parents available - search exhausted");
                                 },
                             }
+
+                            // Emit ParentExplore snapshot (after queue is populated)
+                            self.emit_search_state(
+                                SearchPhase::ParentExplore,
+                                format!("Root boundary at node {checkpoint_root_idx} — exploring parents"),
+                                checkpoint_pos,
+                                vec![checkpoint_root_idx],
+                                None,
+                                Some(checkpoint_root_idx),
+                            );
+
                             // Store the MatchResult with advanced query candidate
                             parent_exploration_result = Some(checkpoint_state);
                         },
