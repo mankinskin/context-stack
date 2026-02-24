@@ -84,8 +84,12 @@ where
             });
 
             // Extract edges from child patterns
+            // Sort by PatternId for deterministic pattern_idx
+            let mut sorted_patterns: Vec<_> =
+                data.child_patterns().iter().collect();
+            sorted_patterns.sort_by_key(|(pid, _)| *pid);
             for (pat_idx, (_pid, pattern)) in
-                data.child_patterns().iter().enumerate()
+                sorted_patterns.into_iter().enumerate()
             {
                 for (sub_idx, token) in pattern.iter().enumerate() {
                     edges.push(SnapshotEdge {

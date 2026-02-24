@@ -13,6 +13,8 @@ use uuid::Uuid;
     Debug,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     From,
     Serialize,
     Deserialize,
