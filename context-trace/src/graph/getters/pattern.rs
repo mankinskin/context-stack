@@ -72,7 +72,8 @@ impl<G: GraphKind> Hypergraph<G> {
         pid: PatternId,
     ) -> Pattern {
         self.expect_vertex_data(index.get_vertex_index(self))
-            .expect_child_pattern(&pid).clone()
+            .expect_child_pattern(&pid)
+            .clone()
     }
     #[track_caller]
     pub fn expect_child_patterns(
@@ -80,7 +81,8 @@ impl<G: GraphKind> Hypergraph<G> {
         index: impl GetVertexIndex,
     ) -> ChildPatterns {
         self.expect_vertex_data(index.get_vertex_index(self))
-            .child_patterns().clone()
+            .child_patterns()
+            .clone()
     }
 
     #[track_caller]

@@ -64,8 +64,7 @@ impl<P: GraphRoot, State: CursorState> GraphRoot for PathCursor<P, State> {
         self.path.root_parent()
     }
 }
-pub type PatternCursor<State = Matched> =
-    PathCursor<PatternRangePath, State>;
+pub type PatternCursor<State = Matched> = PathCursor<PatternRangePath, State>;
 //pub(crate) type IndexCursor = PathCursor<IndexRangePath>;
 
 pub(crate) type PatternPrefixCursor = PathCursor<PatternPrefixPath>;
@@ -112,7 +111,6 @@ impl<P> From<P> for PathCursor<P> {
 
 // State transition methods
 impl<P> PathCursor<P, Matched> {
-
     /// Convert a Matched cursor to a Candidate by creating a copy
     /// This preserves the matched position for potential revert
     pub(crate) fn as_candidate(&self) -> PathCursor<P, Candidate>

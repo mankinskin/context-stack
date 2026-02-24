@@ -149,7 +149,8 @@ impl MatchResult {
         // Check checkpoint position
         let checkpoint = self.cursor.checkpoint();
         let at_end = checkpoint.path.is_at_pattern_end();
-        let path_empty = HasChildPath::child_path(checkpoint.path.end_path()).is_empty();
+        let path_empty =
+            HasChildPath::child_path(checkpoint.path.end_path()).is_empty();
         let end_index =
             HasRootChildIndex::<End>::root_child_index(&checkpoint.path);
         tracing::trace!(

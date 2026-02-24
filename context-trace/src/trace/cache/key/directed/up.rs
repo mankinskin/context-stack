@@ -85,7 +85,6 @@ impl crate::logging::compact_format::CompactFormat for UpPosition {
     }
 }
 
-
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy, new)]
 pub struct UpKey {
     pub index: Token,

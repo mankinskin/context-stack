@@ -1,3 +1,4 @@
+use crate::search::Find;
 use context_trace::{
     tests::{
         env::Env2,
@@ -5,7 +6,6 @@ use context_trace::{
     },
     *,
 };
-use crate::search::Find;
 
 /// Test case for query [d, e, f, g, h] finding ancestor in graph with cdefghi patterns
 pub struct CdefghiTraceCase {
@@ -100,11 +100,7 @@ impl CdefghiTraceCase {
         &self,
         actual_cache: &TraceCache,
     ) {
-        assert_eq!(
-            actual_cache,
-            &self.expected_cache,
-            "Trace cache mismatch"
-        );
+        assert_eq!(actual_cache, &self.expected_cache, "Trace cache mismatch");
     }
 }
 
@@ -121,10 +117,7 @@ fn test_cdefghi_trace_cache() {
     assert!(res.query_exhausted());
 
     assert_eq!(res.root_token(), test_case.expected_root);
-    assert_eq!(
-        res.cursor_position(),
-        test_case.expected_end_bound.into()
-    );
+    assert_eq!(res.cursor_position(), test_case.expected_end_bound.into());
 
     test_case.verify_trace_cache(&res.cache);
 }

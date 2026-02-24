@@ -37,7 +37,7 @@ impl<G: GraphKind> Hypergraph<G> {
                 .get_child_pattern(&location.pattern_id)
                 .map(|pattern| pattern.to_vec())
         })?;
-        
+
         pattern.and_then(|pattern| {
             let pattern = Pattern::from(pattern);
             get_child_pattern_range(

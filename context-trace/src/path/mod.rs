@@ -19,13 +19,11 @@ use crate::{
         location::child::ChildLocation,
         token::Token,
     },
-    path::{
-        structs::{
-            role_path::RolePath,
-            rooted::role_path::{
-                HasRootChildIndex,
-                HasRootChildToken,
-            },
+    path::structs::{
+        role_path::RolePath,
+        rooted::role_path::{
+            HasRootChildIndex,
+            HasRootChildToken,
         },
     },
     trace::has_graph::HasGraph,

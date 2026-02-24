@@ -120,7 +120,9 @@ impl GraphBuilder {
                 .map(|(sub_index, key)| {
                     let loc = ChildLocation::new(node.index, pid, sub_index);
                     if let Some(v) = self.range_map.get(key) {
-                        self.graph.with_vertex_mut(*v, |data| data.add_parent(loc)).unwrap();
+                        self.graph
+                            .with_vertex_mut(*v, |data| data.add_parent(loc))
+                            .unwrap();
                         Token::new(*v, key.clone().count())
                     } else {
                         let vid = self.graph.next_vertex_index();
@@ -132,7 +134,9 @@ impl GraphBuilder {
                 })
                 .collect();
             self.graph
-                .with_vertex_mut(node.index, |data| data.add_pattern_no_update(pid, pattern))
+                .with_vertex_mut(node.index, |data| {
+                    data.add_pattern_no_update(pid, pattern)
+                })
                 .unwrap();
         }
     }

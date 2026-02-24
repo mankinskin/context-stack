@@ -54,8 +54,7 @@ impl TestEnv for EnvAbabab {
         let (abab, abab_id) = graph.insert_pattern_with_id(vec![ab, ab]);
         // ababab = [abab, ab] so that abab is a child of ababab
         // This allows parent exploration to find ababab when matching [ab, ab, ab]
-        let (ababab, ababab_id) =
-            graph.insert_pattern_with_id(vec![abab, ab]);
+        let (ababab, ababab_id) = graph.insert_pattern_with_id(vec![abab, ab]);
 
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);

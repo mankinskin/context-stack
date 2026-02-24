@@ -1,7 +1,9 @@
 use context_trace::*;
 
 #[allow(dead_code)]
-pub(crate) trait InsertDirection: Direction + Clone + PartialEq + Eq {
+pub(crate) trait InsertDirection:
+    Direction + Clone + PartialEq + Eq
+{
     fn context_then_inner(
         context: Pattern,
         inner: Token,

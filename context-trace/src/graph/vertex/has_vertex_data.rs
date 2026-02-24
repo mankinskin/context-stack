@@ -45,7 +45,7 @@ pub trait HasVertexStringRepr: HasVertexIndex {
 impl<T: HasVertexIndex> HasVertexStringRepr for T {}
 
 /// Trait for types that can get vertex data from a graph.
-/// 
+///
 /// With the new DashMap-based interior mutability, we return owned `VertexData`
 /// instead of references.
 pub trait HasVertexData: Sized {
@@ -54,7 +54,7 @@ pub trait HasVertexData: Sized {
         self,
         graph: &R,
     ) -> VertexData;
-    
+
     /// Get vertex data from a graph reference, returning an owned copy.
     fn vertex_ref<G: GraphKind, R: Deref<Target = Hypergraph<G>>>(
         &self,
@@ -69,7 +69,7 @@ impl HasVertexData for Token {
     ) -> VertexData {
         graph.expect_vertex_data(self.vertex_index())
     }
-    
+
     fn vertex_ref<G: GraphKind, R: Deref<Target = Hypergraph<G>>>(
         &self,
         graph: &R,
@@ -85,7 +85,7 @@ impl<V: HasVertexData + Clone> HasVertexData for &'_ V {
     ) -> VertexData {
         V::vertex_ref(self, graph)
     }
-    
+
     fn vertex_ref<G: GraphKind, R: Deref<Target = Hypergraph<G>>>(
         &self,
         graph: &R,
@@ -101,7 +101,7 @@ impl<V: HasVertexData + Clone> HasVertexData for &'_ mut V {
     ) -> VertexData {
         V::vertex_ref(self, graph)
     }
-    
+
     fn vertex_ref<G: GraphKind, R: Deref<Target = Hypergraph<G>>>(
         &self,
         graph: &R,

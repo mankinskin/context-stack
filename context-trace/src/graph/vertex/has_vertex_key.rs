@@ -1,5 +1,7 @@
-use crate::graph::vertex::data::VertexData;
-use crate::graph::vertex::key::VertexKey;
+use crate::graph::vertex::{
+    data::VertexData,
+    key::VertexKey,
+};
 
 pub trait HasVertexKey: Sized {
     fn vertex_key(&self) -> VertexKey;

@@ -165,42 +165,47 @@ impl IntoRootCommand<Start> for RangeCommand {
             self.path.trace_start_sub_path(ctx, initial_prev);
 
         let root_entry = self.path.role_root_child_location::<Start>();
-        
+
         // Trace through all intermediate parents from sub_path_prev to root_entry
         // This ensures all vertices on the bottom-up path are added to the cache
         let mut current = sub_path_prev.index;
         let target_root = root_entry.parent;
-        
+
         tracing::debug!(
             "Tracing intermediate parents: current={:?}, target_root={:?}, entry_pos={:?}",
             current,
             target_root,
             self.entry_pos
         );
-        
+
         // Traverse upward from current through all parents until we reach target_root
         while current != target_root {
             let graph = ctx.trav.graph();
             let parents = graph.expect_parents(current);
-            
+
             // Find the parent that is on the path to target_root
-            let next_parent: Option<(VertexIndex, Token, &Parent)> = parents.iter().find_map(|(parent_idx, parent_data)| {
-                let parent_token = graph.to_token(*parent_idx);
-                
-                // Check if this parent is target_root
-                if parent_token == target_root {
-                    return Some((*parent_idx, parent_token, parent_data));
-                }
-                
-                // Check if target_root is a parent of this parent
-                if graph.expect_parents(parent_token).contains_key(&target_root.vertex_index()) {
-                    return Some((*parent_idx, parent_token, parent_data));
-                }
-                
-                None
-            });
-            
-            if let Some((_parent_idx, parent_token, parent_data)) = next_parent {
+            let next_parent: Option<(VertexIndex, Token, &Parent)> =
+                parents.iter().find_map(|(parent_idx, parent_data)| {
+                    let parent_token = graph.to_token(*parent_idx);
+
+                    // Check if this parent is target_root
+                    if parent_token == target_root {
+                        return Some((*parent_idx, parent_token, parent_data));
+                    }
+
+                    // Check if target_root is a parent of this parent
+                    if graph
+                        .expect_parents(parent_token)
+                        .contains_key(&target_root.vertex_index())
+                    {
+                        return Some((*parent_idx, parent_token, parent_data));
+                    }
+
+                    None
+                });
+
+            if let Some((_parent_idx, parent_token, parent_data)) = next_parent
+            {
                 // If the next parent is the target root, don't add it here
                 // Let PostfixRootCommand handle the final connection
                 if parent_token == target_root {
@@ -208,40 +213,42 @@ impl IntoRootCommand<Start> for RangeCommand {
                     // at the current position, then break
                     break;
                 }
-                
+
                 // Find the correct pattern index for this parent relationship
-                let pattern_idx = parent_data.pattern_indices().iter()
+                let pattern_idx = parent_data
+                    .pattern_indices()
+                    .iter()
                     .find(|_pi| {
                         // For intermediate parents, find any pattern that leads upward
                         true
                     })
                     .expect("Should find pattern index");
-                
+
                 let location = ChildLocation {
                     parent: parent_token,
                     pattern_id: pattern_idx.pattern_id,
                     sub_index: pattern_idx.sub_index,
                 };
-                
+
                 let target = UpKey {
                     index: parent_token,
-                    pos: sub_path_prev.pos,  // Use the current position, not entry_pos
+                    pos: sub_path_prev.pos, // Use the current position, not entry_pos
                 };
-                
+
                 tracing::debug!(
                     "Adding intermediate parent: prev={:?}, target={:?}, location={:?}",
                     sub_path_prev,
                     target,
                     location
                 );
-                
+
                 let new_edge = NewTraceEdge::<BottomUp> {
                     target,
                     prev: sub_path_prev,
                     location,
                 };
                 ctx.cache.add_state(new_edge);
-                
+
                 current = parent_token;
                 sub_path_prev = target;
             } else {
@@ -253,7 +260,7 @@ impl IntoRootCommand<Start> for RangeCommand {
                 break;
             }
         }
-        
+
         // Now update the position to entry_pos for the final connection to root
         sub_path_prev.pos = self.entry_pos;
 

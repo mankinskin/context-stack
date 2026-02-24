@@ -59,7 +59,10 @@ impl std::ops::Sub<PatternSubDeltas> for SplitPositionCache {
 }
 
 impl std::ops::SubAssign<&PatternSubDeltas> for SplitPositionCache {
-    fn sub_assign(&mut self, rhs: &PatternSubDeltas) {
+    fn sub_assign(
+        &mut self,
+        rhs: &PatternSubDeltas,
+    ) {
         self.pattern_splits
             .iter_mut()
             .for_each(|(pid, pos)| {
@@ -119,15 +122,15 @@ impl SplitPositionCache {
             pattern_splits: subs.into_iter().map(Into::into).collect(),
         }
     }
-    
+
     /// Apply delta adjustment with inner_offset for positions inside a merged region.
     ///
     /// This is called for positions that fall INSIDE a merged token (not at its boundary).
     /// In addition to adjusting sub_index, this also sets the inner_offset to indicate
     /// the position within the merged token.
     pub(crate) fn apply_delta_with_inner_offset(
-        &mut self, 
-        deltas: &PatternSubDeltas, 
+        &mut self,
+        deltas: &PatternSubDeltas,
         inner_offset: NonZeroUsize,
     ) {
         self.pattern_splits

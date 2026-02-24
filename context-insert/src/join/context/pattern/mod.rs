@@ -16,7 +16,7 @@ use context_trace::*;
 pub(crate) mod borders;
 
 /// Pattern join context that owns its data.
-/// 
+///
 /// With interior mutability, we can't hold references across lock boundaries,
 /// so this struct owns the pattern and split map data.
 #[derive(Debug, Clone, Deref, DerefMut, Derivative)]

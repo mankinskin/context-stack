@@ -17,8 +17,8 @@ use crate::{
     visualization::emit_insert_node,
 };
 use context_trace::{
-    *,
     graph::visualization::Transition,
+    *,
 };
 
 pub(crate) struct FrontierIterator {
@@ -71,15 +71,19 @@ impl Iterator for FrontierSplitIterator {
             Some(Some(key)) => {
                 if !self.splits.contains_key(&key) {
                     let node_idx = key.index.index.0;
-                    
+
                     // Emit event for processing this node
                     emit_insert_node(
-                        Transition::JoinStep { 
-                            left: node_idx, 
-                            right: node_idx, 
+                        Transition::JoinStep {
+                            left: node_idx,
+                            right: node_idx,
                             result: node_idx,
                         },
-                        format!("Processing node {} at position {}", node_idx, key.pos.get()),
+                        format!(
+                            "Processing node {} at position {}",
+                            node_idx,
+                            key.pos.get()
+                        ),
                         node_idx,
                     );
 
@@ -97,12 +101,12 @@ impl Iterator for FrontierSplitIterator {
             Some(None) => None,
             None => Some({
                 let root_idx = self.frontier.interval.root.index.0;
-                
+
                 // Emit event for root merge
                 emit_insert_node(
-                    Transition::JoinStep { 
-                        left: root_idx, 
-                        right: root_idx, 
+                    Transition::JoinStep {
+                        left: root_idx,
+                        right: root_idx,
                         result: root_idx,
                     },
                     format!("Merging root node {}", root_idx),

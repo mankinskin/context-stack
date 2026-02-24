@@ -9,16 +9,16 @@
 //! - Integration tests simulating context-read failures
 
 use context_trace::{
+    PatternId,
     graph::{
+        Hypergraph,
+        HypergraphRef,
         vertex::{
             atom::Atom,
             token::Token,
         },
-        Hypergraph,
-        HypergraphRef,
     },
     tests::test_case::TestEnv,
-    PatternId,
 };
 use std::sync::{
     Arc,
@@ -59,7 +59,8 @@ impl TestEnv for EnvHypergra {
         };
 
         // Create "hypergra" pattern (partial "hypergraph")
-        let (hypergra, hypergra_id) = graph.insert_pattern_with_id(vec![h, y, p, e, r, g, r, a]);
+        let (hypergra, hypergra_id) =
+            graph.insert_pattern_with_id(vec![h, y, p, e, r, g, r, a]);
 
         #[cfg(any(test, feature = "test-api"))]
         context_trace::graph::test_graph::register_test_graph(&graph);
@@ -94,7 +95,8 @@ impl TestEnv for EnvHypergra {
 
 fn get_env_hypergra() -> &'static Arc<RwLock<EnvHypergra>> {
     ENV_HYPERGRA.with(|cell| unsafe {
-        let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvHypergra::initialize())));
+        let ptr = cell
+            .get_or_init(|| Arc::new(RwLock::new(EnvHypergra::initialize())));
         &*(ptr as *const Arc<RwLock<EnvHypergra>>)
     })
 }

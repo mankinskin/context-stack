@@ -64,8 +64,12 @@ impl StateAdvance for ParentCompareState {
 
                 // Clone and simplify the path, then convert to position-annotated
                 let mut simplified_path = next.child_state.path.clone();
-                simplified_path.role_path_mut_with::<Start, _>().simplify(trav);
-                simplified_path.role_path_mut_with::<End, _>().simplify(trav);
+                simplified_path
+                    .role_path_mut_with::<Start, _>()
+                    .simplify(trav);
+                simplified_path
+                    .role_path_mut_with::<End, _>()
+                    .simplify(trav);
 
                 // Convert to position-annotated path for both working cursor and checkpoint
                 let annotated_path = simplified_path

@@ -69,7 +69,10 @@ impl CanonicalGraph {
 }
 
 /// Populate a graph using context-read from a single input string
-fn populate_context_read_graph(graph: &HypergraphRef, input: &str) {
+fn populate_context_read_graph(
+    graph: &HypergraphRef,
+    input: &str,
+) {
     let _result = (&mut graph.clone(), input.chars()).read_sequence().unwrap();
 }
 
@@ -98,7 +101,10 @@ fn build_ngrams_graph(input: &str) -> Option<Hypergraph> {
 /// Validate that context-read and ngrams produce equivalent graphs for the given input.
 ///
 /// Returns Ok if the graphs are equivalent, Err with a description of the differences otherwise.
-fn validate_graphs_equivalent(graph: &HypergraphRef, input: &str) -> Result<(), String> {
+fn validate_graphs_equivalent(
+    graph: &HypergraphRef,
+    input: &str,
+) -> Result<(), String> {
     populate_context_read_graph(graph, input);
     let cr_graph: &Hypergraph = &*graph;
 
@@ -159,7 +165,10 @@ fn validate_graphs_equivalent(graph: &HypergraphRef, input: &str) -> Result<(), 
 
 /// Run validation on an input and panic with detailed comparison on failure.
 /// Emits a graph snapshot after populating the graph (before assertions that could panic).
-fn assert_graphs_equivalent(graph: &HypergraphRef, input: &str) {
+fn assert_graphs_equivalent(
+    graph: &HypergraphRef,
+    input: &str,
+) {
     // Populate graph first so we can snapshot before validation assertions
     populate_context_read_graph(graph, input);
     graph.emit_graph_snapshot();

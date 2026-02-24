@@ -9,12 +9,12 @@
 
 use context_trace::{
     graph::{
+        Hypergraph,
+        HypergraphRef,
         vertex::{
             atom::Atom,
             token::Token,
         },
-        Hypergraph,
-        HypergraphRef,
     },
     tests::test_case::TestEnv,
 };
@@ -35,9 +35,7 @@ pub(crate) struct EnvSingleAtom {
 impl TestEnv for EnvSingleAtom {
     fn initialize() -> Self {
         let graph = Hypergraph::default();
-        let [a] = graph.insert_atoms([
-            Atom::Element('a'),
-        ])[..] else {
+        let [a] = graph.insert_atoms([Atom::Element('a')])[..] else {
             panic!()
         };
 
@@ -66,7 +64,8 @@ impl TestEnv for EnvSingleAtom {
 
 fn get_env_single_atom() -> &'static Arc<RwLock<EnvSingleAtom>> {
     ENV_SINGLE_ATOM.with(|cell| unsafe {
-        let ptr = cell.get_or_init(|| Arc::new(RwLock::new(EnvSingleAtom::initialize())));
+        let ptr = cell
+            .get_or_init(|| Arc::new(RwLock::new(EnvSingleAtom::initialize())));
         &*(ptr as *const Arc<RwLock<EnvSingleAtom>>)
     })
 }

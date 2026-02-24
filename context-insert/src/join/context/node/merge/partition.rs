@@ -154,7 +154,10 @@ where
     }
 
     /// Internal merge implementation with configurable pattern replacement.
-    fn merge_internal(mut self, skip_pattern_replacement: bool) -> MergeResult {
+    fn merge_internal(
+        mut self,
+        skip_pattern_replacement: bool,
+    ) -> MergeResult {
         debug!(
             range_start = self.partition_range.start(),
             range_end = self.partition_range.end(),
@@ -167,8 +170,11 @@ where
             Ok(info) => {
                 // Check if this will be a perfect match BEFORE calling join
                 let will_have_perfect = info.perfect.complete().0.is_some();
-                
-                let joined = self.join_partition_with_options(info, skip_pattern_replacement);
+
+                let joined = self.join_partition_with_options(
+                    info,
+                    skip_pattern_replacement,
+                );
 
                 debug!(
                     token = %joined.index,
@@ -189,7 +195,8 @@ where
                 MergeResult {
                     token: joined.index,
                     delta,
-                    had_pattern_replacement: will_have_perfect && !skip_pattern_replacement,
+                    had_pattern_replacement: will_have_perfect
+                        && !skip_pattern_replacement,
                 }
             },
             Err(existing) => {

@@ -1,4 +1,3 @@
-
 fn main() {
     #[cfg(feature = "test-api")]
     {

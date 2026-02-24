@@ -31,7 +31,8 @@ impl<G: GraphKind> Hypergraph<G> {
         let pattern_id = PatternId::default();
         self.with_vertex_mut(index.vertex_index(), |data| {
             data.add_pattern_no_update(pattern_id, Pattern::from(tokens));
-        }).expect("Vertex should exist");
+        })
+        .expect("Vertex should exist");
         self.add_parents_to_pattern_nodes(
             indices,
             Token::new(index, width),

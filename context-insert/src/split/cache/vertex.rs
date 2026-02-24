@@ -403,7 +403,10 @@ impl SplitVertexCache {
     ) -> Partition<K> {
         range.get_splits(self).to_partition()
     }
-    pub(crate) fn inner_offsets<R: RangeRole<Mode = Trace>, P: ToPartition<R>>(
+    pub(crate) fn inner_offsets<
+        R: RangeRole<Mode = Trace>,
+        P: ToPartition<R>,
+    >(
         ctx: NodeTraceCtx,
         part: P,
     ) -> Vec<NonZeroUsize> {
@@ -423,7 +426,10 @@ impl SplitVertexCache {
                     .collect())
             .unwrap_or_default()
     }
-    pub(crate) fn add_inner_offsets<K: RangeRole<Mode = Trace>, P: ToPartition<K>>(
+    pub(crate) fn add_inner_offsets<
+        K: RangeRole<Mode = Trace>,
+        P: ToPartition<K>,
+    >(
         ctx: NodeTraceCtx,
         part: P,
     ) -> (

@@ -3,19 +3,25 @@
 //! Concrete implementations of SearchTestCase trait with expected Response values.
 
 use crate::{
-    Response, cursor::{
-        PatternCursor, checkpointed::Checkpointed
-    }, state::{
+    cursor::{
+        checkpointed::Checkpointed,
+        PatternCursor,
+    },
+    state::{
         end::{
-            PathCoverage, prefix::PrefixEnd
+            prefix::PrefixEnd,
+            PathCoverage,
         },
         matched::{
             CheckpointedCursor,
             MatchResult,
         },
-    }, tests::{
-        env::EnvInsertPrefix1, test_case::SearchTestCase
-    }
+    },
+    tests::{
+        env::EnvInsertPrefix1,
+        test_case::SearchTestCase,
+    },
+    Response,
 };
 use context_trace::{
     build_trace_cache,

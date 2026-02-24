@@ -1,13 +1,13 @@
 use crate::cursor::{
-        Candidate,
-        Checkpointed,
-        ChildCursor,
-        CursorState,
-        HasCandidate,
-        Matched,
-        Mismatched,
-        PathCursor,
-    };
+    Candidate,
+    Checkpointed,
+    ChildCursor,
+    CursorState,
+    HasCandidate,
+    Matched,
+    Mismatched,
+    PathCursor,
+};
 use context_trace::{
     path::accessors::has_path::HasRootedPath,
     *,
@@ -117,7 +117,8 @@ pub(crate) struct CompareState<
 > {
     /// Query cursor with checkpoint and candidate (HasCandidate state during search)
     /// Uses PatternRangePath to properly track start/end positions during matching
-    pub(crate) query: Checkpointed<PathCursor<PatternRangePath, Q>, HasCandidate>,
+    pub(crate) query:
+        Checkpointed<PathCursor<PatternRangePath, Q>, HasCandidate>,
 
     /// Index cursor with checkpoint and candidate (HasCandidate state during search)
     /// The ChildState contains the IndexRangePath being traversed with position-annotated end nodes
@@ -140,7 +141,7 @@ impl<Q: CursorState, I: CursorState, EndNode: PathNode>
         // Return reference to the path in candidate (HasCandidate state guarantees it exists)
         &self.child.candidate().child_state.path
     }
-    
+
     /// Access the rooted path from the child cursor's candidate state (mutable)
     fn rooted_path_mut(
         &mut self
@@ -160,11 +161,11 @@ impl<EndNode: PathNode> CompareState<Matched, Matched, EndNode> {
         // Take candidate and convert to checkpoint
         self.query.checkpoint = self.query.candidate().clone();
         self.child.checkpoint = self.child.candidate().clone();
-        
+
         // Now update candidate to match checkpoint (no advancement)
         *self.query.candidate_mut() = self.query.checkpoint.clone();
         *self.child.candidate_mut() = self.child.checkpoint.clone();
-        
+
         // After this, checkpoint and candidate are synchronized
     }
 }

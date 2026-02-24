@@ -29,7 +29,6 @@ use super::{
     partition::MergeResult,
 };
 use crate::{
-    visualization::emit_insert_node,
     PatternSubDeltas,
     RootMode,
     interval::partition::info::range::role::{
@@ -38,6 +37,7 @@ use crate::{
         Pre,
     },
     join::partition::Join,
+    visualization::emit_insert_node,
 };
 
 /// Context for iterating over partitions and merging them.
@@ -596,7 +596,10 @@ impl<'a> MergeCtx<'a> {
                 pattern_id: existing_patterns.len(),
                 children: children.clone(),
             },
-            format!("Creating pattern at root {}: {:?}", root.index.0, children),
+            format!(
+                "Creating pattern at root {}: {:?}",
+                root.index.0, children
+            ),
             root.index.0,
         );
 

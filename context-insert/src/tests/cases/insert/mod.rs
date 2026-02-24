@@ -27,5 +27,5 @@ pub(crate) mod validation;
 
 // Scenario tests
 pub(crate) mod context_read_scenarios;
-pub(crate) mod repeat_patterns;
 pub(crate) mod expanded_overlap;
+pub(crate) mod repeat_patterns;

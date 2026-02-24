@@ -87,7 +87,9 @@ impl<'a> MergeCtx<'a> {
         if !had_perfect_replacement {
             self.add_root_pattern(&range_map, target_token);
         } else {
-            info!("Skipping add_root_pattern - pattern was already modified by replace_in_pattern");
+            info!(
+                "Skipping add_root_pattern - pattern was already modified by replace_in_pattern"
+            );
         }
 
         // Debug: Print actual VertexData child patterns

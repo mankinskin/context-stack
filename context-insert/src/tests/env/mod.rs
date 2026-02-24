@@ -32,10 +32,10 @@ mod insert_pattern2;
 mod insert_postfix1;
 
 // Validation/edge case environments
-mod validation;
-mod triple_repeat;
-mod single_atom;
 mod hypergra;
+mod single_atom;
+mod triple_repeat;
+mod validation;
 
 // Expanded overlap environments
 mod expanded_overlap;
@@ -48,10 +48,17 @@ pub(crate) use insert_pattern2::EnvInsertPattern2;
 pub use insert_postfix1::EnvInsertPostfix1;
 
 // Re-export validation environments
-pub(crate) use validation::{EnvAbcd, EnvAb, EnvAbc};
-pub(crate) use triple_repeat::EnvTripleRepeat;
-pub(crate) use single_atom::EnvSingleAtom;
 pub(crate) use hypergra::EnvHypergra;
+pub(crate) use single_atom::EnvSingleAtom;
+pub(crate) use triple_repeat::EnvTripleRepeat;
+pub(crate) use validation::{
+    EnvAb,
+    EnvAbc,
+    EnvAbcd,
+};
 
 // Re-export expanded overlap environments
-pub(crate) use expanded_overlap::{EnvExpandedOverlap, EnvMultiOverlap};
+pub(crate) use expanded_overlap::{
+    EnvExpandedOverlap,
+    EnvMultiOverlap,
+};

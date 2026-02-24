@@ -521,7 +521,8 @@ fn inject_trait_name_into_attr(
 pub fn typed_debug_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) =
+        input.generics.split_for_impl();
 
     let debug_body = generate_debug_body(&input);
 
@@ -547,49 +548,55 @@ fn generate_debug_body(input: &DeriveInput) -> TokenStream2 {
             quote! {
                 write!(f, "{}", type_name)
             }
-        }
+        },
     }
 }
 
 /// Generate debug implementation for a struct
-fn generate_struct_debug(name: &syn::Ident, data: &syn::DataStruct) -> TokenStream2 {
+fn generate_struct_debug(
+    name: &syn::Ident,
+    data: &syn::DataStruct,
+) -> TokenStream2 {
     match &data.fields {
         syn::Fields::Named(fields) => {
-            let field_names: Vec<_> = fields.named.iter()
+            let field_names: Vec<_> = fields
+                .named
+                .iter()
                 .map(|f| f.ident.as_ref().unwrap())
                 .collect();
-            let field_strs: Vec<_> = field_names.iter()
-                .map(|n| n.to_string())
-                .collect();
+            let field_strs: Vec<_> =
+                field_names.iter().map(|n| n.to_string()).collect();
 
             quote! {
                 f.debug_struct(type_name)
                     #(.field(#field_strs, &self.#field_names))*
                     .finish()
             }
-        }
+        },
         syn::Fields::Unnamed(fields) => {
-            let indices: Vec<_> = (0..fields.unnamed.len())
-                .map(syn::Index::from)
-                .collect();
+            let indices: Vec<_> =
+                (0..fields.unnamed.len()).map(syn::Index::from).collect();
 
             quote! {
                 f.debug_tuple(type_name)
                     #(.field(&self.#indices))*
                     .finish()
             }
-        }
+        },
         syn::Fields::Unit => {
             let _ = name;
             quote! {
                 write!(f, "{}", type_name)
             }
-        }
+        },
     }
 }
 
 /// Generate debug implementation for an enum
-fn generate_enum_debug(name: &syn::Ident, data: &syn::DataEnum) -> TokenStream2 {
+fn generate_enum_debug(
+    name: &syn::Ident,
+    data: &syn::DataEnum,
+) -> TokenStream2 {
     let _ = name;
     let variants: Vec<_> = data.variants.iter().map(|variant| {
         let variant_name = &variant.ident;

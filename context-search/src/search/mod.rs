@@ -37,7 +37,13 @@ use context::{
     SearchCtx,
 };
 use context_trace::{
-    graph::visualization::{GraphOpEvent, LocationInfo, OperationType, QueryInfo, Transition},
+    graph::visualization::{
+        GraphOpEvent,
+        LocationInfo,
+        OperationType,
+        QueryInfo,
+        Transition,
+    },
     logging::format_utils::pretty,
     *,
 };
@@ -139,8 +145,7 @@ where
             query_pattern.iter().map(|t| t.index.0).collect();
         let query_width: usize = query_pattern.iter().map(|t| *t.width()).sum();
 
-        let (candidate_parents, candidate_children) =
-            self.queue_candidates();
+        let (candidate_parents, candidate_children) = self.queue_candidates();
 
         let step = self.step_counter;
         self.step_counter += 1;
@@ -148,7 +153,7 @@ where
         let location = LocationInfo {
             selected_node: current_root,
             root_node: current_root,
-            trace_path: vec![],  // TODO: populate from path
+            trace_path: vec![], // TODO: populate from path
             completed_nodes: matched_nodes,
             pending_parents: candidate_parents,
             pending_children: candidate_children,
@@ -190,7 +195,9 @@ where
 
         // Emit Init event
         self.emit_graph_op(
-            Transition::StartNode { node: self.start_node },
+            Transition::StartNode {
+                node: self.start_node,
+            },
             "Search started — initial queue populated",
             0,
             vec![],
@@ -240,7 +247,10 @@ where
         let cursor_pos = *end.cursor().atom_position.as_ref();
         let matched_root = end.root_parent().index.0;
         self.emit_graph_op(
-            Transition::Done { final_node: Some(matched_root), success: true },
+            Transition::Done {
+                final_node: Some(matched_root),
+                success: true,
+            },
             "Search complete",
             cursor_pos,
             vec![matched_root],
@@ -264,8 +274,10 @@ where
     ) -> MatchResult {
         // Set initial root match as baseline for this root
         let mut last_match = init_state;
-        let root_idx = last_match.child.current().child_state.root_parent().index.0;
-        let init_cursor_pos = *last_match.query.current().atom_position.as_ref();
+        let root_idx =
+            last_match.child.current().child_state.root_parent().index.0;
+        let init_cursor_pos =
+            *last_match.query.current().atom_position.as_ref();
         trace!(
             root = %last_match.child.current().child_state.root_parent(),
             checkpoint_pos = init_cursor_pos,
@@ -300,7 +312,14 @@ where
                         .current()
                         .atom_position
                         .as_ref();
-                    let adv_root = next_match.state.child.current().child_state.root_parent().index.0;
+                    let adv_root = next_match
+                        .state
+                        .child
+                        .current()
+                        .child_state
+                        .root_parent()
+                        .index
+                        .0;
                     trace!(
                         root = %next_match.state.child.current().child_state.root_parent(),
                         checkpoint_pos,
@@ -352,7 +371,8 @@ where
                                 .cursor()
                                 .atom_position
                                 .as_ref();
-                            let checkpoint_root_idx = checkpoint_state.root_parent().index.0;
+                            let checkpoint_root_idx =
+                                checkpoint_state.root_parent().index.0;
                             trace!(
                                 checkpoint_root = %checkpoint_state.root_parent(),
                                 checkpoint_pos,

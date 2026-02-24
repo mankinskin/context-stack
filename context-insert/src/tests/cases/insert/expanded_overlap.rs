@@ -24,7 +24,10 @@
 
 use crate::{
     insert::ToInsertCtx,
-    tests::env::{EnvExpandedOverlap, EnvMultiOverlap},
+    tests::env::{
+        EnvExpandedOverlap,
+        EnvMultiOverlap,
+    },
 };
 use context_trace::{
     tests::test_case::TestEnv,
@@ -45,14 +48,18 @@ use pretty_assertions::assert_eq;
 fn insert_postfix_bc_of_abc() {
     let EnvExpandedOverlap {
         graph,
-        b, c, ab, abc,
+        b,
+        c,
+        ab,
+        abc,
         ..
     } = EnvExpandedOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for [b, c] - this is postfix of abc
     let query = vec![b, c];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -72,11 +79,7 @@ fn insert_postfix_bc_of_abc() {
     );
 
     // Width should be 2 (b + c)
-    assert_eq!(
-        *index.width(),
-        2,
-        "Result should have width 2 for [b, c]"
-    );
+    assert_eq!(*index.width(), 2, "Result should have width 2 for [b, c]");
 }
 
 /// Test: Insert [b, c, d] where "bc" is postfix of "abc"
@@ -88,14 +91,18 @@ fn insert_postfix_bc_of_abc() {
 fn insert_postfix_bcd_extends_abc() {
     let EnvExpandedOverlap {
         graph,
-        b, c, d, abc,
+        b,
+        c,
+        d,
+        abc,
         ..
     } = EnvExpandedOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for [b, c, d] - "bc" is postfix of abc, d extends it
     let query = vec![b, c, d];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -106,19 +113,12 @@ fn insert_postfix_bcd_extends_abc() {
     };
 
     // Path root should have 3 tokens
-    assert_eq!(
-        path.path_root().len(),
-        3,
-        "Query had 3 tokens"
-    );
+    assert_eq!(path.path_root().len(), 3, "Query had 3 tokens");
 
     // Width could be 2 (partial match) or 3 (full)
     // Depending on implementation, we might get bc (width 2) if bcd doesn't exist
     // or bcd (width 3) if it was created/found
-    assert!(
-        *index.width() >= 2,
-        "Should match at least [b, c]"
-    );
+    assert!(*index.width() >= 2, "Should match at least [b, c]");
 }
 
 /// Test: Insert [c, d] where "c" is postfix of "abc"
@@ -129,15 +129,14 @@ fn insert_postfix_bcd_extends_abc() {
 #[test]
 fn insert_single_atom_postfix() {
     let EnvExpandedOverlap {
-        graph,
-        c, d, abc,
-        ..
+        graph, c, d, abc, ..
     } = EnvExpandedOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for [c, d] - c is single-atom postfix of abc
     let query = vec![c, d];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -148,15 +147,11 @@ fn insert_single_atom_postfix() {
     };
 
     // Should have consumed query of 2 tokens
-    assert_eq!(
-        path.path_root().len(),
-        2,
-        "Query had 2 tokens"
-    );
+    assert_eq!(path.path_root().len(), 2, "Query had 2 tokens");
 }
 
 // ============================================================================
-// Multiple Overlap Candidate Tests  
+// Multiple Overlap Candidate Tests
 // ============================================================================
 
 /// Test: Insert [b, c] when both "ab" and "bc" exist
@@ -167,15 +162,14 @@ fn insert_single_atom_postfix() {
 #[test]
 fn insert_finds_existing_overlap_pattern() {
     let EnvMultiOverlap {
-        graph,
-        b, c, bc,
-        ..
+        graph, b, c, bc, ..
     } = EnvMultiOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for [b, c] - bc already exists in graph
     let query = vec![b, c];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -199,14 +193,18 @@ fn insert_finds_existing_overlap_pattern() {
 fn insert_finds_postfix_of_compound_token() {
     let EnvMultiOverlap {
         graph,
-        c, d, cd, abcd,
+        c,
+        d,
+        cd,
+        abcd,
         ..
     } = EnvMultiOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for [c, d] - cd exists and is postfix of abcd
     let query = vec![c, d];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -234,7 +232,12 @@ fn insert_finds_postfix_of_compound_token() {
 fn cursor_position_after_postfix_match() {
     let EnvExpandedOverlap {
         graph,
-        b, c, d, e, ab, abc,
+        b,
+        c,
+        d,
+        e,
+        ab,
+        abc,
         ..
     } = EnvExpandedOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -242,7 +245,8 @@ fn cursor_position_after_postfix_match() {
     // Query for [b, c, d, e] - 4 atoms
     // "bc" might be matched as postfix of abc
     let query = vec![b, c, d, e];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -253,11 +257,7 @@ fn cursor_position_after_postfix_match() {
     };
 
     // The path root should reflect the original query
-    assert_eq!(
-        path.path_root().len(),
-        4,
-        "Original query had 4 tokens"
-    );
+    assert_eq!(path.path_root().len(), 4, "Original query had 4 tokens");
 
     // The matched portion's width tells us how many atoms were consumed
     let consumed = *index.width();
@@ -270,21 +270,20 @@ fn cursor_position_after_postfix_match() {
 
 /// Test: Cursor tracks position correctly for overlapping matches
 ///
-/// The cursor (via path.end indices) should indicate which tokens 
+/// The cursor (via path.end indices) should indicate which tokens
 /// in the query have been processed.
 #[test]
 fn cursor_tracks_overlap_consumption() {
     let EnvMultiOverlap {
-        graph,
-        b, c, d, bc,
-        ..
+        graph, b, c, d, bc, ..
     } = EnvMultiOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for [b, c, d] - 3 atoms
     // bc exists, so should match that first (width 2)
     let query = vec![b, c, d];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -295,11 +294,7 @@ fn cursor_tracks_overlap_consumption() {
     };
 
     // Path root reflects original query
-    assert_eq!(
-        path.path_root().len(),
-        3,
-        "Query had 3 tokens"
-    );
+    assert_eq!(path.path_root().len(), 3, "Query had 3 tokens");
 
     // If bc was found (width 2), cursor consumed first 2 atoms
     // Remaining: d
@@ -319,16 +314,14 @@ fn cursor_tracks_overlap_consumption() {
 /// Query atoms exist in graph but don't form overlapping pattern
 #[test]
 fn insert_no_overlap_path() {
-    let EnvExpandedOverlap {
-        graph,
-        d, e,
-        ..
-    } = EnvExpandedOverlap::initialize();
+    let EnvExpandedOverlap { graph, d, e, .. } =
+        EnvExpandedOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for [d, e] - neither d nor e appear as postfix of abc
     let query = vec![d, e];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     assert!(result.is_ok(), "insert_or_get_complete should succeed");
     let inner = result.unwrap();
@@ -339,11 +332,7 @@ fn insert_no_overlap_path() {
     };
 
     // Should process query of 2 tokens
-    assert_eq!(
-        path.path_root().len(),
-        2,
-        "Query had 2 tokens"
-    );
+    assert_eq!(path.path_root().len(), 2, "Query had 2 tokens");
 }
 
 /// Test: Insert single atom that is postfix of existing token
@@ -352,29 +341,27 @@ fn insert_no_overlap_path() {
 /// This should handle the edge case of single-atom query
 #[test]
 fn insert_single_atom_is_postfix() {
-    let EnvExpandedOverlap {
-        graph,
-        c, abc,
-        ..
-    } = EnvExpandedOverlap::initialize();
+    let EnvExpandedOverlap { graph, c, abc, .. } =
+        EnvExpandedOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Query for single atom [c] - c is postfix of abc
     let query = vec![c];
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query.clone());
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query.clone());
 
     // Single atom query might return error (SingleIndex) or succeed
     // Just verify no panic
     match result {
         Ok(Ok(IndexWithPath { index, .. })) => {
             assert_eq!(index, c, "Should return c atom");
-        }
+        },
         Ok(Err(IndexWithPath { index, .. })) => {
             assert_eq!(index, c, "Should return c atom");
-        }
+        },
         Err(e) => {
             // SingleIndex error is acceptable for single-atom queries
             // This is expected behavior per the search algorithm
-        }
+        },
     }
 }

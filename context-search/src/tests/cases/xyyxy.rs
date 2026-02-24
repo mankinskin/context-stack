@@ -112,7 +112,10 @@ mod tests {
 
         let actual = Searchable::<AncestorSearchTraversal<_>>::search(
             query.clone(),
-            <SearchXyExact as TestCase>::Env::get().graph().clone().into(),
+            <SearchXyExact as TestCase>::Env::get()
+                .graph()
+                .clone()
+                .into(),
         )
         .expect("Search should succeed");
 
@@ -147,7 +150,7 @@ mod tests {
                     xyyxy,
                     "Should find xyyxy pattern"
                 );
-            }
+            },
             other => panic!("Expected EntireRoot, got {:?}", other),
         }
     }
@@ -157,14 +160,14 @@ mod tests {
     #[test]
     fn test_search_y_alone() {
         use context_trace::ErrorReason;
-        
+
         let env = EnvXyyxy::get();
         let graph = env.graph();
         let _tracing = init_test_tracing!(graph);
         let y = env.y;
 
         let result = graph.find_ancestor(&vec![y]);
-        
+
         // Searching for a single token returns SingleIndex error
         assert!(
             matches!(

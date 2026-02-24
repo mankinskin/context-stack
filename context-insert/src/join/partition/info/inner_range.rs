@@ -26,7 +26,9 @@ use derive_more::derive::{
 use derive_new::new;
 
 #[derive(Debug, Clone, Deref, DerefMut, Into, From, new)]
-pub(crate) struct JoinInnerRangeInfo<R: RangeRole<Mode = Join>>(InnerRangeInfo<R>)
+pub(crate) struct JoinInnerRangeInfo<R: RangeRole<Mode = Join>>(
+    InnerRangeInfo<R>,
+)
 where
     R::Borders: JoinBorders<R>;
 

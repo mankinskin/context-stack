@@ -27,7 +27,9 @@ use crate::{
 };
 use context_trace::*;
 
-pub(crate) trait InfoBorder<R: RangeRole>: Sized + PartitionBorder<R> {
+pub(crate) trait InfoBorder<R: RangeRole>:
+    Sized + PartitionBorder<R>
+{
     type Splits;
     /// The atom position type for this border visitor.
     /// - NonZeroUsize for Pre/Post modes

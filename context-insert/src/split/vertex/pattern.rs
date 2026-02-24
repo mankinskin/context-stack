@@ -6,7 +6,7 @@ use derive_new::new;
 use crate::split::vertex::node::NodeTraceCtx;
 
 /// Pattern trace context that owns its data.
-/// 
+///
 /// With interior mutability, we can't hold references across lock boundaries,
 /// so this struct owns the pattern data.
 #[derive(Debug, Clone, Derivative, new)]

@@ -70,7 +70,10 @@ impl<R: InsertResult> InsertCtx<R> {
         ext: R::Extract,
         init: InitInterval,
     ) -> Result<R, ErrorState> {
-        use crate::visualization::{emit_insert_node, reset_step_counter};
+        use crate::visualization::{
+            emit_insert_node,
+            reset_step_counter,
+        };
         use context_trace::graph::visualization::Transition;
 
         // Reset step counter for new insert operation
@@ -85,7 +88,10 @@ impl<R: InsertResult> InsertCtx<R> {
 
         // Emit: Split phase starting
         emit_insert_node(
-            Transition::SplitStart { node: root_idx, split_position: *init.end_bound.as_ref() },
+            Transition::SplitStart {
+                node: root_idx,
+                split_position: *init.end_bound.as_ref(),
+            },
             format!("Starting split phase on root {root_idx}"),
             root_idx,
         );
@@ -95,9 +101,9 @@ impl<R: InsertResult> InsertCtx<R> {
 
         // Emit: Split phase complete
         emit_insert_node(
-            Transition::SplitComplete { 
-                original_node: root_idx, 
-                left_fragment: None, 
+            Transition::SplitComplete {
+                original_node: root_idx,
+                left_fragment: None,
                 right_fragment: None,
             },
             format!("Split phase complete for root {root_idx}"),
@@ -107,7 +113,14 @@ impl<R: InsertResult> InsertCtx<R> {
         // Emit: Join phase starting
         let leaf_count = interval.states.leaves.len();
         emit_insert_node(
-            Transition::JoinStart { nodes: interval.states.leaves.iter().map(|k| k.index.index.0).collect() },
+            Transition::JoinStart {
+                nodes: interval
+                    .states
+                    .leaves
+                    .iter()
+                    .map(|k| k.index.index.0)
+                    .collect(),
+            },
             format!("Starting join phase with {leaf_count} leaves"),
             root_idx,
         );
@@ -118,7 +131,9 @@ impl<R: InsertResult> InsertCtx<R> {
 
         // Emit: Join complete
         emit_insert_node(
-            Transition::JoinComplete { result_node: joined.index.0 },
+            Transition::JoinComplete {
+                result_node: joined.index.0,
+            },
             format!("Join complete — created token {}", joined.index.0),
             joined.index.0,
         );

@@ -40,7 +40,7 @@ fn repeated_pattern_creates_intermediate_tokens() {
     let aa_result: Result<Token, ErrorState> = graph.insert(query_aa);
     assert!(aa_result.is_ok(), "Should be able to insert 'aa'");
     let aa = aa_result.unwrap();
-    
+
     assert_eq!(aa.width(), TokenWidth(2), "aa should have width 2");
 
     // Then insert "aaa" as [aa, a]
@@ -48,7 +48,7 @@ fn repeated_pattern_creates_intermediate_tokens() {
     let aaa_result: Result<Token, ErrorState> = graph.insert(query_aaa);
     assert!(aaa_result.is_ok(), "Should be able to insert 'aaa'");
     let aaa = aaa_result.unwrap();
-    
+
     assert_eq!(aaa.width(), TokenWidth(3), "aaa should have width 3");
 
     // Verify the graph has all expected patterns
@@ -77,7 +77,7 @@ fn repeated_pattern_alternate_decomposition() {
     let aaa: Token = graph.insert(query_aaa).expect("Should insert aaa");
 
     assert_eq!(aaa.width(), TokenWidth(3), "aaa should have width 3");
-    
+
     // The token should be findable via either decomposition
     let find_result = graph.find_ancestor(vec![aa, a]);
     assert!(

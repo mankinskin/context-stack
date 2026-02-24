@@ -59,8 +59,10 @@ impl IndexRangePath<ChildLocation, ChildLocation> {
                 let entry_pos = current_position;
 
                 // Calculate width of tokens before the child we're entering
-                let width_before =
-                    pattern_width(pattern_pre_ctx(pattern.iter().cloned(), loc.sub_index));
+                let width_before = pattern_width(pattern_pre_ctx(
+                    pattern.iter().cloned(),
+                    loc.sub_index,
+                ));
 
                 // Update position for next iteration: add width before child + width of child token
                 current_position.advance_key(

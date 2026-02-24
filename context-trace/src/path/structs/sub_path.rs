@@ -10,9 +10,7 @@ use crate::{
     path::{
         accessors::role::PathRole,
         mutators::move_path::key::AtomPosition,
-        structs::rooted::role_path::{
-            HasRootChildIndex,
-        },
+        structs::rooted::role_path::HasRootChildIndex,
     },
 };
 

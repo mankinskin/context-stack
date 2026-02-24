@@ -26,7 +26,7 @@ impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn alloc_vertex_index(&self) -> VertexIndex {
         VertexIndex::from(self.next_id.fetch_add(1, Ordering::SeqCst))
     }
-    
+
     #[allow(dead_code)]
     pub fn insert_vertex_builder(
         &self,
@@ -57,12 +57,12 @@ impl<G: GraphKind> Hypergraph<G> {
         let token = Token::new(data.vertex_index(), data.width());
         let key = data.key;
         let index = data.vertex_index();
-        
+
         // Insert into all maps
         self.graph.insert(key, VertexEntry::new(data));
         self.key_to_index.insert(key, index);
         self.index_to_key.insert(index, key);
-        
+
         token
     }
 }

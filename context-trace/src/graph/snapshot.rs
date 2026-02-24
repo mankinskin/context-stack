@@ -6,11 +6,17 @@
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::graph::{Hypergraph, kind::GraphKind};
+use crate::graph::{
+    Hypergraph,
+    kind::GraphKind,
+};
 
 /// A compact, serializable snapshot of the hypergraph topology.
 #[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
+#[ts(
+    export,
+    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
+)]
 pub struct GraphSnapshot {
     /// All vertices in the graph.
     pub nodes: Vec<SnapshotNode>,
@@ -20,7 +26,10 @@ pub struct GraphSnapshot {
 
 /// A single vertex in the snapshot.
 #[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
+#[ts(
+    export,
+    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
+)]
 pub struct SnapshotNode {
     /// Vertex index (numeric id).
     pub index: usize,
@@ -34,7 +43,10 @@ pub struct SnapshotNode {
 
 /// A directed edge from parent vertex to child vertex.
 #[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
+#[ts(
+    export,
+    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
+)]
 pub struct SnapshotEdge {
     /// Parent vertex index.
     pub from: usize,
@@ -99,8 +111,7 @@ where
     /// `message == "graph_snapshot"` and parses the `graph_data` field.
     pub fn emit_graph_snapshot(&self) {
         let snapshot = self.to_graph_snapshot();
-        let json =
-            serde_json::to_string(&snapshot).unwrap_or_default();
+        let json = serde_json::to_string(&snapshot).unwrap_or_default();
         tracing::info!(
             graph_data = %json,
             node_count = snapshot.nodes.len(),
@@ -115,4 +126,10 @@ where
 // ---------------------------------------------------------------------------
 
 // Re-export the new visualization types for backwards compatibility during migration
-pub use super::visualization::{GraphOpEvent, LocationInfo, OperationType, QueryInfo, Transition};
+pub use super::visualization::{
+    GraphOpEvent,
+    LocationInfo,
+    OperationType,
+    QueryInfo,
+    Transition,
+};

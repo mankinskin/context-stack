@@ -31,7 +31,8 @@ use info::{
 
 use crate::join::context::pattern::PatternJoinCtx;
 
-pub(crate) trait JoinPartition<R: RangeRole<Mode = Join>>: InfoPartition<R>
+pub(crate) trait JoinPartition<R: RangeRole<Mode = Join>>:
+    InfoPartition<R>
 where
     R::Borders: JoinBorders<R>,
 {

@@ -117,7 +117,10 @@ where
 /// - Updates to checkpoint only happen via `mark_match()`
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(private_bounds)]
-pub(crate) struct Checkpointed<C: HasCheckpoint, S: CandidateState = AtCheckpoint> {
+pub(crate) struct Checkpointed<
+    C: HasCheckpoint,
+    S: CandidateState = AtCheckpoint,
+> {
     /// Last confirmed match position (always Matched state)
     /// This is updated only when `mark_match()` is called
     pub(crate) checkpoint: C::Checkpoint,

@@ -23,7 +23,9 @@ pub(crate) struct SplitRun<G: HasGraph> {
     incomplete: BTreeSet<Token>,
 }
 impl<G: HasGraph> SplitRun<G> {
-    pub(crate) fn init(&mut self) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
+    pub(crate) fn init(
+        &mut self
+    ) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
         self.ctx.cache.augment_root(
             &self.ctx.states_ctx.trav,
             self.ctx.states_ctx.ctx.root,

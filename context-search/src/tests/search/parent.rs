@@ -3,12 +3,6 @@ use {
     crate::search::Find,
     crate::state::end::PathCoverage,
     context_trace::{
-        init_test_tracing,
-        tests::{
-            env::Env1,
-            test_case::TestEnv,
-        },
-        GraphRoot,
         graph::{
             getters::{
                 ErrorReason,
@@ -16,6 +10,12 @@ use {
             },
             vertex::token::Token,
         },
+        init_test_tracing,
+        tests::{
+            env::Env1,
+            test_case::TestEnv,
+        },
+        GraphRoot,
     },
     pretty_assertions::assert_eq,
 };

@@ -24,8 +24,8 @@ use crate::{
     },
     SearchKind,
 };
-use tracing::trace;
 use std::fmt::Debug;
+use tracing::trace;
 
 //pub(crate) type FoldResult = Result<Response, ErrorState>;
 
@@ -48,7 +48,9 @@ impl From<IndexWithPath> for ErrorState {
     }
 }
 
-pub trait Searchable<K: SearchKind = AncestorSearchTraversal>: Sized + Debug {
+pub trait Searchable<K: SearchKind = AncestorSearchTraversal>:
+    Sized + Debug
+{
     fn start_search(
         self,
         trav: K::Trav,

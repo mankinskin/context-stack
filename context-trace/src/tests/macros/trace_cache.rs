@@ -3,7 +3,10 @@
 //! Provides macro for building TraceCache structures with a declarative syntax.
 
 #[cfg(test)]
-use crate::{init_test_tracing, *};
+use crate::{
+    init_test_tracing,
+    *,
+};
 
 /// Build a TraceCache with declarative syntax
 ///

@@ -6,8 +6,8 @@ pub(crate) mod root;
 use crate::{
     ChildLocation,
     EndPath,
-    HasEndPath,
     HasChildPath,
+    HasEndPath,
     HasStartPath,
     IntoRootedRolePath,
     StartPath,

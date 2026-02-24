@@ -8,7 +8,8 @@
 use crate::{
     context::root::RootManager,
     expansion::{
-        ExpansionCtx, chain::BandState,
+        chain::BandState,
+        ExpansionCtx,
     },
 };
 use context_trace::*;
@@ -47,7 +48,11 @@ impl<'a> BlockExpansionCtx {
         );
 
         // Create expansion context with root's last token for overlap detection
-        let expansion_ctx = ExpansionCtx::new(root.graph.clone(), cursor, root_last_token.map(BandState::new));
+        let expansion_ctx = ExpansionCtx::new(
+            root.graph.clone(),
+            cursor,
+            root_last_token.map(BandState::new),
+        );
         Self {
             root,
             ctx: expansion_ctx,
@@ -57,7 +62,6 @@ impl<'a> BlockExpansionCtx {
     /// Process the known pattern and commit the result to the root.
     /// Uses overlap expansion and commits when an overlap is found.
     pub(crate) fn process(&mut self) {
-
         let first = self.ctx.state.anchor_token();
         debug!(state = ?self.ctx.state, ?first, "expansion state before processing");
 

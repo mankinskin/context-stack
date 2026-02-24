@@ -9,7 +9,7 @@ pub(crate) mod direction;
 pub mod result;
 
 /// Trait for types that can create an InsertCtx for graph insertions.
-/// 
+///
 /// With interior mutability, we only need `HasGraph` - mutations happen
 /// through `&self` methods on `Hypergraph` using per-vertex locks.
 pub trait ToInsertCtx<R: InsertResult = Token>: HasGraph {

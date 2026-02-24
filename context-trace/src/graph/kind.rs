@@ -15,7 +15,9 @@ use std::fmt::{
     Display,
 };
 
-pub trait GraphKind: Debug + Clone + Default + PartialEq + Eq + Send + Sync {
+pub trait GraphKind:
+    Debug + Clone + Default + PartialEq + Eq + Send + Sync
+{
     type Atom: Atomize + Display + DeserializeOwned;
     type Direction: PatternDirection;
 }

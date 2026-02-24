@@ -59,7 +59,7 @@ impl Iterator for ExpansionCtx {
                         } else {
                             None
                         }
-                    }
+                    },
                 })
             })
             .and_then(|op| self.apply_op(op))
@@ -67,11 +67,11 @@ impl Iterator for ExpansionCtx {
 }
 impl ExpansionCtx {
     /// Create a new ExpansionCtx.
-    /// 
+    ///
     /// If `root_last_token` is provided, it will be used as the starting point
     /// for overlap detection. This allows finding overlaps between the existing
     /// root and the new cursor pattern.
-    /// 
+    ///
     /// If no root token is provided, the first token is created from the cursor pattern.
     pub(crate) fn new(
         graph: HypergraphRef,
@@ -83,7 +83,7 @@ impl ExpansionCtx {
             //root_last_token = ?root_last_token,
             "New ExpansionCtx"
         );
-        
+
         // If we have a root token, use it as the start for overlap detection
         if let Some(band) = band {
             debug!(band = ?band, "Using root's last token for overlap detection");
@@ -92,12 +92,14 @@ impl ExpansionCtx {
                 cursor: CursorCtx::new(graph, cursor),
             }
         } else {
-        
             // No root - use insert_or_get_complete to find longest prefix match
-            let result: Result<Result<IndexWithPath, _>, _> = 
+            let result: Result<Result<IndexWithPath, _>, _> =
                 graph.insert_or_get_complete(cursor.clone());
-            
-            let IndexWithPath { index: first, path: cursor } = match result {
+
+            let IndexWithPath {
+                index: first,
+                path: cursor,
+            } = match result {
                 Ok(Ok(found)) => found,
                 Ok(Err(found)) => found,
                 Err(ErrorReason::SingleIndex(c)) => *c,
@@ -109,11 +111,11 @@ impl ExpansionCtx {
                         state: BandState::new(first),
                         cursor: CursorCtx::new(graph, cursor),
                     };
-                }
+                },
             };
-            
+
             debug!(first_index = ?first, "ExpansionCtx initialized with insert_or_get_complete result");
-            
+
             // Update cursor to the advanced position
 
             Self {
@@ -141,21 +143,22 @@ impl ExpansionCtx {
 
                 // Create expansion link with paths representing the overlap
                 let expansion_link = self.create_expansion_link(&exp);
-                
+
                 // Create overlap link for the band state
                 let overlap_link = self.create_overlap_link(&expansion_link);
-                
-                let complement =
-                    ComplementBuilder::new(expansion_link).build(&self.cursor.graph);
-                
+
+                let complement = ComplementBuilder::new(expansion_link)
+                    .build(&self.cursor.graph);
+
                 // Create overlap band [complement, expansion]
                 let overlap_band = Band::from((
                     0.into(),
                     Pattern::from(vec![complement, exp.expansion.index]),
                 ));
-                
+
                 // Transition to WithOverlap state
-                let state = BandState::default().set_overlap(overlap_band, overlap_link);
+                let state = BandState::default()
+                    .set_overlap(overlap_band, overlap_link);
 
                 Some(state)
             },
@@ -202,21 +205,24 @@ impl ExpansionCtx {
             expansion_prefix: prefix_path,
         }
     }
-    
+
     /// Create an overlap link from an expansion link.
-    /// 
+    ///
     /// The overlap link contains:
     /// - child_path: top-down path from starting root to expandable postfix (overlap region)
     /// - search_path: bottom-up then top-down path from expansion (overlap region from expansion's view)
     /// - start_bound: position where the overlap starts
-    fn create_overlap_link(&self, expansion_link: &ExpansionLink) -> OverlapLink {
+    fn create_overlap_link(
+        &self,
+        expansion_link: &ExpansionLink,
+    ) -> OverlapLink {
         debug!(
             root_postfix = ?expansion_link.root_postfix,
             expansion_prefix = ?expansion_link.expansion_prefix,
             start_bound = ?expansion_link.start_bound,
             "create_overlap_link"
         );
-        
+
         OverlapLink {
             child_path: expansion_link.root_postfix.clone(),
             search_path: expansion_link.expansion_prefix.clone(),

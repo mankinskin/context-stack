@@ -216,7 +216,10 @@ fn test_entire_root_cursor_position_equals_token_width() {
     graph.emit_graph_snapshot();
 
     // Search for "ab" - should find EntireRoot since "ab" is a complete token at the root
-    let response = Searchable::<AncestorSearchTraversal<_>>::search(vec![a, b], graph.into());
+    let response = Searchable::<AncestorSearchTraversal<_>>::search(
+        vec![a, b],
+        graph.into(),
+    );
 
     let response = response.expect("search should succeed");
 
@@ -258,7 +261,10 @@ fn test_no_match_entire_root_cursor_position() {
     graph.emit_graph_snapshot();
 
     // Search for a pattern "zz" that doesn't exist in the graph
-    let response = Searchable::<AncestorSearchTraversal<_>>::search(vec![z, z], graph.into());
+    let response = Searchable::<AncestorSearchTraversal<_>>::search(
+        vec![z, z],
+        graph.into(),
+    );
 
     let response = response.expect("search should succeed even with no match");
 
@@ -275,13 +281,12 @@ fn test_no_match_entire_root_cursor_position() {
                 *cursor_pos.as_ref(),
                 usize::from(root_width)
             );
-        }
+        },
         other => {
             panic!(
                 "Expected EntireRoot for non-existent pattern, got {:?}",
                 other
             );
-        }
+        },
     }
 }
-

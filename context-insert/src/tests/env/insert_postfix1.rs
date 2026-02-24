@@ -4,16 +4,16 @@
 //! Tests postfix matching behavior
 
 use context_trace::{
+    PatternId,
     graph::{
+        Hypergraph,
+        HypergraphRef,
         vertex::{
             atom::Atom,
             token::Token,
         },
-        Hypergraph,
-        HypergraphRef,
     },
     tests::test_case::TestEnv,
-    PatternId,
 };
 use std::sync::{
     Arc,

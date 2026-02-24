@@ -4,16 +4,16 @@
 //! For example, graph has "abc" and insert starts with "bcd" (bc is postfix of abc).
 
 use context_trace::{
+    PatternId,
     graph::{
+        Hypergraph,
+        HypergraphRef,
         vertex::{
             atom::Atom,
             token::Token,
         },
-        Hypergraph,
-        HypergraphRef,
     },
     tests::test_case::TestEnv,
-    PatternId,
 };
 use std::sync::{
     Arc,
@@ -24,11 +24,11 @@ use std::sync::{
 };
 
 /// Environment with "abc" token for testing postfix overlaps
-/// 
+///
 /// Graph structure:
 /// - Atoms: a, b, c, d, e
 /// - Patterns: ab=[a,b], abc=[ab,c]
-/// 
+///
 /// Test scenario: Insert [b, c, d] where "bc" is postfix of "abc"
 #[derive(Debug)]
 pub struct EnvExpandedOverlap {
@@ -83,7 +83,7 @@ impl TestEnv for EnvExpandedOverlap {
     fn get<'a>() -> RwLockReadGuard<'a, Self> {
         get_context().read().unwrap()
     }
-    
+
     fn get_mut<'a>() -> RwLockWriteGuard<'a, Self> {
         get_context().write().unwrap()
     }
@@ -107,12 +107,12 @@ thread_local! {
 }
 
 /// Environment with overlapping tokens for testing complex scenarios
-/// 
+///
 /// Graph structure:
 /// - Atoms: a, b, c, d
 /// - Patterns: ab=[a,b], bc=[b,c], cd=[c,d]
 /// - Pattern: abcd=[ab,cd]
-/// 
+///
 /// Test scenario: Insert starting at various postfixes to test overlap detection
 #[derive(Debug)]
 pub struct EnvMultiOverlap {
@@ -174,7 +174,7 @@ impl TestEnv for EnvMultiOverlap {
     fn get<'a>() -> RwLockReadGuard<'a, Self> {
         get_multi_context().read().unwrap()
     }
-    
+
     fn get_mut<'a>() -> RwLockWriteGuard<'a, Self> {
         get_multi_context().write().unwrap()
     }

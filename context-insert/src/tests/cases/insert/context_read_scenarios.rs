@@ -10,7 +10,11 @@
 
 use crate::{
     insert::ToInsertCtx,
-    tests::env::{EnvAbc, EnvHypergra, EnvTripleRepeat},
+    tests::env::{
+        EnvAbc,
+        EnvHypergra,
+        EnvTripleRepeat,
+    },
 };
 use context_search::{
     ErrorState,
@@ -44,7 +48,8 @@ fn integration_partial_match_no_checkpoint() {
 
     // This mimics what context-read does: insert_or_get_complete
     // Should handle gracefully without panicking
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query);
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query);
 
     // The result should either be:
     // - Ok(Ok(_)) if insertion succeeded
@@ -101,7 +106,8 @@ fn triple_repeat_pattern_scenario() {
     let query = vec![ab];
 
     // insert_or_get_complete should handle this without panic
-    let result: Result<Result<IndexWithPath, _>, _> = graph.insert_or_get_complete(query);
+    let result: Result<Result<IndexWithPath, _>, _> =
+        graph.insert_or_get_complete(query);
 
     // Verify no panic occurred
     match result {
@@ -117,7 +123,9 @@ fn triple_repeat_pattern_scenario() {
 /// should find ababab, not abab.
 #[test]
 fn search_triple_repeat_finds_full_pattern() {
-    let EnvTripleRepeat { graph, ab, ababab, .. } = EnvTripleRepeat::initialize();
+    let EnvTripleRepeat {
+        graph, ab, ababab, ..
+    } = EnvTripleRepeat::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
 
     // Search for [ab, ab, ab] - should find ababab
@@ -126,12 +134,9 @@ fn search_triple_repeat_finds_full_pattern() {
 
     assert!(result.is_ok(), "Search should succeed");
     let response = result.unwrap();
-    
+
     // Should find ababab (width 6), not abab (width 4)
-    assert!(
-        response.query_exhausted(),
-        "Query should be fully consumed"
-    );
+    assert!(response.query_exhausted(), "Query should be fully consumed");
     assert_eq!(
         response.root_token(),
         ababab,
@@ -145,7 +150,7 @@ fn search_triple_repeat_finds_full_pattern() {
 #[test]
 fn insert_same_token_repeated() {
     use crate::tests::env::EnvSingleAtom;
-    
+
     let EnvSingleAtom { graph, a } = EnvSingleAtom::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
     graph.emit_graph_snapshot();
@@ -156,6 +161,6 @@ fn insert_same_token_repeated() {
 
     assert!(result.is_ok(), "Should be able to insert [a, a]");
     let aa = result.unwrap();
-    
+
     assert_eq!(aa.width(), TokenWidth(2), "aa should have width 2");
 }

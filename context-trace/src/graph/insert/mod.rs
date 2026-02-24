@@ -3,8 +3,8 @@
 //! Provides methods for inserting vertices, atoms, patterns, and managing
 //! parent-child relationships in the hypergraph.
 
-use std::sync::atomic::AtomicUsize;
 use lazy_static::lazy_static;
+use std::sync::atomic::AtomicUsize;
 
 mod atom;
 mod parents;

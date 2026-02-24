@@ -3,10 +3,14 @@
 //! Provides a thread-local step counter and helper functions for emitting
 //! `GraphOpEvent` messages during split and join operations.
 
-use std::cell::Cell;
 use context_trace::graph::visualization::{
-    GraphOpEvent, LocationInfo, OperationType, QueryInfo, Transition,
+    GraphOpEvent,
+    LocationInfo,
+    OperationType,
+    QueryInfo,
+    Transition,
 };
+use std::cell::Cell;
 
 thread_local! {
     /// Step counter for insert operations.

@@ -139,7 +139,9 @@ impl<M: PostVisitMode> OffsetIndexRange<Post<M>> for RangeFrom<usize> {
         lo.to_vertex_splits()
     }
 }
-pub(crate) trait RangeOffsets<R: RangeRole>: Debug + Clone + Copy {
+pub(crate) trait RangeOffsets<R: RangeRole>:
+    Debug + Clone + Copy
+{
     fn as_splits<C: AsNodeTraceCtx>(
         &self,
         ctx: C,

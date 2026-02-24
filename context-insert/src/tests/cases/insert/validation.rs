@@ -10,7 +10,10 @@
 use crate::{
     insert::ToInsertCtx,
     interval::init::InitInterval,
-    tests::env::{EnvAbcd, EnvAb},
+    tests::env::{
+        EnvAb,
+        EnvAbcd,
+    },
 };
 use context_search::{
     ErrorState,
@@ -127,7 +130,8 @@ fn reject_empty_pattern_search() {
     let empty_pattern: Pattern = Pattern::default();
 
     // Should return an error, not panic
-    let result: Result<Response, ErrorReason> = graph.find_ancestor(empty_pattern);
+    let result: Result<Response, ErrorReason> =
+        graph.find_ancestor(empty_pattern);
 
     assert!(result.is_err(), "Expected error for empty pattern search");
     assert_eq!(result.unwrap_err(), ErrorReason::EmptyPatterns);

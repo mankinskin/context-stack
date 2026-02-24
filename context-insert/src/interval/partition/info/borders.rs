@@ -18,7 +18,10 @@ use crate::interval::partition::info::{
         },
     },
 };
-pub(crate) struct PartitionBorders<R: RangeRole, C: PartitionBorderKey = PatternId> {
+pub(crate) struct PartitionBorders<
+    R: RangeRole,
+    C: PartitionBorderKey = PatternId,
+> {
     pub(crate) borders: HashMap<C, R::Borders>,
     pub(crate) perfect: R::Perfect,
 }

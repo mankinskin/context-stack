@@ -59,7 +59,6 @@ pub(crate) trait StartFoldPath:
     + CalcWidth
 {
     fn to_range_path(self) -> PatternRangePath;
-
 }
 
 impl StartFoldPath for PatternRangePath {

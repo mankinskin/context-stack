@@ -3,9 +3,7 @@
 use super::{
     core::CompactFieldsFormatter,
     field_visitor::FieldVisitor,
-    fields::filter_span_fields,
-    helpers::extract_trait_context,
-    string_utils::strip_ansi_codes,
+    special_fields::SpecialFields,
     syntax::highlight_rust_signature,
 };
 
@@ -232,42 +230,47 @@ where
             let mut parts = Vec::new();
             parts.push(format!("SPAN ENTERED: {}::{}", target, span_name));
 
-            // Get formatted fields (but don't display them inline - they'll be shown below)
-            let fields_str_opt = span.as_ref().and_then(|s| {
-                s.extensions()
-                    .get::<tracing_subscriber::fmt::FormattedFields<N>>()
-                    .map(|f| strip_ansi_codes(f.as_str()))
-            });
+            // Read special fields directly from span extensions
+            let special = span
+                .as_ref()
+                .and_then(|s| s.extensions().get::<SpecialFields>().cloned());
 
-            // Extract and display trait context
-            if (config.span_enter.trait_context.show_trait_name
-                || config.span_enter.trait_context.show_self_type
-                || config.span_enter.trait_context.show_associated_types)
-                && let Some(trait_ctx) = fields_str_opt
-                    .as_ref()
-                    .and_then(|fs| extract_trait_context(fs))
-            {
+            // Display trait context from special fields
+            if let Some(ref special) = special {
                 if config.span_enter.trait_context.show_trait_name
-                    && let Some(trait_name) = trait_ctx.trait_name
+                    && let Some(ref trait_name) = special.trait_name
                 {
                     parts.push(format!("[trait: {}]", trait_name));
                 }
                 if config.span_enter.trait_context.show_self_type
-                    && let Some(self_type) = trait_ctx.self_type
+                    && let Some(ref self_type) = special.self_type
                 {
                     let type_name =
-                        self_type.rsplit("::").next().unwrap_or(&self_type);
+                        self_type.rsplit("::").next().unwrap_or(self_type);
                     parts.push(format!("<{}>", type_name));
                 }
                 if config.span_enter.trait_context.show_associated_types
-                    && !trait_ctx.associated_types.is_empty()
+                    && !special.associated_types.is_empty()
                 {
-                    let assoc_str = trait_ctx
+                    let assoc_str = special
                         .associated_types
                         .iter()
                         .map(|(name, ty)| {
+                            let assoc_name = name
+                                .strip_suffix("_type")
+                                .map(|s| {
+                                    let mut chars = s.chars();
+                                    match chars.next() {
+                                        None => String::new(),
+                                        Some(first) => first
+                                            .to_uppercase()
+                                            .chain(chars)
+                                            .collect(),
+                                    }
+                                })
+                                .unwrap_or_else(|| name.clone());
                             let ty_short = ty.rsplit("::").next().unwrap_or(ty);
-                            format!("{}={}", name, ty_short)
+                            format!("{}={}", assoc_name, ty_short)
                         })
                         .collect::<Vec<_>>()
                         .join(", ");
@@ -275,12 +278,13 @@ where
                 }
             }
 
-            // Extract and display function signature
+            // Display function signature from special fields
             if config.span_enter.show_fn_signature
-                && let Some(fn_sig) = extract_fn_sig(fields_str_opt.as_ref())
+                && let Some(ref fn_sig) =
+                    special.as_ref().and_then(|s| s.fn_sig.as_ref())
             {
                 let highlighted =
-                    highlight_rust_signature(&fn_sig, config.enable_ansi);
+                    highlight_rust_signature(fn_sig, config.enable_ansi);
                 parts.push(format!("- {}", highlighted));
             }
 
@@ -297,38 +301,15 @@ where
     }
 }
 
-/// Extract fn_sig from formatted fields
-fn extract_fn_sig(fields_str_opt: Option<&String>) -> Option<String> {
-    fields_str_opt.and_then(|fields_str| {
-        // Pattern: fn_sig="..."
-        if let Some(idx) = fields_str.find("fn_sig=\"") {
-            let start = idx + 8;
-            if let Some(end_offset) = fields_str[start..].find('"') {
-                return Some(fields_str[start..start + end_offset].to_string());
-            }
-        }
-
-        // Pattern: fn_sig=...
-        if let Some(idx) = fields_str.find("fn_sig=") {
-            let start = idx + 7;
-            let remaining = &fields_str[start..];
-            let end = remaining
-                .find(char::is_whitespace)
-                .unwrap_or(remaining.len());
-            if end > 0 {
-                return Some(remaining[..end].trim_matches('"').to_string());
-            }
-        }
-        None
-    })
-}
-
 /// Format span fields for SPAN ENTERED events
+///
+/// Special fields (fn_sig, self_type, trait_name, *_type) are already
+/// filtered out by SpanFieldFormatter, so we just display what remains.
 fn format_span_fields<S, N>(
     writer: &mut dyn Write,
     ctx: &FmtContext<'_, S, N>,
     gutter_indent: &str,
-    config: &super::config::FormatConfig,
+    _config: &super::config::FormatConfig,
 ) -> fmt::Result
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
@@ -340,29 +321,8 @@ where
             span.extensions()
                 .get::<tracing_subscriber::fmt::FormattedFields<N>>()
     {
-        let fields_str = strip_ansi_codes(fields.as_str());
-
-        // Filter out special fields that are displayed elsewhere
-        let cleaned = filter_span_fields(&fields_str);
-
-        // Also remove trait context fields if they were displayed
-        let mut final_cleaned = cleaned;
-        if config.span_enter.trait_context.show_self_type {
-            final_cleaned =
-                remove_all_occurrences(&final_cleaned, "self_type=");
-        }
-        if config.span_enter.trait_context.show_trait_name {
-            final_cleaned =
-                remove_all_occurrences(&final_cleaned, "trait_name=");
-        }
-        if config.span_enter.trait_context.show_associated_types {
-            final_cleaned = remove_associated_types(&final_cleaned);
-        }
-
-        // Only trim leading/trailing newlines, not spaces (to preserve field indentation)
-        let trimmed = final_cleaned.trim_matches('\n');
-
-        // Remove empty lines (that may have been left by field removal)
+        let fields_str = fields.as_str();
+        let trimmed = fields_str.trim_matches('\n');
         for line in trimmed.lines() {
             if !line.trim().is_empty() {
                 write!(writer, "\n{}{}", gutter_indent, line)?;
@@ -370,60 +330,4 @@ where
         }
     }
     Ok(())
-}
-
-/// Remove all occurrences of a field from formatted fields string
-fn remove_all_occurrences(
-    fields: &str,
-    field_prefix: &str,
-) -> String {
-    let mut result = fields.to_string();
-    while let Some(start) = result.find(field_prefix) {
-        let after_eq = start + field_prefix.len();
-        let remaining = &result[after_eq..];
-        let field_end = if let Some(stripped) = remaining.strip_prefix('"') {
-            stripped.find('"').map(|i| after_eq + i + 2)
-        } else {
-            remaining.find(char::is_whitespace).map(|i| after_eq + i)
-        }
-        .unwrap_or(result.len());
-        result.replace_range(start..field_end, "");
-    }
-    result
-}
-
-/// Remove associated type fields (ending with _type, except self_type/trait_name)
-fn remove_associated_types(fields: &str) -> String {
-    let mut result = fields.to_string();
-    let mut pos = 0;
-    while pos < result.len() {
-        if let Some(type_pos) = result[pos..].find("_type=") {
-            let abs_pos = pos + type_pos;
-            let field_start = result[..abs_pos]
-                .rfind(char::is_whitespace)
-                .map(|i| i + 1)
-                .unwrap_or(0);
-            let field_name = &result[field_start..abs_pos];
-
-            if field_name != "self" && field_name != "trait_name" {
-                let after_eq = abs_pos + 6;
-                let remaining = &result[after_eq..];
-                let field_end = if let Some(stripped) =
-                    remaining.strip_prefix('"')
-                {
-                    stripped.find('"').map(|i| after_eq + i + 2)
-                } else {
-                    remaining.find(char::is_whitespace).map(|i| after_eq + i)
-                }
-                .unwrap_or(result.len());
-                result.replace_range(field_start..field_end, "");
-                pos = field_start;
-            } else {
-                pos = abs_pos + 1;
-            }
-        } else {
-            break;
-        }
-    }
-    result
 }

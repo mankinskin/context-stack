@@ -46,7 +46,9 @@ impl BoolPerfect for (bool, bool) {
     }
 }
 
-pub(crate) trait BorderPerfect: Default + Debug + Clone + Extend<Self> {
+pub(crate) trait BorderPerfect:
+    Default + Debug + Clone + Extend<Self>
+{
     type Boolean: BoolPerfect<Result = Self>;
     fn new(
         boolean: Self::Boolean,
@@ -61,7 +63,10 @@ pub(crate) trait BorderPerfect: Default + Debug + Clone + Extend<Self> {
 pub(crate) struct SinglePerfect(pub(crate) Option<PatternId>);
 
 #[derive(Debug, Default, Clone, Copy, From, Into)]
-pub(crate) struct DoublePerfect(pub(crate) Option<PatternId>, pub(crate) Option<PatternId>);
+pub(crate) struct DoublePerfect(
+    pub(crate) Option<PatternId>,
+    pub(crate) Option<PatternId>,
+);
 
 impl std::ops::Add for SinglePerfect {
     type Output = Self;

@@ -45,10 +45,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Adds a parent to all nodes in a pattern
     #[track_caller]
-    pub fn add_parents_to_pattern_nodes<
-        I: HasVertexIndex,
-        P: ToToken,
-    >(
+    pub fn add_parents_to_pattern_nodes<I: HasVertexIndex, P: ToToken>(
         &self,
         pattern: Vec<I>,
         parent: P,
@@ -61,7 +58,8 @@ impl<G: GraphKind> Hypergraph<G> {
                     pattern_id,
                     i,
                 ));
-            }).expect("Vertex should exist");
+            })
+            .expect("Vertex should exist");
         }
     }
 
@@ -84,7 +82,8 @@ impl<G: GraphKind> Hypergraph<G> {
                         pattern_id,
                         pos,
                     ));
-                }).expect("Vertex should exist");
+                })
+                .expect("Vertex should exist");
             });
     }
 }
@@ -102,27 +101,33 @@ impl<G: GraphKind> Hypergraph<G> {
             return parent.to_token();
         }
         let width = pattern_width(&new);
-        
+
         // Get pattern and update child parents
-        let pattern = self.with_vertex(parent.vertex_index(), |vertex| {
-            vertex.expect_child_pattern(&pattern_id).clone()
-        }).expect("Parent vertex should exist");
-        
+        let pattern = self
+            .with_vertex(parent.vertex_index(), |vertex| {
+                vertex.expect_child_pattern(&pattern_id).clone()
+            })
+            .expect("Parent vertex should exist");
+
         for c in pattern.into_iter().collect::<HashSet<_>>() {
             self.with_vertex_mut(c.vertex_index(), |node| {
-                node.get_parent_mut(parent.vertex_index()).unwrap().width += width;
-            }).expect("Child vertex should exist");
+                node.get_parent_mut(parent.vertex_index()).unwrap().width +=
+                    width;
+            })
+            .expect("Child vertex should exist");
         }
-        
+
         // Update parent vertex
-        let (offset, final_width) = self.with_vertex_mut(parent.vertex_index(), |vertex| {
-            let pattern = vertex.expect_child_pattern_mut(&pattern_id);
-            let offset = pattern.len();
-            pattern.extend(new.iter());
-            *vertex.width_mut() += width.0;
-            (offset, vertex.width())
-        }).expect("Parent vertex should exist");
-        
+        let (offset, final_width) = self
+            .with_vertex_mut(parent.vertex_index(), |vertex| {
+                let pattern = vertex.expect_child_pattern_mut(&pattern_id);
+                let offset = pattern.len();
+                pattern.extend(new.iter());
+                *vertex.width_mut() += width.0;
+                (offset, vertex.width())
+            })
+            .expect("Parent vertex should exist");
+
         let parent = Token::new(parent.vertex_index(), final_width);
         self.add_pattern_parent(parent, new, pattern_id, offset);
         parent

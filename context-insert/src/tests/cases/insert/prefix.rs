@@ -54,7 +54,9 @@ fn insert_prefix1() {
         end_bound: 3.into(),
     };
 
-    let abc: Token = graph.insert_init((), expected_init).expect("insert_init should succeed");
+    let abc: Token = graph
+        .insert_init((), expected_init)
+        .expect("insert_init should succeed");
     assert_indices!(graph, ab, abcd);
     assert_patterns! {
         graph,

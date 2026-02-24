@@ -83,7 +83,6 @@ impl crate::logging::compact_format::CompactFormat for DownPosition {
     }
 }
 
-
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy, new)]
 pub struct DownKey {
     pub index: Token,

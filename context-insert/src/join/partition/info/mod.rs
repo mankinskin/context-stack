@@ -8,9 +8,7 @@ use crate::{
     },
     join::{
         context::pattern::borders::JoinBorders,
-        joined::{
-            partition::JoinedPartition,
-        },
+        joined::partition::JoinedPartition,
         partition::Join,
     },
 };
@@ -26,7 +24,9 @@ pub(crate) mod inner_range;
 pub(crate) mod pattern_info;
 
 #[derive(Debug, Deref, DerefMut, Into, From, new)]
-pub(crate) struct JoinPartitionInfo<R: RangeRole<Mode = Join>>(PartitionInfo<R>)
+pub(crate) struct JoinPartitionInfo<R: RangeRole<Mode = Join>>(
+    PartitionInfo<R>,
+)
 where
     R::Borders: JoinBorders<R>;
 

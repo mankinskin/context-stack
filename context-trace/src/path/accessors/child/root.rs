@@ -14,9 +14,7 @@ use crate::{
             },
         },
         structs::rooted::{
-            role_path::{
-                HasRootChildIndex,
-            },
+            role_path::HasRootChildIndex,
             root::RootedPath,
         },
     },
@@ -75,7 +73,9 @@ impl<R: PathRole> GraphRootChild<R> for ChildLocation {
         *self
     }
 }
-impl<R: PathRole, T: GraphRootChild<R>> GraphRootChild<R> for PositionAnnotated<T> {
+impl<R: PathRole, T: GraphRootChild<R>> GraphRootChild<R>
+    for PositionAnnotated<T>
+{
     fn graph_root_child_location(&self) -> ChildLocation {
         self.node.graph_root_child_location()
     }

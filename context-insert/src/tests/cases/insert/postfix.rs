@@ -3,9 +3,7 @@ use crate::{
     interval::init::InitInterval,
     tests::env::EnvInsertPostfix1,
 };
-use context_search::{
-    *,
-};
+use context_search::*;
 use context_trace::{
     tests::test_case::TestEnv,
     trace::has_graph::HasGraph,
@@ -50,7 +48,9 @@ fn insert_postfix1() {
         end_bound: 3.into(),
     };
 
-    let bcd: Token = graph.insert_init((), expected_init).expect("insert_init should succeed");
+    let bcd: Token = graph
+        .insert_init((), expected_init)
+        .expect("insert_init should succeed");
     assert_indices!(graph, cd, abcd);
     assert_patterns! {
         graph,

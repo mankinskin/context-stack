@@ -1,4 +1,7 @@
-use {crate::{cursor::Checkpointed, state::matched::CheckpointedCursor}};
+use crate::{
+    cursor::Checkpointed,
+    state::matched::CheckpointedCursor,
+};
 #[cfg(test)]
 use {
     crate::{

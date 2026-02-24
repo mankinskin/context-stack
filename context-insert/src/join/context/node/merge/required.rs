@@ -15,7 +15,7 @@
 //!
 //! For inserting `aby` into `xxabyzw` with pattern `[x, x, a, b, yz, w]`:
 //! - Target: `1..=3` (aby)
-//! - Wrapper: `1..=4` (abyz) 
+//! - Wrapper: `1..=4` (abyz)
 //! - Overlap: `1..=2` (ab) ← intersection of target and wrapper
 //!
 //! NOT required: `2..=3` (by), `2..=4` (byz) - just covered, not overlaps
@@ -36,13 +36,19 @@ impl RequiredPartitions {
     }
 
     /// Mark a partition range as required.
-    pub(crate) fn add(&mut self, range: PartitionRange) {
+    pub(crate) fn add(
+        &mut self,
+        range: PartitionRange,
+    ) {
         debug!(?range, "RequiredPartitions: adding");
         self.required.insert(range);
     }
 
     /// Check if a partition range is required.
-    pub(crate) fn is_required(&self, range: &PartitionRange) -> bool {
+    pub(crate) fn is_required(
+        &self,
+        range: &PartitionRange,
+    ) -> bool {
         self.required.contains(range)
     }
 
@@ -80,7 +86,7 @@ impl RequiredPartitions {
     ///
     /// For each required partition like `1..=3`, adds all sub-ranges:
     /// - `1..=1`, `1..=2`, `2..=2`, `2..=3`, `3..=3`
-    /// 
+    ///
     /// These are needed as components for building 2-way merge patterns.
     /// For example, to build `aby` (1..=3) with pattern `[ab, y]`:
     /// - Need `ab` (1..=2) as left component
@@ -93,7 +99,7 @@ impl RequiredPartitions {
             for range in &current {
                 let start = *range.start();
                 let end = *range.end();
-                
+
                 // Add all sub-ranges of length > 0 (multi-partition ranges)
                 // Single partitions (start == end) don't need sub-ranges
                 if end > start {
@@ -107,7 +113,8 @@ impl RequiredPartitions {
                             if sub_start == sub_end {
                                 continue;
                             }
-                            let sub_range = PartitionRange::new(sub_start..=sub_end);
+                            let sub_range =
+                                PartitionRange::new(sub_start..=sub_end);
                             if !self.required.contains(&sub_range) {
                                 debug!(
                                     parent = ?range,

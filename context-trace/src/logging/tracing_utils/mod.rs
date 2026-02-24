@@ -4,53 +4,21 @@
 //! Logs are written to `<target-dir>/test-logs/<test_name>.log` and deleted if the test passes.
 //! The target directory is automatically detected from the Cargo build environment.
 //!
-//! # Log Format Features
-//!
-//! The logging system provides:
-//! - **Compact format** with timestamps and file locations
-//! - **Span tracking** showing NEW, ENTER, EXIT, and CLOSE events for spans
-//! - **Visual indentation** in the compact format for nested spans
-//! - **Color coding** in stdout (when terminal supports it)
-//!
-//! # Enabling stdout logging
-//!
-//! By default, logs are only written to files. To enable stdout logging for debugging,
-//! set the `LOG_STDOUT` environment variable:
-//!
-//! ```bash
-//! # Enable stdout logging
-//! LOG_STDOUT=1 cargo test
-//!
-//! # Or with true/yes
-//! LOG_STDOUT=true cargo test
-//! LOG_STDOUT=yes cargo test
-//!
-//! # Run specific test with stdout logging
-//! LOG_STDOUT=1 cargo test my_test_name -- --nocapture
-//! ```
-//!
-//! You can also combine with `RUST_LOG` or `LOG_FILTER` to control log levels:
-//!
-//! ```bash
-//! # Using LOG_FILTER (recommended)
-//! LOG_STDOUT=1 LOG_FILTER=debug cargo test
-//! LOG_STDOUT=1 LOG_FILTER=context_search::search=trace cargo test
-//!
-//! # Using RUST_LOG (fallback)
-//! LOG_STDOUT=1 RUST_LOG=debug cargo test
-//! ```
 
 // Internal modules
 mod config;
+mod debug_to_json;
 mod field_visitor;
 mod formatter;
+mod graph_ref;
 mod panic;
 mod path;
 mod span_fields;
-mod string_utils;
+mod special_fields;
 mod syntax;
 mod test_tracing;
 mod timer;
+mod writers;
 
 // Re-export public API
 pub use config::TracingConfig;
@@ -82,31 +50,6 @@ pub use test_tracing::TestTracing;
 ///     // ... build graph ...
 ///     let _tracing = init_test_tracing!(graph);
 ///     // Tokens will now show string representations
-/// }
-/// ```
-///
-/// With custom configuration:
-/// ```no_run
-/// use context_trace::{init_test_tracing, logging::tracing_utils::TracingConfig};
-///
-/// #[test]
-/// fn my_test() {
-///     let config = TracingConfig::default().with_stdout_level("debug");
-///     let _tracing = init_test_tracing!(config);
-///     // Your test code
-/// }
-/// ```
-///
-/// With both graph and config:
-/// ```no_run
-/// use context_trace::{init_test_tracing, Hypergraph, logging::tracing_utils::TracingConfig};
-///
-/// #[test]
-/// fn my_test() {
-///     let graph = Hypergraph::default();
-///     let config = TracingConfig::default().with_stdout_level("debug");
-///     let _tracing = init_test_tracing!(graph, config);
-///     // Your test code
 /// }
 /// ```
 #[macro_export]

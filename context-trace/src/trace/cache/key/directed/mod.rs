@@ -11,13 +11,13 @@ use crate::{
     direction::Right,
     graph::vertex::{
         VertexIndex,
-        token::Token,
         has_vertex_index::HasVertexIndex,
+        token::Token,
         wide::Wide,
     },
     path::mutators::move_path::key::{
-        MoveKey,
         AtomPosition,
+        MoveKey,
     },
 };
 

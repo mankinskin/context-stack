@@ -59,7 +59,9 @@ where
 
     let result = prefix_children
         .iter()
-        .sorted_unstable_by(|a: &&SubToken, b: &&SubToken| b.token().width().cmp(&a.token().width()))
+        .sorted_unstable_by(|a: &&SubToken, b: &&SubToken| {
+            b.token().width().cmp(&a.token().width())
+        })
         .map(|sub: &SubToken| {
             let child_location = leaf.to_child_location(*sub.sub_location());
             let next_state = update_state(sub.clone(), child_location);

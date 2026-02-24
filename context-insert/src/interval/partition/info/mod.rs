@@ -49,7 +49,9 @@ pub(crate) type PatternCtxs<R> = HashMap<PatternId, ModePatternCtxOf<R>>;
 pub(crate) trait PartitionBorderKey: Hash + Eq {}
 
 impl<T: Hash + Eq> PartitionBorderKey for T {}
-pub(crate) trait InfoPartition<R: RangeRole>: Sized + Clone + ToPartition<R> {
+pub(crate) trait InfoPartition<R: RangeRole>:
+    Sized + Clone + ToPartition<R>
+{
     fn info_borders(
         &self,
         ctx: &PatternTraceCtx,

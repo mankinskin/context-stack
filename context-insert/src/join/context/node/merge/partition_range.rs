@@ -6,9 +6,7 @@ use derive_more::{
     Deref,
     DerefMut,
 };
-use std::ops::{
-    RangeInclusive,
-};
+use std::ops::RangeInclusive;
 
 /// A range of partition indices.
 ///
@@ -49,7 +47,10 @@ impl PartitionRange {
     ///
     /// This is used for computing inner partitions: when target and wrapper
     /// overlap, the overlapping portion becomes a required inner partition.
-    pub(crate) fn overlap(&self, other: &Self) -> Option<Self> {
+    pub(crate) fn overlap(
+        &self,
+        other: &Self,
+    ) -> Option<Self> {
         let start = (*self.start()).max(*other.start());
         let end = (*self.end()).min(*other.end());
 

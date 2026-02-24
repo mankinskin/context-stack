@@ -13,12 +13,12 @@ use crate::{
         },
     },
     cursor::CursorState,
+    policy::SearchKind,
     r#match::{
         iterator::SearchIterator,
         SearchNode,
         SearchQueue,
     },
-    policy::SearchKind,
 };
 use context_trace::*;
 use std::fmt;

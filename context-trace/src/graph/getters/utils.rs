@@ -63,7 +63,9 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> Result<Vec<Token>, ErrorReason> {
         let loc = id.into_pattern_location();
         self.with_vertex(loc.parent, |vertex| {
-            vertex.get_child_pattern_range(&loc.pattern_id, range).map(|s| s.to_vec())
+            vertex
+                .get_child_pattern_range(&loc.pattern_id, range)
+                .map(|s| s.to_vec())
         })?
     }
     #[track_caller]
@@ -74,7 +76,8 @@ impl<G: GraphKind> Hypergraph<G> {
     ) -> Vec<Token> {
         let loc = id.into_pattern_location();
         self.expect_vertex_data(loc.parent)
-            .expect_child_pattern_range(&loc.pattern_id, range).to_vec()
+            .expect_child_pattern_range(&loc.pattern_id, range)
+            .to_vec()
     }
     /// get sub-vertex at range relative to index
     /// FIXME: can crash if range does not have an exact match in the root vertex

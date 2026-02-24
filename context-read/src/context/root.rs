@@ -79,7 +79,7 @@ impl RootManager {
     pub(crate) fn last_child_token(&self) -> Option<Token> {
         let root = self.root?;
         let vertex = root.vertex(&self.graph);
-        
+
         // If root has child patterns, get the last token from the first pattern
         if let Some((&_pid, pattern)) = vertex.child_patterns().iter().next() {
             pattern.last().copied()
@@ -90,7 +90,7 @@ impl RootManager {
     }
 
     /// Commit a band state to the root.
-    /// 
+    ///
     /// Linear control flow:
     /// 1. Collapse the state to a single append_pattern
     /// 2. Append to existing root or create new root
@@ -102,7 +102,7 @@ impl RootManager {
 
         // 1. Collapse state to single append_pattern
         let append_pattern = state.collapse(&mut self.graph);
-        
+
         debug!(
             append_pattern = ?append_pattern,
             has_root = self.root.is_some(),
@@ -114,13 +114,16 @@ impl RootManager {
     }
 
     /// Append a collapsed pattern to the root.
-    /// 
+    ///
     /// - No root → create fresh root from pattern
     /// - With root → check for compound overlap, then append
-    /// 
+    ///
     /// Compound overlap: root's last child equals append[0]'s first child (both compound).
     /// This creates both decompositions: [root, append] and [overlap_prefix, rest].
-    fn append_collapsed(&mut self, append_pattern: Pattern) {
+    fn append_collapsed(
+        &mut self,
+        append_pattern: Pattern,
+    ) {
         use tracing::debug;
 
         // Handle empty pattern
@@ -155,24 +158,27 @@ impl RootManager {
                     append_first = ?append_first,
                     "Cursor-level overlap (atomic root) - creating decompositions"
                 );
-                
+
                 // Bundle the append pattern
-                let bundled = self.graph.insert_pattern(append_pattern.to_vec());
-                
+                let bundled =
+                    self.graph.insert_pattern(append_pattern.to_vec());
+
                 // Standard decomposition: [root, bundled]
                 let standard = vec![root, bundled];
-                
+
                 // Overlap decomposition: [root_extended, rest]
-                let root_extended = self.graph.insert_pattern(vec![root, append_first]);
+                let root_extended =
+                    self.graph.insert_pattern(vec![root, append_first]);
                 let mut overlap = vec![root_extended];
                 overlap.extend(append_pattern[1..].iter().cloned());
-                
+
                 debug!(standard = ?standard, overlap = ?overlap, "Inserting both decompositions");
-                self.root = Some(self.graph.insert_patterns(vec![standard, overlap]));
+                self.root =
+                    Some(self.graph.insert_patterns(vec![standard, overlap]));
                 return;
             }
         }
-        
+
         // Compound overlap: root's last child equals append[0]'s first child
         // Only applies when append[0] is compound (has children)
         if let (Some(r_last), Some(a_first)) = (root_last, append_first_first) {
@@ -184,16 +190,20 @@ impl RootManager {
                     append_first_first = ?a_first,
                     "Compound overlap - creating both decompositions"
                 );
-                
+
                 // Standard decomposition: [root, append...]
                 let standard: Vec<Token> = std::iter::once(root)
                     .chain(append_pattern.iter().cloned())
                     .collect();
-                
+
                 // Overlap decomposition
-                if let Some(overlap) = self.build_overlap_decomposition(root, &append_pattern) {
+                if let Some(overlap) =
+                    self.build_overlap_decomposition(root, &append_pattern)
+                {
                     debug!(standard = ?standard, overlap = ?overlap, "Inserting both decompositions");
-                    self.root = Some(self.graph.insert_patterns(vec![standard, overlap]));
+                    self.root = Some(
+                        self.graph.insert_patterns(vec![standard, overlap]),
+                    );
                     return;
                 }
             }
@@ -201,9 +211,11 @@ impl RootManager {
 
         // No overlap - standard append logic
         let vertex = root.vertex(&self.graph);
-        let can_extend = vertex.child_patterns().len() == 1 
+        let can_extend = vertex.child_patterns().len() == 1
             && vertex.parents().is_empty()
-            && !append_pattern.iter().any(|t| t.vertex_index() == root.vertex_index());
+            && !append_pattern
+                .iter()
+                .any(|t| t.vertex_index() == root.vertex_index());
 
         self.root = Some(if can_extend {
             debug!("Extending root in place");
@@ -219,7 +231,10 @@ impl RootManager {
     }
 
     /// Get the last child token of a token (or the token itself if atomic)
-    fn last_child_of(&self, token: Token) -> Option<Token> {
+    fn last_child_of(
+        &self,
+        token: Token,
+    ) -> Option<Token> {
         let vertex = token.vertex(&self.graph);
         if let Some((&_pid, pattern)) = vertex.child_patterns().iter().next() {
             pattern.last().copied()
@@ -229,7 +244,10 @@ impl RootManager {
     }
 
     /// Get the first child token of a token (or the token itself if atomic)
-    fn first_child_of(&self, token: Token) -> Option<Token> {
+    fn first_child_of(
+        &self,
+        token: Token,
+    ) -> Option<Token> {
         let vertex = token.vertex(&self.graph);
         if let Some((&_pid, pattern)) = vertex.child_patterns().iter().next() {
             pattern.first().copied()
@@ -240,21 +258,25 @@ impl RootManager {
 
     /// Build the overlap decomposition: [overlap_prefix, rest_of_append]
     /// where overlap_prefix = [root, first_child_of_append[0]]
-    fn build_overlap_decomposition(&mut self, root: Token, append_pattern: &Pattern) -> Option<Vec<Token>> {
+    fn build_overlap_decomposition(
+        &mut self,
+        root: Token,
+        append_pattern: &Pattern,
+    ) -> Option<Vec<Token>> {
         let append_first = append_pattern[0];
         let vertex = append_first.vertex(&self.graph);
-        
+
         // Get children of append[0]
         let (&_pid, children) = vertex.child_patterns().iter().next()?;
-        
+
         if children.is_empty() {
             return None;
         }
-        
+
         // overlap_prefix = [root, first_child]
         let first_child = children[0];
         let overlap_prefix = self.graph.insert_pattern(vec![root, first_child]);
-        
+
         // rest_of_append = [children[1..], append[1..]]
         let mut rest = Vec::new();
         if children.len() > 1 {
@@ -268,14 +290,13 @@ impl RootManager {
             rest.push(remaining);
         }
         rest.extend(append_pattern[1..].iter().cloned());
-        
+
         // Full overlap decomposition: [overlap_prefix, rest...]
         let mut result = vec![overlap_prefix];
         result.extend(rest);
-        
+
         Some(result)
     }
-
 }
 
 // RootManager derefs to HypergraphRef, which implements HasGraph

@@ -8,8 +8,10 @@ use std::{
     num::NonZeroUsize,
 };
 
-use crate::split::cache::position::SplitPositionCache;
-use crate::*;
+use crate::{
+    split::cache::position::SplitPositionCache,
+    *,
+};
 
 use crate::split::{
     position_splits,
@@ -217,7 +219,7 @@ impl VertexSplitCtx<'_> {
             (true, true) => output.set_root_mode(RootMode::Infix),
             (false, true) => output.set_root_mode(RootMode::Prefix),
             (true, false) => output.set_root_mode(RootMode::Postfix),
-            (false, false) => { /* No splits found, return default output */ }
+            (false, false) => { /* No splits found, return default output */ },
         }
         output
     }

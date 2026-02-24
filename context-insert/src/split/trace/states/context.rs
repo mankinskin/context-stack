@@ -5,7 +5,16 @@ use derive_more::derive::{
     DerefMut,
 };
 
-use crate::{split::cache::{position::{PosKey, SplitPositionCache}, vertex::SplitVertexCache}, *};
+use crate::{
+    split::cache::{
+        position::{
+            PosKey,
+            SplitPositionCache,
+        },
+        vertex::SplitVertexCache,
+    },
+    *,
+};
 use context_trace::*;
 
 #[derive(Debug, Deref, DerefMut)]

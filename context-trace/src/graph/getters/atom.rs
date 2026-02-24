@@ -1,7 +1,9 @@
 use crate::graph::{
     Hypergraph,
-    getters::ErrorReason,
-    getters::vertex::VertexSet,
+    getters::{
+        ErrorReason,
+        vertex::VertexSet,
+    },
     kind::GraphKind,
     vertex::{
         IndexPattern,

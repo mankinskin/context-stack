@@ -145,8 +145,8 @@ impl<R: PathRole> IndexRolePath<R> {
 }
 impl<R: PathRole> HasLeafToken<R> for IndexRolePath<R>
 where
-    Self:
-        HasRolePath<R, Node = ChildLocation> + HasChildPath<R, Node = ChildLocation>,
+    Self: HasRolePath<R, Node = ChildLocation>
+        + HasChildPath<R, Node = ChildLocation>,
 {
     fn leaf_token_location(&self) -> Option<ChildLocation> {
         Some(

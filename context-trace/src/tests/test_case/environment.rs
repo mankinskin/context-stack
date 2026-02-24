@@ -1,7 +1,10 @@
 //! Graph environment trait for reusable test fixtures
 
 use crate::HypergraphRef;
-use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{
+    RwLockReadGuard,
+    RwLockWriteGuard,
+};
 
 /// A graph environment provides pre-initialized graph state for testing.
 ///

@@ -181,7 +181,6 @@ impl crate::logging::compact_format::CompactFormat for TokenWidth {
     }
 }
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SubToken {
     pub(crate) token: Token,

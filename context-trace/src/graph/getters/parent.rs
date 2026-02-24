@@ -19,7 +19,9 @@ impl<G: GraphKind> Hypergraph<G> {
         &self,
         index: impl HasVertexIndex,
     ) -> VertexParents {
-        self.expect_vertex_data(index.vertex_index()).parents().clone()
+        self.expect_vertex_data(index.vertex_index())
+            .parents()
+            .clone()
     }
     #[track_caller]
     pub(crate) fn expect_parent(
@@ -28,7 +30,8 @@ impl<G: GraphKind> Hypergraph<G> {
         parent: impl HasVertexIndex,
     ) -> Parent {
         self.expect_vertex_data(index.vertex_index())
-            .expect_parent(parent).clone()
+            .expect_parent(parent)
+            .clone()
     }
     pub(crate) fn get_pattern_parents(
         &self,

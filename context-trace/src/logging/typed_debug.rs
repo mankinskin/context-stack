@@ -24,7 +24,10 @@ use std::fmt;
 pub struct TypedDebug<'a, T: fmt::Debug + ?Sized>(pub &'a T);
 
 impl<T: fmt::Debug + ?Sized> fmt::Debug for TypedDebug<'_, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         let type_name = std::any::type_name::<T>();
         write!(f, "{} ", type_name)?;
         self.0.fmt(f)
@@ -65,9 +68,11 @@ mod tests {
     fn test_typed_debug_includes_path() {
         let s = TestStruct { value: 42 };
         let output = format!("{:?}", TypedDebug(&s));
-        
+
         // Should contain the full module path
-        assert!(output.contains("context_trace::logging::typed_debug::tests::TestStruct"));
+        assert!(output.contains(
+            "context_trace::logging::typed_debug::tests::TestStruct"
+        ));
         // Should also contain the struct contents
         assert!(output.contains("value: 42"));
     }
@@ -76,7 +81,7 @@ mod tests {
     fn test_typed_macro() {
         let s = TestStruct { value: 123 };
         let output = format!("{:?}", typed!(s));
-        
+
         assert!(output.contains("TestStruct"));
         assert!(output.contains("value: 123"));
     }
@@ -91,12 +96,20 @@ mod tests {
 
     #[test]
     fn test_derive_typed_debug_struct() {
-        let s = DerivedStruct { name: "test".to_string(), count: 5 };
+        let s = DerivedStruct {
+            name: "test".to_string(),
+            count: 5,
+        };
         let output = format!("{:?}", s);
-        
+
         // Should contain full module path
-        assert!(output.contains("context_trace::logging::typed_debug::tests::DerivedStruct"), 
-            "Expected full path in output: {}", output);
+        assert!(
+            output.contains(
+                "context_trace::logging::typed_debug::tests::DerivedStruct"
+            ),
+            "Expected full path in output: {}",
+            output
+        );
         // Should contain field values
         assert!(output.contains("name"));
         assert!(output.contains("test"));
@@ -111,9 +124,14 @@ mod tests {
     fn test_derive_typed_debug_tuple_struct() {
         let t = DerivedTuple(42, "hello".to_string());
         let output = format!("{:?}", t);
-        
-        assert!(output.contains("context_trace::logging::typed_debug::tests::DerivedTuple"),
-            "Expected full path in output: {}", output);
+
+        assert!(
+            output.contains(
+                "context_trace::logging::typed_debug::tests::DerivedTuple"
+            ),
+            "Expected full path in output: {}",
+            output
+        );
         assert!(output.contains("42"));
         assert!(output.contains("hello"));
     }
@@ -125,9 +143,14 @@ mod tests {
     fn test_derive_typed_debug_unit_struct() {
         let u = DerivedUnit;
         let output = format!("{:?}", u);
-        
-        assert!(output.contains("context_trace::logging::typed_debug::tests::DerivedUnit"),
-            "Expected full path in output: {}", output);
+
+        assert!(
+            output.contains(
+                "context_trace::logging::typed_debug::tests::DerivedUnit"
+            ),
+            "Expected full path in output: {}",
+            output
+        );
     }
 
     #[derive(TypedDebugDerive)]
@@ -141,16 +164,21 @@ mod tests {
     fn test_derive_typed_debug_enum_unit() {
         let e = DerivedEnum::Unit;
         let output = format!("{:?}", e);
-        
-        assert!(output.contains("context_trace::logging::typed_debug::tests::DerivedEnum::Unit"),
-            "Expected full path in output: {}", output);
+
+        assert!(
+            output.contains(
+                "context_trace::logging::typed_debug::tests::DerivedEnum::Unit"
+            ),
+            "Expected full path in output: {}",
+            output
+        );
     }
 
     #[test]
     fn test_derive_typed_debug_enum_tuple() {
         let e = DerivedEnum::Tuple(99);
         let output = format!("{:?}", e);
-        
+
         assert!(output.contains("DerivedEnum"));
         assert!(output.contains("Tuple"));
         assert!(output.contains("99"));
@@ -158,9 +186,11 @@ mod tests {
 
     #[test]
     fn test_derive_typed_debug_enum_struct() {
-        let e = DerivedEnum::Struct { value: "data".to_string() };
+        let e = DerivedEnum::Struct {
+            value: "data".to_string(),
+        };
         let output = format!("{:?}", e);
-        
+
         assert!(output.contains("DerivedEnum"));
         assert!(output.contains("Struct"));
         assert!(output.contains("value"));
