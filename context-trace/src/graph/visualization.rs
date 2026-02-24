@@ -4,14 +4,16 @@
 //! frontend to render step-by-step animations of algorithm execution.
 
 use serde::Serialize;
+use ts_rs::TS;
 
 // ---------------------------------------------------------------------------
 // Operation Types
 // ---------------------------------------------------------------------------
 
 /// Operation type for categorizing events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub enum OperationType {
     Search,
     Insert,
@@ -27,8 +29,9 @@ pub enum OperationType {
 /// Each variant represents a state change that can be visualized as an
 /// animation frame. The frontend uses these to update node styling and
 /// draw trace paths.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub enum Transition {
     // ══════════════════════════════════════════════════════════════════════
     // Common transitions (used by search, insert, read)
@@ -192,7 +195,8 @@ pub enum Transition {
 /// - `trace_path` → connected with trace line
 /// - `completed_nodes` → green
 /// - `pending_nodes` → orange (parents) / purple (children)
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, TS)]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub struct LocationInfo {
     /// Primary node being operated on (selected in UI)
     pub selected_node: Option<usize>,
@@ -219,7 +223,8 @@ pub struct LocationInfo {
 // ---------------------------------------------------------------------------
 
 /// Information about the search/insert query.
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, TS)]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub struct QueryInfo {
     /// Token indices in the query pattern
     pub query_tokens: Vec<usize>,
@@ -253,7 +258,8 @@ pub struct QueryInfo {
 /// };
 /// event.emit();
 /// ```
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub struct GraphOpEvent {
     /// Monotonically increasing step counter (per operation)
     pub step: usize,

@@ -540,6 +540,14 @@ fn transform_structured_fields(value: &mut serde_json::Value) {
                             }
                         }
                         
+                        // Special handling for graph_data and graph_op - parse JSON strings into objects
+                        if key == "graph_data" || key == "graph_op" {
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(s) {
+                                *val = parsed;
+                                continue;
+                            }
+                        }
+                        
                         // For fields objects or known field keys, try to parse the value
                         if is_fields_obj || key == "fields" {
                             if looks_like_rust_debug(s) {

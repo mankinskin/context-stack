@@ -13,6 +13,7 @@ use context_trace::{
     Pattern,
     Token,
     VertexSet,
+    graph::visualization::Transition,
 };
 use tracing::debug;
 
@@ -28,6 +29,7 @@ use super::{
     partition::MergeResult,
 };
 use crate::{
+    visualization::emit_insert_node,
     PatternSubDeltas,
     RootMode,
     interval::partition::info::range::role::{
@@ -585,6 +587,18 @@ impl<'a> MergeCtx<'a> {
             debug!(?pattern, "Root pattern already exists, skipping");
             return;
         }
+
+        // Emit CreatePattern event
+        let children: Vec<usize> = pattern.iter().map(|t| t.index.0).collect();
+        emit_insert_node(
+            Transition::CreatePattern {
+                parent: root.index.0,
+                pattern_id: existing_patterns.len(),
+                children: children.clone(),
+            },
+            format!("Creating pattern at root {}: {:?}", root.index.0, children),
+            root.index.0,
+        );
 
         debug!(?root, ?pattern, "Adding root pattern");
         self.ctx.trav.add_pattern_with_update(root, pattern);

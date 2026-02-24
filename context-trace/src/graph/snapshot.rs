@@ -4,11 +4,13 @@
 //! so the log-viewer frontend can reconstruct and render the 3D graph.
 
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::graph::{Hypergraph, kind::GraphKind};
 
 /// A compact, serializable snapshot of the hypergraph topology.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub struct GraphSnapshot {
     /// All vertices in the graph.
     pub nodes: Vec<SnapshotNode>,
@@ -17,7 +19,8 @@ pub struct GraphSnapshot {
 }
 
 /// A single vertex in the snapshot.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub struct SnapshotNode {
     /// Vertex index (numeric id).
     pub index: usize,
@@ -30,7 +33,8 @@ pub struct SnapshotNode {
 }
 
 /// A directed edge from parent vertex to child vertex.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../../tools/log-viewer/frontend/src/types/generated/")]
 pub struct SnapshotEdge {
     /// Parent vertex index.
     pub from: usize,

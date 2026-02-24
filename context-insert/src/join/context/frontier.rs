@@ -14,8 +14,12 @@ use crate::{
         SplitMap,
         cache::position::PosKey,
     },
+    visualization::emit_insert_node,
 };
-use context_trace::*;
+use context_trace::{
+    *,
+    graph::visualization::Transition,
+};
 
 pub(crate) struct FrontierIterator {
     pub(crate) frontier: LinkedHashSet<PosKey>,
@@ -66,6 +70,19 @@ impl Iterator for FrontierSplitIterator {
         Some(match self.frontier.next() {
             Some(Some(key)) => {
                 if !self.splits.contains_key(&key) {
+                    let node_idx = key.index.index.0;
+                    
+                    // Emit event for processing this node
+                    emit_insert_node(
+                        Transition::JoinStep { 
+                            left: node_idx, 
+                            right: node_idx, 
+                            result: node_idx,
+                        },
+                        format!("Processing node {} at position {}", node_idx, key.pos.get()),
+                        node_idx,
+                    );
+
                     let ctx = self.node(key.index);
                     // Use shared initial partition creation
                     let partitions =
@@ -79,6 +96,19 @@ impl Iterator for FrontierSplitIterator {
             },
             Some(None) => None,
             None => Some({
+                let root_idx = self.frontier.interval.root.index.0;
+                
+                // Emit event for root merge
+                emit_insert_node(
+                    Transition::JoinStep { 
+                        left: root_idx, 
+                        right: root_idx, 
+                        result: root_idx,
+                    },
+                    format!("Merging root node {}", root_idx),
+                    root_idx,
+                );
+
                 let ctx = self.node(self.frontier.interval.root);
                 let root_mode = ctx.interval.cache.root_mode;
                 MergeCtx::new(ctx, MergeMode::Root(root_mode)).merge_root()

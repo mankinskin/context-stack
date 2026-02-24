@@ -4,6 +4,7 @@ pub mod insert;
 pub mod interval;
 pub(crate) mod join;
 pub mod split;
+pub(crate) mod visualization;
 
 #[cfg(test)]
 pub(crate) mod tests;
