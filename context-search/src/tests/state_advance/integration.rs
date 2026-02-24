@@ -28,6 +28,7 @@ fn test_advancement_chain_through_multiple_states() {
         (abcd, abcd_id) => [a, b, c, d]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     tracing::info!("Testing advancement chain through multiple indices");
 
@@ -96,6 +97,7 @@ fn test_advancement_preserves_atom_positions() {
         (abc, abc_id) => [a, b, c]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let test_positions = vec![0, 5, 10, 100];
 
@@ -184,6 +186,7 @@ fn test_advancement_with_different_pattern_sizes() {
         (abcdef, abcdef_id) => [a, b, c, d, e, f]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let test_cases = vec![
         (ab, ab_id, vec![a, b], "two-element pattern"),
@@ -245,6 +248,7 @@ fn test_advancement_fails_at_boundaries() {
         (abc, abc_id) => [a, b, c]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Test at the last index
     let root = IndexRoot::from(
@@ -309,6 +313,7 @@ fn test_advancement_with_nested_patterns() {
         (abcd, abcd_id) => [ab, cd]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     tracing::info!("Testing nested pattern advancement");
 
@@ -373,6 +378,7 @@ fn test_state_advance_idempotency_on_error() {
         (ab, ab_id) => [a, b]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let root = IndexRoot::from(
         ChildLocation::new(ab, ab_id, 1).into_pattern_location(),

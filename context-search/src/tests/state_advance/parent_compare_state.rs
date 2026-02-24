@@ -26,6 +26,7 @@ fn test_parent_compare_state_advance_success() {
         (abc, abc_id) => [a, b, c]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Create a ParentState at index 0
     let root = IndexRoot::from(
@@ -113,6 +114,7 @@ fn test_parent_compare_state_advance_at_last_index() {
         (abc, abc_id) => [a, b, c]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Create a ParentState at the last index (2)
     let root = IndexRoot::from(
@@ -174,6 +176,7 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
         (abc, abc_id) => [ab, c]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Create a ParentState at index 0 of 'abc' pattern
     let root = IndexRoot::from(
@@ -245,6 +248,7 @@ fn test_parent_compare_state_cursor_conversion() {
         (abc, abc_id) => [a, b, c]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let root = IndexRoot::from(
         ChildLocation::new(abc, abc_id, 0).into_pattern_location(),
@@ -319,6 +323,7 @@ fn test_state_advance_error_propagation() {
         (ab, ab_id) => [a, b]
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Create ParentState that cannot advance (at last index)
     let root = IndexRoot::from(

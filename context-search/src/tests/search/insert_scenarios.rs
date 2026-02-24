@@ -44,6 +44,7 @@ fn prefix1() {
         (heldld, heldld_id) => [h, e, ld, ld]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
     let res = Searchable::<AncestorSearchTraversal<_>>::search(
         vec![h, e, l, l],
         graph.into(),
@@ -116,6 +117,7 @@ fn search_pattern1_by_z() {
         (xabyz, xabyz_ids) => [[xaby, z], [xab, yz]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let xa_by_id = xaby_ids[1]; // [xa, by] pattern
     let xaby_z_id = xabyz_ids[0]; // [xaby, z] pattern
@@ -221,6 +223,7 @@ fn search_pattern1_ab_y() {
         _xabyz => [[xaby, z], [xab, yz]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let xab_y_id = xaby_ids[0]; // [xab, y]
 
@@ -321,6 +324,7 @@ fn search_pattern2_a_b_y() {
         (xabyz, xabyz_ids) => [[xab, yz]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let xab_yz_id = xabyz_ids[0]; // [xab, yz]
     let xab_pat_id = xab_ids[0];
@@ -472,6 +476,7 @@ fn search_pattern2_a_b() {
         _xabyz => [[xab, yz]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let xab_pat_id = xab_ids[0];
 
@@ -544,6 +549,7 @@ fn search_infix1_a_b_y() {
         (xxabyzw, xxabyzw_ids) => [[x, x, a, b, yz, w]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let xxabyzw_pat_id = xxabyzw_ids[0];
     let yz_pat_id = yz_ids[0];
@@ -666,6 +672,7 @@ fn search_infix1_a_b() {
         (xxabyzw, xxabyzw_ids) => [[x, x, a, b, yz, w]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let xxabyzw_pat_id = xxabyzw_ids[0];
 
@@ -780,6 +787,7 @@ fn search_infix2_a_b_c_d() {
         _xxyyabcdxxyy => [[xx, yy, abcdxx, yy], [xxy, yabcdx, xy, y]]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let abcdx_pat_id = abcdx_ids;
 
@@ -871,6 +879,7 @@ fn search_postfix1_b_c_d_d() {
         (ababcd, ababcd_ids) => [ab, ab, c, d]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let ab_pat_id = ab_ids;
     let ababcd_pat_id = ababcd_ids;
@@ -978,6 +987,7 @@ fn search_complete_token_b_c() {
         _abc => [a, bc]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let bc_pat_id = bc_ids;
 
@@ -1031,6 +1041,7 @@ fn search_complete_token_a_bc() {
         (abc, abc_ids) => [a, bc]
     );
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let abc_pat_id = abc_ids;
 
@@ -1093,6 +1104,7 @@ fn test_index_prefix1_hell() {
     } = EnvInsertPrefix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![a, b, c, c];
     let res = Searchable::<AncestorSearchTraversal<_>>::search(
@@ -1167,6 +1179,7 @@ fn test_index_postfix1_bcdd() {
     } = EnvInsertPostfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![b, c, d, d];
     let res = Searchable::<AncestorSearchTraversal<_>>::search(

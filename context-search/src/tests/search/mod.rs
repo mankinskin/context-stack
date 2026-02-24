@@ -76,6 +76,7 @@ fn find_sequence() {
         a,
         ..
     } = &*Env1::get();
+    let _tracing = context_trace::init_test_tracing!(graph);
     assert_eq!(
         graph.find_ancestor("a".chars()),
         Err(ErrorReason::SingleIndex(Box::new(IndexWithPath {
@@ -129,6 +130,7 @@ fn find_pattern1() {
     );
 
     let _tracing = context_trace::init_test_tracing!(&base_graph);
+    base_graph.emit_graph_snapshot();
     let graph_ref = HypergraphRef::from(base_graph);
 
     let query = vec![a, b, y, x];
@@ -210,6 +212,9 @@ fn test_entire_root_cursor_position_equals_token_width() {
         (_abc, _abc_id) => [ab, c]
     );
 
+    let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
+
     // Search for "ab" - should find EntireRoot since "ab" is a complete token at the root
     let response = Searchable::<AncestorSearchTraversal<_>>::search(vec![a, b], graph.into());
 
@@ -248,6 +253,9 @@ fn test_no_match_entire_root_cursor_position() {
         (_ab, _ab_id) => [a, b],
         (_bc, _bc_id) => [b, c]
     );
+
+    let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Search for a pattern "zz" that doesn't exist in the graph
     let response = Searchable::<AncestorSearchTraversal<_>>::search(vec![z, z], graph.into());

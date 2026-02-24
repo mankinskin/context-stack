@@ -71,6 +71,7 @@ fn setup_single_atom() -> (HypergraphRef, Token) {
     ])[..] else {
         panic!("insert_atoms failed")
     };
+    graph.emit_graph_snapshot();
     let graph = HypergraphRef::from(graph);
     (graph, a)
 }

@@ -175,6 +175,7 @@ mod tests {
         let query = test.query();
         let graph = <SearchAbababExact as TestCase>::Env::get().graph().clone();
         let _tracing = init_test_tracing!(&graph);
+        graph.emit_graph_snapshot();
 
         let actual = Searchable::<AncestorSearchTraversal<_>>::search(
             query.clone(),
@@ -203,13 +204,13 @@ mod tests {
     fn test_search_abab_exact() {
         let test = SearchAbabExact;
         let query = test.query();
+        let graph = <SearchAbabExact as TestCase>::Env::get().graph().clone();
+        let _tracing = init_test_tracing!(&graph);
+        graph.emit_graph_snapshot();
 
         let actual = Searchable::<AncestorSearchTraversal<_>>::search(
             query.clone(),
-            <SearchAbabExact as TestCase>::Env::get()
-                .graph()
-                .clone()
-                .into(),
+            graph.into(),
         )
         .expect("Search should succeed");
 
@@ -222,6 +223,8 @@ mod tests {
     fn test_search_ab_from_atoms() {
         let env = EnvAbabab::get();
         let graph = env.graph();
+        let _tracing = init_test_tracing!(graph);
+        graph.emit_graph_snapshot();
         let a = env.a;
         let b = env.b;
         let ab = env.ab;

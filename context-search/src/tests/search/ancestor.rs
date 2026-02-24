@@ -31,6 +31,7 @@ use {
 fn find_ancestor1_single_token() {
     let Env1 { graph, bc, .. } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![Token::new(bc, 2)];
     assert_eq!(
@@ -50,6 +51,7 @@ fn find_ancestor1_b_c() {
         graph, b, c, bc, ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![Token::new(b, 1), Token::new(c, 1)];
     let response = graph.find_ancestor(&query).unwrap();
@@ -68,6 +70,7 @@ fn find_ancestor1_a_bc() {
         graph, a, bc, abc, ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![Token::new(a, 1), Token::new(bc, 2)];
     let response = graph.find_ancestor(&query).unwrap();
@@ -86,6 +89,7 @@ fn find_ancestor1_ab_c() {
         graph, ab, c, abc, ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![Token::new(ab, 2), Token::new(c, 1)];
     let response = graph.find_ancestor(&query).unwrap();
@@ -109,6 +113,7 @@ fn find_ancestor1_a_bc_d() {
         ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![Token::new(a, 1), Token::new(bc, 2), Token::new(d, 1)];
     let response = graph.find_ancestor(&query).unwrap();
@@ -132,6 +137,7 @@ fn find_ancestor1_a_b_c() {
         ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![Token::new(a, 1), Token::new(b, 1), Token::new(c, 1)];
     let response = graph.find_ancestor(&query).unwrap();
@@ -154,6 +160,7 @@ fn find_ancestor1_a_b_c_c() {
         ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query = vec![
         Token::new(a, 1),
@@ -188,6 +195,7 @@ fn find_ancestor1_long_pattern() {
         ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
+    graph.emit_graph_snapshot();
 
     let query: Vec<_> = [a, b, a, b, a, b, a, b, c, d, e, f, g, h, i]
         .into_iter()
@@ -222,6 +230,7 @@ fn find_ancestor2() {
         (xabyz, xabyz_ids) => [[xaby, z],[xab,yz]],
     );
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
     let xa_by_id = xaby_ids[0];
     let xaby_z_id = xabyz_ids[0];
     //assert_eq!(xaby_z_id, 8);
@@ -344,6 +353,7 @@ fn find_ancestor3() {
     // 12
     let _xabyz = graph.insert_patterns([vec![xaby, z], vec![xab, yz]]);
     let _tracing = init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
     let gr = HypergraphRef::from(graph);
 
     let query = vec![ab, y];
