@@ -19,13 +19,27 @@ use tracing_subscriber::fmt::format::FmtSpan;
 impl FormatConfig {
     /// Load configuration from a TOML file
     ///
+    /// Note: In TOML, top-level keys MUST appear before any [section] headers.
+    /// Keys after a [section] header are part of that section, not top-level.
+    ///
     /// Example file format:
     /// ```toml
+    /// # Top-level options (must be before any [section])
+    /// enable_indentation = true
+    /// show_file_location = true
+    /// enable_ansi = true
+    /// show_timestamp = true
+    ///
+    /// # Optional: fallback values when environment variables are not set
+    /// log_to_stdout = true
+    /// log_filter = "debug"           # Applies to both stdout and file (fallback)
+    /// stdout_log_filter = "info"     # Specific filter for stdout output
+    /// file_log_filter = "trace"      # Specific filter for file output
+    ///
     /// [span_enter]
     /// show = true
     /// show_fn_signature = true
     /// show_fields = true
-    /// show_trait_context = true
     ///
     /// [span_close]
     /// show = true
@@ -38,17 +52,6 @@ impl FormatConfig {
     /// blank_line_after_span_enter = false
     /// blank_line_before_span_close = false
     /// blank_line_after_span_close = false
-    ///
-    /// enable_indentation = true
-    /// show_file_location = true
-    /// enable_ansi = true
-    /// show_timestamp = true
-    ///
-    /// # Optional: override environment variables
-    /// log_to_stdout = true
-    /// log_filter = "debug"           # Applies to both stdout and file (fallback)
-    /// stdout_log_filter = "info"     # Specific filter for stdout output
-    /// file_log_filter = "trace"      # Specific filter for file output
     /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let contents = fs::read_to_string(path.as_ref())
@@ -287,19 +290,19 @@ impl Default for TracingConfig {
             .or(format.log_to_stdout)
             .unwrap_or(false);
 
-        // Check for log filter: specific env vars and config values take precedence over general ones
-        // Priority for stdout: LOG_STDOUT_FILTER > config.stdout_log_filter > LOG_FILTER > config.log_filter
+        // Check for log filter: env vars always take precedence over config file values
+        // Priority for stdout: LOG_STDOUT_FILTER > LOG_FILTER > config.stdout_log_filter > config.log_filter
         let stdout_filter_directives = env::var("LOG_STDOUT_FILTER")
             .ok()
-            .or_else(|| format.stdout_log_filter.clone())
             .or_else(|| env::var("LOG_FILTER").ok())
+            .or_else(|| format.stdout_log_filter.clone())
             .or_else(|| format.log_filter.clone());
 
-        // Priority for file: LOG_FILE_FILTER > config.file_log_filter > LOG_FILTER > config.log_filter
+        // Priority for file: LOG_FILE_FILTER > LOG_FILTER > config.file_log_filter > config.log_filter
         let file_filter_directives = env::var("LOG_FILE_FILTER")
             .ok()
-            .or_else(|| format.file_log_filter.clone())
             .or_else(|| env::var("LOG_FILTER").ok())
+            .or_else(|| format.file_log_filter.clone())
             .or_else(|| format.log_filter.clone());
 
         // Check for keep logs: env var takes precedence over config file

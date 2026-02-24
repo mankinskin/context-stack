@@ -167,22 +167,22 @@ pub struct FormatConfig {
     /// Show timestamp at the beginning of each log line
     #[serde(default = "default_true")]
     pub show_timestamp: bool,
-    /// Enable logging to stdout (overrides LOG_STDOUT env var if present)
+    /// Enable logging to stdout (used as fallback when LOG_STDOUT env var is not set)
     #[serde(default)]
     pub log_to_stdout: Option<bool>,
     /// Log level filter for both stdout and file (e.g., "debug", "trace", "context_search=trace,context_trace=debug")
-    /// Overrides LOG_FILTER env var if present. Used as fallback if stdout_log_filter or file_log_filter are not set.
+    /// Used as fallback when LOG_FILTER env var is not set. Used as fallback if stdout_log_filter or file_log_filter are not set.
     #[serde(default)]
     pub log_filter: Option<String>,
     /// Log level filter specifically for stdout output
-    /// Overrides LOG_STDOUT_FILTER env var and log_filter if present
+    /// Used as fallback when LOG_STDOUT_FILTER and LOG_FILTER env vars are not set. Takes precedence over log_filter.
     #[serde(default)]
     pub stdout_log_filter: Option<String>,
     /// Log level filter specifically for file output
-    /// Overrides LOG_FILE_FILTER env var and log_filter if present
+    /// Used as fallback when LOG_FILE_FILTER and LOG_FILTER env vars are not set. Takes precedence over log_filter.
     #[serde(default)]
     pub file_log_filter: Option<String>,
-    /// Keep log files even when tests pass (overrides KEEP_SUCCESS_LOGS env var if present)
+    /// Keep log files even when tests pass (used as fallback when KEEP_SUCCESS_LOGS env var is not set)
     #[serde(default)]
     pub keep_success_logs: Option<bool>,
 }
