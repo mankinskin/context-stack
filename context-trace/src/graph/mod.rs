@@ -47,6 +47,7 @@ pub mod insert;
 pub mod kind;
 pub mod snapshot;
 pub mod validation;
+pub mod visualization;
 
 pub mod vertex;
 

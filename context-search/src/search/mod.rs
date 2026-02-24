@@ -37,7 +37,7 @@ use context::{
     SearchCtx,
 };
 use context_trace::{
-    graph::snapshot::{SearchPhase, SearchStateSnapshot},
+    graph::visualization::{GraphOpEvent, LocationInfo, OperationType, QueryInfo, Transition},
     logging::format_utils::pretty,
     *,
 };
@@ -125,19 +125,19 @@ impl<K: SearchKind> SearchState<K>
 where
     K::Trav: Clone,
 {
-    /// Build and emit a [`SearchStateSnapshot`] for the current algorithm state.
-    fn emit_search_state(
+    /// Build and emit a [`GraphOpEvent`] for the current algorithm state.
+    fn emit_graph_op(
         &mut self,
-        phase: SearchPhase,
+        transition: Transition,
         description: impl Into<String>,
         cursor_position: usize,
         matched_nodes: Vec<usize>,
-        partial_node: Option<usize>,
         current_root: Option<usize>,
     ) {
         let query_pattern = self.query.path_root();
         let query_tokens: Vec<usize> =
             query_pattern.iter().map(|t| t.index.0).collect();
+        let query_width: usize = query_pattern.iter().map(|t| *t.width()).sum();
 
         let (candidate_parents, candidate_children) =
             self.queue_candidates();
@@ -145,20 +145,30 @@ where
         let step = self.step_counter;
         self.step_counter += 1;
 
-        let snapshot = SearchStateSnapshot {
-            step,
-            description: description.into(),
-            phase,
+        let location = LocationInfo {
+            selected_node: current_root,
+            root_node: current_root,
+            trace_path: vec![],  // TODO: populate from path
+            completed_nodes: matched_nodes,
+            pending_parents: candidate_parents,
+            pending_children: candidate_children,
+        };
+
+        let query = QueryInfo {
             query_tokens,
             cursor_position,
-            start_node: self.start_node,
-            matched_nodes,
-            partial_node,
-            candidate_parents,
-            candidate_children,
-            current_root,
+            query_width,
         };
-        snapshot.emit();
+
+        let event = GraphOpEvent {
+            step,
+            op_type: OperationType::Search,
+            transition,
+            location,
+            query,
+            description: description.into(),
+        };
+        event.emit();
     }
 
     /// Extract parent and child candidate vertex indices from the BFS queue.
@@ -178,13 +188,12 @@ where
     pub(crate) fn search(mut self) -> Response {
         trace!(queue = %&self.matches.queue, "initial state");
 
-        // Emit Init snapshot
-        self.emit_search_state(
-            SearchPhase::Init,
+        // Emit Init event
+        self.emit_graph_op(
+            Transition::StartNode { node: self.start_node },
             "Search started — initial queue populated",
             0,
             vec![],
-            None,
             None,
         );
 
@@ -227,15 +236,14 @@ where
 
         trace!(end = %pretty(&end), "final matched state");
 
-        // Emit Done snapshot
+        // Emit Done event
         let cursor_pos = *end.cursor().atom_position.as_ref();
         let matched_root = end.root_parent().index.0;
-        self.emit_search_state(
-            SearchPhase::Done,
+        self.emit_graph_op(
+            Transition::Done { final_node: Some(matched_root), success: true },
             "Search complete",
             cursor_pos,
             vec![matched_root],
-            None,
             Some(matched_root),
         );
 
@@ -264,13 +272,12 @@ where
             "New root match - finishing root cursor"
         );
 
-        // Emit RootExplore snapshot
-        self.emit_search_state(
-            SearchPhase::RootExplore,
+        // Emit RootExplore event
+        self.emit_graph_op(
+            Transition::RootExplore { root: root_idx },
             format!("Root match found at node {root_idx}"),
             init_cursor_pos,
             vec![root_idx],
-            None,
             Some(root_idx),
         );
 
@@ -300,13 +307,16 @@ where
                         "Match advanced - updating best_match"
                     );
 
-                    // Emit MatchAdvance snapshot
-                    self.emit_search_state(
-                        SearchPhase::MatchAdvance,
+                    // Emit MatchAdvance event
+                    self.emit_graph_op(
+                        Transition::MatchAdvance { 
+                            root: adv_root, 
+                            prev_pos: init_cursor_pos,
+                            new_pos: checkpoint_pos,
+                        },
                         format!("Match advanced in root {adv_root} to pos {checkpoint_pos}"),
                         checkpoint_pos,
                         vec![adv_root],
-                        None,
                         Some(adv_root),
                     );
 
@@ -366,13 +376,15 @@ where
                                 },
                             }
 
-                            // Emit ParentExplore snapshot (after queue is populated)
-                            self.emit_search_state(
-                                SearchPhase::ParentExplore,
+                            // Emit ParentExplore event (after queue is populated)
+                            self.emit_graph_op(
+                                Transition::ParentExplore { 
+                                    current_root: checkpoint_root_idx,
+                                    parent_candidates: self.queue_candidates().0.clone(),
+                                },
                                 format!("Root boundary at node {checkpoint_root_idx} — exploring parents"),
                                 checkpoint_pos,
                                 vec![checkpoint_root_idx],
-                                None,
                                 Some(checkpoint_root_idx),
                             );
 
