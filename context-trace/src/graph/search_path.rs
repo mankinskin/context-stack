@@ -303,109 +303,6 @@ impl VizPathGraph {
     }
 }
 
-// ---------------------------------------------------------------------------
-// SearchPathEvent — the event emitted to logs
-// ---------------------------------------------------------------------------
-
-/// A search path event emitted to the log.
-///
-/// Contains both the incremental transition AND the full path snapshot
-/// (for the initial implementation — later we can drop the full snapshot
-/// and reconstruct purely from transitions).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
-pub struct SearchPathEvent {
-    /// Unique identifier for this search path (scopes transitions
-    /// to a specific `search()` call). Multiple concurrent searches
-    /// in the same log can be distinguished by `path_id`.
-    pub path_id: String,
-
-    /// Step number within this path (0-based, monotonically increasing).
-    pub step: usize,
-
-    /// The transition that occurred at this step.
-    pub transition: PathTransition,
-
-    /// Full path graph snapshot AFTER applying this transition.
-    /// Redundant with applying transitions in order, but included
-    /// for debugging and initial implementation.
-    pub path_graph: VizPathGraph,
-}
-
-impl SearchPathEvent {
-    /// Emit this event as a structured tracing log entry.
-    ///
-    /// The log-viewer frontend looks for entries with
-    /// `message == "search_path"` and parses the `search_path` field.
-    pub fn emit(&self) {
-        let json = serde_json::to_string(self).unwrap_or_default();
-        tracing::info!(
-            search_path = %json,
-            path_id = %self.path_id,
-            step = self.step,
-            "search_path"
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// VizPathTracker — stateful builder used in SearchState
-// ---------------------------------------------------------------------------
-
-/// Tracks the current search path and emits `SearchPathEvent`s.
-///
-/// Lives inside `SearchState` during a search call, maintaining the
-/// running `VizPathGraph` and emitting transitions as they occur.
-#[derive(Debug, Clone)]
-pub struct VizPathTracker {
-    /// Unique identifier for this search path.
-    pub path_id: String,
-    /// Current step counter.
-    pub step: usize,
-    /// The current path graph state.
-    pub graph: VizPathGraph,
-}
-
-impl VizPathTracker {
-    /// Create a new tracker with a generated path_id.
-    pub fn new(path_id: impl Into<String>) -> Self {
-        Self {
-            path_id: path_id.into(),
-            step: 0,
-            graph: VizPathGraph::new(),
-        }
-    }
-
-    /// Apply a transition, emit a `SearchPathEvent`, and advance the step.
-    ///
-    /// Panics if the transition is invalid (indicates a bug in the
-    /// emission wiring, not user error).
-    pub fn emit(&mut self, transition: PathTransition) {
-        self.graph
-            .apply(&transition)
-            .unwrap_or_else(|e| {
-                tracing::warn!(
-                    path_id = %self.path_id,
-                    step = self.step,
-                    error = %e,
-                    "Invalid path transition"
-                );
-            });
-
-        let event = SearchPathEvent {
-            path_id: self.path_id.clone(),
-            step: self.step,
-            transition,
-            path_graph: self.graph.clone(),
-        };
-        event.emit();
-        self.step += 1;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -721,24 +618,6 @@ mod tests {
     }
 
     // ---------------------------------------------------------------
-    // VizPathTracker — test that it builds graph correctly
-    // ---------------------------------------------------------------
-
-    #[test]
-    fn test_tracker_increments_step() {
-        let mut tracker = VizPathTracker::new("test-path-1");
-        tracker.emit(PathTransition::SetStartNode { node: node(1, 1) });
-        tracker.emit(PathTransition::PushParent {
-            parent: node(10, 2),
-            edge: edge(10, 1, 0, 0),
-        });
-
-        assert_eq!(tracker.step, 2);
-        assert_eq!(tracker.graph.start_node, Some(node(1, 1)));
-        assert_eq!(tracker.graph.start_path.len(), 1);
-    }
-
-    // ---------------------------------------------------------------
     // JSON serialization round-trip
     // ---------------------------------------------------------------
 
@@ -774,38 +653,6 @@ mod tests {
                 serde_json::from_str(&json).unwrap();
             assert_eq!(*t, deserialized);
         }
-    }
-
-    #[test]
-    fn test_search_path_event_json_roundtrip() {
-        let event = SearchPathEvent {
-            path_id: "search-42".into(),
-            step: 3,
-            transition: PathTransition::PushChild {
-                child: node(5, 1),
-                edge: edge(20, 5, 0, 1),
-            },
-            path_graph: VizPathGraph {
-                start_node: Some(node(1, 1)),
-                start_path: vec![node(10, 2)],
-                start_edges: vec![edge(10, 1, 0, 0)],
-                root: Some(node(20, 4)),
-                root_edge: Some(edge(20, 10, 0, 0)),
-                end_path: vec![node(5, 1)],
-                end_edges: vec![edge(20, 5, 0, 1)],
-                cursor_pos: 2,
-                done: false,
-                success: false,
-            },
-        };
-
-        let json = serde_json::to_string(&event).unwrap();
-        let deserialized: SearchPathEvent =
-            serde_json::from_str(&json).unwrap();
-        assert_eq!(event.path_id, deserialized.path_id);
-        assert_eq!(event.step, deserialized.step);
-        assert_eq!(event.transition, deserialized.transition);
-        assert_eq!(event.path_graph, deserialized.path_graph);
     }
 
     #[test]

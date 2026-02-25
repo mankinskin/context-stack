@@ -47,6 +47,9 @@ pub(crate) fn emit_insert_event(
         location,
         query,
         description: description.into(),
+        path_id: None,
+        path_transition: None,
+        path_graph: None,
     };
     event.emit();
 }

@@ -6,6 +6,8 @@
 use serde::Serialize;
 use ts_rs::TS;
 
+use super::search_path::{PathTransition, VizPathGraph};
+
 // ---------------------------------------------------------------------------
 // Operation Types
 // ---------------------------------------------------------------------------
@@ -284,6 +286,25 @@ pub struct GraphOpEvent {
 
     /// Human-readable description of what happened
     pub description: String,
+
+    /// Search path identifier (scopes to a particular `search()` call).
+    /// Multiple concurrent searches in the same log can be distinguished
+    /// by `path_id`. Only present for search operations that track a path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path_id: Option<String>,
+
+    /// Incremental path transition at this step.
+    /// Describes how the `(start_path, root, end_path)` triple changed.
+    /// Only present for search operations that emit path data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path_transition: Option<PathTransition>,
+
+    /// Full path graph snapshot AFTER applying the transition.
+    /// Redundant (can reconstruct from transitions in order), but included
+    /// for debugging and so the frontend can display the path without
+    /// reconstructing from history.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path_graph: Option<VizPathGraph>,
 }
 
 impl GraphOpEvent {
@@ -320,6 +341,9 @@ impl GraphOpEvent {
             location: LocationInfo::default(),
             query: QueryInfo::default(),
             description: description.into(),
+            path_id: None,
+            path_transition: None,
+            path_graph: None,
         }
     }
 
@@ -336,6 +360,9 @@ impl GraphOpEvent {
             location: LocationInfo::default(),
             query: QueryInfo::default(),
             description: description.into(),
+            path_id: None,
+            path_transition: None,
+            path_graph: None,
         }
     }
 
@@ -354,6 +381,19 @@ impl GraphOpEvent {
         query: QueryInfo,
     ) -> Self {
         self.query = query;
+        self
+    }
+
+    /// Set search path data (path_id, transition, and snapshot).
+    pub fn with_path(
+        mut self,
+        path_id: impl Into<String>,
+        transition: PathTransition,
+        graph: VizPathGraph,
+    ) -> Self {
+        self.path_id = Some(path_id.into());
+        self.path_transition = Some(transition);
+        self.path_graph = Some(graph);
         self
     }
 }
