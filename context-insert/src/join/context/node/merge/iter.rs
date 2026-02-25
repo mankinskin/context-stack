@@ -13,7 +13,10 @@ use context_trace::{
     Pattern,
     Token,
     VertexSet,
-    graph::visualization::Transition,
+    graph::{
+        search_path::PathTransition,
+        visualization::Transition,
+    },
 };
 use tracing::debug;
 
@@ -596,6 +599,7 @@ impl<'a> MergeCtx<'a> {
                 pattern_id: existing_patterns.len(),
                 children: children.clone(),
             },
+            PathTransition::ChildMatch { cursor_pos: root.index.0 },
             format!(
                 "Creating pattern at root {}: {:?}",
                 root.index.0, children

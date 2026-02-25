@@ -17,7 +17,10 @@ use crate::{
     visualization::emit_insert_node,
 };
 use context_trace::{
-    graph::visualization::Transition,
+    graph::{
+        search_path::PathTransition,
+        visualization::Transition,
+    },
     *,
 };
 
@@ -79,6 +82,7 @@ impl Iterator for FrontierSplitIterator {
                             right: node_idx,
                             result: node_idx,
                         },
+                        PathTransition::ChildMatch { cursor_pos: node_idx },
                         format!(
                             "Processing node {} at position {}",
                             node_idx,
@@ -109,6 +113,7 @@ impl Iterator for FrontierSplitIterator {
                         right: root_idx,
                         result: root_idx,
                     },
+                    PathTransition::ChildMatch { cursor_pos: root_idx },
                     format!("Merging root node {}", root_idx),
                     root_idx,
                 );

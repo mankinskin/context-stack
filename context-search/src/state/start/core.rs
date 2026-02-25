@@ -107,6 +107,15 @@ impl<K: SearchKind> StartCtx<K> {
                     ),
                     step_counter: 0,
                     start_node: self.start_token.index.0,
+                    path_id: format!(
+                        "search-{}-{}",
+                        self.start_token.index.0,
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_nanos())
+                            .unwrap_or(0),
+                    ),
+                    viz_path: Default::default(),
                 })
             },
             Err(err) => {
