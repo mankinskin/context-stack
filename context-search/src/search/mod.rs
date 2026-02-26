@@ -142,7 +142,7 @@ where
     fn emit_graph_op(
         &mut self,
         transition: Transition,
-        path_transition: PathTransition,
+        path_transition: Option<PathTransition>,
         description: impl Into<String>,
         cursor_position: usize,
         matched_nodes: Vec<usize>,
@@ -158,8 +158,10 @@ where
         let step = self.step_counter;
         self.step_counter += 1;
 
-        // Apply transition to accumulated path graph
-        let _ = self.viz_path.apply(&path_transition);
+        // Apply transition to accumulated path graph (if present)
+        if let Some(ref pt) = path_transition {
+            let _ = self.viz_path.apply(pt);
+        }
 
         let location = LocationInfo {
             selected_node: current_root,
@@ -213,14 +215,30 @@ where
             Transition::StartNode {
                 node: self.start_node,
             },
-            PathTransition::SetStartNode {
+            Some(PathTransition::SetStartNode {
                 node: PathNode { index: self.start_node, width: start_width },
-            },
+            }),
             "Search started — initial queue populated",
             0,
             vec![],
             None,
         );
+
+        // Emit initial ParentExplore for the start node's parent candidates
+        let initial_candidates = self.queue_candidates().0.clone();
+        if !initial_candidates.is_empty() {
+            self.emit_graph_op(
+                Transition::ParentExplore {
+                    current_root: self.start_node,
+                    parent_candidates: initial_candidates,
+                },
+                None,
+                format!("Start node {} exploring parent candidates", self.start_node),
+                0,
+                vec![],
+                Some(self.start_node),
+            );
+        }
 
         let mut best_match = None;
         for item in self.by_ref() {
@@ -269,7 +287,7 @@ where
                 final_node: Some(matched_root),
                 success: true,
             },
-            PathTransition::Done { success: true },
+            Some(PathTransition::Done { success: true }),
             "Search complete",
             cursor_pos,
             vec![matched_root],
@@ -303,18 +321,64 @@ where
             "New root match - finishing root cursor"
         );
 
-        // Emit RootExplore event
+        // Always emit VisitParent + PushParent before SetRoot.
+        // For the first parent, `from` is start_node; for subsequent parents,
+        // `from` is the current root (which gets demoted into start_path).
+        let push_from = if let Some(current_root_node) = self.viz_path.root {
+            current_root_node.index
+        } else {
+            self.viz_path.start_node.map(|n| n.index).unwrap_or(self.start_node)
+        };
         self.emit_graph_op(
-            Transition::RootExplore { root: root_idx },
-            PathTransition::SetRoot {
-                root: PathNode { index: root_idx, width: 1 },
+            Transition::VisitParent {
+                from: push_from,
+                to: root_idx,
+                entry_pos: init_cursor_pos,
+            },
+            Some(PathTransition::PushParent {
+                parent: PathNode { index: root_idx, width: 1 },
                 edge: context_trace::graph::search_path::EdgeRef {
-                    from: self.start_node,
+                    from: push_from,
                     to: root_idx,
                     pattern_idx: 0,
                     sub_index: 0,
                 },
-            },
+            }),
+            format!("Visiting parent {root_idx} from {push_from}"),
+            init_cursor_pos,
+            vec![push_from],
+            Some(push_from),
+        );
+
+        // SetRoot "graduates" the node from start_path to root.
+        // apply() detects that root_idx == start_path.last() and pops it,
+        // using the popped edge as root_edge.
+        let edge_from = {
+            let sp = &self.viz_path;
+            if sp.start_path.last().map(|n| n.index) == Some(root_idx) {
+                // Root matches last start_path entry — use the entry below it
+                if sp.start_path.len() >= 2 {
+                    sp.start_path[sp.start_path.len() - 2].index
+                } else {
+                    sp.start_node.map(|n| n.index).unwrap_or(self.start_node)
+                }
+            } else {
+                sp.start_path.last()
+                    .map(|n| n.index)
+                    .unwrap_or(sp.start_node.map(|n| n.index).unwrap_or(self.start_node))
+            }
+        };
+        self.emit_graph_op(
+            Transition::RootExplore { root: root_idx },
+            Some(PathTransition::SetRoot {
+                root: PathNode { index: root_idx, width: 1 },
+                edge: context_trace::graph::search_path::EdgeRef {
+                    from: edge_from,
+                    to: root_idx,
+                    pattern_idx: 0,
+                    sub_index: 0,
+                },
+            }),
             format!("Root match found at node {root_idx}"),
             init_cursor_pos,
             vec![root_idx],
@@ -354,14 +418,57 @@ where
                         "Match advanced - updating best_match"
                     );
 
-                    // Emit MatchAdvance event
+                    // Extract child info for end_path visualization
+                    let trav = &self.matches.trace_ctx.trav;
+                    let child_state = &next_match.state.child.current().child_state;
+                    let child_token = child_state.path.role_rooted_leaf_token::<End, _>(trav);
+                    let child_idx = child_token.index.0;
+                    let child_width = child_token.width.0;
+                    let child_sub_index = child_state.root_child_index();
+
+                    // Emit VisitChild + PushChild/ReplaceChild to show end_path
+                    let child_path_transition = if self.viz_path.end_path.is_empty() {
+                        PathTransition::PushChild {
+                            child: PathNode { index: child_idx, width: child_width },
+                            edge: context_trace::graph::search_path::EdgeRef {
+                                from: adv_root,
+                                to: child_idx,
+                                pattern_idx: 0,
+                                sub_index: child_sub_index,
+                            },
+                        }
+                    } else {
+                        PathTransition::ReplaceChild {
+                            child: PathNode { index: child_idx, width: child_width },
+                            edge: context_trace::graph::search_path::EdgeRef {
+                                from: adv_root,
+                                to: child_idx,
+                                pattern_idx: 0,
+                                sub_index: child_sub_index,
+                            },
+                        }
+                    };
+                    self.emit_graph_op(
+                        Transition::VisitChild {
+                            from: adv_root,
+                            to: child_idx,
+                            child_index: child_sub_index,
+                        },
+                        Some(child_path_transition),
+                        format!("Visiting child {child_idx} from root {adv_root}"),
+                        checkpoint_pos,
+                        vec![adv_root],
+                        Some(adv_root),
+                    );
+
+                    // Emit MatchAdvance event with ChildMatch
                     self.emit_graph_op(
                         Transition::MatchAdvance { 
                             root: adv_root, 
                             prev_pos: init_cursor_pos,
                             new_pos: checkpoint_pos,
                         },
-                        PathTransition::ChildMatch { cursor_pos: checkpoint_pos },
+                        Some(PathTransition::ChildMatch { cursor_pos: checkpoint_pos }),
                         format!("Match advanced in root {adv_root} to pos {checkpoint_pos}"),
                         checkpoint_pos,
                         vec![adv_root],
@@ -425,23 +532,16 @@ where
                                 },
                             }
 
-                            // Emit ParentExplore event (after queue is populated)
+                            // Emit ParentExplore event (informational — no path transition).
+                            // The actual PushParent will be emitted when the parent
+                            // is visited in the next finish_root_cursor call.
                             let parent_candidates = self.queue_candidates().0.clone();
-                            let first_parent = parent_candidates.first().copied().unwrap_or(checkpoint_root_idx);
                             self.emit_graph_op(
                                 Transition::ParentExplore { 
                                     current_root: checkpoint_root_idx,
                                     parent_candidates,
                                 },
-                                PathTransition::PushParent {
-                                    parent: PathNode { index: first_parent, width: 1 },
-                                    edge: context_trace::graph::search_path::EdgeRef {
-                                        from: checkpoint_root_idx,
-                                        to: first_parent,
-                                        pattern_idx: 0,
-                                        sub_index: 0,
-                                    },
-                                },
+                                None,
                                 format!("Root boundary at node {checkpoint_root_idx} — exploring parents"),
                                 checkpoint_pos,
                                 vec![checkpoint_root_idx],

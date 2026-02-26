@@ -230,8 +230,18 @@ impl VizPathGraph {
                 if self.root.is_some() {
                     return Err("SetRoot called twice".into());
                 }
-                self.root = Some(*root);
-                self.root_edge = Some(*edge);
+                // If root matches the last start_path entry, pop it
+                // (the node is "graduating" from candidate to confirmed root).
+                // Use the popped edge as root_edge since it correctly connects
+                // the prior start_path node to this root.
+                if self.start_path.last().map(|n| n.index) == Some(root.index) {
+                    self.start_path.pop();
+                    self.root = Some(*root);
+                    self.root_edge = self.start_edges.pop().or(Some(*edge));
+                } else {
+                    self.root = Some(*root);
+                    self.root_edge = Some(*edge);
+                }
             },
             PathTransition::PushChild { child, edge } => {
                 if self.root.is_none() {
@@ -505,12 +515,72 @@ mod tests {
         assert!(g.root.is_none());
         assert!(g.root_edge.is_none());
 
-        // A second SetRoot can now follow (extends path further)
+        // A second SetRoot with a DIFFERENT node (extends path further)
         g.apply(&PathTransition::SetRoot {
             root: node(30, 6),
             edge: edge(20, 30, 0, 0),
         }).unwrap();
         assert_eq!(g.root, Some(node(30, 6)));
+    }
+
+    #[test]
+    fn test_push_parent_then_set_root_same_node() {
+        // Tests the real-world pattern: PushParent(X) then SetRoot(X).
+        // SetRoot should pop X from start_path (graduate to root)
+        // and use the popped edge as root_edge.
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
+
+        // First root
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        }).unwrap();
+
+        // Root boundary exhausted — explore parent
+        g.apply(&PathTransition::PushParent {
+            parent: node(20, 4),
+            edge: edge(10, 20, 0, 0),
+        }).unwrap();
+
+        // After PushParent-after-SetRoot: start_path = [10, 20]
+        assert_eq!(g.start_path.len(), 2);
+        assert!(g.root.is_none());
+
+        // SetRoot with the SAME node as PushParent — node graduates from
+        // start_path candidate to confirmed root.
+        g.apply(&PathTransition::SetRoot {
+            root: node(20, 4),
+            edge: edge(1, 20, 0, 0), // emission has wrong 'from', but apply fixes it
+        }).unwrap();
+
+        // Node 20 popped from start_path, now root. root_edge is the
+        // popped edge (10→20), NOT the provided edge (1→20).
+        assert_eq!(g.start_path.len(), 1);
+        assert_eq!(g.start_path[0], node(10, 3));
+        assert_eq!(g.start_edges.len(), 1);
+        assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
+        assert_eq!(g.root, Some(node(20, 4)));
+        assert_eq!(g.root_edge, Some(edge(10, 20, 0, 0))); // correct popped edge
+
+        // Chain: PushParent(30) then SetRoot(30) again
+        g.apply(&PathTransition::PushParent {
+            parent: node(30, 6),
+            edge: edge(20, 30, 0, 0),
+        }).unwrap();
+        // start_path = [10, 20, 30] (20 re-enters from demoted root)
+        assert_eq!(g.start_path.len(), 3);
+
+        g.apply(&PathTransition::SetRoot {
+            root: node(30, 6),
+            edge: edge(1, 30, 0, 0), // wrong from, but apply fixes it
+        }).unwrap();
+        // 30 popped, root_edge is the popped edge (20→30)
+        assert_eq!(g.start_path.len(), 2);
+        assert_eq!(g.start_path[0], node(10, 3));
+        assert_eq!(g.start_path[1], node(20, 4));
+        assert_eq!(g.root, Some(node(30, 6)));
+        assert_eq!(g.root_edge, Some(edge(20, 30, 0, 0)));
     }
 
     #[test]
@@ -965,6 +1035,8 @@ mod tests {
             },
             // Simulates the runtime search pattern: SetRoot is called first (root found),
             // then PushParent extends the start path when the root boundary is exhausted.
+            // Matches real behavior where PushParent and the following SetRoot target
+            // the SAME node (SetRoot "graduates" the candidate from start_path to root).
             TestFixture {
                 name: "push_parent_after_root".into(),
                 transitions: vec![
@@ -979,14 +1051,16 @@ mod tests {
                         parent: node(20, 6),
                         edge: edge(10, 20, 0, 0),
                     },
-                    // New root found at parent level
+                    // SetRoot for the SAME node 20 — graduates from start_path to root.
+                    // The emission uses from:1 (start_node) which is wrong, but apply()
+                    // pops node 20 and uses the popped edge (10→20) as root_edge.
                     PathTransition::SetRoot {
-                        root: node(30, 8),
-                        edge: edge(20, 30, 0, 0),
+                        root: node(20, 6),
+                        edge: edge(1, 20, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(5, 1),
-                        edge: edge(30, 5, 0, 1),
+                        edge: edge(20, 5, 0, 1),
                     },
                     PathTransition::ChildMatch { cursor_pos: 3 },
                     PathTransition::Done { success: true },
@@ -1002,12 +1076,12 @@ mod tests {
                         edge: edge(10, 20, 0, 0),
                     },
                     PathTransition::SetRoot {
-                        root: node(30, 8),
-                        edge: edge(20, 30, 0, 0),
+                        root: node(20, 6),
+                        edge: edge(1, 20, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(5, 1),
-                        edge: edge(30, 5, 0, 1),
+                        edge: edge(20, 5, 0, 1),
                     },
                     PathTransition::ChildMatch { cursor_pos: 3 },
                     PathTransition::Done { success: true },

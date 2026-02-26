@@ -289,7 +289,9 @@ pub struct GraphOpEvent {
 
     /// Incremental path transition at this step.
     /// Describes how the `(start_path, root, end_path)` triple changed.
-    pub path_transition: PathTransition,
+    /// `None` for informational events (e.g., ParentExplore) that don't
+    /// modify the search path state.
+    pub path_transition: Option<PathTransition>,
 
     /// Full path graph snapshot AFTER applying the transition.
     /// Redundant (can reconstruct from transitions in order), but included
@@ -324,7 +326,7 @@ impl GraphOpEvent {
         step: usize,
         path_id: impl Into<String>,
         transition: Transition,
-        path_transition: PathTransition,
+        path_transition: impl Into<Option<PathTransition>>,
         path_graph: VizPathGraph,
         description: impl Into<String>,
     ) -> Self {
@@ -336,7 +338,7 @@ impl GraphOpEvent {
             query: QueryInfo::default(),
             description: description.into(),
             path_id: path_id.into(),
-            path_transition,
+            path_transition: path_transition.into(),
             path_graph,
         }
     }
@@ -346,7 +348,7 @@ impl GraphOpEvent {
         step: usize,
         path_id: impl Into<String>,
         transition: Transition,
-        path_transition: PathTransition,
+        path_transition: impl Into<Option<PathTransition>>,
         path_graph: VizPathGraph,
         description: impl Into<String>,
     ) -> Self {
@@ -358,7 +360,7 @@ impl GraphOpEvent {
             query: QueryInfo::default(),
             description: description.into(),
             path_id: path_id.into(),
-            path_transition,
+            path_transition: path_transition.into(),
             path_graph,
         }
     }
@@ -384,9 +386,9 @@ impl GraphOpEvent {
     /// Override the path transition.
     pub fn with_path_transition(
         mut self,
-        transition: PathTransition,
+        transition: impl Into<Option<PathTransition>>,
     ) -> Self {
-        self.path_transition = transition;
+        self.path_transition = transition.into();
         self
     }
 
