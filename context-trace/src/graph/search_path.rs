@@ -24,9 +24,13 @@ use ts_rs::TS;
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
 )]
 pub struct EdgeRef {
-    /// Parent vertex index.
+    /// Source vertex index (traversal origin).
+    /// For start_path edges: the child (pointing upward toward parent).
+    /// For end_path edges: the parent (pointing downward toward child).
     pub from: usize,
-    /// Child vertex index.
+    /// Target vertex index (traversal destination).
+    /// For start_path edges: the parent (pointing upward).
+    /// For end_path edges: the child (pointing downward).
     pub to: usize,
     /// Pattern index (0-based enumeration order in snapshot).
     pub pattern_idx: usize,
@@ -161,20 +165,20 @@ pub struct VizPathGraph {
     /// Does NOT include start_node itself or the root.
     pub start_path: Vec<PathNode>,
 
-    /// Edges in the start_path (bottom-up).
+    /// Edges in the start_path (bottom-up: from=child, to=parent).
     pub start_edges: Vec<EdgeRef>,
 
     /// The root node (set when first child match occurs).
     pub root: Option<PathNode>,
 
-    /// Edge connecting the top of start_path to the root.
+    /// Edge connecting the top of start_path to the root (from=start_path_top, to=root).
     pub root_edge: Option<EdgeRef>,
 
     /// Nodes in the end_path (top-down, from root toward leaf).
     /// Does NOT include the root itself.
     pub end_path: Vec<PathNode>,
 
-    /// Edges in the end_path (top-down).
+    /// Edges in the end_path (top-down: from=parent, to=child).
     pub end_edges: Vec<EdgeRef>,
 
     /// Current cursor position in the query.
@@ -335,19 +339,19 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::PushParent {
             parent: node(10, 2),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         g.apply(&PathTransition::PushParent {
             parent: node(20, 4),
-            edge: edge(20, 10, 0, 1),
+            edge: edge(10, 20, 0, 1),
         }).unwrap();
 
         assert_eq!(g.start_path.len(), 2);
         assert_eq!(g.start_path[0], node(10, 2));
         assert_eq!(g.start_path[1], node(20, 4));
         assert_eq!(g.start_edges.len(), 2);
-        assert_eq!(g.start_edges[0], edge(10, 1, 0, 0));
-        assert_eq!(g.start_edges[1], edge(20, 10, 0, 1));
+        assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
+        assert_eq!(g.start_edges[1], edge(10, 20, 0, 1));
     }
 
     #[test]
@@ -356,15 +360,15 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::PushParent {
             parent: node(10, 2),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(20, 4),
-            edge: edge(20, 10, 0, 0),
+            edge: edge(10, 20, 0, 0),
         }).unwrap();
 
         assert_eq!(g.root, Some(node(20, 4)));
-        assert_eq!(g.root_edge, Some(edge(20, 10, 0, 0)));
+        assert_eq!(g.root_edge, Some(edge(10, 20, 0, 0)));
     }
 
     #[test]
@@ -373,7 +377,7 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(10, 3),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         g.apply(&PathTransition::PushChild {
             child: node(3, 1),
@@ -397,7 +401,7 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(10, 3),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         g.apply(&PathTransition::PushChild {
             child: node(3, 1),
@@ -415,7 +419,7 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(10, 3),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         g.apply(&PathTransition::PushChild {
             child: node(3, 1),
@@ -476,11 +480,11 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(10, 3),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         let err = g.apply(&PathTransition::PushParent {
             parent: node(20, 4),
-            edge: edge(20, 10, 0, 0),
+            edge: edge(10, 20, 0, 0),
         });
         assert!(err.is_err());
     }
@@ -502,7 +506,7 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(10, 3),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         let err = g.apply(&PathTransition::PopChild);
         assert!(err.is_err());
@@ -514,7 +518,7 @@ mod tests {
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(10, 3),
-            edge: edge(10, 1, 0, 0),
+            edge: edge(1, 10, 0, 0),
         }).unwrap();
         let err = g.apply(&PathTransition::ReplaceChild {
             child: node(4, 1),
@@ -534,11 +538,11 @@ mod tests {
             PathTransition::SetStartNode { node: node(1, 1) },
             PathTransition::PushParent {
                 parent: node(10, 2),
-                edge: edge(10, 1, 0, 0),
+                edge: edge(1, 10, 0, 0),
             },
             PathTransition::SetRoot {
                 root: node(20, 4),
-                edge: edge(20, 10, 0, 0),
+                edge: edge(10, 20, 0, 0),
             },
             PathTransition::PushChild {
                 child: node(5, 1),
@@ -567,7 +571,7 @@ mod tests {
             PathTransition::SetStartNode { node: node(1, 1) },
             PathTransition::SetRoot {
                 root: node(10, 2),
-                edge: edge(10, 1, 0, 0),
+                edge: edge(1, 10, 0, 0),
             },
             PathTransition::PushChild {
                 child: node(3, 1),
@@ -594,7 +598,7 @@ mod tests {
             PathTransition::SetStartNode { node: node(1, 1) },
             PathTransition::SetRoot {
                 root: node(10, 3),
-                edge: edge(10, 1, 0, 0),
+                edge: edge(1, 10, 0, 0),
             },
             PathTransition::PushChild {
                 child: node(3, 1),
@@ -627,11 +631,11 @@ mod tests {
             PathTransition::SetStartNode { node: node(1, 1) },
             PathTransition::PushParent {
                 parent: node(10, 2),
-                edge: edge(10, 1, 0, 0),
+                edge: edge(1, 10, 0, 0),
             },
             PathTransition::SetRoot {
                 root: node(20, 4),
-                edge: edge(20, 10, 0, 0),
+                edge: edge(10, 20, 0, 0),
             },
             PathTransition::PushChild {
                 child: node(5, 1),
@@ -661,11 +665,11 @@ mod tests {
             PathTransition::SetStartNode { node: node(1, 1) },
             PathTransition::PushParent {
                 parent: node(10, 2),
-                edge: edge(10, 1, 0, 0),
+                edge: edge(1, 10, 0, 0),
             },
             PathTransition::SetRoot {
                 root: node(20, 4),
-                edge: edge(20, 10, 0, 0),
+                edge: edge(10, 20, 0, 0),
             },
             PathTransition::PushChild {
                 child: node(5, 1),
@@ -711,22 +715,22 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::PushParent {
                         parent: node(10, 2),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushParent {
                         parent: node(20, 4),
-                        edge: edge(20, 10, 0, 1),
+                        edge: edge(10, 20, 0, 1),
                     },
                 ],
                 expected: VizPathGraph::from_transitions(&[
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::PushParent {
                         parent: node(10, 2),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushParent {
                         parent: node(20, 4),
-                        edge: edge(20, 10, 0, 1),
+                        edge: edge(10, 20, 0, 1),
                     },
                 ]).unwrap(),
             },
@@ -736,11 +740,11 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::PushParent {
                         parent: node(10, 2),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::SetRoot {
                         root: node(20, 4),
-                        edge: edge(20, 10, 0, 0),
+                        edge: edge(10, 20, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(5, 1),
@@ -753,11 +757,11 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::PushParent {
                         parent: node(10, 2),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::SetRoot {
                         root: node(20, 4),
-                        edge: edge(20, 10, 0, 0),
+                        edge: edge(10, 20, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(5, 1),
@@ -773,7 +777,7 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::SetRoot {
                         root: node(10, 2),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(3, 1),
@@ -786,7 +790,7 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::SetRoot {
                         root: node(10, 2),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(3, 1),
@@ -802,7 +806,7 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::SetRoot {
                         root: node(10, 3),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(3, 1),
@@ -821,7 +825,7 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::SetRoot {
                         root: node(10, 3),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(3, 1),
@@ -843,7 +847,7 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::SetRoot {
                         root: node(10, 3),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(3, 1),
@@ -860,7 +864,7 @@ mod tests {
                     PathTransition::SetStartNode { node: node(1, 1) },
                     PathTransition::SetRoot {
                         root: node(10, 3),
-                        edge: edge(10, 1, 0, 0),
+                        edge: edge(1, 10, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(3, 1),
@@ -880,15 +884,15 @@ mod tests {
                     PathTransition::SetStartNode { node: node(0, 1) },
                     PathTransition::PushParent {
                         parent: node(5, 2),
-                        edge: edge(5, 0, 0, 0),
+                        edge: edge(0, 5, 0, 0),
                     },
                     PathTransition::PushParent {
                         parent: node(10, 3),
-                        edge: edge(10, 5, 0, 1),
+                        edge: edge(5, 10, 0, 1),
                     },
                     PathTransition::SetRoot {
                         root: node(20, 6),
-                        edge: edge(20, 10, 0, 0),
+                        edge: edge(10, 20, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(15, 3),
@@ -909,15 +913,15 @@ mod tests {
                     PathTransition::SetStartNode { node: node(0, 1) },
                     PathTransition::PushParent {
                         parent: node(5, 2),
-                        edge: edge(5, 0, 0, 0),
+                        edge: edge(0, 5, 0, 0),
                     },
                     PathTransition::PushParent {
                         parent: node(10, 3),
-                        edge: edge(10, 5, 0, 1),
+                        edge: edge(5, 10, 0, 1),
                     },
                     PathTransition::SetRoot {
                         root: node(20, 6),
-                        edge: edge(20, 10, 0, 0),
+                        edge: edge(10, 20, 0, 0),
                     },
                     PathTransition::PushChild {
                         child: node(15, 3),
