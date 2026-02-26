@@ -213,8 +213,12 @@ impl VizPathGraph {
                 if self.start_node.is_none() {
                     return Err("PushParent before SetStartNode".into());
                 }
-                if self.root.is_some() {
-                    return Err("PushParent after SetRoot".into());
+                if let Some(old_root) = self.root.take() {
+                    // Root already set — extend start path upward past the old root.
+                    // Demote old root + its edge into start_path, then push the new parent.
+                    let old_edge = self.root_edge.take().unwrap();
+                    self.start_path.push(old_root);
+                    self.start_edges.push(old_edge);
                 }
                 self.start_path.push(*parent);
                 self.start_edges.push(*edge);
@@ -475,18 +479,38 @@ mod tests {
     }
 
     #[test]
-    fn test_push_parent_after_root_fails() {
+    fn test_push_parent_after_root_extends_start_path() {
+        // PushParent after SetRoot demotes the old root into start_path
+        // and clears root/root_edge so a new SetRoot can follow.
         let mut g = VizPathGraph::new();
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
             root: node(10, 3),
             edge: edge(1, 10, 0, 0),
         }).unwrap();
-        let err = g.apply(&PathTransition::PushParent {
+        assert!(g.root.is_some());
+
+        g.apply(&PathTransition::PushParent {
             parent: node(20, 4),
             edge: edge(10, 20, 0, 0),
-        });
-        assert!(err.is_err());
+        }).unwrap();
+
+        // Old root (10) demoted into start_path; root cleared.
+        assert_eq!(g.start_path.len(), 2);
+        assert_eq!(g.start_path[0], node(10, 3));
+        assert_eq!(g.start_path[1], node(20, 4));
+        assert_eq!(g.start_edges.len(), 2);
+        assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
+        assert_eq!(g.start_edges[1], edge(10, 20, 0, 0));
+        assert!(g.root.is_none());
+        assert!(g.root_edge.is_none());
+
+        // A second SetRoot can now follow (extends path further)
+        g.apply(&PathTransition::SetRoot {
+            root: node(30, 6),
+            edge: edge(20, 30, 0, 0),
+        }).unwrap();
+        assert_eq!(g.root, Some(node(30, 6)));
     }
 
     #[test]
@@ -936,6 +960,56 @@ mod tests {
                         edge: edge(8, 3, 0, 1),
                     },
                     PathTransition::ChildMatch { cursor_pos: 5 },
+                    PathTransition::Done { success: true },
+                ]).unwrap(),
+            },
+            // Simulates the runtime search pattern: SetRoot is called first (root found),
+            // then PushParent extends the start path when the root boundary is exhausted.
+            TestFixture {
+                name: "push_parent_after_root".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    // First root found immediately
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    // Root boundary exhausted — explore parent (PushParent after SetRoot)
+                    PathTransition::PushParent {
+                        parent: node(20, 6),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    // New root found at parent level
+                    PathTransition::SetRoot {
+                        root: node(30, 8),
+                        edge: edge(20, 30, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(5, 1),
+                        edge: edge(30, 5, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 3 },
+                    PathTransition::Done { success: true },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushParent {
+                        parent: node(20, 6),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    PathTransition::SetRoot {
+                        root: node(30, 8),
+                        edge: edge(20, 30, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(5, 1),
+                        edge: edge(30, 5, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 3 },
                     PathTransition::Done { success: true },
                 ]).unwrap(),
             },
