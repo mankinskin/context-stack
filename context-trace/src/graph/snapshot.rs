@@ -37,8 +37,6 @@ pub struct SnapshotNode {
     pub label: String,
     /// Token width (1 for atoms, >1 for merged).
     pub width: usize,
-    /// Whether this is a leaf atom vertex.
-    pub is_atom: bool,
 }
 
 /// A directed edge from parent vertex to child vertex.
@@ -72,15 +70,10 @@ where
             let width = data.to_token().width.0;
             let label = self.vertex_data_string(data.clone());
 
-            let key = data.to_token().index;
-            let vertex_key = self.expect_key_for_index(key);
-            let is_atom = self.get_atom_by_key(&vertex_key).is_some();
-
             nodes.push(SnapshotNode {
                 index: vi,
                 label,
                 width,
-                is_atom,
             });
 
             // Extract edges from child patterns

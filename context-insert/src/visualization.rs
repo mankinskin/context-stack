@@ -75,7 +75,7 @@ pub(crate) fn emit_insert_event(
         query,
         description: description.into(),
         path_id,
-        path_transition,
+        path_transition: Some(path_transition),
         path_graph,
     };
     event.emit();
