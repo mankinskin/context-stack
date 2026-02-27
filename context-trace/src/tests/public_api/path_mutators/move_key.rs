@@ -8,7 +8,7 @@ use crate::*;
 
 #[test]
 fn atom_position_basic_creation() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     let pos = AtomPosition::from(5);
     assert_eq!(*pos, 5);
@@ -17,7 +17,7 @@ fn atom_position_basic_creation() {
 
 #[test]
 fn atom_position_add_operations() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     let mut pos = AtomPosition::from(10);
 
@@ -33,7 +33,7 @@ fn atom_position_add_operations() {
 
 #[test]
 fn atom_position_sub_operations() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     let mut pos = AtomPosition::from(10);
 
@@ -49,7 +49,7 @@ fn atom_position_sub_operations() {
 
 #[test]
 fn atom_position_move_key_right() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     use crate::{
         direction::Right,
@@ -63,7 +63,7 @@ fn atom_position_move_key_right() {
 
 #[test]
 fn atom_position_move_key_left() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     use crate::{
         direction::Left,
@@ -77,7 +77,7 @@ fn atom_position_move_key_left() {
 
 #[test]
 fn atom_position_advance_key() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     use crate::path::mutators::move_path::key::AdvanceKey;
 
@@ -91,7 +91,7 @@ fn atom_position_advance_key() {
 
 #[test]
 fn atom_position_retract_key() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     use crate::path::mutators::move_path::key::RetractKey;
 
@@ -105,7 +105,7 @@ fn atom_position_retract_key() {
 
 #[test]
 fn atom_position_zero_moves() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     use crate::{
         direction::{
@@ -138,7 +138,7 @@ fn atom_position_zero_moves() {
 
 #[test]
 fn atom_position_chain_operations() {
-    let _tracing = init_test_tracing!();
+    //let _tracing = init_test_tracing!();
 
     let mut pos = AtomPosition::from(0);
     pos += 5;

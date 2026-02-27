@@ -11,7 +11,7 @@ use crate::{
         PatternCursor,
     },
     r#match::{
-        iterator::SearchIterator,
+        iterator::{BfsStepResult, SearchIterator},
         root_cursor::{
             ConclusiveEnd,
             RootAdvanceResult,
@@ -595,23 +595,87 @@ where
     type Item = MatchResult;
     fn next(&mut self) -> Option<Self::Item> {
         trace!("searching for next match");
-        match self.matches.find_next_root() {
-            Some(state) => {
-                let matched_state = self.finish_root_cursor(state);
-                let checkpoint_pos =
-                    *matched_state.cursor().atom_position.as_ref();
 
-                trace!(
-                    query_exhausted = matched_state.query_exhausted(),
-                    checkpoint_pos = checkpoint_pos,
-                    "found matched state"
-                );
-                Some(matched_state)
-            },
-            None => {
-                trace!("no more matches found");
-                None
-            },
-        }
+        // Drive the BFS loop one step at a time so we can emit graph-op
+        // events for intermediate nodes (e.g. a parent that is explored but
+        // doesn't produce a root match).
+        let matched_state = loop {
+            match self.matches.pop_and_process_one() {
+                BfsStepResult::Expanded { node_index, is_parent } => {
+                    // The node was explored but didn't yield a match —
+                    // emit RootExplore + ParentExplore so the visualisation
+                    // shows the intermediate candidate.
+                    if is_parent {
+                        let candidate_parents = self.queue_candidates().0.clone();
+                        self.emit_graph_op(
+                            Transition::RootExplore {
+                                root: node_index,
+                                width: 1,
+                                edge: EdgeRef {
+                                    from: self.start_node,
+                                    to: node_index,
+                                    pattern_idx: 0,
+                                    sub_index: 0,
+                                },
+                            },
+                            format!("Exploring candidate node {node_index} (advance failed — expanding parents)"),
+                        );
+                        self.emit_graph_op(
+                            Transition::ParentExplore {
+                                current_root: node_index,
+                                parent_candidates: candidate_parents,
+                            },
+                            format!("Node {node_index} boundary reached — exploring parents"),
+                        );
+                    }
+                    continue;
+                },
+                BfsStepResult::FoundMatch(state) => {
+                    // Clear queue — finish_root_cursor will explore via
+                    // RootCursor and re-populate if necessary.
+                    debug!(
+                        "Found matching root — clearing search queue (will explore via parents)"
+                    );
+                    self.matches.queue.nodes.clear();
+
+                    let root_parent =
+                        state.child.current().child_state.root_parent();
+                    debug!(
+                        root_parent = %root_parent,
+                        root_width = root_parent.width.0,
+                        "found matching root — creating RootCursor"
+                    );
+                    break state;
+                },
+                BfsStepResult::Skipped { node_index, is_parent } => {
+                    // Emit a Dequeue event so the visualisation shows the
+                    // mismatch.
+                    self.emit_graph_op(
+                        Transition::Dequeue {
+                            node: node_index,
+                            queue_remaining: self.matches.queue.nodes.len(),
+                            is_parent,
+                        },
+                        format!("Node {node_index} skipped (mismatch)"),
+                    );
+                    continue;
+                },
+                BfsStepResult::Empty => {
+                    trace!("no more matches found");
+                    return None;
+                },
+            }
+        };
+
+        let matched_result = self.finish_root_cursor(matched_state);
+        let checkpoint_pos =
+            *matched_result.cursor().atom_position.as_ref();
+
+        trace!(
+            query_exhausted = matched_result.query_exhausted(),
+            checkpoint_pos = checkpoint_pos,
+            "found matched state"
+        );
+        Some(matched_result)
     }
 }
