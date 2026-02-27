@@ -90,7 +90,7 @@ impl<K: SearchKind> std::fmt::Display for StartCtx<K> {
 }
 impl<K: SearchKind> StartCtx<K> {
     pub(crate) fn into_search(self) -> Result<SearchState<K>, ErrorState> {
-        trace!(start_token = %self.start_token, cursor = %self.cursor, "creating search from start context");
+        trace!(start_token = %self.start_token, cursor = %self.cursor, "creating search state");
         match self.get_parent_batch() {
             Ok(p) => {
                 trace!(
@@ -124,11 +124,11 @@ impl<K: SearchKind> StartCtx<K> {
             },
         }
     }
+    #[context_trace::instrument_sig(level = "trace", skip(self), fields(cursor = %self.cursor))]
     pub(crate) fn get_parent_batch(
         &self
     ) -> Result<CompareParentBatch, ErrorState> {
         let mut cursor = self.cursor.clone();
-        trace!(cursor_path = %cursor.path, "get_parent_batch called");
         let start = self.start_token;
         let checkpoint = cursor.clone();
         if cursor.advance(&self.trav).is_continue() {

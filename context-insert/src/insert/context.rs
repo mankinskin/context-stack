@@ -75,7 +75,6 @@ impl<R: InsertResult> InsertCtx<R> {
             reset_step_counter,
         };
         use context_trace::graph::{
-            search_path::{PathNode, PathTransition},
             visualization::Transition,
         };
 
@@ -95,9 +94,6 @@ impl<R: InsertResult> InsertCtx<R> {
                 node: root_idx,
                 split_position: *init.end_bound.as_ref(),
             },
-            PathTransition::SetStartNode {
-                node: PathNode { index: root_idx, width: 1 },
-            },
             format!("Starting split phase on root {root_idx}"),
             root_idx,
         );
@@ -111,15 +107,6 @@ impl<R: InsertResult> InsertCtx<R> {
                 original_node: root_idx,
                 left_fragment: None,
                 right_fragment: None,
-            },
-            PathTransition::SetRoot {
-                root: PathNode { index: root_idx, width: 1 },
-                edge: context_trace::graph::search_path::EdgeRef {
-                    from: root_idx,
-                    to: root_idx,
-                    pattern_idx: 0,
-                    sub_index: 0,
-                },
             },
             format!("Split phase complete for root {root_idx}"),
             root_idx,
@@ -136,7 +123,6 @@ impl<R: InsertResult> InsertCtx<R> {
                     .map(|k| k.index.index.0)
                     .collect(),
             },
-            PathTransition::ChildMatch { cursor_pos: 0 },
             format!("Starting join phase with {leaf_count} leaves"),
             root_idx,
         );
@@ -150,7 +136,6 @@ impl<R: InsertResult> InsertCtx<R> {
             Transition::JoinComplete {
                 result_node: joined.index.0,
             },
-            PathTransition::Done { success: true },
             format!("Join complete — created token {}", joined.index.0),
             joined.index.0,
         );

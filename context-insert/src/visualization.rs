@@ -4,7 +4,7 @@
 //! `GraphOpEvent` messages during split and join operations.
 
 use context_trace::graph::{
-    search_path::{PathTransition, VizPathGraph},
+    search_path::VizPathGraph,
     visualization::{
         GraphOpEvent,
         LocationInfo,
@@ -55,7 +55,6 @@ fn next_step() -> usize {
 /// Emit a graph operation event for insert operations.
 pub(crate) fn emit_insert_event(
     transition: Transition,
-    path_transition: PathTransition,
     description: impl Into<String>,
     location: LocationInfo,
     query: QueryInfo,
@@ -64,7 +63,7 @@ pub(crate) fn emit_insert_event(
     let path_id = INSERT_PATH_ID.with(|c| c.borrow().clone());
     // Apply transition to accumulated path graph
     INSERT_VIZ_PATH.with(|c| {
-        let _ = c.borrow_mut().apply(&path_transition);
+        let _ = c.borrow_mut().apply_transition(&transition);
     });
     let path_graph = INSERT_VIZ_PATH.with(|c| c.borrow().clone());
     let event = GraphOpEvent {
@@ -75,7 +74,6 @@ pub(crate) fn emit_insert_event(
         query,
         description: description.into(),
         path_id,
-        path_transition: Some(path_transition),
         path_graph,
     };
     event.emit();
@@ -84,13 +82,11 @@ pub(crate) fn emit_insert_event(
 /// Emit a simple insert event with just node location.
 pub(crate) fn emit_insert_node(
     transition: Transition,
-    path_transition: PathTransition,
     description: impl Into<String>,
     node: usize,
 ) {
     emit_insert_event(
         transition,
-        path_transition,
         description,
         LocationInfo::selected(node),
         QueryInfo::default(),

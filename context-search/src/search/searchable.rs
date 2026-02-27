@@ -78,15 +78,12 @@ pub trait Searchable<K: SearchKind = AncestorSearchTraversal>:
 }
 
 impl<K: SearchKind> Searchable<K> for PatternCursor {
-    #[context_trace::instrument_sig(level = "trace", skip(self, trav))]
     fn start_search(
         self,
         trav: K::Trav,
     ) -> Result<SearchState<K>, ErrorState> {
         // Get the starting token from the query pattern for the SearchIterator
         let start_token = self.path.role_root_child_token::<End, _>(&trav);
-        debug!(start_token = %&start_token, "starting search from token");
-
         StartCtx {
             trav,
             start_token,
@@ -196,7 +193,6 @@ impl<K: SearchKind> Searchable<K> for PatternEndPath {
 }
 
 impl<K: SearchKind> Searchable<K> for PatternRangePath {
-    #[context_trace::instrument_sig(level = "trace", skip(self, trav), fields(path = ?self))]
     fn start_search(
         self,
         trav: K::Trav,

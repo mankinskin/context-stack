@@ -6,7 +6,7 @@
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::search_path::{PathTransition, VizPathGraph};
+use super::search_path::{EdgeRef, VizPathGraph};
 
 // ---------------------------------------------------------------------------
 // Operation Types
@@ -45,7 +45,11 @@ pub enum Transition {
     // Common transitions (used by search, insert, read)
     // ══════════════════════════════════════════════════════════════════════
     /// Initial entry point - search/insert started at this node
-    StartNode { node: usize },
+    StartNode {
+        node: usize,
+        /// Token width (atom count) for path visualization
+        width: usize,
+    },
 
     /// Exploring a parent node (bottom-up traversal)
     VisitParent {
@@ -53,6 +57,10 @@ pub enum Transition {
         to: usize,
         /// Position in parent where we entered
         entry_pos: usize,
+        /// Width of the parent node for path visualization
+        width: usize,
+        /// Edge connecting from → to in the snapshot
+        edge: EdgeRef,
     },
 
     /// Exploring a child node (top-down traversal)
@@ -61,6 +69,12 @@ pub enum Transition {
         to: usize,
         /// Child index within parent's pattern
         child_index: usize,
+        /// Width of the child node for path visualization
+        width: usize,
+        /// Edge connecting from → to in the snapshot
+        edge: EdgeRef,
+        /// Whether this replaces the current end_path tail (vs. push)
+        replace: bool,
     },
 
     /// Child comparison succeeded - tokens match
@@ -100,7 +114,13 @@ pub enum Transition {
     },
 
     /// Started exploring a root match via RootCursor
-    RootExplore { root: usize },
+    RootExplore {
+        root: usize,
+        /// Width of the root node for path visualization
+        width: usize,
+        /// Edge connecting start_path top → root
+        edge: EdgeRef,
+    },
 
     /// Advanced match position within current root
     MatchAdvance {
@@ -287,12 +307,6 @@ pub struct GraphOpEvent {
     /// concurrent operations in the same log are distinguished by this id.
     pub path_id: String,
 
-    /// Incremental path transition at this step.
-    /// Describes how the `(start_path, root, end_path)` triple changed.
-    /// `None` for informational events (e.g., ParentExplore) that don't
-    /// modify the search path state.
-    pub path_transition: Option<PathTransition>,
-
     /// Full path graph snapshot AFTER applying the transition.
     /// Redundant (can reconstruct from transitions in order), but included
     /// for debugging and so the frontend can display the path without
@@ -326,7 +340,6 @@ impl GraphOpEvent {
         step: usize,
         path_id: impl Into<String>,
         transition: Transition,
-        path_transition: impl Into<Option<PathTransition>>,
         path_graph: VizPathGraph,
         description: impl Into<String>,
     ) -> Self {
@@ -338,7 +351,6 @@ impl GraphOpEvent {
             query: QueryInfo::default(),
             description: description.into(),
             path_id: path_id.into(),
-            path_transition: path_transition.into(),
             path_graph,
         }
     }
@@ -348,7 +360,6 @@ impl GraphOpEvent {
         step: usize,
         path_id: impl Into<String>,
         transition: Transition,
-        path_transition: impl Into<Option<PathTransition>>,
         path_graph: VizPathGraph,
         description: impl Into<String>,
     ) -> Self {
@@ -360,7 +371,6 @@ impl GraphOpEvent {
             query: QueryInfo::default(),
             description: description.into(),
             path_id: path_id.into(),
-            path_transition: path_transition.into(),
             path_graph,
         }
     }
@@ -380,15 +390,6 @@ impl GraphOpEvent {
         query: QueryInfo,
     ) -> Self {
         self.query = query;
-        self
-    }
-
-    /// Override the path transition.
-    pub fn with_path_transition(
-        mut self,
-        transition: impl Into<Option<PathTransition>>,
-    ) -> Self {
-        self.path_transition = transition.into();
         self
     }
 

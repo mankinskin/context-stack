@@ -197,7 +197,90 @@ impl VizPathGraph {
         Self::default()
     }
 
-    /// Apply a single transition, mutating this path graph in place.
+    /// Apply a [`Transition`] to update this path graph in place.
+    ///
+    /// Only transitions that modify the search path have an effect;
+    /// informational transitions (e.g., `ParentExplore`, `Dequeue`) are
+    /// silently ignored.
+    pub fn apply_transition(
+        &mut self,
+        transition: &super::visualization::Transition,
+    ) -> Result<(), String> {
+        use super::visualization::Transition;
+        match transition {
+            Transition::StartNode { node, width } => {
+                if self.start_node.is_some() {
+                    return Err("StartNode applied twice".into());
+                }
+                self.start_node =
+                    Some(PathNode { index: *node, width: *width });
+            },
+            Transition::VisitParent { to, width, edge, .. } => {
+                if self.start_node.is_none() {
+                    return Err("VisitParent before StartNode".into());
+                }
+                if let Some(old_root) = self.root.take() {
+                    let old_edge = self.root_edge.take().unwrap();
+                    self.start_path.push(old_root);
+                    self.start_edges.push(old_edge);
+                }
+                let parent = PathNode { index: *to, width: *width };
+                self.start_path.push(parent);
+                self.start_edges.push(*edge);
+            },
+            Transition::RootExplore { root, width, edge } => {
+                if self.start_node.is_none() {
+                    return Err("RootExplore before StartNode".into());
+                }
+                if self.root.is_some() {
+                    return Err("RootExplore called when root already set".into());
+                }
+                let root_node = PathNode { index: *root, width: *width };
+                if self.start_path.last().map(|n| n.index) == Some(*root) {
+                    self.start_path.pop();
+                    self.root = Some(root_node);
+                    self.root_edge = self.start_edges.pop().or(Some(*edge));
+                } else {
+                    self.root = Some(root_node);
+                    self.root_edge = Some(*edge);
+                }
+            },
+            Transition::VisitChild { to, width, edge, replace, .. } => {
+                if self.root.is_none() {
+                    return Err("VisitChild before RootExplore".into());
+                }
+                let child = PathNode { index: *to, width: *width };
+                if *replace {
+                    if self.end_path.is_empty() {
+                        return Err("VisitChild replace on empty end_path".into());
+                    }
+                    *self.end_path.last_mut().unwrap() = child;
+                    *self.end_edges.last_mut().unwrap() = *edge;
+                } else {
+                    self.end_path.push(child);
+                    self.end_edges.push(*edge);
+                }
+            },
+            Transition::ChildMatch { cursor_pos, .. } => {
+                self.cursor_pos = *cursor_pos;
+            },
+            Transition::ChildMismatch { cursor_pos, .. } => {
+                self.cursor_pos = *cursor_pos;
+            },
+            Transition::MatchAdvance { new_pos, .. } => {
+                self.cursor_pos = *new_pos;
+            },
+            Transition::Done { success, .. } => {
+                self.done = true;
+                self.success = *success;
+            },
+            // Informational transitions — no path state change.
+            _ => {},
+        }
+        Ok(())
+    }
+
+    /// Apply a single [`PathTransition`], mutating this path graph in place.
     ///
     /// Returns `Err` if the transition is invalid for the current state
     /// (e.g., `PushChild` before `SetRoot`).
