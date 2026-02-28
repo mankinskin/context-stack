@@ -124,7 +124,6 @@ impl<K: SearchKind> StartCtx<K> {
             },
         }
     }
-    #[context_trace::instrument_sig(level = "trace", skip(self), fields(cursor = %self.cursor))]
     pub(crate) fn get_parent_batch(
         &self
     ) -> Result<CompareParentBatch, ErrorState> {

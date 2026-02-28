@@ -55,9 +55,8 @@ where
     );
     let prefix_children =
         trav.graph().expect_vertex_data(leaf).prefix_children::<G>();
-    debug!(num_children = prefix_children.len(), "got prefix_children");
 
-    let result = prefix_children
+    prefix_children
         .iter()
         .sorted_unstable_by(|a: &&SubToken, b: &&SubToken| {
             b.token().width().cmp(&a.token().width())
@@ -67,9 +66,7 @@ where
             let next_state = update_state(sub.clone(), child_location);
             (sub.clone(), next_state)
         })
-        .collect();
-    debug!("returning prefixes");
-    result
+        .collect()
 }
 
 pub(crate) trait PrefixStates: Sized + Clone {
@@ -174,7 +171,6 @@ where
             result.push_back((sub.clone(), cursor));
         }
 
-        debug!("returning prefixes");
         result
     }
 }

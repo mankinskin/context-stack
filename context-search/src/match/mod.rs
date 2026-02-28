@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     compare::{
+        iterator::CompareEvent,
         parent::ParentCompareState,
         state::{
             CompareEndResult,
@@ -19,7 +20,10 @@ use crate::{
         SearchKind,
     },
 };
-use context_trace::*;
+use context_trace::{
+    path::accessors::has_path::HasRootedPath,
+    *,
+};
 
 use derive_new::new;
 pub(crate) mod iterator;
@@ -35,9 +39,9 @@ pub(crate) struct SearchQueue {
 
 #[derive(Debug)]
 pub(crate) enum NodeResult {
-    QueueMore(Vec<SearchNode>),
-    FoundMatch(Box<MatchedCompareState>),
-    Skip,
+    QueueMore(Vec<SearchNode>, Vec<CompareEvent>),
+    FoundMatch(Box<MatchedCompareState>, Vec<CompareEvent>),
+    Skip(Vec<CompareEvent>),
 }
 use NodeResult::*;
 
@@ -106,19 +110,52 @@ where
         trav: &K::Trav,
         state: CompareState<Candidate, Candidate>,
     ) -> Option<NodeResult> {
+        // Extract tokens being compared *before* consuming the state.
+        let path_leaf =
+            state.rooted_path().role_rooted_leaf_token::<End, _>(trav);
+        let query_leaf =
+            (*state.query.current()).role_rooted_leaf_token::<End, _>(trav);
+        let cursor_pos = *state.query.current().atom_position.as_ref();
+
         match state.compare_leaf_tokens(trav) {
             Finished(CompareEndResult::FoundMatch(matched_state)) => {
-                // Return the matched state directly without conversion
-                // RootCursor will handle the conversion to Candidate with checkpoint update
-                Some(NodeResult::FoundMatch(Box::new(matched_state)))
+                let event = CompareEvent::ChildMatch {
+                    node: path_leaf.index.0,
+                    cursor_pos,
+                };
+                Some(NodeResult::FoundMatch(Box::new(matched_state), vec![event]))
             },
-            Finished(CompareEndResult::Mismatch(_)) => Some(Skip),
+            Finished(CompareEndResult::Mismatch(_)) => {
+                let event = CompareEvent::ChildMismatch {
+                    node: path_leaf.index.0,
+                    cursor_pos,
+                    expected: query_leaf.index.0,
+                    actual: path_leaf.index.0,
+                };
+                Some(Skip(vec![event]))
+            },
             Prefixes(next) => {
                 tracing::debug!(
                     num_prefixes = next.len(),
                     "got Prefixes, extending queue"
                 );
-                Some(QueueMore(next.into_iter().map(ChildCandidate).collect()))
+                let events: Vec<CompareEvent> = next
+                    .iter()
+                    .map(|prefix_state| {
+                        let child_leaf = prefix_state
+                            .rooted_path()
+                            .role_rooted_leaf_token::<End, _>(trav);
+                        CompareEvent::VisitChild {
+                            parent: path_leaf.index.0,
+                            child: child_leaf.index.0,
+                            child_width: child_leaf.width.0,
+                        }
+                    })
+                    .collect();
+                Some(QueueMore(
+                    next.into_iter().map(ChildCandidate).collect(),
+                    events,
+                ))
             },
         }
     }
@@ -136,6 +173,7 @@ where
                         })
                         .map(ParentCandidate)
                         .collect(),
+                    Vec::new(),
                 )),
             },
             ChildCandidate(state) => Self::compare_next(self.1, state),

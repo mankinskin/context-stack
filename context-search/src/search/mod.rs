@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    compare::state::CompareState,
+    compare::{
+        iterator::CompareEvent,
+        state::CompareState,
+    },
     cursor::{
         checkpointed::{
             Checkpointed,
@@ -11,8 +14,9 @@ use crate::{
         PatternCursor,
     },
     r#match::{
-        iterator::{BfsStepResult, SearchIterator},
+        iterator::{ProcessResult, SearchIterator},
         root_cursor::{
+            AdvanceOutcome,
             ConclusiveEnd,
             RootAdvanceResult,
             RootCursor,
@@ -191,6 +195,62 @@ where
         event.emit();
     }
 
+    /// Convert a batch of [`CompareEvent`]s into [`GraphOpEvent`]s and emit them.
+    fn emit_compare_events(&mut self, events: &[CompareEvent]) {
+        for ev in events {
+            match ev {
+                CompareEvent::VisitChild { parent, child, child_width } => {
+                    let replace = !self.viz_path.end_path.is_empty();
+                    self.emit_graph_op(
+                        Transition::VisitChild {
+                            from: *parent,
+                            to: *child,
+                            child_index: 0,
+                            width: *child_width,
+                            edge: EdgeRef {
+                                from: *parent,
+                                to: *child,
+                                pattern_idx: 0,
+                                sub_index: 0,
+                            },
+                            replace,
+                        },
+                        format!(
+                            "Prefix expansion: decomposing {} into child {}",
+                            parent, child
+                        ),
+                    );
+                },
+                CompareEvent::ChildMatch { node, cursor_pos } => {
+                    self.emit_graph_op(
+                        Transition::ChildMatch {
+                            node: *node,
+                            cursor_pos: *cursor_pos,
+                        },
+                        format!(
+                            "Child token match at node {} (query pos {})",
+                            node, cursor_pos
+                        ),
+                    );
+                },
+                CompareEvent::ChildMismatch { node, cursor_pos, expected, actual } => {
+                    self.emit_graph_op(
+                        Transition::ChildMismatch {
+                            node: *node,
+                            cursor_pos: *cursor_pos,
+                            expected: *expected,
+                            actual: *actual,
+                        },
+                        format!(
+                            "Child token mismatch at node {} (expected {}, got {})",
+                            node, expected, actual
+                        ),
+                    );
+                },
+            }
+        }
+    }
+
     /// Infer `(current_root, matched_nodes)` from a [`Transition`] variant.
     fn infer_location(transition: &Transition) -> (Option<usize>, Vec<usize>) {
         match transition {
@@ -328,29 +388,9 @@ where
             "New root match - finishing root cursor"
         );
 
-        // Always emit VisitParent + PushParent before SetRoot.
-        // For the first parent, `from` is start_node; for subsequent parents,
-        // `from` is the current root (which gets demoted into start_path).
-        let push_from = if let Some(current_root_node) = self.viz_path.root {
-            current_root_node.index
-        } else {
-            self.viz_path.start_node.map(|n| n.index).unwrap_or(self.start_node)
-        };
-        self.emit_graph_op(
-            Transition::VisitParent {
-                from: push_from,
-                to: root_idx,
-                entry_pos: init_cursor_pos,
-                width: 1,
-                edge: EdgeRef {
-                    from: push_from,
-                    to: root_idx,
-                    pattern_idx: 0,
-                    sub_index: 0,
-                },
-            },
-            format!("Visiting parent {root_idx} from {push_from}"),
-        );
+        // VisitParent and compare_events were already emitted by the
+        // BFS loop in next() before we got here. Now emit RootExplore
+        // to confirm the root.
 
         // SetRoot "graduates" the node from start_path to root.
         // apply() detects that root_idx == start_path.last() and pops it,
@@ -395,7 +435,10 @@ where
                 state: last_match.clone(),
             };
             match root_cursor.advance_to_next_match() {
-                RootAdvanceResult::Advanced(next_match) => {
+                AdvanceOutcome { result: RootAdvanceResult::Advanced(next_match), compare_events } => {
+                    // Emit child comparison events from the compare loop
+                    self.emit_compare_events(&compare_events);
+
                     // Successfully advanced to next match - always update best_match
                     let checkpoint_pos = *next_match
                         .state
@@ -457,7 +500,10 @@ where
                     // Continue with the new matched cursor
                     last_match = next_match.state;
                 },
-                RootAdvanceResult::Finished(end_result) => {
+                AdvanceOutcome { result: RootAdvanceResult::Finished(end_result), compare_events } => {
+                    // Emit child comparison events even for terminal states
+                    self.emit_compare_events(&compare_events);
+
                     // Reached an end condition
                     match end_result {
                         RootEndResult::Conclusive(conclusive) => {
@@ -599,27 +645,51 @@ where
         // Drive the BFS loop one step at a time so we can emit graph-op
         // events for intermediate nodes (e.g. a parent that is explored but
         // doesn't produce a root match).
+        //
+        // Flow: pop → VisitParent (if parent) → process → compare_events → result events
+        // No look-ahead or caching — events are emitted in natural algorithm order.
         let matched_state = loop {
-            match self.matches.pop_and_process_one() {
-                BfsStepResult::Expanded { node_index, is_parent } => {
-                    // The node was explored but didn't yield a match —
-                    // emit RootExplore + ParentExplore so the visualisation
-                    // shows the intermediate candidate.
+            let popped = match self.matches.pop_node() {
+                Some(p) => p,
+                None => {
+                    trace!("no more matches found");
+                    return None;
+                },
+            };
+
+            let node_index = popped.node_index;
+            let is_parent = popped.is_parent;
+
+            // Emit VisitParent BEFORE processing so the visualization shows
+            // navigation to the candidate before any child comparison.
+            if is_parent {
+                let push_from = if let Some(current_root_node) = self.viz_path.root {
+                    current_root_node.index
+                } else {
+                    self.viz_path.start_node.map(|n| n.index).unwrap_or(self.start_node)
+                };
+                self.emit_graph_op(
+                    Transition::VisitParent {
+                        from: push_from,
+                        to: node_index,
+                        entry_pos: 0,
+                        width: 1,
+                        edge: EdgeRef {
+                            from: push_from,
+                            to: node_index,
+                            pattern_idx: 0,
+                            sub_index: 0,
+                        },
+                    },
+                    format!("Visiting candidate parent {node_index} from {push_from}"),
+                );
+            }
+
+            match self.matches.process_node(popped) {
+                ProcessResult::Expanded(compare_events) => {
+                    self.emit_compare_events(&compare_events);
                     if is_parent {
                         let candidate_parents = self.queue_candidates().0.clone();
-                        self.emit_graph_op(
-                            Transition::RootExplore {
-                                root: node_index,
-                                width: 1,
-                                edge: EdgeRef {
-                                    from: self.start_node,
-                                    to: node_index,
-                                    pattern_idx: 0,
-                                    sub_index: 0,
-                                },
-                            },
-                            format!("Exploring candidate node {node_index} (advance failed — expanding parents)"),
-                        );
                         self.emit_graph_op(
                             Transition::ParentExplore {
                                 current_root: node_index,
@@ -630,7 +700,9 @@ where
                     }
                     continue;
                 },
-                BfsStepResult::FoundMatch(state) => {
+                ProcessResult::FoundMatch(state, compare_events) => {
+                    self.emit_compare_events(&compare_events);
+
                     // Clear queue — finish_root_cursor will explore via
                     // RootCursor and re-populate if necessary.
                     debug!(
@@ -647,9 +719,8 @@ where
                     );
                     break state;
                 },
-                BfsStepResult::Skipped { node_index, is_parent } => {
-                    // Emit a Dequeue event so the visualisation shows the
-                    // mismatch.
+                ProcessResult::Skipped(compare_events) => {
+                    self.emit_compare_events(&compare_events);
                     self.emit_graph_op(
                         Transition::Dequeue {
                             node: node_index,
@@ -660,7 +731,7 @@ where
                     );
                     continue;
                 },
-                BfsStepResult::Empty => {
+                ProcessResult::NoResult => {
                     trace!("no more matches found");
                     return None;
                 },
