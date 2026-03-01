@@ -33,7 +33,7 @@ thread_local! {
 pub(crate) fn reset_step_counter() {
     INSERT_STEP.with(|c| c.set(0));
     let id = format!(
-        "insert-{}",
+        "insert/context-insert/{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())

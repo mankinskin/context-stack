@@ -108,7 +108,7 @@ impl<K: SearchKind> StartCtx<K> {
                     step_counter: 0,
                     start_node: self.start_token.index.0,
                     path_id: format!(
-                        "search-{}-{}",
+                        "search/context-search/token-{}-{}",
                         self.start_token.index.0,
                         std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)

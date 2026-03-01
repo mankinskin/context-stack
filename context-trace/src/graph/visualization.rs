@@ -25,6 +25,67 @@ pub enum OperationType {
     Read,
 }
 
+/// Parsed components of a namespaced `path_id`.
+///
+/// New format: `<op_type>/<module>/<semantic_id>`
+/// e.g. `search/context-search/token-42-1234567890`
+///
+/// Legacy format (no slashes): treated as `semantic_id` only.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedPathId<'a> {
+    /// Operation type prefix (e.g. "search", "insert", "read").
+    /// `None` for legacy path_ids without slashes.
+    pub op_type: Option<&'a str>,
+    /// Module name (e.g. "context-search", "context-insert").
+    /// `None` for legacy path_ids.
+    pub module: Option<&'a str>,
+    /// The semantic identifier portion.
+    pub semantic_id: &'a str,
+}
+
+/// Parse a `path_id` string into its namespaced components.
+///
+/// Supports both new (`op/module/id`) and legacy (`search-42-...`) formats.
+pub fn parse_path_id(path_id: &str) -> ParsedPathId<'_> {
+    let mut parts = path_id.splitn(3, '/');
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(op), Some(module), Some(id)) => ParsedPathId {
+            op_type: Some(op),
+            module: Some(module),
+            semantic_id: id,
+        },
+        _ => ParsedPathId {
+            op_type: None,
+            module: None,
+            semantic_id: path_id,
+        },
+    }
+}
+
+impl OperationType {
+    /// Infer the operation type from a `path_id` string.
+    ///
+    /// Returns `None` for unrecognised prefixes or legacy ids.
+    pub fn from_path_id(path_id: &str) -> Option<Self> {
+        let parsed = parse_path_id(path_id);
+        match parsed.op_type {
+            Some("search") => Some(Self::Search),
+            Some("insert") => Some(Self::Insert),
+            Some("read") => Some(Self::Read),
+            _ => {
+                // Legacy heuristic: "search-..." / "insert-..."
+                if path_id.starts_with("search-") {
+                    Some(Self::Search)
+                } else if path_id.starts_with("insert-") {
+                    Some(Self::Insert)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Transitions - describe what operation occurred (before → after)
 // ---------------------------------------------------------------------------
