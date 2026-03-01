@@ -320,6 +320,91 @@ pub struct QueryInfo {
 
     /// Total width of the query in atoms
     pub query_width: usize,
+
+    /// Atom positions that have been confirmed as matched so far.
+    /// The frontend uses this to highlight matched portions of the query.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_positions: Vec<usize>,
+
+    /// Token index that was just compared (for match/mismatch highlighting).
+    /// Points into the graph, not the query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_token: Option<usize>,
+}
+
+// ---------------------------------------------------------------------------
+// Graph Delta - describes graph mutations for insert visualization
+// ---------------------------------------------------------------------------
+
+/// A single graph mutation operation.
+///
+/// Used to describe what changed in the graph during an insert step.
+/// The frontend uses these to show before/after states and highlight
+/// newly created or removed nodes/edges.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(tag = "op", rename_all = "snake_case")]
+#[ts(
+    export,
+    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
+)]
+pub enum DeltaOp {
+    /// A new node (token) was created in the graph
+    AddNode {
+        index: usize,
+        /// Width (atom count) of the new token
+        width: usize,
+    },
+    /// A node was removed from the graph
+    RemoveNode { index: usize },
+    /// A new edge was added (parent → child in a pattern)
+    AddEdge {
+        from: usize,
+        to: usize,
+        pattern_id: usize,
+    },
+    /// An edge was removed
+    RemoveEdge {
+        from: usize,
+        to: usize,
+        pattern_id: usize,
+    },
+    /// A node's data was updated (e.g. width changed after split)
+    UpdateNode {
+        index: usize,
+        /// Human-readable description of what changed
+        detail: String,
+    },
+}
+
+/// Graph delta — describes mutations applied to the graph at a single step.
+///
+/// Carried as an optional field on `GraphOpEvent` so the frontend can
+/// display before/after graph states during insert operations.
+#[derive(Debug, Clone, Default, Serialize, TS)]
+#[ts(
+    export,
+    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
+)]
+pub struct GraphDelta {
+    /// Mutation operations applied at this step, in order.
+    pub ops: Vec<DeltaOp>,
+}
+
+impl GraphDelta {
+    /// Create a delta with a single operation.
+    pub fn single(op: DeltaOp) -> Self {
+        Self { ops: vec![op] }
+    }
+
+    /// Create a delta from multiple operations.
+    pub fn new(ops: Vec<DeltaOp>) -> Self {
+        Self { ops }
+    }
+
+    /// Whether this delta is empty (no mutations).
+    pub fn is_empty(&self) -> bool {
+        self.ops.is_empty()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +458,12 @@ pub struct GraphOpEvent {
     /// for debugging and so the frontend can display the path without
     /// reconstructing from history.
     pub path_graph: VizPathGraph,
+
+    /// Optional graph delta — describes mutations to the graph at this step.
+    /// Populated for insert operations that modify the graph structure
+    /// (split, join, create pattern, etc.).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub graph_delta: Option<GraphDelta>,
 }
 
 impl GraphOpEvent {
@@ -413,6 +504,7 @@ impl GraphOpEvent {
             description: description.into(),
             path_id: path_id.into(),
             path_graph,
+            graph_delta: None,
         }
     }
 
@@ -433,6 +525,7 @@ impl GraphOpEvent {
             description: description.into(),
             path_id: path_id.into(),
             path_graph,
+            graph_delta: None,
         }
     }
 
@@ -460,6 +553,15 @@ impl GraphOpEvent {
         graph: VizPathGraph,
     ) -> Self {
         self.path_graph = graph;
+        self
+    }
+
+    /// Set graph delta information.
+    pub fn with_graph_delta(
+        mut self,
+        delta: GraphDelta,
+    ) -> Self {
+        self.graph_delta = Some(delta);
         self
     }
 }
@@ -530,6 +632,8 @@ impl QueryInfo {
             query_tokens: tokens,
             cursor_position: cursor,
             query_width: width,
+            matched_positions: Vec::new(),
+            active_token: None,
         }
     }
 }

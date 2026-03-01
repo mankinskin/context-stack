@@ -14,11 +14,11 @@ use crate::{
         SplitMap,
         cache::position::PosKey,
     },
-    visualization::emit_insert_node,
+    visualization::{emit_insert_node, emit_insert_node_with_delta},
 };
 use context_trace::{
     graph::{
-        visualization::Transition,
+        visualization::{DeltaOp, GraphDelta, Transition},
     },
     *,
 };
@@ -75,7 +75,7 @@ impl Iterator for FrontierSplitIterator {
                     let node_idx = key.index.index.0;
 
                     // Emit event for processing this node
-                    emit_insert_node(
+                    emit_insert_node_with_delta(
                         Transition::JoinStep {
                             left: node_idx,
                             right: node_idx,
@@ -87,6 +87,10 @@ impl Iterator for FrontierSplitIterator {
                             key.pos.get()
                         ),
                         node_idx,
+                        GraphDelta::single(DeltaOp::UpdateNode {
+                            index: node_idx,
+                            detail: format!("Processing at pos {}", key.pos.get()),
+                        }),
                     );
 
                     let ctx = self.node(key.index);
@@ -105,7 +109,7 @@ impl Iterator for FrontierSplitIterator {
                 let root_idx = self.frontier.interval.root.index.0;
 
                 // Emit event for root merge
-                emit_insert_node(
+                emit_insert_node_with_delta(
                     Transition::JoinStep {
                         left: root_idx,
                         right: root_idx,
@@ -113,6 +117,10 @@ impl Iterator for FrontierSplitIterator {
                     },
                     format!("Merging root node {}", root_idx),
                     root_idx,
+                    GraphDelta::single(DeltaOp::UpdateNode {
+                        index: root_idx,
+                        detail: "Root merge".to_string(),
+                    }),
                 );
 
                 let ctx = self.node(self.frontier.interval.root);

@@ -72,10 +72,11 @@ impl<R: InsertResult> InsertCtx<R> {
     ) -> Result<R, ErrorState> {
         use crate::visualization::{
             emit_insert_node,
+            emit_insert_node_with_delta,
             reset_step_counter,
         };
         use context_trace::graph::{
-            visualization::Transition,
+            visualization::{DeltaOp, GraphDelta, Transition},
         };
 
         // Reset step counter for new insert operation
@@ -101,16 +102,24 @@ impl<R: InsertResult> InsertCtx<R> {
         // With interior mutability, we just pass a reference to the graph
         let interval = IntervalGraph::from((&*self.graph, init));
 
-        // Emit: Split phase complete
-        emit_insert_node(
-            Transition::SplitComplete {
-                original_node: root_idx,
-                left_fragment: None,
-                right_fragment: None,
-            },
-            format!("Split phase complete for root {root_idx}"),
-            root_idx,
-        );
+        // Emit: Split phase complete — include delta with split info
+        {
+            let mut ops = Vec::new();
+            ops.push(DeltaOp::UpdateNode {
+                index: root_idx,
+                detail: "Split phase completed".to_string(),
+            });
+            emit_insert_node_with_delta(
+                Transition::SplitComplete {
+                    original_node: root_idx,
+                    left_fragment: None,
+                    right_fragment: None,
+                },
+                format!("Split phase complete for root {root_idx}"),
+                root_idx,
+                GraphDelta::new(ops),
+            );
+        }
 
         // Emit: Join phase starting
         let leaf_count = interval.states.leaves.len();
@@ -131,13 +140,17 @@ impl<R: InsertResult> InsertCtx<R> {
             FrontierSplitIterator::from((self.graph.clone(), interval));
         let joined = ctx.find_map(|joined| joined).unwrap();
 
-        // Emit: Join complete
-        emit_insert_node(
+        // Emit: Join complete — include delta for the result node
+        emit_insert_node_with_delta(
             Transition::JoinComplete {
                 result_node: joined.index.0,
             },
             format!("Join complete — created token {}", joined.index.0),
             joined.index.0,
+            GraphDelta::single(DeltaOp::AddNode {
+                index: joined.index.0,
+                width: 0, // width resolved later
+            }),
         );
 
         Ok(R::build_with_extract(joined, ext))

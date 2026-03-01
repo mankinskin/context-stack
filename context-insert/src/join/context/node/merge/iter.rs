@@ -14,7 +14,7 @@ use context_trace::{
     Token,
     VertexSet,
     graph::{
-        visualization::Transition,
+        visualization::{DeltaOp, GraphDelta, Transition},
     },
 };
 use tracing::debug;
@@ -39,7 +39,7 @@ use crate::{
         Pre,
     },
     join::partition::Join,
-    visualization::emit_insert_node,
+    visualization::{emit_insert_node_with_delta},
 };
 
 /// Context for iterating over partitions and merging them.
@@ -590,12 +590,21 @@ impl<'a> MergeCtx<'a> {
             return;
         }
 
-        // Emit CreatePattern event
+        // Emit CreatePattern event with delta
         let children: Vec<usize> = pattern.iter().map(|t| t.index.0).collect();
-        emit_insert_node(
+        let pattern_id = existing_patterns.len();
+        let delta_ops: Vec<DeltaOp> = children
+            .iter()
+            .map(|&child| DeltaOp::AddEdge {
+                from: root.index.0,
+                to: child,
+                pattern_id,
+            })
+            .collect();
+        emit_insert_node_with_delta(
             Transition::CreatePattern {
                 parent: root.index.0,
-                pattern_id: existing_patterns.len(),
+                pattern_id,
                 children: children.clone(),
             },
             format!(
@@ -603,6 +612,7 @@ impl<'a> MergeCtx<'a> {
                 root.index.0, children
             ),
             root.index.0,
+            GraphDelta::new(delta_ops),
         );
 
         debug!(?root, ?pattern, "Adding root pattern");

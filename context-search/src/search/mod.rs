@@ -136,6 +136,10 @@ pub struct SearchState<K: SearchKind> {
     pub(crate) path_id: String,
     /// Accumulated path graph for incremental visualization.
     pub(crate) viz_path: VizPathGraph,
+    /// Highest confirmed cursor position (atom index) for query visualization.
+    pub(crate) viz_cursor_pos: usize,
+    /// Atom positions confirmed as matched (for query token highlighting).
+    pub(crate) viz_matched_positions: Vec<usize>,
 }
 
 impl<K: SearchKind> SearchState<K>
@@ -146,6 +150,8 @@ where
     ///
     /// `current_root` and `matched_nodes` are inferred from the [`Transition`]
     /// variant. The transition also drives [`VizPathGraph`] updates.
+    /// `cursor_position` and `matched_positions` are tracked incrementally
+    /// for query path visualization.
     fn emit_graph_op(
         &mut self,
         transition: Transition,
@@ -164,6 +170,26 @@ where
         // Infer current_root and matched_nodes from the transition
         let (current_root, matched_nodes) = Self::infer_location(&transition);
 
+        // Update viz cursor position and matched state from transition
+        let (cursor_pos, active_token) = match &transition {
+            Transition::ChildMatch { cursor_pos, node } => {
+                // Record this position as matched
+                if !self.viz_matched_positions.contains(cursor_pos) {
+                    self.viz_matched_positions.push(*cursor_pos);
+                }
+                self.viz_cursor_pos = *cursor_pos;
+                (*cursor_pos, Some(*node))
+            },
+            Transition::ChildMismatch { cursor_pos, node, .. } => {
+                (*cursor_pos, Some(*node))
+            },
+            Transition::MatchAdvance { new_pos, .. } => {
+                self.viz_cursor_pos = *new_pos;
+                (*new_pos, None)
+            },
+            _ => (self.viz_cursor_pos, None),
+        };
+
         // Apply transition to accumulated path graph
         let _ = self.viz_path.apply_transition(&transition);
 
@@ -178,8 +204,10 @@ where
 
         let query = QueryInfo {
             query_tokens,
-            cursor_position: 0,
+            cursor_position: cursor_pos,
             query_width,
+            matched_positions: self.viz_matched_positions.clone(),
+            active_token,
         };
 
         let event = GraphOpEvent {
@@ -191,6 +219,7 @@ where
             description: description.into(),
             path_id: self.path_id.clone(),
             path_graph: self.viz_path.clone(),
+            graph_delta: None,
         };
         event.emit();
     }
