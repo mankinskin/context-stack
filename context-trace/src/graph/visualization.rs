@@ -105,160 +105,275 @@ pub enum Transition {
     // ══════════════════════════════════════════════════════════════════════
     // Common transitions (used by search, insert, read)
     // ══════════════════════════════════════════════════════════════════════
-    /// Initial entry point - search/insert started at this node
+
+    /// Initial entry point — the first event for any search or insert operation.
+    ///
+    /// **Emitted by:** `context-search` (search start), `context-insert` (via shared path).
+    /// **Frontend:** Node gets `viz-start` (bright cyan, pulsing glow).
     StartNode {
+        /// Token index the operation starts at.
         node: usize,
-        /// Token width (atom count) for path visualization
+        /// Atom count of the start token (for path width calculation).
         width: usize,
     },
 
-    /// Exploring a parent node (bottom-up traversal)
+    /// Exploring a parent node during bottom-up traversal.
+    ///
+    /// Fires when ascending from a child to its parent to find the longest
+    /// matching prefix. Typically follows a `Dequeue` of a parent candidate.
+    ///
+    /// **Emitted by:** `context-search` (parent candidate exploration).
+    /// **Frontend:** `to` gets `viz-candidate-parent` (orange, pulsing).
+    ///   Edge colored as candidate (muted violet, 30% alpha).
     VisitParent {
+        /// Node we are ascending from.
         from: usize,
+        /// Parent node being explored.
         to: usize,
-        /// Position in parent where we entered
+        /// Position within parent where `from` appears.
         entry_pos: usize,
-        /// Width of the parent node for path visualization
+        /// Width (atom count) of the parent node.
         width: usize,
-        /// Edge connecting from → to in the snapshot
+        /// Edge connecting `from → to` in the snapshot.
         edge: EdgeRef,
     },
 
-    /// Exploring a child node (top-down traversal)
+    /// Exploring a child node during top-down comparison.
+    ///
+    /// Fires when descending from a root/parent to verify children match
+    /// the query pattern.
+    ///
+    /// **Emitted by:** `context-search` (child comparison walk).
+    /// **Frontend:** `to` gets `viz-candidate-child` (purple, pulsing).
+    ///   Edge colored as candidate (muted violet, 30% alpha).
     VisitChild {
+        /// Parent node we are descending from.
         from: usize,
+        /// Child node being explored.
         to: usize,
-        /// Child index within parent's pattern
+        /// Index within parent's pattern.
         child_index: usize,
-        /// Width of the child node for path visualization
+        /// Width (atom count) of the child node.
         width: usize,
-        /// Edge connecting from → to in the snapshot
+        /// Edge connecting `from → to` in the snapshot.
         edge: EdgeRef,
-        /// Whether this replaces the current end_path tail (vs. push)
+        /// `true` if this replaces the current `end_path` tail (vs. push).
         replace: bool,
     },
 
-    /// Child comparison succeeded - tokens match
+    /// Child comparison succeeded — the child token matches the query at `cursor_pos`.
+    ///
+    /// **Emitted by:** `context-search` (during `process_child_comparison`).
+    /// **Frontend:** Node gets `viz-matched` (green). `QueryInfo.active_token`
+    ///   set to this node; `matched_positions` updated.
     ChildMatch {
+        /// The child node that matched.
         node: usize,
-        /// Atom position in the query where match occurred
+        /// Atom position in the query where match occurred.
         cursor_pos: usize,
     },
 
-    /// Child comparison failed - tokens don't match
+    /// Child comparison failed — the child token does not match the query.
+    ///
+    /// **Emitted by:** `context-search` (during `process_child_comparison`).
+    /// **Frontend:** Node gets `viz-mismatched` (red). `QueryInfo.active_token`
+    ///   set to this node.
     ChildMismatch {
+        /// The child node that mismatched.
         node: usize,
-        /// Atom position where mismatch was detected
+        /// Atom position where mismatch was detected.
         cursor_pos: usize,
-        /// Expected token index
+        /// Token index that was expected.
         expected: usize,
-        /// Actual token index found
+        /// Token index that was found in the graph.
         actual: usize,
     },
 
-    /// Operation complete
+    /// Terminal event — the operation completed.
+    ///
+    /// **Emitted by:** `context-search` (match found or queue exhausted).
+    /// **Frontend:** If `success`, `final_node` gets `viz-completed`.
     Done {
+        /// Result node if successful, `None` otherwise.
         final_node: Option<usize>,
+        /// Whether the operation found a match.
         success: bool,
     },
 
     // ══════════════════════════════════════════════════════════════════════
-    // Search-specific transitions
+    // Search-specific transitions (only emitted by context-search)
     // ══════════════════════════════════════════════════════════════════════
-    /// Popped a candidate from the BFS queue
+
+    /// A candidate was popped from the BFS priority queue.
+    ///
+    /// Fires before `VisitParent` or `RootExplore`. The queue is ordered by
+    /// priority (closest match first).
+    ///
+    /// **Frontend:** Node gets `viz-selected`. Remaining queue shown via
+    ///   `LocationInfo.pending_parents` / `pending_children`.
     Dequeue {
+        /// Node popped from the queue.
         node: usize,
-        /// Number of items remaining in queue
+        /// Items left in queue after this pop.
         queue_remaining: usize,
-        /// Whether this is a parent or child candidate
+        /// `true` if this is a parent candidate, `false` for child.
         is_parent: bool,
     },
 
-    /// Started exploring a root match via RootCursor
+    /// Started exploring a root match via RootCursor.
+    ///
+    /// Fires when a parent candidate becomes the new root — the highest
+    /// point in the upward path from which we now explore children.
+    ///
+    /// **Frontend:** `root` gets `viz-root` (gold ring via `::before`).
+    ///   Edge colored gold (`SP_ROOT_EDGE_COLOR`).
     RootExplore {
+        /// Root node being explored.
         root: usize,
-        /// Width of the root node for path visualization
+        /// Width of the root node.
         width: usize,
-        /// Edge connecting start_path top → root
+        /// Edge from start_path top → root.
         edge: EdgeRef,
     },
 
-    /// Advanced match position within current root
+    /// Match cursor advanced within the current root's span.
+    ///
+    /// Fires when the root's self-token matched and the atom cursor moved
+    /// forward. `QueryInfo.cursor_position` is updated to `new_pos`.
+    ///
+    /// **Frontend:** QueryPathPanel shows progress advancing. `matched_positions`
+    ///   extended.
     MatchAdvance {
+        /// Current root node.
         root: usize,
-        /// Previous atom position
+        /// Previous atom cursor position.
         prev_pos: usize,
-        /// New atom position
+        /// New atom cursor position.
         new_pos: usize,
     },
 
-    /// Need to explore parents (root boundary reached)
+    /// Root boundary reached — need to explore further parents.
+    ///
+    /// Fires when the search has fully matched the current root but the
+    /// query extends beyond it. Parent candidates are queued.
+    ///
+    /// **Frontend:** `parent_candidates` added to `pendingParents`. Overlay
+    ///   renderer carries these forward across subsequent steps.
     ParentExplore {
+        /// Current root whose boundary was reached.
         current_root: usize,
-        /// Parent candidates added to queue
+        /// Parent nodes added to the queue for further exploration.
         parent_candidates: Vec<usize>,
     },
 
     // ══════════════════════════════════════════════════════════════════════
-    // Insert-specific transitions
+    // Insert-specific transitions (only emitted by context-insert)
     // ══════════════════════════════════════════════════════════════════════
-    /// Starting a split operation on a node
+
+    /// Beginning a split operation — a token must be broken at `split_position`.
+    ///
+    /// **Emitted by:** `context-insert/src/insert/context.rs`.
+    /// **Frontend:** Node gets `viz-split-source` (warm orange, pulsing).
     SplitStart {
+        /// Token being split.
         node: usize,
-        /// Position where split occurs
+        /// Atom position where the split occurs.
         split_position: usize,
     },
 
-    /// Split operation completed
+    /// Split completed — the original token is now two fragments.
+    ///
+    /// **Emitted by:** `context-insert/src/insert/context.rs`.
+    /// **Frontend:** `original_node` → `viz-split-source`, `left_fragment` →
+    ///   `viz-split-left`, `right_fragment` → `viz-split-right`. Insert edges
+    ///   colored warm orange. `GraphDelta` typically carries `AddNode` for
+    ///   fragments.
     SplitComplete {
+        /// The original node that was split.
         original_node: usize,
-        /// Left fragment (before split point)
+        /// Left fragment (atoms before split point), if created.
         left_fragment: Option<usize>,
-        /// Right fragment (after split point)
+        /// Right fragment (atoms after split point), if created.
         right_fragment: Option<usize>,
     },
 
-    /// Starting a join operation
+    /// Beginning a join operation — multiple fragments will merge.
+    ///
+    /// **Emitted by:** `context-insert/src/insert/context.rs`.
+    /// **Frontend:** First node in `nodes` is the primary focus.
     JoinStart {
-        /// Nodes being joined
+        /// Nodes being joined.
         nodes: Vec<usize>,
     },
 
-    /// Join step - merging two fragments
+    /// A pairwise merge within a join — two inputs produce one output.
+    ///
+    /// May fire multiple times per join. Emitted during frontier traversal.
+    ///
+    /// **Emitted by:** `context-insert/src/join/context/frontier.rs`.
+    /// **Frontend:** `left` → `viz-join-left`, `right` → `viz-join-right`,
+    ///   `result` → `viz-join-result` (green, pulsing). Edges to result
+    ///   colored green (`INSERT_JOIN_EDGE_COLOR`).
     JoinStep {
+        /// Left input node.
         left: usize,
+        /// Right input node.
         right: usize,
-        /// Result of joining (new or existing node)
+        /// Result node (new or reused).
         result: usize,
     },
 
-    /// Join operation completed
-    JoinComplete { result_node: usize },
+    /// Join completed — the final merged token is ready.
+    ///
+    /// **Emitted by:** `context-insert/src/insert/context.rs`.
+    /// **Frontend:** `result_node` → `viz-join-result` (green glow).
+    JoinComplete {
+        /// Final result of the join.
+        result_node: usize,
+    },
 
-    /// Creating a new pattern in the graph
+    /// A new pattern (ordered sequence of children) was added to a parent.
+    ///
+    /// **Emitted by:** `context-insert/src/join/context/node/merge/iter.rs`.
+    /// **Frontend:** `parent` → `viz-new-pattern` (yellow), each child →
+    ///   `viz-new-pattern-child` (light yellow). Insert edges colored warm
+    ///   orange.
     CreatePattern {
-        /// Parent token that owns this pattern
+        /// Token that owns the new pattern.
         parent: usize,
-        /// Pattern ID within the parent
+        /// Pattern index within the parent.
         pattern_id: usize,
-        /// Child token indices
+        /// Child token indices in the pattern.
         children: Vec<usize>,
     },
 
-    /// Creating a new root node (top-level token)
+    /// A new top-level token (root) was created.
+    ///
+    /// **Emitted by:** `context-insert`.
+    /// **Frontend:** Node gets `viz-new-root` (bright white-gold, pulsing).
     CreateRoot {
+        /// Newly created root token.
         node: usize,
-        /// Width of the new token
+        /// Width (atom count) of the new root.
         width: usize,
     },
 
-    /// Updating an existing pattern
+    /// An existing pattern's children were modified.
+    ///
+    /// Fires after split replaces a child with fragments, or when a join
+    /// produces a new child sequence.
+    ///
+    /// **Emitted by:** `context-insert`.
+    /// **Frontend:** `parent` → `viz-new-pattern` (yellow). Insert edges for
+    ///   new children colored warm orange.
     UpdatePattern {
+        /// Token whose pattern is being updated.
         parent: usize,
+        /// Index of the updated pattern.
         pattern_id: usize,
-        /// Old children
+        /// Previous child sequence.
         old_children: Vec<usize>,
-        /// New children
+        /// Updated child sequence.
         new_children: Vec<usize>,
     },
 }
