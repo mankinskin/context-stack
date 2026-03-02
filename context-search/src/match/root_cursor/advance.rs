@@ -7,7 +7,7 @@ use super::core::{
 };
 use crate::{
     compare::{
-        iterator::{CompareEvent, CompareIterator},
+        iterator::CompareIterator,
         state::{
             CompareEndResult,
             IndexAdvanceResult,
@@ -36,13 +36,6 @@ use tracing::{
     trace,
 };
 
-/// Bundles a [`RootAdvanceResult`] with the [`CompareEvent`]s that were
-/// produced during the child comparison loop.
-pub(crate) struct AdvanceOutcome<K: SearchKind> {
-    pub(crate) result: RootAdvanceResult<K>,
-    pub(crate) compare_events: Vec<CompareEvent>,
-}
-
 impl<K: SearchKind> RootCursor<K, Matched, Matched>
 where
     K::Trav: Clone,
@@ -60,7 +53,7 @@ where
     /// - `Finished(Conclusive(Exhausted))`: Query pattern exhausted - complete match
     /// - `Finished(Inconclusive)`: Root boundary reached - needs parent exploration
     #[context_trace::instrument_sig(level = "debug", skip(self))]
-    pub(crate) fn advance_to_next_match(self) -> AdvanceOutcome<K> {
+    pub(crate) fn advance_to_next_match(self) -> RootAdvanceResult<K> {
         info!("→ advance_to_next_match: starting advancement");
 
         // Save trav before moving self
@@ -77,22 +70,16 @@ where
                 debug!(
                     "→ advance_to_next_match: query exhausted - complete match"
                 );
-                return AdvanceOutcome {
-                    result: RootAdvanceResult::Finished(RootEndResult::Conclusive(
-                        ConclusiveEnd::Exhausted,
-                    )),
-                    compare_events: Vec::new(),
-                };
+                return RootAdvanceResult::Finished(RootEndResult::Conclusive(
+                    ConclusiveEnd::Exhausted,
+                ));
             },
             BothCursorsAdvanceResult::ChildExhausted(need_parent) => {
                 // Child exhausted but query continues - need parent exploration
                 debug!("→ advance_to_next_match: child exhausted - needs parent exploration");
-                return AdvanceOutcome {
-                    result: RootAdvanceResult::Finished(
-                        RootEndResult::Inconclusive(need_parent),
-                    ),
-                    compare_events: Vec::new(),
-                };
+                return RootAdvanceResult::Finished(
+                    RootEndResult::Inconclusive(need_parent),
+                );
             },
         };
 
@@ -101,12 +88,9 @@ where
             "→ advance_to_next_match: comparing tokens at candidate position"
         );
         let prev_candidate = candidate_cursor.state.clone();
-        let outcome =
-            CompareIterator::<K>::new(trav.clone(), candidate_cursor.state)
-                .compare_with_events();
-        let compare_events = outcome.events;
-
-        match outcome.result {
+        match CompareIterator::<K>::new(trav.clone(), candidate_cursor.state)
+            .compare()
+        {
             CompareEndResult::FoundMatch(matched_state) => {
                 // Successfully matched - return new Matched cursor
                 // CompareEndResult already has Matched states, SearchIterator will create checkpoint
@@ -116,13 +100,10 @@ where
                     "→ advance_to_next_match: match found - returning Advanced"
                 );
 
-                AdvanceOutcome {
-                    result: RootAdvanceResult::Advanced(Box::new(RootCursor {
-                        state: matched_state,
-                        trav,
-                    })),
-                    compare_events,
-                }
+                RootAdvanceResult::Advanced(Box::new(RootCursor {
+                    state: matched_state,
+                    trav,
+                }))
             },
             CompareEndResult::Mismatch(_) => {
                 // Found mismatch - check if we made progress
@@ -131,17 +112,14 @@ where
                 if checkpoint_pos == 0 {
                     // No progress - not a valid match, this shouldn't happen after a Matched state
                     info!("→ advance_to_next_match: immediate mismatch after match - this is unexpected");
-                    return AdvanceOutcome {
-                        result: RootAdvanceResult::Finished(
-                            RootEndResult::Conclusive(ConclusiveEnd::Mismatch(
-                                Box::new(RootCursor {
-                                    state: prev_candidate,
-                                    trav: trav.clone(),
-                                }),
-                            )),
-                        ),
-                        compare_events,
-                    };
+                    return RootAdvanceResult::Finished(
+                        RootEndResult::Conclusive(ConclusiveEnd::Mismatch(
+                            Box::new(RootCursor {
+                                state: prev_candidate,
+                                trav: trav.clone(),
+                            }),
+                        )),
+                    );
                 }
 
                 // Found mismatch after progress - this is the maximum match for this root
@@ -149,15 +127,12 @@ where
                     checkpoint_pos,
                     "→ advance_to_next_match: mismatch after progress - maximum match reached"
                 );
-                AdvanceOutcome {
-                    result: RootAdvanceResult::Finished(RootEndResult::Conclusive(
-                        ConclusiveEnd::Mismatch(Box::new(RootCursor {
-                            state: prev_candidate,
-                            trav,
-                        })),
-                    )),
-                    compare_events,
-                }
+                RootAdvanceResult::Finished(RootEndResult::Conclusive(
+                    ConclusiveEnd::Mismatch(Box::new(RootCursor {
+                        state: prev_candidate,
+                        trav,
+                    })),
+                ))
             },
         }
     }

@@ -1,10 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    compare::{
-        iterator::CompareEvent,
-        state::CompareState,
-    },
+    compare::state::CompareState,
     cursor::{
         checkpointed::{
             Checkpointed,
@@ -16,7 +13,6 @@ use crate::{
     r#match::{
         iterator::{ProcessResult, SearchIterator},
         root_cursor::{
-            AdvanceOutcome,
             ConclusiveEnd,
             RootAdvanceResult,
             RootCursor,
@@ -220,62 +216,6 @@ where
         event.emit();
     }
 
-    /// Convert a batch of [`CompareEvent`]s into [`GraphOpEvent`]s and emit them.
-    fn emit_compare_events(&mut self, events: &[CompareEvent]) {
-        for ev in events {
-            match ev {
-                CompareEvent::VisitChild { parent, child, child_width } => {
-                    let replace = !self.viz_path.end_path.is_empty();
-                    self.emit_graph_op(
-                        Transition::VisitChild {
-                            from: *parent,
-                            to: *child,
-                            child_index: 0,
-                            width: *child_width,
-                            edge: EdgeRef {
-                                from: *parent,
-                                to: *child,
-                                pattern_idx: 0,
-                                sub_index: 0,
-                            },
-                            replace,
-                        },
-                        format!(
-                            "Prefix expansion: decomposing {} into child {}",
-                            parent, child
-                        ),
-                    );
-                },
-                CompareEvent::ChildMatch { node, cursor_pos } => {
-                    self.emit_graph_op(
-                        Transition::ChildMatch {
-                            node: *node,
-                            cursor_pos: *cursor_pos,
-                        },
-                        format!(
-                            "Child token match at node {} (query pos {})",
-                            node, cursor_pos
-                        ),
-                    );
-                },
-                CompareEvent::ChildMismatch { node, cursor_pos, expected, actual } => {
-                    self.emit_graph_op(
-                        Transition::ChildMismatch {
-                            node: *node,
-                            cursor_pos: *cursor_pos,
-                            expected: *expected,
-                            actual: *actual,
-                        },
-                        format!(
-                            "Child token mismatch at node {} (expected {}, got {})",
-                            node, expected, actual
-                        ),
-                    );
-                },
-            }
-        }
-    }
-
     /// Infer `(current_root, matched_nodes)` from a [`Transition`] variant.
     fn infer_location(transition: &Transition) -> (Option<usize>, Vec<usize>) {
         match transition {
@@ -459,10 +399,7 @@ where
                 state: last_match.clone(),
             };
             match root_cursor.advance_to_next_match() {
-                AdvanceOutcome { result: RootAdvanceResult::Advanced(next_match), compare_events } => {
-                    // Emit child comparison events from the compare loop
-                    self.emit_compare_events(&compare_events);
-
+                RootAdvanceResult::Advanced(next_match) => {
                     // Successfully advanced to next match - always update best_match
                     let checkpoint_pos = *next_match
                         .state
@@ -511,12 +448,19 @@ where
                         format!("Visiting child {child_idx} from root {adv_root}"),
                     );
 
+                    // Emit ChildMatch for the matched child
+                    self.emit_graph_op(
+                        Transition::ChildMatch {
+                            node: child_idx,
+                            cursor_pos: checkpoint_pos,
+                        },
+                        format!("Child token match at node {} (query pos {})", child_idx, checkpoint_pos),
+                    );
+
                     // Continue with the new matched cursor
                     last_match = next_match.state;
                 },
-                AdvanceOutcome { result: RootAdvanceResult::Finished(end_result), compare_events } => {
-                    // Emit child comparison events even for terminal states
-                    self.emit_compare_events(&compare_events);
+                RootAdvanceResult::Finished(end_result) => {
 
                     // Reached an end condition
                     match end_result {
@@ -700,8 +644,7 @@ where
             }
 
             match self.matches.process_node(popped) {
-                ProcessResult::Expanded(compare_events) => {
-                    self.emit_compare_events(&compare_events);
+                ProcessResult::Expanded => {
                     if is_parent {
                         let candidate_parents = self.queue_candidates().0.clone();
                         self.emit_graph_op(
@@ -714,9 +657,7 @@ where
                     }
                     continue;
                 },
-                ProcessResult::FoundMatch(state, compare_events) => {
-                    self.emit_compare_events(&compare_events);
-
+                ProcessResult::FoundMatch(state) => {
                     // Clear queue — finish_root_cursor will explore via
                     // RootCursor and re-populate if necessary.
                     debug!(
@@ -733,8 +674,7 @@ where
                     );
                     break state;
                 },
-                ProcessResult::Skipped(compare_events) => {
-                    self.emit_compare_events(&compare_events);
+                ProcessResult::Skipped => {
                     self.emit_graph_op(
                         Transition::CandidateMismatch {
                             node: node_index,
