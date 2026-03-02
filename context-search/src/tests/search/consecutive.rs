@@ -1,7 +1,7 @@
-use context_trace::graph::visualization::Transition;
 use crate::{
     cursor::Checkpointed,
     state::matched::CheckpointedCursor,
+    tests::search::event_helpers::*,
 };
 #[cfg(test)]
 use {
@@ -23,8 +23,21 @@ fn find_consecutive1() {
         g,
         h,
         i,
+        ab,
         abc,
+        gh,
         ghi,
+        efgh,
+        efghi,
+        aba,
+        abcd,
+        abab,
+        ababcd,
+        abcdef,
+        ababab,
+        abcdefghi,
+        ababcdefghi,
+        ababababcdefghi,
         ..
     } = &*Env1::get();
     let _tracing = context_trace::init_test_tracing!(graph);
@@ -99,13 +112,46 @@ fn find_consecutive1() {
         _ => panic!("Expected EntireRoot path"),
     }
 
-    // Validate events for first search
-    let t1 = fin1.transitions();
-    assert_matches!(t1.first(), Some(Transition::StartNode { .. }));
-    assert_matches!(t1.last(), Some(Transition::Done { .. }));
-    assert!(t1.iter().any(|t| matches!(t, Transition::VisitChild { .. })), "Expected VisitChild");
-    let steps1: Vec<usize> = fin1.events.iter().map(|e| e.step).collect();
-    assert_eq!(steps1, (0..steps1.len()).collect::<Vec<_>>(), "Steps should be sequential");
+    // Exact expected event sequence for first search (37 events)
+    assert_events(&fin1.events, &[
+        start(g),                                                                          // 0
+        explore(g, &[gh]),                                                                 // 1
+        up(g, gh),                                                                         // 2
+        down(gh, h, false),                                                                // 3
+        matched(h, 2),                                                                     // 4
+        root_match(gh),                                                                    // 5
+        explore(gh, &[ghi, efgh]),                                                         // 6
+        up(gh, ghi),                                                                       // 7
+        down(ghi, i, false),                                                               // 8
+        matched(i, 3),                                                                     // 9
+        root_match(ghi),                                                                   // 10
+        explore(ghi, &[efghi, abcdefghi]),                                                 // 11
+        up(ghi, efghi),                                                                    // 12
+        explore(efghi, &[abcdefghi, abcdefghi, ababcdefghi, ababababcdefghi]),              // 13
+        up(g, abcdefghi),                                                                  // 14
+        explore(abcdefghi, &[abcdefghi, ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi]), // 15
+        up(g, abcdefghi),                                                                  // 16
+        explore(abcdefghi, &[ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi, ababcdefghi, ababababcdefghi]), // 17
+        up(g, ababcdefghi),                                                                // 18
+        explore(ababcdefghi, &[ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 19
+        up(g, ababcdefghi),                                                                // 20
+        explore(ababcdefghi, &[ababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 21
+        up(g, ababcdefghi),                                                                // 22
+        explore(ababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 23
+        up(g, ababababcdefghi),                                                            // 24
+        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 25
+        up(g, ababababcdefghi),                                                            // 26
+        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 27
+        up(g, ababababcdefghi),                                                            // 28
+        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi]),      // 29
+        up(g, ababababcdefghi),                                                            // 30
+        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi]),                       // 31
+        up(g, ababababcdefghi),                                                            // 32
+        explore(ababababcdefghi, &[ababababcdefghi]),                                       // 33
+        up(g, ababababcdefghi),                                                            // 34
+        explore(ababababcdefghi, &[]),                                                     // 35
+        done_ok(ghi),                                                                      // 36
+    ]);
 
     // Extract the cursor from the response and use it for the next search
     let query = fin1.end.cursor().clone();
@@ -142,10 +188,23 @@ fn find_consecutive1() {
         _ => panic!("Expected EntireRoot path"),
     }
 
-    // Validate events for second search
-    let t2 = fin2.transitions();
-    assert_matches!(t2.first(), Some(Transition::StartNode { .. }));
-    assert_matches!(t2.last(), Some(Transition::Done { .. }));
-    let steps2: Vec<usize> = fin2.events.iter().map(|e| e.step).collect();
-    assert_eq!(steps2, (0..steps2.len()).collect::<Vec<_>>(), "Steps should be sequential");
+    // Exact expected event sequence for second search (16 events)
+    assert_events(&fin2.events, &[
+        start(a),                                                                          // 0
+        explore(a, &[ab, abc, aba, abcd]),                                                 // 1
+        up(a, ab),                                                                         // 2
+        down(ab, b, false),                                                                // 3
+        matched(b, 5),                                                                     // 4
+        root_match(ab),                                                                    // 5
+        explore(ab, &[aba, abc, abab, abab, ababcd, abcdef, ababab, ababab, ababcdefghi]), // 6
+        up(ab, aba),                                                                       // 7
+        down(aba, a, false),                                                               // 8
+        mismatched(a, 6, c, a),                                                            // 9
+        skip(aba, 8, true),                                                                // 10
+        up(a, abc),                                                                        // 11
+        down(abc, c, false),                                                               // 12
+        matched(c, 6),                                                                     // 13
+        root_match(abc),                                                                   // 14
+        done_ok(abc),                                                                      // 15
+    ]);
 }
