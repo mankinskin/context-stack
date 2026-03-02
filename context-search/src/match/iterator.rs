@@ -3,6 +3,7 @@ use crate::{
     cursor::Matched,
     policy::SearchKind,
     r#match::{
+        CompareInfo,
         root_cursor::CompareParentBatch,
         NodeConsumer,
         NodeResult::{
@@ -33,11 +34,11 @@ pub(crate) struct PoppedNode {
 #[derive(Debug)]
 pub(crate) enum ProcessResult {
     /// Node expanded — new candidates added to queue.
-    Expanded,
+    Expanded(CompareInfo),
     /// Found a root match.
-    FoundMatch(CompareState<Matched, Matched>),
+    FoundMatch(CompareState<Matched, Matched>, CompareInfo),
     /// Node skipped (comparison mismatch).
-    Skipped,
+    Skipped(CompareInfo),
     /// Node consumed with no result.
     NoResult,
 }
@@ -51,11 +52,11 @@ pub(crate) enum ProcessResult {
 pub(crate) enum BfsStepResult {
     /// Node was consumed but didn't produce a match — more nodes were added
     /// to the queue (parent exploration or child decomposition).
-    Expanded,
+    Expanded(CompareInfo),
     /// Found a root match.
-    FoundMatch(CompareState<Matched, Matched>),
+    FoundMatch(CompareState<Matched, Matched>, CompareInfo),
     /// Node was skipped (comparison mismatch).
-    Skipped,
+    Skipped(CompareInfo),
     /// Queue is empty — no more nodes to process.
     Empty,
 }
@@ -117,7 +118,7 @@ where
     /// from the [`PoppedNode`].
     pub(crate) fn process_node(&mut self, popped: PoppedNode) -> ProcessResult {
         match NodeConsumer::<'_, K>::new(popped.node, &self.trace_ctx.trav).consume() {
-            Some(QueueMore(next)) => {
+            Some(QueueMore(next, info)) => {
                 debug!(
                     node_index = popped.node_index,
                     is_parent = popped.is_parent,
@@ -125,20 +126,20 @@ where
                     "node expanded — queuing new candidates"
                 );
                 self.queue.nodes.extend(next);
-                ProcessResult::Expanded
+                ProcessResult::Expanded(info)
             },
-            Some(NodeResult::FoundMatch(matched_state)) => {
+            Some(NodeResult::FoundMatch(matched_state, info)) => {
                 let root = matched_state.child.current().child_state.root_parent();
                 debug!(
                     node_index = popped.node_index,
                     %root,
                     "found root match"
                 );
-                ProcessResult::FoundMatch(matched_state)
+                ProcessResult::FoundMatch(matched_state, info)
             },
-            Some(Skip) => {
+            Some(Skip(info)) => {
                 debug!(node_index = popped.node_index, is_parent = popped.is_parent, "node skipped (mismatch)");
-                ProcessResult::Skipped
+                ProcessResult::Skipped(info)
             },
             None => {
                 debug!(node_index = popped.node_index, "node consumed with no result");
@@ -169,7 +170,7 @@ where
         );
 
         match NodeConsumer::<'_, K>::new(node, &self.trace_ctx.trav).consume() {
-            Some(QueueMore(next)) => {
+            Some(QueueMore(next, info)) => {
                 debug!(
                     node_index,
                     is_parent,
@@ -177,20 +178,20 @@ where
                     "node expanded — queuing new candidates"
                 );
                 self.queue.nodes.extend(next);
-                BfsStepResult::Expanded
+                BfsStepResult::Expanded(info)
             },
-            Some(NodeResult::FoundMatch(matched_state)) => {
+            Some(NodeResult::FoundMatch(matched_state, info)) => {
                 let root = matched_state.child.current().child_state.root_parent();
                 debug!(
                     node_index,
                     %root,
                     "found root match"
                 );
-                BfsStepResult::FoundMatch(matched_state)
+                BfsStepResult::FoundMatch(matched_state, info)
             },
-            Some(Skip) => {
+            Some(Skip(info)) => {
                 debug!(node_index, is_parent, "node skipped (mismatch)");
-                BfsStepResult::Skipped
+                BfsStepResult::Skipped(info)
             },
             None => {
                 debug!(node_index, "node consumed with no result");
@@ -205,11 +206,11 @@ where
         trace!("finding next root match");
         loop {
             match self.pop_and_process_one() {
-                BfsStepResult::Expanded => continue,
-                BfsStepResult::FoundMatch(matched_state) => {
+                BfsStepResult::Expanded(_) => continue,
+                BfsStepResult::FoundMatch(matched_state, _) => {
                     return Some(matched_state);
                 },
-                BfsStepResult::Skipped => continue,
+                BfsStepResult::Skipped(_) => continue,
                 BfsStepResult::Empty => {
                     trace!("no root cursor found, iteration complete");
                     return None;

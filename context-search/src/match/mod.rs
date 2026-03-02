@@ -19,7 +19,10 @@ use crate::{
         SearchKind,
     },
 };
-use context_trace::*;
+use context_trace::{
+    path::accessors::has_path::HasRootedPath,
+    *,
+};
 
 use derive_new::new;
 pub(crate) mod iterator;
@@ -33,11 +36,41 @@ pub(crate) struct SearchQueue {
 
 // Display implementation moved to logging/mod.rs via impl_display_via_compact macro
 
+/// Metadata about a child comparison (match, mismatch, or prefix expansion).
+/// Carried on [`NodeResult`] variants so callers can emit visualization events.
+#[derive(Debug, Clone)]
+pub(crate) struct CompareInfo {
+    /// The compared node index.
+    pub node: usize,
+    /// The compared node's width.
+    pub node_width: usize,
+    /// Query cursor position at comparison time.
+    pub cursor_pos: usize,
+    /// The outcome of the comparison.
+    pub outcome: CompareOutcome,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum CompareOutcome {
+    /// Leaf token matched.
+    Match,
+    /// Leaf token mismatched.
+    Mismatch { expected: usize, actual: usize },
+    /// Node decomposed into prefix children.
+    Prefixes(Vec<PrefixChildInfo>),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PrefixChildInfo {
+    pub child: usize,
+    pub child_width: usize,
+}
+
 #[derive(Debug)]
 pub(crate) enum NodeResult {
-    QueueMore(Vec<SearchNode>),
-    FoundMatch(MatchedCompareState),
-    Skip,
+    QueueMore(Vec<SearchNode>, CompareInfo),
+    FoundMatch(MatchedCompareState, CompareInfo),
+    Skip(CompareInfo),
 }
 use NodeResult::*;
 
@@ -106,17 +139,58 @@ where
         trav: &K::Trav,
         state: CompareState<Candidate, Candidate>,
     ) -> Option<NodeResult> {
+        // Extract the leaf tokens being compared *before* consuming the state.
+        let path_leaf =
+            state.rooted_path().role_rooted_leaf_token::<End, _>(trav);
+        let query_leaf =
+            (*state.query.current()).role_rooted_leaf_token::<End, _>(trav);
+        let cursor_pos = *state.query.current().atom_position.as_ref();
+        let node = path_leaf.index.0;
+        let node_width = path_leaf.width.0;
+
         match state.compare_leaf_tokens(trav) {
             Finished(CompareEndResult::FoundMatch(matched_state)) => {
-                Some(NodeResult::FoundMatch(matched_state))
+                let info = CompareInfo {
+                    node, node_width, cursor_pos,
+                    outcome: CompareOutcome::Match,
+                };
+                Some(NodeResult::FoundMatch(matched_state, info))
             },
-            Finished(CompareEndResult::Mismatch(_)) => Some(Skip),
+            Finished(CompareEndResult::Mismatch(_)) => {
+                let info = CompareInfo {
+                    node, node_width, cursor_pos,
+                    outcome: CompareOutcome::Mismatch {
+                        expected: query_leaf.index.0,
+                        actual: path_leaf.index.0,
+                    },
+                };
+                Some(Skip(info))
+            },
             Prefixes(next) => {
                 tracing::debug!(
                     num_prefixes = next.len(),
                     "got Prefixes, extending queue"
                 );
-                Some(QueueMore(next.into_iter().map(ChildCandidate).collect()))
+                let prefix_children: Vec<PrefixChildInfo> = next
+                    .iter()
+                    .map(|prefix_state| {
+                        let child_leaf = prefix_state
+                            .rooted_path()
+                            .role_rooted_leaf_token::<End, _>(trav);
+                        PrefixChildInfo {
+                            child: child_leaf.index.0,
+                            child_width: child_leaf.width.0,
+                        }
+                    })
+                    .collect();
+                let info = CompareInfo {
+                    node, node_width, cursor_pos,
+                    outcome: CompareOutcome::Prefixes(prefix_children),
+                };
+                Some(QueueMore(
+                    next.into_iter().map(ChildCandidate).collect(),
+                    info,
+                ))
             },
         }
     }
@@ -134,6 +208,13 @@ where
                         })
                         .map(ParentCandidate)
                         .collect(),
+                    // Parent expansion has no leaf comparison — use a dummy CompareInfo.
+                    CompareInfo {
+                        node: parent.parent_state.path.root_parent().index.0,
+                        node_width: parent.parent_state.path.root_parent().width.0,
+                        cursor_pos: *parent.cursor.candidate().atom_position.as_ref(),
+                        outcome: CompareOutcome::Prefixes(vec![]),
+                    },
                 )),
             },
             ChildCandidate(state) => Self::compare_next(self.1, state),

@@ -18,6 +18,8 @@ use crate::{
             RootCursor,
             RootEndResult,
         },
+        CompareInfo,
+        CompareOutcome,
         SearchNode,
         SearchNode::ParentCandidate,
     },
@@ -251,6 +253,98 @@ where
         (parents, children)
     }
 
+    /// Emit `VisitChild` / `ChildMatch` / `ChildMismatch` events from a
+    /// [`CompareInfo`] returned by the BFS node comparison.
+    ///
+    /// This translates the metadata captured during `compare_leaf_tokens`
+    /// into graph-op events so the visualization stays in sync with the
+    /// algorithm.
+    fn emit_compare_events(&mut self, info: CompareInfo, parent_node: usize) {
+        match info.outcome {
+            CompareOutcome::Match => {
+                // Emit VisitChild to show the child being examined
+                let replace = !self.viz_path.end_path.is_empty();
+                self.emit_graph_op(
+                    Transition::VisitChild {
+                        from: parent_node,
+                        to: info.node,
+                        child_index: 0,
+                        width: info.node_width,
+                        edge: EdgeRef {
+                            from: parent_node,
+                            to: info.node,
+                            pattern_idx: 0,
+                            sub_index: 0,
+                        },
+                        replace,
+                    },
+                    format!("Comparing child node {}", info.node),
+                );
+                self.emit_graph_op(
+                    Transition::ChildMatch {
+                        node: info.node,
+                        cursor_pos: info.cursor_pos,
+                    },
+                    format!(
+                        "Child match at node {} (query pos {})",
+                        info.node, info.cursor_pos
+                    ),
+                );
+            },
+            CompareOutcome::Mismatch { expected, actual } => {
+                let replace = !self.viz_path.end_path.is_empty();
+                self.emit_graph_op(
+                    Transition::VisitChild {
+                        from: parent_node,
+                        to: info.node,
+                        child_index: 0,
+                        width: info.node_width,
+                        edge: EdgeRef {
+                            from: parent_node,
+                            to: info.node,
+                            pattern_idx: 0,
+                            sub_index: 0,
+                        },
+                        replace,
+                    },
+                    format!("Comparing child node {}", info.node),
+                );
+                self.emit_graph_op(
+                    Transition::ChildMismatch {
+                        node: info.node,
+                        cursor_pos: info.cursor_pos,
+                        expected,
+                        actual,
+                    },
+                    format!(
+                        "Child mismatch at node {} (expected {}, got {})",
+                        info.node, expected, actual
+                    ),
+                );
+            },
+            CompareOutcome::Prefixes(children) => {
+                for child in children {
+                    self.emit_graph_op(
+                        Transition::VisitChild {
+                            from: parent_node,
+                            to: child.child,
+                            child_index: 0,
+                            width: child.child_width,
+                            edge: EdgeRef {
+                                from: parent_node,
+                                to: child.child,
+                                pattern_idx: 0,
+                                sub_index: 0,
+                            },
+                            replace: false,
+                        },
+                        format!("Visiting prefix child {}", child.child),
+                    );
+                }
+            },
+        }
+    }
+
     pub(crate) fn search(mut self) -> Response {
         trace!(queue = %&self.matches.queue, "initial state");
 
@@ -467,11 +561,49 @@ where
                         RootEndResult::Conclusive(conclusive) => {
                             // Conclusive end - this is the maximum match for the search
                             match conclusive {
-                                ConclusiveEnd::Mismatch(_candidate_cursor) => {
-                                    // Found mismatch after progress - create final MatchResult
-                                    // Clone the state before consuming
+                                ConclusiveEnd::Mismatch(candidate_cursor) => {
+                                    // Found mismatch after progress - emit child events
                                     trace!(
                                         "Conclusive end: Mismatch - keeping best match"
+                                    );
+                                    // Extract token info for mismatch visualization
+                                    let trav = &self.matches.trace_ctx.trav;
+                                    let child_state = &candidate_cursor.state.child.candidate().child_state;
+                                    let child_token = child_state.path.role_rooted_leaf_token::<End, _>(trav);
+                                    let child_idx = child_token.index.0;
+                                    let child_width = child_token.width.0;
+                                    let child_sub_index = child_state.root_child_index();
+                                    let adv_root = child_state.root_parent().index.0;
+                                    let cursor_pos = *candidate_cursor.state.query.candidate().atom_position.as_ref();
+                                    let query_token = candidate_cursor.state.query.candidate().path.role_rooted_leaf_token::<End, _>(trav);
+                                    let expected_idx = query_token.index.0;
+
+                                    // Emit VisitChild + ChildMismatch
+                                    let replace = !self.viz_path.end_path.is_empty();
+                                    self.emit_graph_op(
+                                        Transition::VisitChild {
+                                            from: adv_root,
+                                            to: child_idx,
+                                            child_index: child_sub_index,
+                                            width: child_width,
+                                            edge: EdgeRef {
+                                                from: adv_root,
+                                                to: child_idx,
+                                                pattern_idx: 0,
+                                                sub_index: child_sub_index,
+                                            },
+                                            replace,
+                                        },
+                                        format!("Visiting child {child_idx} from root {adv_root}"),
+                                    );
+                                    self.emit_graph_op(
+                                        Transition::ChildMismatch {
+                                            node: child_idx,
+                                            cursor_pos,
+                                            expected: expected_idx,
+                                            actual: child_idx,
+                                        },
+                                        format!("Child mismatch at node {child_idx} (expected {expected_idx}, got {child_idx})"),
                                     );
                                     // Continue searching from queue (no parent exploration for mismatch)
                                 },
@@ -644,7 +776,10 @@ where
             }
 
             match self.matches.process_node(popped) {
-                ProcessResult::Expanded => {
+                ProcessResult::Expanded(info) => {
+                    // Emit child comparison events from the BFS comparison
+                    self.emit_compare_events(info, node_index);
+
                     if is_parent {
                         let candidate_parents = self.queue_candidates().0.clone();
                         self.emit_graph_op(
@@ -657,7 +792,10 @@ where
                     }
                     continue;
                 },
-                ProcessResult::FoundMatch(state) => {
+                ProcessResult::FoundMatch(state, info) => {
+                    // Emit child comparison events for the match
+                    self.emit_compare_events(info, node_index);
+
                     // Clear queue — finish_root_cursor will explore via
                     // RootCursor and re-populate if necessary.
                     debug!(
@@ -674,7 +812,10 @@ where
                     );
                     break state;
                 },
-                ProcessResult::Skipped => {
+                ProcessResult::Skipped(info) => {
+                    // Emit child comparison events for the mismatch
+                    self.emit_compare_events(info, node_index);
+
                     self.emit_graph_op(
                         Transition::CandidateMismatch {
                             node: node_index,
