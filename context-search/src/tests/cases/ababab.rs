@@ -92,6 +92,7 @@ impl SearchTestCase for SearchAbababExact {
                     TD {},
                 ),
             ),
+            events: vec![],
         }
     }
 }
@@ -148,6 +149,7 @@ impl SearchTestCase for SearchAbabExact {
                     TD {},
                 ),
             ),
+            events: vec![],
         }
     }
 }

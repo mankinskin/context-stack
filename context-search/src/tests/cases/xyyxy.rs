@@ -88,6 +88,7 @@ impl SearchTestCase for SearchXyExact {
                     TD {},
                 ),
             ),
+            events: vec![],
         }
     }
 }

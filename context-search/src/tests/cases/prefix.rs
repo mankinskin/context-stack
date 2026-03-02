@@ -109,6 +109,7 @@ impl SearchTestCase for Prefix1 {
                     TD { 2 },
                 ),
             ),
+            events: vec![],
         }
     }
 }

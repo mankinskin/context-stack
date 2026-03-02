@@ -83,7 +83,7 @@ impl OperationType {
 /// Each variant represents a state change that can be visualized as an
 /// animation frame. The frontend uses these to update node styling and
 /// draw trace paths.
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[ts(
     export,
@@ -358,7 +358,7 @@ pub enum Transition {
 /// - `trace_path` → connected with trace line
 /// - `completed_nodes` → green
 /// - `pending_nodes` → orange (parents) / purple (children)
-#[derive(Debug, Clone, Default, Serialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[ts(
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
@@ -389,7 +389,7 @@ pub struct LocationInfo {
 // ---------------------------------------------------------------------------
 
 /// Information about the search/insert query.
-#[derive(Debug, Clone, Default, Serialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[ts(
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
@@ -424,7 +424,7 @@ pub struct QueryInfo {
 /// Used to describe what changed in the graph during an insert step.
 /// The frontend uses these to show before/after states and highlight
 /// newly created or removed nodes/edges.
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "op", rename_all = "snake_case")]
 #[ts(
     export,
@@ -463,7 +463,7 @@ pub enum DeltaOp {
 ///
 /// Carried as an optional field on `GraphOpEvent` so the frontend can
 /// display before/after graph states during insert operations.
-#[derive(Debug, Clone, Default, Serialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[ts(
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
@@ -508,7 +508,7 @@ impl GraphMutation {
 ///     .with_query(QueryInfo::new(vec![1, 2, 3], 0, 3));
 /// event.emit();
 /// ```
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[ts(
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"

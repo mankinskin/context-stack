@@ -9,6 +9,7 @@ use {
                 IndexWithPath,
             },
             vertex::token::Token,
+            visualization::Transition,
         },
         init_test_tracing,
         tests::{
@@ -59,6 +60,20 @@ fn find_parent1() {
         },
         _ => panic!("Expected EntireRoot path"),
     }
+
+    // Validate events: must start with StartNode, end with Done, have sequential steps
+    let transitions = response.transitions();
+    assert!(
+        matches!(transitions.first(), Some(Transition::StartNode { .. })),
+        "First event should be StartNode, got {:?}", transitions.first()
+    );
+    assert!(
+        matches!(transitions.last(), Some(Transition::Done { success: true, .. })),
+        "Last event should be Done(success: true)"
+    );
+    let steps: Vec<usize> = response.events.iter().map(|e| e.step).collect();
+    assert_eq!(steps, (0..steps.len()).collect::<Vec<_>>(), "Steps should be sequential");
+
     let query = ab_c_pattern;
     let response = graph.find_parent(query).unwrap();
     assert!(response.query_exhausted(), "Query should be complete");

@@ -1,4 +1,7 @@
-use context_trace::*;
+use context_trace::{
+    *,
+    graph::visualization::{GraphOpEvent, Transition},
+};
 
 use crate::{
     cursor::{
@@ -11,10 +14,23 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq)]
 pub struct Response {
     pub cache: TraceCache,
     pub end: MatchResult,
+    /// Collected graph-op events emitted during the search.
+    /// Available for test assertions and post-hoc inspection.
+    pub events: Vec<GraphOpEvent>,
+}
+
+/// PartialEq compares only `cache` and `end`, ignoring `events`.
+/// This lets existing tests compare structural results without
+/// enumerating the full event trace.  Use `response.events` or
+/// `response.transitions()` to assert on events separately.
+impl PartialEq for Response {
+    fn eq(&self, other: &Self) -> bool {
+        self.cache == other.cache && self.end == other.end
+    }
 }
 //impl From<EndState> for Response {
 //    fn from(state: EndState) -> Self {
@@ -86,6 +102,23 @@ impl Response {
     /// This is useful for consecutive searches.
     pub fn cursor_position(&self) -> AtomPosition {
         self.end.cursor().atom_position
+    }
+
+    /// Get the collected transitions (event kinds) in emission order.
+    ///
+    /// Useful for test assertions:
+    /// ```ignore
+    /// use context_trace::graph::visualization::Transition;
+    /// let transitions = response.transitions();
+    /// assert!(matches!(transitions[0], Transition::StartNode { .. }));
+    /// ```
+    pub fn transitions(&self) -> Vec<&Transition> {
+        self.events.iter().map(|e| &e.transition).collect()
+    }
+
+    /// Get the transitions as owned clones.
+    pub fn transitions_owned(&self) -> Vec<Transition> {
+        self.events.iter().map(|e| e.transition.clone()).collect()
     }
 }
 

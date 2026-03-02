@@ -98,6 +98,7 @@ fn prefix1() {
                     TD { 2 },
                 ),
             ),
+            events: vec![],
         })
     );
 }
@@ -199,6 +200,7 @@ fn search_pattern1_by_z() {
                     ),
                 ]),
             },
+            events: vec![],
         }
     );
 }
@@ -304,6 +306,7 @@ fn search_pattern1_ab_y() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -456,6 +459,7 @@ fn search_pattern2_a_b_y() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -536,6 +540,7 @@ fn search_pattern2_a_b() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -657,6 +662,7 @@ fn search_infix1_a_b_y() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -762,6 +768,7 @@ fn search_infix1_a_b() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -866,6 +873,7 @@ fn search_infix2_a_b_c_d() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -972,6 +980,7 @@ fn search_postfix1_b_c_d_d() {
                     _state: std::marker::PhantomData,
                 }),
             },
+            events: vec![],
         }
     );
 }
@@ -1026,6 +1035,7 @@ fn search_complete_token_b_c() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -1080,6 +1090,7 @@ fn search_complete_token_a_bc() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }
@@ -1156,6 +1167,7 @@ fn test_index_prefix1_hell() {
                 TD { 2 },
             ),
         ),
+        events: vec![],
     };
 
     assert_eq!(res, Ok(expected));
@@ -1233,6 +1245,7 @@ fn test_index_postfix1_bcdd() {
                 TD {},
             ),
         ),
+        events: vec![],
     };
 
     assert_eq!(res, Ok(expected));

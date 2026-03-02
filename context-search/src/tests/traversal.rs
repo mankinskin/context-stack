@@ -143,6 +143,7 @@ fn prefix1() {
                     ),
                 ]),
             },
+            events: vec![],
         }
     );
 }
@@ -240,6 +241,7 @@ fn postfix1() {
                     ),
                 ]),
             },
+            events: vec![],
         }
     );
 }
@@ -377,7 +379,8 @@ fn range1() {
                         },
                     ),
                 ]),
-            }
+            },
+            events: vec![],
         }
     );
 }

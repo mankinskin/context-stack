@@ -18,7 +18,10 @@ use {
             response::Response,
         },
     },
-    context_trace::*,
+    context_trace::{
+        *,
+        graph::visualization::Transition,
+    },
     itertools::*,
     pretty_assertions::{
         assert_eq,
@@ -61,6 +64,13 @@ fn find_ancestor1_b_c() {
         PathCoverage::EntireRoot(ref path)
             if path.path_root().pattern_location().parent == *bc
     );
+
+    // Validate events
+    let transitions = response.transitions();
+    assert_matches!(transitions.first(), Some(Transition::StartNode { .. }));
+    assert_matches!(transitions.last(), Some(Transition::Done { success: true, .. }));
+    let steps: Vec<usize> = response.events.iter().map(|e| e.step).collect();
+    assert_eq!(steps, (0..steps.len()).collect::<Vec<_>>(), "Steps should be sequential");
 }
 
 // Test: Pattern [a, bc] should match token abc (Complete)
@@ -147,6 +157,33 @@ fn find_ancestor1_a_b_c() {
             if path.path_root().pattern_location().parent == *abc
     );
     assert_eq!(response.query_exhausted(), true);
+
+    // Validate collected events
+    let transitions = response.transitions();
+
+    // Must start with StartNode and end with Done
+    assert_matches!(transitions.first(), Some(Transition::StartNode { .. }));
+    assert_matches!(transitions.last(), Some(Transition::Done { success: true, .. }));
+
+    // Must contain at least one VisitChild and ChildMatch
+    assert!(
+        transitions.iter().any(|t| matches!(t, Transition::VisitChild { .. })),
+        "Expected at least one VisitChild event"
+    );
+    assert!(
+        transitions.iter().any(|t| matches!(t, Transition::ChildMatch { .. })),
+        "Expected at least one ChildMatch event"
+    );
+
+    // Must contain CandidateMatch (root was confirmed)
+    assert!(
+        transitions.iter().any(|t| matches!(t, Transition::CandidateMatch { .. })),
+        "Expected a CandidateMatch event"
+    );
+
+    // Steps should be monotonically increasing
+    let steps: Vec<usize> = response.events.iter().map(|e| e.step).collect();
+    assert_eq!(steps, (0..steps.len()).collect::<Vec<_>>(), "Steps should be sequential");
 }
 // Test: Pattern [a, b, c, c] should partially match token abc - only first 3 tokens match
 #[test]
@@ -168,6 +205,7 @@ fn find_ancestor1_a_b_c_c() {
         Token::new(c, 1),
         Token::new(c, 1),
     ];
+    // (assertions added below after response)
     let response = graph.find_ancestor(&query).unwrap();
     assert_matches!(
         response.end.path,
@@ -175,6 +213,18 @@ fn find_ancestor1_a_b_c_c() {
             if path.path_root().pattern_location().parent == *abc
     );
     assert_eq!(response.query_exhausted(), false);
+
+    // Validate events: partial match still produces full event trace
+    let transitions = response.transitions();
+    assert_matches!(transitions.first(), Some(Transition::StartNode { .. }));
+    assert_matches!(transitions.last(), Some(Transition::Done { .. }));
+    // Even partial matches produce ChildMatch events for the matched portion
+    assert!(
+        transitions.iter().any(|t| matches!(t, Transition::ChildMatch { .. })),
+        "Expected ChildMatch events for partial match"
+    );
+    let steps: Vec<usize> = response.events.iter().map(|e| e.step).collect();
+    assert_eq!(steps, (0..steps.len()).collect::<Vec<_>>(), "Steps should be sequential");
 }
 
 // Test: Long pattern [a,b,a,b,a,b,a,b,c,d,e,f,g,h,i] should match ababababcdefghi (Complete)
@@ -208,6 +258,18 @@ fn find_ancestor1_long_pattern() {
             if path.path_root().pattern_location().parent == *ababababcdefghi
     );
     assert_eq!(response.query_exhausted(), true);
+
+    // Validate events for long pattern
+    let transitions = response.transitions();
+    assert_matches!(transitions.first(), Some(Transition::StartNode { .. }));
+    assert_matches!(transitions.last(), Some(Transition::Done { success: true, .. }));
+    // Long pattern should have many VisitChild/ChildMatch events
+    let visit_count = transitions.iter().filter(|t| matches!(t, Transition::VisitChild { .. })).count();
+    let match_count = transitions.iter().filter(|t| matches!(t, Transition::ChildMatch { .. })).count();
+    assert!(visit_count >= 1, "Expected VisitChild events, got {}", visit_count);
+    assert!(match_count >= 1, "Expected ChildMatch events, got {}", match_count);
+    let steps: Vec<usize> = response.events.iter().map(|e| e.step).collect();
+    assert_eq!(steps, (0..steps.len()).collect::<Vec<_>>(), "Steps should be sequential");
 }
 
 #[test]
@@ -312,6 +374,7 @@ fn find_ancestor2() {
                     ),
                 ]),
             },
+            events: vec![],
         }
     );
 }
@@ -432,6 +495,7 @@ fn find_ancestor3() {
                     }
                 )),
             },
+            events: vec![],
         }
     );
 }

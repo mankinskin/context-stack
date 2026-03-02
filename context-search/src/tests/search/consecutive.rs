@@ -1,3 +1,4 @@
+use context_trace::graph::visualization::Transition;
 use crate::{
     cursor::Checkpointed,
     state::matched::CheckpointedCursor,
@@ -9,6 +10,7 @@ use {
         state::end::PathCoverage,
     },
     context_trace::*,
+    pretty_assertions::assert_matches,
 };
 
 #[test]
@@ -97,6 +99,14 @@ fn find_consecutive1() {
         _ => panic!("Expected EntireRoot path"),
     }
 
+    // Validate events for first search
+    let t1 = fin1.transitions();
+    assert_matches!(t1.first(), Some(Transition::StartNode { .. }));
+    assert_matches!(t1.last(), Some(Transition::Done { .. }));
+    assert!(t1.iter().any(|t| matches!(t, Transition::VisitChild { .. })), "Expected VisitChild");
+    let steps1: Vec<usize> = fin1.events.iter().map(|e| e.step).collect();
+    assert_eq!(steps1, (0..steps1.len()).collect::<Vec<_>>(), "Steps should be sequential");
+
     // Extract the cursor from the response and use it for the next search
     let query = fin1.end.cursor().clone();
     // second search
@@ -131,4 +141,11 @@ fn find_consecutive1() {
         },
         _ => panic!("Expected EntireRoot path"),
     }
+
+    // Validate events for second search
+    let t2 = fin2.transitions();
+    assert_matches!(t2.first(), Some(Transition::StartNode { .. }));
+    assert_matches!(t2.last(), Some(Transition::Done { .. }));
+    let steps2: Vec<usize> = fin2.events.iter().map(|e| e.step).collect();
+    assert_eq!(steps2, (0..steps2.len()).collect::<Vec<_>>(), "Steps should be sequential");
 }

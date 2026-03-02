@@ -138,6 +138,8 @@ pub struct SearchState<K: SearchKind> {
     pub(crate) viz_cursor_pos: usize,
     /// Atom positions confirmed as matched (for query token highlighting).
     pub(crate) viz_matched_positions: Vec<usize>,
+    /// Collected graph-op events for testing and inspection.
+    pub(crate) collected_events: Vec<GraphOpEvent>,
 }
 
 impl<K: SearchKind> SearchState<K>
@@ -216,6 +218,7 @@ where
             graph_mutation: None,
         };
         event.emit();
+        self.collected_events.push(event);
     }
 
     /// Infer `(current_root, matched_nodes)` from a [`Transition`] variant.
@@ -425,6 +428,7 @@ where
         let response = Response {
             cache: self.matches.trace_ctx.cache,
             end,
+            events: self.collected_events,
         };
 
         info!(end=?response.end, "search complete");

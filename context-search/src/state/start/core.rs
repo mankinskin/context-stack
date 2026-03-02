@@ -118,6 +118,7 @@ impl<K: SearchKind> StartCtx<K> {
                     viz_path: Default::default(),
                     viz_cursor_pos: 0,
                     viz_matched_positions: Vec::new(),
+                    collected_events: Vec::new(),
                 })
             },
             Err(err) => {
