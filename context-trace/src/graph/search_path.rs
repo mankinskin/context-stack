@@ -199,9 +199,13 @@ impl VizPathGraph {
 
     /// Apply a [`Transition`] to update this path graph in place.
     ///
-    /// Only transitions that modify the search path have an effect;
-    /// informational transitions (e.g., `ParentExplore`, `CandidateMismatch`) are
-    /// silently ignored.
+    /// **Root-setting semantics:**
+    /// - `VisitParent` sets the root (so child arrows appear during comparison).
+    /// - `CandidateMatch` only sets root as fallback when no `VisitParent` preceded it
+    ///   (e.g. non-parent / start-node matches). Otherwise it is informational.
+    /// - `CandidateMismatch` clears root + end_path when the candidate is rejected.
+    ///
+    /// Informational transitions (e.g., `ParentExplore`) are silently ignored.
     pub fn apply_transition(
         &mut self,
         transition: &super::visualization::Transition,
@@ -223,31 +227,44 @@ impl VizPathGraph {
                     let old_edge = self.root_edge.take().unwrap();
                     self.start_path.push(old_root);
                     self.start_edges.push(old_edge);
+                    // Clear end_path — previous root's children are no longer relevant
+                    self.end_path.clear();
+                    self.end_edges.clear();
                 }
+                // Set this parent candidate as the root so that subsequent
+                // VisitChild events can populate end_path immediately
+                // (child arrows appear during comparison, not after match).
                 let parent = PathNode { index: *to, width: *width };
-                self.start_path.push(parent);
-                self.start_edges.push(*edge);
+                self.root = Some(parent);
+                self.root_edge = Some(*edge);
             },
             Transition::CandidateMatch { root, width, edge } => {
-                if self.start_node.is_none() {
-                    return Err("CandidateMatch before StartNode".into());
+                // CandidateMatch signals that the candidate root matched.
+                // If VisitParent already set the root, this is informational.
+                // Only set root as fallback for non-parent candidates (e.g.
+                // start-node matches where no VisitParent was emitted).
+                if self.root.is_none() {
+                    if self.start_node.is_none() {
+                        return Err("CandidateMatch before StartNode".into());
+                    }
+                    let root_node =
+                        PathNode { index: *root, width: *width };
+                    if self.start_path.last().map(|n| n.index) == Some(*root)
+                    {
+                        self.start_path.pop();
+                        self.root = Some(root_node);
+                        self.root_edge =
+                            self.start_edges.pop().or(Some(*edge));
+                    } else {
+                        self.root = Some(root_node);
+                        self.root_edge = Some(*edge);
+                    }
                 }
-                if self.root.is_some() {
-                    return Err("CandidateMatch called when root already set".into());
-                }
-                let root_node = PathNode { index: *root, width: *width };
-                if self.start_path.last().map(|n| n.index) == Some(*root) {
-                    self.start_path.pop();
-                    self.root = Some(root_node);
-                    self.root_edge = self.start_edges.pop().or(Some(*edge));
-                } else {
-                    self.root = Some(root_node);
-                    self.root_edge = Some(*edge);
-                }
+                // else: root already set by VisitParent — no state change.
             },
             Transition::VisitChild { to, width, edge, replace, .. } => {
                 if self.root.is_none() {
-                    return Err("VisitChild before CandidateMatch".into());
+                    return Err("VisitChild before root is set".into());
                 }
                 let child = PathNode { index: *to, width: *width };
                 if *replace {
@@ -272,9 +289,20 @@ impl VizPathGraph {
                 self.success = *success;
             },
             Transition::CandidateMismatch { node, .. } => {
-                // Pop the rejected parent that was pushed by the prior VisitParent.
-                // This keeps start_path accurate — only confirmed ancestors remain.
-                if self.start_path.last().map(|n| n.index) == Some(*node) {
+                // If the rejected node is the current root (set by
+                // VisitParent as a candidate), clear it along with any
+                // end_path entries built during child comparison.
+                if self.root.map(|n| n.index) == Some(*node) {
+                    self.root = None;
+                    self.root_edge = None;
+                    self.end_path.clear();
+                    self.end_edges.clear();
+                } else if self.start_path.last().map(|n| n.index)
+                    == Some(*node)
+                {
+                    // Safety net: pop a rejected parent from start_path
+                    // (shouldn't normally trigger since VisitParent now sets
+                    // root instead of pushing to start_path).
                     self.start_path.pop();
                     self.start_edges.pop();
                 }

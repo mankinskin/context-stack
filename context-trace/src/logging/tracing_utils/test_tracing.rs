@@ -18,6 +18,10 @@ use tracing_subscriber::{
 
 use super::{
     config::TracingConfig,
+    debug_to_json::{
+        self,
+        SignatureStore,
+    },
     formatter::CompactFieldsFormatter,
     panic::install_panic_hook,
     special_fields::SpecialFieldExtractor,
@@ -40,6 +44,8 @@ static GLOBAL_INIT: Once = Once::new();
 /// The guard holds a tracing dispatcher that's active for the lifetime of the test.
 pub struct TestTracing {
     log_file_path: Option<PathBuf>,
+    signatures_path: Option<PathBuf>,
+    signatures: Option<SignatureStore>,
     keep_success_logs: bool,
     clear_test_graph_on_drop: bool,
     _dispatcher: Dispatch,
@@ -175,6 +181,22 @@ impl TestTracing {
         let log_to_stdout = config.log_to_stdout;
         let format_config = config.format.clone();
 
+        // Create signature store for collecting fn_sig entries
+        let signatures = debug_to_json::new_signature_store();
+
+        // Determine signature file path (sibling directory to log_dir)
+        let signatures_path = if config.log_to_file {
+            let sig_dir = config
+                .log_dir
+                .parent()
+                .unwrap_or(&config.log_dir)
+                .join("debug_signatures");
+            fs::create_dir_all(&sig_dir).ok();
+            Some(sig_dir.join(format!("{}.json", test_name)))
+        } else {
+            None
+        };
+
         // Build layers based on configuration
         // Timestamp display is controlled by the formatter's show_timestamp config,
         // so we always use CompactTimer and let the formatter decide whether to call format_time.
@@ -186,7 +208,8 @@ impl TestTracing {
                 let file =
                     fs::File::create(path).expect("Failed to create log file");
                 let flushing_writer = FlushingWriter::new(file);
-                let pretty_writer = PrettyJsonWriter::new(flushing_writer);
+                let pretty_writer =
+                    PrettyJsonWriter::new(flushing_writer, signatures.clone());
 
                 let stdout_layer = tracing_subscriber::fmt::layer()
                     .with_writer(std::io::stdout)
@@ -246,7 +269,8 @@ impl TestTracing {
                 let file =
                     fs::File::create(path).expect("Failed to create log file");
                 let flushing_writer = FlushingWriter::new(file);
-                let pretty_writer = PrettyJsonWriter::new(flushing_writer);
+                let pretty_writer =
+                    PrettyJsonWriter::new(flushing_writer, signatures.clone());
 
                 let file_layer = tracing_subscriber::fmt::layer()
                     .with_writer(move || pretty_writer.clone())
@@ -280,6 +304,8 @@ impl TestTracing {
 
         Self {
             log_file_path,
+            signatures_path,
+            signatures: Some(signatures),
             keep_success_logs: config.keep_success_logs,
             clear_test_graph_on_drop,
             _dispatcher: dispatcher,
@@ -314,6 +340,19 @@ impl Drop for TestTracing {
         // Check if we're unwinding (test panicked/failed)
         let is_panicking = std::thread::panicking();
 
+        // Write collected signatures to JSON file
+        if let (Some(sig_path), Some(signatures)) =
+            (&self.signatures_path, &self.signatures)
+        {
+            if let Ok(sigs) = signatures.lock() {
+                if !sigs.is_empty() {
+                    let json = serde_json::to_string_pretty(&*sigs)
+                        .unwrap_or_else(|_| "{}".to_string());
+                    fs::write(sig_path, json).ok();
+                }
+            }
+        }
+
         if !is_panicking && !self.keep_success_logs {
             // Test passed and keep_success_logs disabled - clean up log file
             if let Some(ref path) = self.log_file_path {
@@ -322,6 +361,10 @@ impl Drop for TestTracing {
                     "Test passed, removing log file"
                 );
                 fs::remove_file(path).ok();
+            }
+            // Also clean up signatures file on success
+            if let Some(ref sig_path) = self.signatures_path {
+                fs::remove_file(sig_path).ok();
             }
         } else {
             // Test failed or keep_success_logs enabled - keep log file

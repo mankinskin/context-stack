@@ -14,6 +14,7 @@ use std::{
 
 use super::debug_to_json::{
     convert_paths_to_unix,
+    SignatureStore,
     transform_structured_fields,
 };
 
@@ -69,17 +70,21 @@ impl Write for FlushingWriter {
 ///
 /// Wraps another writer and buffers JSON objects. When a complete JSON
 /// object is detected, it's parsed and re-serialized with indentation.
+/// Also collects fn_sig entries into a shared signature store and strips
+/// them from the output.
 #[derive(Clone)]
 pub(super) struct PrettyJsonWriter<W> {
     inner: W,
     buffer: Arc<Mutex<Vec<u8>>>,
+    signatures: SignatureStore,
 }
 
 impl<W: Clone> PrettyJsonWriter<W> {
-    pub(super) fn new(writer: W) -> Self {
+    pub(super) fn new(writer: W, signatures: SignatureStore) -> Self {
         Self {
             inner: writer,
             buffer: Arc::new(Mutex::new(Vec::new())),
+            signatures,
         }
     }
 }
@@ -109,7 +114,8 @@ impl<W: Write + Clone> Write for PrettyJsonWriter<W> {
                         convert_paths_to_unix(&mut value);
 
                         // Transform structured fields (fn_sig, etc.) into JSON objects
-                        transform_structured_fields(&mut value);
+                        // This also collects fn_sig entries and strips them from output
+                        transform_structured_fields(&mut value, Some(&self.signatures));
 
                         // Write pretty-printed JSON
                         let pretty = serde_json::to_string_pretty(&value)

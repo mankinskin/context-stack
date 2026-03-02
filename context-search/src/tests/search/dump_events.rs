@@ -20,7 +20,10 @@ use {
 fn dump(label: &str, events: &[context_trace::graph::visualization::GraphOpEvent]) {
     eprintln!("\n=== {label} ({} events) ===", events.len());
     for e in events {
-        eprintln!("  [{:>2}] {:?}", e.step, e.transition);
+        eprintln!("  [{:>2}] transition: {:?}", e.step, e.transition);
+        let pg = &e.path_graph;
+        eprintln!("        path_graph: start_node={:?} start_path={:?} root={:?} end_path={:?} end_edges={:?}",
+            pg.start_node, pg.start_path, pg.root, pg.end_path, pg.end_edges);
     }
 }
 

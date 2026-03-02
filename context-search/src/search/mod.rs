@@ -348,6 +348,51 @@ where
         }
     }
 
+    /// Compute the `from` vertex for a [`Transition::CandidateMatch`] edge.
+    ///
+    /// If `root_idx` matches the last start_path entry (the candidate was
+    /// pushed by VisitParent), use the entry below it. Otherwise use the
+    /// start_path top or start_node as fallback.
+    fn compute_candidate_edge_from(&self, root_idx: usize) -> usize {
+        let sp = &self.viz_path;
+        if sp.start_path.last().map(|n| n.index) == Some(root_idx) {
+            if sp.start_path.len() >= 2 {
+                sp.start_path[sp.start_path.len() - 2].index
+            } else {
+                sp.start_node.map(|n| n.index).unwrap_or(self.start_node)
+            }
+        } else {
+            sp.start_path
+                .last()
+                .map(|n| n.index)
+                .unwrap_or(sp.start_node.map(|n| n.index).unwrap_or(self.start_node))
+        }
+    }
+
+    /// Emit a [`Transition::CandidateMatch`] to signal that the given node
+    /// is being explored as a root candidate.
+    ///
+    /// With the new semantics, `VisitParent` already sets the root on
+    /// [`VizPathGraph`], so this transition is informational for parent
+    /// candidates. For non-parent candidates (where no `VisitParent` was
+    /// emitted), `CandidateMatch` still sets the root as a fallback.
+    fn emit_candidate_match(&mut self, node_index: usize) {
+        let edge_from = self.compute_candidate_edge_from(node_index);
+        self.emit_graph_op(
+            Transition::CandidateMatch {
+                root: node_index,
+                width: 1,
+                edge: EdgeRef {
+                    from: edge_from,
+                    to: node_index,
+                    pattern_idx: 0,
+                    sub_index: 0,
+                },
+            },
+            format!("Setting candidate root at node {node_index}"),
+        );
+    }
+
     pub(crate) fn search(mut self) -> Response {
         trace!(queue = %&self.matches.queue, "initial state");
 
@@ -450,41 +495,12 @@ where
             "New root match - finishing root cursor"
         );
 
-        // VisitParent and compare_events were already emitted by the
-        // BFS loop in next() before we got here. Now emit CandidateMatch
-        // to confirm the root.
-
-        // SetRoot "graduates" the node from start_path to root.
-        // apply() detects that root_idx == start_path.last() and pops it,
-        // using the popped edge as root_edge.
-        let edge_from = {
-            let sp = &self.viz_path;
-            if sp.start_path.last().map(|n| n.index) == Some(root_idx) {
-                // Root matches last start_path entry — use the entry below it
-                if sp.start_path.len() >= 2 {
-                    sp.start_path[sp.start_path.len() - 2].index
-                } else {
-                    sp.start_node.map(|n| n.index).unwrap_or(self.start_node)
-                }
-            } else {
-                sp.start_path.last()
-                    .map(|n| n.index)
-                    .unwrap_or(sp.start_node.map(|n| n.index).unwrap_or(self.start_node))
-            }
-        };
-        self.emit_graph_op(
-            Transition::CandidateMatch {
-                root: root_idx,
-                width: 1,
-                edge: EdgeRef {
-                    from: edge_from,
-                    to: root_idx,
-                    pattern_idx: 0,
-                    sub_index: 0,
-                },
-            },
-            format!("Root match found at node {root_idx}"),
-        );
+        // The BFS loop now emits CandidateMatch unconditionally for
+        // FoundMatch, so root should already be set. This is a safety net
+        // for any edge cases where root wasn't set (should not normally fire).
+        if self.viz_path.root.is_none() {
+            self.emit_candidate_match(root_idx);
+        }
 
         // Advance the root cursor step by step, updating best_match after each step
         // Option to store MatchResult directly when created during parent exploration
@@ -781,7 +797,10 @@ where
 
             match self.matches.process_node(popped) {
                 ProcessResult::Expanded(info) => {
-                    // Emit child comparison events from the BFS comparison
+                    // Emit child comparison events from the BFS comparison.
+                    // Root was already set by VisitParent, so VisitChild
+                    // events can populate end_path for arrow visualization.
+                    // No CandidateMatch — node is merely explored, not matched.
                     self.emit_compare_events(info, node_index);
 
                     if is_parent {
@@ -794,11 +813,31 @@ where
                             format!("Node {node_index} boundary reached — exploring parents"),
                         );
                     }
+                    // Expanded nodes are explored, not confirmed matches.
+                    // Demote the transient root back to start_path so the
+                    // next VisitParent uses the correct push_from, and clear
+                    // end_path since the child arrows are transient.
+                    if let Some(exp_root) = self.viz_path.root.take() {
+                        let exp_edge = self.viz_path.root_edge.take();
+                        self.viz_path.start_path.push(exp_root);
+                        if let Some(edge) = exp_edge {
+                            self.viz_path.start_edges.push(edge);
+                        }
+                    }
+                    self.viz_path.end_path.clear();
+                    self.viz_path.end_edges.clear();
                     continue;
                 },
                 ProcessResult::FoundMatch(state, info) => {
-                    // Emit child comparison events for the match
+                    // Emit child comparison events first so the visualization
+                    // shows the comparison before confirming the match.
                     self.emit_compare_events(info, node_index);
+
+                    // Signal that this candidate is a confirmed root match.
+                    // For parent candidates, VisitParent already set root;
+                    // CandidateMatch is informational confirmation.
+                    // For non-parents, CandidateMatch sets root as fallback.
+                    self.emit_candidate_match(node_index);
 
                     // Clear queue — finish_root_cursor will explore via
                     // RootCursor and re-populate if necessary.
@@ -817,7 +856,9 @@ where
                     break state;
                 },
                 ProcessResult::Skipped(info) => {
-                    // Emit child comparison events for the mismatch
+                    // Emit child comparison events. Root was set by
+                    // VisitParent, so VisitChild arrows appear during
+                    // comparison. No CandidateMatch — node is rejected.
                     self.emit_compare_events(info, node_index);
 
                     self.emit_graph_op(

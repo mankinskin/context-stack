@@ -7,6 +7,23 @@
 //! that contain Rust Debug output, function signatures, or serialized data
 //! into proper structured JSON objects.
 
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+
+/// Thread-safe store for collecting function signatures during logging.
+///
+/// Maps function name to its parsed fn_sig JSON object.
+/// Signatures are collected during log writing and later dumped to
+/// `target/debug_signatures/<test_name>.json`.
+pub(super) type SignatureStore = Arc<Mutex<HashMap<String, serde_json::Value>>>;
+
+/// Create a new empty signature store.
+pub(super) fn new_signature_store() -> SignatureStore {
+    Arc::new(Mutex::new(HashMap::new()))
+}
+
 /// Convert Windows paths to Unix paths in a string
 fn to_unix_path(s: &str) -> String {
     // Replace backslashes with forward slashes
@@ -526,8 +543,14 @@ fn try_parse_string_to_json(
     None
 }
 
-/// Transform ALL string fields that look like JSON or Rust debug values into structured JSON objects
-pub(super) fn transform_structured_fields(value: &mut serde_json::Value) {
+/// Transform ALL string fields that look like JSON or Rust debug values into structured JSON objects.
+///
+/// Also collects fn_sig entries into the signature store (if provided) and
+/// strips them from the output to reduce log file size.
+pub(super) fn transform_structured_fields(
+    value: &mut serde_json::Value,
+    signatures: Option<&SignatureStore>,
+) {
     match value {
         serde_json::Value::Object(obj) => {
             // Process each key-value pair
@@ -535,7 +558,7 @@ pub(super) fn transform_structured_fields(value: &mut serde_json::Value) {
             for key in keys {
                 if let Some(val) = obj.get_mut(&key) {
                     // First, recursively transform nested objects/arrays
-                    transform_structured_fields(val);
+                    transform_structured_fields(val, signatures);
 
                     // Then try to parse string values into structured JSON
                     if let serde_json::Value::String(s) = val {
@@ -546,12 +569,119 @@ pub(super) fn transform_structured_fields(value: &mut serde_json::Value) {
                     }
                 }
             }
+
+            // Collect fn_sig from span/spans objects and strip them
+            collect_and_strip_fn_sigs(obj, signatures);
         },
         serde_json::Value::Array(arr) =>
             for item in arr {
-                transform_structured_fields(item);
+                transform_structured_fields(item, signatures);
             },
         _ => {},
+    }
+}
+
+/// Collect fn_sig and self_type from span objects, store in signatures,
+/// then simplify spans to plain name strings.
+///
+/// Looks for fn_sig/self_type in:
+/// - `span` (current span object)
+/// - `spans[*]` (span stack objects)
+/// - `fields.fn_sig` (event fields inherited from span)
+///
+/// After collection, span objects `{"name": "foo", "self_type": "..."}` become
+/// plain strings `"foo"`, and self_type is merged into the fn_sig entry.
+fn collect_and_strip_fn_sigs(
+    obj: &mut serde_json::Map<String, serde_json::Value>,
+    signatures: Option<&SignatureStore>,
+) {
+    /// Extract fn_sig and self_type from a span object, collect into store.
+    /// Returns the span name if found.
+    fn collect_from_span_obj(
+        span_obj: &mut serde_json::Map<String, serde_json::Value>,
+        signatures: Option<&SignatureStore>,
+    ) -> Option<String> {
+        let name = span_obj
+            .get("name")
+            .and_then(|n| n.as_str())
+            .map(|s| s.to_string());
+        let fn_sig = span_obj.remove("fn_sig");
+        let self_type = span_obj.remove("self_type");
+
+        if let Some(store) = signatures {
+            if let Some(ref fn_name) = name {
+                if let Ok(mut sigs) = store.lock() {
+                    // Insert fn_sig if we have one, merging self_type into it
+                    if let Some(mut sig) = fn_sig {
+                        if let Some(self_type_val) = &self_type {
+                            if let Some(sig_obj) = sig.as_object_mut() {
+                                sig_obj
+                                    .entry("self_type".to_string())
+                                    .or_insert(self_type_val.clone());
+                            }
+                        }
+                        sigs.entry(fn_name.clone()).or_insert(sig);
+                    } else if let Some(self_type_val) = &self_type {
+                        // No fn_sig but we have self_type — add it to existing entry
+                        if let Some(existing) = sigs.get_mut(fn_name) {
+                            if let Some(obj) = existing.as_object_mut() {
+                                obj.entry("self_type".to_string())
+                                    .or_insert(self_type_val.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        name
+    }
+
+    // Process "span" object → replace with name string
+    if let Some(serde_json::Value::Object(span_obj)) = obj.get_mut("span") {
+        if let Some(name) = collect_from_span_obj(span_obj, signatures) {
+            obj.insert(
+                "span".to_string(),
+                serde_json::Value::String(name),
+            );
+        }
+    }
+
+    // Process "spans" array → collect signatures, then replace each object with name string
+    if let Some(serde_json::Value::Array(spans)) = obj.get_mut("spans") {
+        // First pass: collect fn_sig and self_type from each span object
+        for span in spans.iter_mut() {
+            if let serde_json::Value::Object(span_obj) = span {
+                let _ = collect_from_span_obj(span_obj, signatures);
+            }
+        }
+        // Second pass: replace objects with name strings
+        let simplified: Vec<serde_json::Value> = spans
+            .iter()
+            .map(|s| match s {
+                serde_json::Value::Object(obj) => obj
+                    .get("name")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null),
+                other => other.clone(),
+            })
+            .collect();
+        *spans = simplified;
+    }
+
+    // Process "fields" object (fn_sig can appear here too)
+    if let Some(serde_json::Value::Object(fields_obj)) = obj.get_mut("fields") {
+        if let Some(fn_sig) = fields_obj.remove("fn_sig") {
+            if let Some(store) = signatures {
+                if let Some(name) = fn_sig.get("name").and_then(|n| n.as_str()) {
+                    if let Ok(mut sigs) = store.lock() {
+                        sigs.entry(name.to_string()).or_insert(fn_sig);
+                    }
+                }
+            }
+        }
+        // Also strip self_type from fields
+        fields_obj.remove("self_type");
     }
 }
 
