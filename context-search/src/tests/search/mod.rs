@@ -1,5 +1,6 @@
 pub(crate) mod ancestor;
 pub(crate) mod consecutive;
+pub(crate) mod dump_events;
 pub(crate) mod event_helpers;
 pub(crate) mod insert_scenarios;
 pub(crate) mod parent;
