@@ -18,7 +18,7 @@ use crate::{
 };
 use context_trace::{
     graph::{
-        visualization::{DeltaOp, GraphDelta, Transition},
+        visualization::{DeltaOp, GraphMutation, Transition},
     },
     *,
 };
@@ -87,7 +87,7 @@ impl Iterator for FrontierSplitIterator {
                             key.pos.get()
                         ),
                         node_idx,
-                        GraphDelta::single(DeltaOp::UpdateNode {
+                        GraphMutation::single(DeltaOp::UpdateNode {
                             index: node_idx,
                             detail: format!("Processing at pos {}", key.pos.get()),
                         }),
@@ -117,7 +117,7 @@ impl Iterator for FrontierSplitIterator {
                     },
                     format!("Merging root node {}", root_idx),
                     root_idx,
-                    GraphDelta::single(DeltaOp::UpdateNode {
+                    GraphMutation::single(DeltaOp::UpdateNode {
                         index: root_idx,
                         detail: "Root merge".to_string(),
                     }),

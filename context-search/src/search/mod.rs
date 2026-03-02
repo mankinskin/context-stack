@@ -183,10 +183,6 @@ where
             Transition::ChildMismatch { cursor_pos, node, .. } => {
                 (*cursor_pos, Some(*node))
             },
-            Transition::MatchAdvance { new_pos, .. } => {
-                self.viz_cursor_pos = *new_pos;
-                (*new_pos, None)
-            },
             _ => (self.viz_cursor_pos, None),
         };
 
@@ -219,7 +215,7 @@ where
             description: description.into(),
             path_id: self.path_id.clone(),
             path_graph: self.viz_path.clone(),
-            graph_delta: None,
+            graph_mutation: None,
         };
         event.emit();
     }
@@ -285,9 +281,8 @@ where
         match transition {
             Transition::StartNode { .. } => (None, vec![]),
             Transition::VisitParent { from, .. } => (Some(*from), vec![*from]),
-            Transition::RootExplore { root, .. } => (Some(*root), vec![*root]),
+            Transition::CandidateMatch { root, .. } => (Some(*root), vec![*root]),
             Transition::VisitChild { from, .. } => (Some(*from), vec![*from]),
-            Transition::MatchAdvance { root, .. } => (Some(*root), vec![*root]),
             Transition::ParentExplore { current_root, .. } => {
                 (Some(*current_root), vec![*current_root])
             },
@@ -296,7 +291,7 @@ where
             },
             Transition::ChildMatch { node, .. } => (Some(*node), vec![*node]),
             Transition::ChildMismatch { node, .. } => (Some(*node), vec![]),
-            Transition::Dequeue { node, .. } => (Some(*node), vec![]),
+            Transition::CandidateMismatch { node, .. } => (Some(*node), vec![]),
             // Insert-specific transitions — not expected in search
             _ => (None, vec![]),
         }
@@ -418,7 +413,7 @@ where
         );
 
         // VisitParent and compare_events were already emitted by the
-        // BFS loop in next() before we got here. Now emit RootExplore
+        // BFS loop in next() before we got here. Now emit CandidateMatch
         // to confirm the root.
 
         // SetRoot "graduates" the node from start_path to root.
@@ -440,7 +435,7 @@ where
             }
         };
         self.emit_graph_op(
-            Transition::RootExplore {
+            Transition::CandidateMatch {
                 root: root_idx,
                 width: 1,
                 edge: EdgeRef {
@@ -514,16 +509,6 @@ where
                             replace,
                         },
                         format!("Visiting child {child_idx} from root {adv_root}"),
-                    );
-
-                    // Emit MatchAdvance event
-                    self.emit_graph_op(
-                        Transition::MatchAdvance { 
-                            root: adv_root, 
-                            prev_pos: init_cursor_pos,
-                            new_pos: checkpoint_pos,
-                        },
-                        format!("Match advanced in root {adv_root} to pos {checkpoint_pos}"),
                     );
 
                     // Continue with the new matched cursor
@@ -751,7 +736,7 @@ where
                 ProcessResult::Skipped(compare_events) => {
                     self.emit_compare_events(&compare_events);
                     self.emit_graph_op(
-                        Transition::Dequeue {
+                        Transition::CandidateMismatch {
                             node: node_index,
                             queue_remaining: self.matches.queue.nodes.len(),
                             is_parent,

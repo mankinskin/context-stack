@@ -27,17 +27,13 @@ pub enum OperationType {
 
 /// Parsed components of a namespaced `path_id`.
 ///
-/// New format: `<op_type>/<module>/<semantic_id>`
+/// Format: `<op_type>/<module>/<semantic_id>`
 /// e.g. `search/context-search/token-42-1234567890`
-///
-/// Legacy format (no slashes): treated as `semantic_id` only.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedPathId<'a> {
     /// Operation type prefix (e.g. "search", "insert", "read").
-    /// `None` for legacy path_ids without slashes.
     pub op_type: Option<&'a str>,
     /// Module name (e.g. "context-search", "context-insert").
-    /// `None` for legacy path_ids.
     pub module: Option<&'a str>,
     /// The semantic identifier portion.
     pub semantic_id: &'a str,
@@ -45,7 +41,8 @@ pub struct ParsedPathId<'a> {
 
 /// Parse a `path_id` string into its namespaced components.
 ///
-/// Supports both new (`op/module/id`) and legacy (`search-42-...`) formats.
+/// Expects `<op_type>/<module>/<semantic_id>` format.
+/// Returns `None` for op_type/module if the string has fewer than 3 `/`-separated parts.
 pub fn parse_path_id(path_id: &str) -> ParsedPathId<'_> {
     let mut parts = path_id.splitn(3, '/');
     match (parts.next(), parts.next(), parts.next()) {
@@ -65,23 +62,14 @@ pub fn parse_path_id(path_id: &str) -> ParsedPathId<'_> {
 impl OperationType {
     /// Infer the operation type from a `path_id` string.
     ///
-    /// Returns `None` for unrecognised prefixes or legacy ids.
+    /// Returns `None` for unrecognised prefixes.
     pub fn from_path_id(path_id: &str) -> Option<Self> {
         let parsed = parse_path_id(path_id);
         match parsed.op_type {
             Some("search") => Some(Self::Search),
             Some("insert") => Some(Self::Insert),
             Some("read") => Some(Self::Read),
-            _ => {
-                // Legacy heuristic: "search-..." / "insert-..."
-                if path_id.starts_with("search-") {
-                    Some(Self::Search)
-                } else if path_id.starts_with("insert-") {
-                    Some(Self::Insert)
-                } else {
-                    None
-                }
-            }
+            _ => None,
         }
     }
 }
@@ -103,12 +91,12 @@ impl OperationType {
 )]
 pub enum Transition {
     // ══════════════════════════════════════════════════════════════════════
-    // Common transitions (used by search, insert, read)
+    // Search-specific transitions (only emitted by context-search)
     // ══════════════════════════════════════════════════════════════════════
 
-    /// Initial entry point — the first event for any search or insert operation.
+    /// Initial entry point — the first event for a search operation.
     ///
-    /// **Emitted by:** `context-search` (search start), `context-insert` (via shared path).
+    /// **Emitted by:** `context-search` (search start).
     /// **Frontend:** Node gets `viz-start` (bright cyan, pulsing glow).
     StartNode {
         /// Token index the operation starts at.
@@ -120,7 +108,7 @@ pub enum Transition {
     /// Exploring a parent node during bottom-up traversal.
     ///
     /// Fires when ascending from a child to its parent to find the longest
-    /// matching prefix. Typically follows a `Dequeue` of a parent candidate.
+    /// matching prefix. Typically follows a `CandidateMismatch` of a parent candidate.
     ///
     /// **Emitted by:** `context-search` (parent candidate exploration).
     /// **Frontend:** `to` gets `viz-candidate-parent` (orange, pulsing).
@@ -189,7 +177,7 @@ pub enum Transition {
         actual: usize,
     },
 
-    /// Terminal event — the operation completed.
+    /// Terminal event — the search operation completed.
     ///
     /// **Emitted by:** `context-search` (match found or queue exhausted).
     /// **Frontend:** If `success`, `final_node` gets `viz-completed`.
@@ -200,56 +188,36 @@ pub enum Transition {
         success: bool,
     },
 
-    // ══════════════════════════════════════════════════════════════════════
-    // Search-specific transitions (only emitted by context-search)
-    // ══════════════════════════════════════════════════════════════════════
-
-    /// A candidate was popped from the BFS priority queue.
+    /// A candidate was rejected after processing (mismatch or skip).
     ///
-    /// Fires before `VisitParent` or `RootExplore`. The queue is ordered by
-    /// priority (closest match first).
+    /// Fires when `ProcessResult::Skipped` is returned — the popped
+    /// candidate did not produce a root match.
     ///
     /// **Frontend:** Node gets `viz-selected`. Remaining queue shown via
     ///   `LocationInfo.pending_parents` / `pending_children`.
-    Dequeue {
-        /// Node popped from the queue.
+    CandidateMismatch {
+        /// Node that was rejected.
         node: usize,
-        /// Items left in queue after this pop.
+        /// Items left in queue after this rejection.
         queue_remaining: usize,
-        /// `true` if this is a parent candidate, `false` for child.
+        /// `true` if this was a parent candidate, `false` for child.
         is_parent: bool,
     },
 
-    /// Started exploring a root match via RootCursor.
+    /// A parent candidate became the new root — confirmed match.
     ///
     /// Fires when a parent candidate becomes the new root — the highest
     /// point in the upward path from which we now explore children.
     ///
     /// **Frontend:** `root` gets `viz-root` (gold ring via `::before`).
     ///   Edge colored gold (`SP_ROOT_EDGE_COLOR`).
-    RootExplore {
+    CandidateMatch {
         /// Root node being explored.
         root: usize,
         /// Width of the root node.
         width: usize,
         /// Edge from start_path top → root.
         edge: EdgeRef,
-    },
-
-    /// Match cursor advanced within the current root's span.
-    ///
-    /// Fires when the root's self-token matched and the atom cursor moved
-    /// forward. `QueryInfo.cursor_position` is updated to `new_pos`.
-    ///
-    /// **Frontend:** QueryPathPanel shows progress advancing. `matched_positions`
-    ///   extended.
-    MatchAdvance {
-        /// Current root node.
-        root: usize,
-        /// Previous atom cursor position.
-        prev_pos: usize,
-        /// New atom cursor position.
-        new_pos: usize,
     },
 
     /// Root boundary reached — need to explore further parents.
@@ -286,7 +254,7 @@ pub enum Transition {
     /// **Emitted by:** `context-insert/src/insert/context.rs`.
     /// **Frontend:** `original_node` → `viz-split-source`, `left_fragment` →
     ///   `viz-split-left`, `right_fragment` → `viz-split-right`. Insert edges
-    ///   colored warm orange. `GraphDelta` typically carries `AddNode` for
+    ///   colored warm orange. `GraphMutation` typically carries `AddNode` for
     ///   fragments.
     SplitComplete {
         /// The original node that was split.
@@ -491,7 +459,7 @@ pub enum DeltaOp {
     },
 }
 
-/// Graph delta — describes mutations applied to the graph at a single step.
+/// Graph mutation — describes mutations applied to the graph at a single step.
 ///
 /// Carried as an optional field on `GraphOpEvent` so the frontend can
 /// display before/after graph states during insert operations.
@@ -500,23 +468,23 @@ pub enum DeltaOp {
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
 )]
-pub struct GraphDelta {
+pub struct GraphMutation {
     /// Mutation operations applied at this step, in order.
     pub ops: Vec<DeltaOp>,
 }
 
-impl GraphDelta {
-    /// Create a delta with a single operation.
+impl GraphMutation {
+    /// Create a mutation with a single operation.
     pub fn single(op: DeltaOp) -> Self {
         Self { ops: vec![op] }
     }
 
-    /// Create a delta from multiple operations.
+    /// Create a mutation from multiple operations.
     pub fn new(ops: Vec<DeltaOp>) -> Self {
         Self { ops }
     }
 
-    /// Whether this delta is empty (no mutations).
+    /// Whether this mutation is empty (no operations).
     pub fn is_empty(&self) -> bool {
         self.ops.is_empty()
     }
@@ -528,8 +496,9 @@ impl GraphDelta {
 
 /// Unified event for graph operation visualization.
 ///
-/// Emitted as a `tracing::info!` event with `message == "graph_op"`.
-/// The log-viewer frontend parses the `graph_op` field as JSON.
+/// Emitted as a `tracing::info!` event with the description as the message.
+/// The log-viewer frontend detects events by the presence of the `graph_op`
+/// field and parses it as JSON.
 ///
 /// # Example
 ///
@@ -574,25 +543,27 @@ pub struct GraphOpEvent {
     /// reconstructing from history.
     pub path_graph: VizPathGraph,
 
-    /// Optional graph delta — describes mutations to the graph at this step.
+    /// Optional graph mutation — describes mutations to the graph at this step.
     /// Populated for insert operations that modify the graph structure
     /// (split, join, create pattern, etc.).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub graph_delta: Option<GraphDelta>,
+    pub graph_mutation: Option<GraphMutation>,
 }
 
 impl GraphOpEvent {
     /// Emit this event as a structured tracing log entry.
     ///
-    /// The log-viewer frontend looks for entries with
-    /// `message == "graph_op"` and parses the `graph_op` field.
+    /// The log-viewer frontend detects events by the presence of the
+    /// `graph_op` field and parses it as JSON. The message is the
+    /// human-readable description.
     pub fn emit(&self) {
         let json = serde_json::to_string(self).unwrap_or_default();
         tracing::info!(
             graph_op = %json,
             step = self.step,
             op_type = ?self.op_type,
-            "graph_op"
+            "{}",
+            self.description,
         );
     }
 }
@@ -619,7 +590,7 @@ impl GraphOpEvent {
             description: description.into(),
             path_id: path_id.into(),
             path_graph,
-            graph_delta: None,
+            graph_mutation: None,
         }
     }
 
@@ -640,7 +611,7 @@ impl GraphOpEvent {
             description: description.into(),
             path_id: path_id.into(),
             path_graph,
-            graph_delta: None,
+            graph_mutation: None,
         }
     }
 
@@ -671,12 +642,12 @@ impl GraphOpEvent {
         self
     }
 
-    /// Set graph delta information.
-    pub fn with_graph_delta(
+    /// Set graph mutation information.
+    pub fn with_graph_mutation(
         mut self,
-        delta: GraphDelta,
+        mutation: GraphMutation,
     ) -> Self {
-        self.graph_delta = Some(delta);
+        self.graph_mutation = Some(mutation);
         self
     }
 }

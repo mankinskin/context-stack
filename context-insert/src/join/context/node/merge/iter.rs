@@ -14,7 +14,7 @@ use context_trace::{
     Token,
     VertexSet,
     graph::{
-        visualization::{DeltaOp, GraphDelta, Transition},
+        visualization::{DeltaOp, GraphMutation, Transition},
     },
 };
 use tracing::debug;
@@ -612,7 +612,7 @@ impl<'a> MergeCtx<'a> {
                 root.index.0, children
             ),
             root.index.0,
-            GraphDelta::new(delta_ops),
+            GraphMutation::new(delta_ops),
         );
 
         debug!(?root, ?pattern, "Adding root pattern");

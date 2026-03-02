@@ -76,7 +76,7 @@ impl<R: InsertResult> InsertCtx<R> {
             reset_step_counter,
         };
         use context_trace::graph::{
-            visualization::{DeltaOp, GraphDelta, Transition},
+            visualization::{DeltaOp, GraphMutation, Transition},
         };
 
         // Reset step counter for new insert operation
@@ -117,7 +117,7 @@ impl<R: InsertResult> InsertCtx<R> {
                 },
                 format!("Split phase complete for root {root_idx}"),
                 root_idx,
-                GraphDelta::new(ops),
+                GraphMutation::new(ops),
             );
         }
 
@@ -147,7 +147,7 @@ impl<R: InsertResult> InsertCtx<R> {
             },
             format!("Join complete — created token {}", joined.index.0),
             joined.index.0,
-            GraphDelta::single(DeltaOp::AddNode {
+            GraphMutation::single(DeltaOp::AddNode {
                 index: joined.index.0,
                 width: 0, // width resolved later
             }),

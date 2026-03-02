@@ -200,7 +200,7 @@ impl VizPathGraph {
     /// Apply a [`Transition`] to update this path graph in place.
     ///
     /// Only transitions that modify the search path have an effect;
-    /// informational transitions (e.g., `ParentExplore`, `Dequeue`) are
+    /// informational transitions (e.g., `ParentExplore`, `CandidateMismatch`) are
     /// silently ignored.
     pub fn apply_transition(
         &mut self,
@@ -228,12 +228,12 @@ impl VizPathGraph {
                 self.start_path.push(parent);
                 self.start_edges.push(*edge);
             },
-            Transition::RootExplore { root, width, edge } => {
+            Transition::CandidateMatch { root, width, edge } => {
                 if self.start_node.is_none() {
-                    return Err("RootExplore before StartNode".into());
+                    return Err("CandidateMatch before StartNode".into());
                 }
                 if self.root.is_some() {
-                    return Err("RootExplore called when root already set".into());
+                    return Err("CandidateMatch called when root already set".into());
                 }
                 let root_node = PathNode { index: *root, width: *width };
                 if self.start_path.last().map(|n| n.index) == Some(*root) {
@@ -247,7 +247,7 @@ impl VizPathGraph {
             },
             Transition::VisitChild { to, width, edge, replace, .. } => {
                 if self.root.is_none() {
-                    return Err("VisitChild before RootExplore".into());
+                    return Err("VisitChild before CandidateMatch".into());
                 }
                 let child = PathNode { index: *to, width: *width };
                 if *replace {
@@ -267,12 +267,17 @@ impl VizPathGraph {
             Transition::ChildMismatch { cursor_pos, .. } => {
                 self.cursor_pos = *cursor_pos;
             },
-            Transition::MatchAdvance { new_pos, .. } => {
-                self.cursor_pos = *new_pos;
-            },
             Transition::Done { success, .. } => {
                 self.done = true;
                 self.success = *success;
+            },
+            Transition::CandidateMismatch { node, .. } => {
+                // Pop the rejected parent that was pushed by the prior VisitParent.
+                // This keeps start_path accurate — only confirmed ancestors remain.
+                if self.start_path.last().map(|n| n.index) == Some(*node) {
+                    self.start_path.pop();
+                    self.start_edges.pop();
+                }
             },
             // Informational transitions — no path state change.
             _ => {},

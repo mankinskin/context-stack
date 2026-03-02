@@ -6,7 +6,7 @@
 use context_trace::graph::{
     search_path::VizPathGraph,
     visualization::{
-        GraphDelta,
+        GraphMutation,
         GraphOpEvent,
         LocationInfo,
         OperationType,
@@ -63,13 +63,13 @@ pub(crate) fn emit_insert_event(
     emit_insert_event_inner(transition, description, location, query, None)
 }
 
-/// Emit a graph operation event for insert operations with a graph delta.
+/// Emit a graph operation event for insert operations with a graph mutation.
 pub(crate) fn emit_insert_event_with_delta(
     transition: Transition,
     description: impl Into<String>,
     location: LocationInfo,
     query: QueryInfo,
-    delta: GraphDelta,
+    delta: GraphMutation,
 ) {
     emit_insert_event_inner(transition, description, location, query, Some(delta))
 }
@@ -80,7 +80,7 @@ fn emit_insert_event_inner(
     description: impl Into<String>,
     location: LocationInfo,
     query: QueryInfo,
-    delta: Option<GraphDelta>,
+    delta: Option<GraphMutation>,
 ) {
     let step = next_step();
     let path_id = INSERT_PATH_ID.with(|c| c.borrow().clone());
@@ -98,7 +98,7 @@ fn emit_insert_event_inner(
         description: description.into(),
         path_id,
         path_graph,
-        graph_delta: delta,
+        graph_mutation: delta,
     };
     event.emit();
 }
@@ -117,12 +117,12 @@ pub(crate) fn emit_insert_node(
     );
 }
 
-/// Emit an insert event with node location and a graph delta.
+/// Emit an insert event with node location and a graph mutation.
 pub(crate) fn emit_insert_node_with_delta(
     transition: Transition,
     description: impl Into<String>,
     node: usize,
-    delta: GraphDelta,
+    delta: GraphMutation,
 ) {
     emit_insert_event_with_delta(
         transition,
