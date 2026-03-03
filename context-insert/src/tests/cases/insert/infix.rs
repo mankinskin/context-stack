@@ -38,6 +38,7 @@ fn insert_infix1() {
     } = EnvInsertInfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     let aby: Token = graph.insert(vec![a, b, y]).expect("Indexing failed");
 

@@ -27,6 +27,7 @@ fn insert_postfix1() {
     } = EnvInsertPostfix1::initialize();
 
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Expected InitInterval from search for [b, c, d, d]
     let expected_init = InitInterval {

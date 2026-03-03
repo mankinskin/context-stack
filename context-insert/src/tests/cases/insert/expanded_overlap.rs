@@ -55,6 +55,7 @@ fn insert_postfix_bc_of_abc() {
         ..
     } = EnvExpandedOverlap::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
+    graph.emit_graph_snapshot();
 
     // Query for [b, c] - this is postfix of abc
     let query = vec![b, c];
