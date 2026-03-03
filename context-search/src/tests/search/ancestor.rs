@@ -383,14 +383,14 @@ fn find_ancestor1_long_pattern() {
         down(ababab, a, false),                                                            // 25
         matched(a, 5),                                                                     // 26
         root_match(ababab),                                                                // 27
-        down_at(ababab, b, false, 1),                                                      // 28
+        down_at(ababab, b, true, 1),                                                       // 28
         matched(b, 6),                                                                     // 29
         explore(ababab, &[ababababcd, ababababcdefghi]),                                    // 30
         up(ababab, ababababcd),                                                            // 31
         down(ababababcd, abc, false),                                                      // 32
         down(ababababcd, a, false),                                                        // 33
         explore(ababababcd, &[ababababcdefghi]),                                            // 34
-        down(ababababcd, a, true),                                                         // 35
+        down(ababababcd, a, false),                                                        // 35
         matched(a, 7),                                                                     // 36
         root_match(ababababcd),                                                            // 37
         down_at(ababababcd, b, true, 1),                                                   // 38
@@ -407,7 +407,7 @@ fn find_ancestor1_long_pattern() {
         down(ababababcdefghi, ef, false),                                                  // 49
         down(ababababcdefghi, e, false),                                                   // 50
         down(ababababcdefghi, e, false),                                                   // 51
-        down(ababababcdefghi, e, true),                                                    // 52
+        down(ababababcdefghi, e, false),                                                   // 52
         matched(e, 11),                                                                    // 53
         root_match(ababababcdefghi),                                                       // 54
         down_at(ababababcdefghi, f, true, 1),                                              // 55

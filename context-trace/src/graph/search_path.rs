@@ -171,8 +171,13 @@ pub struct VizPathGraph {
     /// The root node (set when first child match occurs).
     pub root: Option<PathNode>,
 
-    /// Edge connecting the top of start_path to the root (from=start_path_top, to=root).
-    pub root_edge: Option<EdgeRef>,
+    /// Edge connecting the top of start_path to the root (bottom-up: from=child, to=root).
+    /// This is the "root entry" edge — the last upward step before root.
+    pub root_entry_edge: Option<EdgeRef>,
+
+    /// Edge connecting the root to the first end_path child (top-down: from=root, to=child).
+    /// This is the "root exit" edge — the first downward step from root.
+    pub root_exit_edge: Option<EdgeRef>,
 
     /// Nodes in the end_path (top-down, from root toward leaf).
     /// Does NOT include the root itself.
@@ -224,19 +229,20 @@ impl VizPathGraph {
                     return Err("VisitParent before StartNode".into());
                 }
                 if let Some(old_root) = self.root.take() {
-                    let old_edge = self.root_edge.take().unwrap();
+                    let old_edge = self.root_entry_edge.take().unwrap();
                     self.start_path.push(old_root);
                     self.start_edges.push(old_edge);
                     // Clear end_path — previous root's children are no longer relevant
                     self.end_path.clear();
                     self.end_edges.clear();
+                    self.root_exit_edge = None;
                 }
                 // Set this parent candidate as the root so that subsequent
                 // VisitChild events can populate end_path immediately
                 // (child arrows appear during comparison, not after match).
                 let parent = PathNode { index: *to, width: *width };
                 self.root = Some(parent);
-                self.root_edge = Some(*edge);
+                self.root_entry_edge = Some(*edge);
             },
             Transition::CandidateMatch { root, width, edge } => {
                 // CandidateMatch signals that the candidate root matched.
@@ -253,19 +259,19 @@ impl VizPathGraph {
                     {
                         self.start_path.pop();
                         self.root = Some(root_node);
-                        self.root_edge =
+                        self.root_entry_edge =
                             self.start_edges.pop().or(Some(*edge));
                     } else {
                         self.root = Some(root_node);
-                        self.root_edge = Some(*edge);
+                        self.root_entry_edge = Some(*edge);
                     }
                 }
                 // else: root already set by VisitParent — no state change.
             },
             Transition::VisitChild { to, width, edge, replace, .. } => {
-                if self.root.is_none() {
-                    return Err("VisitChild before root is set".into());
-                }
+                // Note: root may be None during comparison events for
+                // non-parent candidates after Expanded demotion. This is
+                // expected — CandidateMatch will set root afterward.
                 let child = PathNode { index: *to, width: *width };
                 if *replace {
                     if self.end_path.is_empty() {
@@ -273,9 +279,17 @@ impl VizPathGraph {
                     }
                     *self.end_path.last_mut().unwrap() = child;
                     *self.end_edges.last_mut().unwrap() = *edge;
+                    // Update root_exit_edge if replacing the first child
+                    if self.end_path.len() == 1 {
+                        self.root_exit_edge = Some(*edge);
+                    }
                 } else {
                     self.end_path.push(child);
                     self.end_edges.push(*edge);
+                    // Set root_exit_edge on the first child pushed
+                    if self.end_path.len() == 1 {
+                        self.root_exit_edge = Some(*edge);
+                    }
                 }
             },
             Transition::ChildMatch { cursor_pos, .. } => {
@@ -294,7 +308,8 @@ impl VizPathGraph {
                 // end_path entries built during child comparison.
                 if self.root.map(|n| n.index) == Some(*node) {
                     self.root = None;
-                    self.root_edge = None;
+                    self.root_entry_edge = None;
+                    self.root_exit_edge = None;
                     self.end_path.clear();
                     self.end_edges.clear();
                 } else if self.start_path.last().map(|n| n.index)
@@ -332,9 +347,13 @@ impl VizPathGraph {
                 if let Some(old_root) = self.root.take() {
                     // Root already set — extend start path upward past the old root.
                     // Demote old root + its edge into start_path, then push the new parent.
-                    let old_edge = self.root_edge.take().unwrap();
+                    let old_edge = self.root_entry_edge.take().unwrap();
                     self.start_path.push(old_root);
                     self.start_edges.push(old_edge);
+                    // Clear end_path — previous root's children are no longer relevant
+                    self.end_path.clear();
+                    self.end_edges.clear();
+                    self.root_exit_edge = None;
                 }
                 self.start_path.push(*parent);
                 self.start_edges.push(*edge);
@@ -348,15 +367,15 @@ impl VizPathGraph {
                 }
                 // If root matches the last start_path entry, pop it
                 // (the node is "graduating" from candidate to confirmed root).
-                // Use the popped edge as root_edge since it correctly connects
+                // Use the popped edge as root_entry_edge since it correctly connects
                 // the prior start_path node to this root.
                 if self.start_path.last().map(|n| n.index) == Some(root.index) {
                     self.start_path.pop();
                     self.root = Some(*root);
-                    self.root_edge = self.start_edges.pop().or(Some(*edge));
+                    self.root_entry_edge = self.start_edges.pop().or(Some(*edge));
                 } else {
                     self.root = Some(*root);
-                    self.root_edge = Some(*edge);
+                    self.root_entry_edge = Some(*edge);
                 }
             },
             PathTransition::PushChild { child, edge } => {
@@ -365,6 +384,10 @@ impl VizPathGraph {
                 }
                 self.end_path.push(*child);
                 self.end_edges.push(*edge);
+                // Set root_exit_edge on the first child pushed
+                if self.end_path.len() == 1 {
+                    self.root_exit_edge = Some(*edge);
+                }
             },
             PathTransition::PopChild => {
                 if self.end_path.is_empty() {
@@ -372,6 +395,10 @@ impl VizPathGraph {
                 }
                 self.end_path.pop();
                 self.end_edges.pop();
+                // Clear root_exit_edge if end_path is now empty
+                if self.end_path.is_empty() {
+                    self.root_exit_edge = None;
+                }
             },
             PathTransition::ReplaceChild { child, edge } => {
                 if self.end_path.is_empty() {
@@ -379,6 +406,10 @@ impl VizPathGraph {
                 }
                 *self.end_path.last_mut().unwrap() = *child;
                 *self.end_edges.last_mut().unwrap() = *edge;
+                // Update root_exit_edge if replacing the first child
+                if self.end_path.len() == 1 {
+                    self.root_exit_edge = Some(*edge);
+                }
             },
             PathTransition::ChildMatch { cursor_pos } => {
                 self.cursor_pos = *cursor_pos;
@@ -429,7 +460,10 @@ impl VizPathGraph {
     pub fn all_edges(&self) -> Vec<EdgeRef> {
         let mut edges = Vec::new();
         edges.extend_from_slice(&self.start_edges);
-        if let Some(re) = &self.root_edge {
+        if let Some(re) = &self.root_entry_edge {
+            edges.push(*re);
+        }
+        if let Some(re) = &self.root_exit_edge {
             edges.push(*re);
         }
         edges.extend_from_slice(&self.end_edges);
@@ -498,7 +532,7 @@ mod tests {
         }).unwrap();
 
         assert_eq!(g.root, Some(node(20, 4)));
-        assert_eq!(g.root_edge, Some(edge(10, 20, 0, 0)));
+        assert_eq!(g.root_entry_edge, Some(edge(10, 20, 0, 0)));
     }
 
     #[test]
@@ -607,7 +641,7 @@ mod tests {
     #[test]
     fn test_push_parent_after_root_extends_start_path() {
         // PushParent after SetRoot demotes the old root into start_path
-        // and clears root/root_edge so a new SetRoot can follow.
+        // and clears root/root_entry_edge so a new SetRoot can follow.
         let mut g = VizPathGraph::new();
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
         g.apply(&PathTransition::SetRoot {
@@ -629,7 +663,7 @@ mod tests {
         assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
         assert_eq!(g.start_edges[1], edge(10, 20, 0, 0));
         assert!(g.root.is_none());
-        assert!(g.root_edge.is_none());
+        assert!(g.root_entry_edge.is_none());
 
         // A second SetRoot with a DIFFERENT node (extends path further)
         g.apply(&PathTransition::SetRoot {
@@ -643,7 +677,7 @@ mod tests {
     fn test_push_parent_then_set_root_same_node() {
         // Tests the real-world pattern: PushParent(X) then SetRoot(X).
         // SetRoot should pop X from start_path (graduate to root)
-        // and use the popped edge as root_edge.
+        // and use the popped edge as root_entry_edge.
         let mut g = VizPathGraph::new();
         g.apply(&PathTransition::SetStartNode { node: node(1, 1) }).unwrap();
 
@@ -670,14 +704,14 @@ mod tests {
             edge: edge(1, 20, 0, 0), // emission has wrong 'from', but apply fixes it
         }).unwrap();
 
-        // Node 20 popped from start_path, now root. root_edge is the
+        // Node 20 popped from start_path, now root. root_entry_edge is the
         // popped edge (10→20), NOT the provided edge (1→20).
         assert_eq!(g.start_path.len(), 1);
         assert_eq!(g.start_path[0], node(10, 3));
         assert_eq!(g.start_edges.len(), 1);
         assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
         assert_eq!(g.root, Some(node(20, 4)));
-        assert_eq!(g.root_edge, Some(edge(10, 20, 0, 0))); // correct popped edge
+        assert_eq!(g.root_entry_edge, Some(edge(10, 20, 0, 0))); // correct popped edge
 
         // Chain: PushParent(30) then SetRoot(30) again
         g.apply(&PathTransition::PushParent {
@@ -691,12 +725,12 @@ mod tests {
             root: node(30, 6),
             edge: edge(1, 30, 0, 0), // wrong from, but apply fixes it
         }).unwrap();
-        // 30 popped, root_edge is the popped edge (20→30)
+        // 30 popped, root_entry_edge is the popped edge (20→30)
         assert_eq!(g.start_path.len(), 2);
         assert_eq!(g.start_path[0], node(10, 3));
         assert_eq!(g.start_path[1], node(20, 4));
         assert_eq!(g.root, Some(node(30, 6)));
-        assert_eq!(g.root_edge, Some(edge(20, 30, 0, 0)));
+        assert_eq!(g.root_entry_edge, Some(edge(20, 30, 0, 0)));
     }
 
     #[test]
@@ -772,7 +806,7 @@ mod tests {
         assert!(g.done);
         assert!(g.success);
         assert_eq!(g.all_node_indices(), vec![1, 10, 20, 5]);
-        assert_eq!(g.all_edges().len(), 3); // start_edge + root_edge + end_edge
+        assert_eq!(g.all_edges().len(), 4); // start_edge + root_entry_edge + root_exit_edge + end_edge
     }
 
     #[test]
@@ -1169,7 +1203,7 @@ mod tests {
                     },
                     // SetRoot for the SAME node 20 — graduates from start_path to root.
                     // The emission uses from:1 (start_node) which is wrong, but apply()
-                    // pops node 20 and uses the popped edge (10→20) as root_edge.
+                    // pops node 20 and uses the popped edge (10→20) as root_entry_edge.
                     PathTransition::SetRoot {
                         root: node(20, 6),
                         edge: edge(1, 20, 0, 0),

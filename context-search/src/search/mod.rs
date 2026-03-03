@@ -797,6 +797,12 @@ where
 
             match self.matches.process_node(popped) {
                 ProcessResult::Expanded(info) => {
+                    // Clear transient end_path from any previous comparison
+                    // before starting a new comparison for this candidate.
+                    self.viz_path.end_path.clear();
+                    self.viz_path.end_edges.clear();
+                    self.viz_path.root_exit_edge = None;
+
                     // Emit child comparison events from the BFS comparison.
                     // Root was already set by VisitParent, so VisitChild
                     // events can populate end_path for arrow visualization.
@@ -815,20 +821,22 @@ where
                     }
                     // Expanded nodes are explored, not confirmed matches.
                     // Demote the transient root back to start_path so the
-                    // next VisitParent uses the correct push_from, and clear
-                    // end_path since the child arrows are transient.
+                    // next VisitParent uses the correct push_from.
                     if let Some(exp_root) = self.viz_path.root.take() {
-                        let exp_edge = self.viz_path.root_edge.take();
+                        let exp_edge = self.viz_path.root_entry_edge.take();
                         self.viz_path.start_path.push(exp_root);
                         if let Some(edge) = exp_edge {
                             self.viz_path.start_edges.push(edge);
                         }
                     }
-                    self.viz_path.end_path.clear();
-                    self.viz_path.end_edges.clear();
                     continue;
                 },
                 ProcessResult::FoundMatch(state, info) => {
+                    // Clear transient end_path from any previous comparison.
+                    self.viz_path.end_path.clear();
+                    self.viz_path.end_edges.clear();
+                    self.viz_path.root_exit_edge = None;
+
                     // Emit child comparison events first so the visualization
                     // shows the comparison before confirming the match.
                     self.emit_compare_events(info, node_index);
@@ -856,6 +864,11 @@ where
                     break state;
                 },
                 ProcessResult::Skipped(info) => {
+                    // Clear transient end_path from any previous comparison.
+                    self.viz_path.end_path.clear();
+                    self.viz_path.end_edges.clear();
+                    self.viz_path.root_exit_edge = None;
+
                     // Emit child comparison events. Root was set by
                     // VisitParent, so VisitChild arrows appear during
                     // comparison. No CandidateMatch — node is rejected.
