@@ -76,7 +76,7 @@ impl<R: InsertResult> InsertCtx<R> {
             reset_step_counter,
         };
         use context_trace::graph::{
-            visualization::{DeltaOp, GraphMutation, Transition},
+            visualization::{DeltaOp, GraphMutation, PathNode, Transition},
         };
 
         // Reset step counter for new insert operation
@@ -88,11 +88,12 @@ impl<R: InsertResult> InsertCtx<R> {
         }
 
         let root_idx = init.root.index.0;
+        let root_width = init.root.width.0;
 
         // Emit: Split phase starting
         emit_insert_node(
             Transition::SplitStart {
-                node: root_idx,
+                node: PathNode { index: root_idx, width: root_width },
                 split_position: *init.end_bound.as_ref(),
             },
             format!("Starting split phase on root {root_idx}"),

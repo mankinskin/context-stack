@@ -20,6 +20,7 @@ use crate::{
     },
 };
 use context_trace::{
+    graph::search_path::PathNode,
     path::accessors::has_path::HasRootedPath,
     *,
 };
@@ -40,12 +41,14 @@ pub(crate) struct SearchQueue {
 /// Carried on [`NodeResult`] variants so callers can emit visualization events.
 #[derive(Debug, Clone)]
 pub(crate) struct CompareInfo {
-    /// The compared node index.
-    pub node: usize,
-    /// The compared node's width.
-    pub node_width: usize,
+    /// The compared path token (index + width).
+    pub token: PathNode,
+    /// The query token being compared against.
+    pub query_token: PathNode,
     /// Query cursor position at comparison time.
     pub cursor_pos: usize,
+    /// The child entry index within the parent pattern (for EdgeRef.sub_index).
+    pub sub_index: usize,
     /// The outcome of the comparison.
     pub outcome: CompareOutcome,
 }
@@ -55,15 +58,22 @@ pub(crate) enum CompareOutcome {
     /// Leaf token matched.
     Match,
     /// Leaf token mismatched.
-    Mismatch { expected: usize, actual: usize },
+    Mismatch {
+        /// Expected query token.
+        expected: PathNode,
+        /// Actual path token.
+        actual: PathNode,
+    },
     /// Node decomposed into prefix children.
     Prefixes(Vec<PrefixChildInfo>),
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct PrefixChildInfo {
-    pub child: usize,
-    pub child_width: usize,
+    /// The prefix child token (index + width).
+    pub token: PathNode,
+    /// The child entry index within the parent pattern (for EdgeRef.sub_index).
+    pub sub_index: usize,
 }
 
 #[derive(Debug)]
@@ -113,6 +123,24 @@ impl GraphRoot for SearchNode {
         }
     }
 }
+
+impl SearchNode {
+    /// Returns true if this is a parent candidate (root exploration).
+    pub(crate) fn is_parent(&self) -> bool {
+        matches!(self, SearchNode::ParentCandidate(_))
+    }
+
+    /// Returns the root token for this search node.
+    /// Alias for `root_parent()` with a clearer name.
+    pub(crate) fn root_token(&self) -> Token {
+        self.root_parent()
+    }
+
+    /// Returns the root vertex index (convenience for visualization).
+    pub(crate) fn root_index(&self) -> usize {
+        self.root_parent().index.0
+    }
+}
 impl Ord for SearchNode {
     fn cmp(
         &self,
@@ -145,23 +173,31 @@ where
         let query_leaf =
             (*state.query.current()).role_rooted_leaf_token::<End, _>(trav);
         let cursor_pos = *state.query.current().atom_position.as_ref();
-        let node = path_leaf.index.0;
-        let node_width = path_leaf.width.0;
+        let path_node = PathNode::from(path_leaf);
+        let query_node = PathNode::from(query_leaf);
+        // Extract the child entry index within the parent pattern (for EdgeRef.sub_index).
+        let sub_index = state.rooted_path().role_root_child_index::<End>();
 
         match state.compare_leaf_tokens(trav) {
             Finished(CompareEndResult::FoundMatch(matched_state)) => {
                 let info = CompareInfo {
-                    node, node_width, cursor_pos,
+                    token: path_node,
+                    query_token: query_node,
+                    cursor_pos,
+                    sub_index,
                     outcome: CompareOutcome::Match,
                 };
                 Some(NodeResult::FoundMatch(matched_state, info))
             },
             Finished(CompareEndResult::Mismatch(_)) => {
                 let info = CompareInfo {
-                    node, node_width, cursor_pos,
+                    token: path_node,
+                    query_token: query_node,
+                    cursor_pos,
+                    sub_index,
                     outcome: CompareOutcome::Mismatch {
-                        expected: query_leaf.index.0,
-                        actual: path_leaf.index.0,
+                        expected: query_node,
+                        actual: path_node,
                     },
                 };
                 Some(Skip(info))
@@ -177,14 +213,20 @@ where
                         let child_leaf = prefix_state
                             .rooted_path()
                             .role_rooted_leaf_token::<End, _>(trav);
+                        let child_sub_index = prefix_state
+                            .rooted_path()
+                            .role_root_child_index::<End>();
                         PrefixChildInfo {
-                            child: child_leaf.index.0,
-                            child_width: child_leaf.width.0,
+                            token: PathNode::from(child_leaf),
+                            sub_index: child_sub_index,
                         }
                     })
                     .collect();
                 let info = CompareInfo {
-                    node, node_width, cursor_pos,
+                    token: path_node,
+                    query_token: query_node,
+                    cursor_pos,
+                    sub_index,
                     outcome: CompareOutcome::Prefixes(prefix_children),
                 };
                 Some(QueueMore(
@@ -198,24 +240,30 @@ where
         match self.0 {
             ParentCandidate(parent) => match parent.advance_state(&self.1) {
                 Ok(state) => Self::compare_next(self.1, state.candidate),
-                Err(parent) => Some(QueueMore(
-                    K::Policy::next_batch(self.1, &parent)
-                        .into_iter()
-                        .flat_map(|batch| batch.parents)
-                        .map(|parent_state| ParentCompareState {
-                            parent_state,
-                            cursor: parent.cursor.clone(),
-                        })
-                        .map(ParentCandidate)
-                        .collect(),
-                    // Parent expansion has no leaf comparison — use a dummy CompareInfo.
-                    CompareInfo {
-                        node: parent.parent_state.path.root_parent().index.0,
-                        node_width: parent.parent_state.path.root_parent().width.0,
-                        cursor_pos: *parent.cursor.candidate().atom_position.as_ref(),
-                        outcome: CompareOutcome::Prefixes(vec![]),
-                    },
-                )),
+                Err(parent) => {
+                    let parent_token = parent.parent_state.path.root_parent();
+                    let query_cursor = parent.cursor.candidate();
+                    let query_token = query_cursor.path.role_rooted_leaf_token::<End, _>(&self.1);
+                    Some(QueueMore(
+                        K::Policy::next_batch(self.1, &parent)
+                            .into_iter()
+                            .flat_map(|batch| batch.parents)
+                            .map(|parent_state| ParentCompareState {
+                                parent_state,
+                                cursor: parent.cursor.clone(),
+                            })
+                            .map(ParentCandidate)
+                            .collect(),
+                        // Parent expansion has no leaf comparison — use a dummy CompareInfo.
+                        CompareInfo {
+                            token: PathNode::from(parent_token),
+                            query_token: PathNode::from(query_token),
+                            cursor_pos: *query_cursor.atom_position.as_ref(),
+                            sub_index: 0, // Placeholder for parent expansion
+                            outcome: CompareOutcome::Prefixes(vec![]),
+                        },
+                    ))
+                },
             },
             ChildCandidate(state) => Self::compare_next(self.1, state),
         }

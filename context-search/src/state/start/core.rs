@@ -98,6 +98,10 @@ impl<K: SearchKind> StartCtx<K> {
                     "first parent batch obtained"
                 );
 
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0);
                 Ok(SearchState {
                     query: self.cursor.path,
                     matches: SearchIterator::new(
@@ -110,15 +114,18 @@ impl<K: SearchKind> StartCtx<K> {
                     path_id: format!(
                         "search/context-search/token-{}-{}",
                         self.start_token.index.0,
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_nanos())
-                            .unwrap_or(0),
+                        timestamp,
                     ),
                     viz_path: Default::default(),
                     viz_cursor_pos: 0,
                     viz_matched_positions: Vec::new(),
                     collected_events: Vec::new(),
+                    query_path_id: format!(
+                        "query/context-search/token-{}-{}",
+                        self.start_token.index.0,
+                        timestamp,
+                    ),
+                    query_viz_path: Default::default(),
                 })
             },
             Err(err) => {

@@ -8,6 +8,9 @@ use ts_rs::TS;
 
 use super::search_path::{EdgeRef, VizPathGraph};
 
+// Re-export PathNode for downstream crates
+pub use super::search_path::PathNode;
+
 // ---------------------------------------------------------------------------
 // Operation Types
 // ---------------------------------------------------------------------------
@@ -23,6 +26,7 @@ pub enum OperationType {
     Search,
     Insert,
     Read,
+    Query,
 }
 
 /// Parsed components of a namespaced `path_id`.
@@ -99,10 +103,8 @@ pub enum Transition {
     /// **Emitted by:** `context-search` (search start).
     /// **Frontend:** Node gets `viz-start` (bright cyan, pulsing glow).
     StartNode {
-        /// Token index the operation starts at.
-        node: usize,
-        /// Atom count of the start token (for path width calculation).
-        width: usize,
+        /// Token the operation starts at (index + width).
+        node: PathNode,
     },
 
     /// Exploring a parent node during bottom-up traversal.
@@ -114,14 +116,12 @@ pub enum Transition {
     /// **Frontend:** `to` gets `viz-candidate-parent` (orange, pulsing).
     ///   Edge colored as candidate (muted violet, 30% alpha).
     VisitParent {
-        /// Node we are ascending from.
-        from: usize,
-        /// Parent node being explored.
-        to: usize,
+        /// Node we are ascending from (index + width).
+        from: PathNode,
+        /// Parent node being explored (index + width).
+        to: PathNode,
         /// Position within parent where `from` appears.
         entry_pos: usize,
-        /// Width (atom count) of the parent node.
-        width: usize,
         /// Edge connecting `from → to` in the snapshot.
         edge: EdgeRef,
     },
@@ -135,14 +135,12 @@ pub enum Transition {
     /// **Frontend:** `to` gets `viz-candidate-child` (purple, pulsing).
     ///   Edge colored as candidate (muted violet, 30% alpha).
     VisitChild {
-        /// Parent node we are descending from.
-        from: usize,
-        /// Child node being explored.
-        to: usize,
+        /// Parent node we are descending from (index + width).
+        from: PathNode,
+        /// Child node being explored (index + width).
+        to: PathNode,
         /// Index within parent's pattern.
         child_index: usize,
-        /// Width (atom count) of the child node.
-        width: usize,
         /// Edge connecting `from → to` in the snapshot.
         edge: EdgeRef,
         /// `true` if this replaces the current `end_path` tail (vs. push).
@@ -155,8 +153,8 @@ pub enum Transition {
     /// **Frontend:** Node gets `viz-matched` (green). `QueryInfo.active_token`
     ///   set to this node; `matched_positions` updated.
     ChildMatch {
-        /// The child node that matched.
-        node: usize,
+        /// The child node that matched (index + width).
+        node: PathNode,
         /// Atom position in the query where match occurred.
         cursor_pos: usize,
     },
@@ -167,14 +165,14 @@ pub enum Transition {
     /// **Frontend:** Node gets `viz-mismatched` (red). `QueryInfo.active_token`
     ///   set to this node.
     ChildMismatch {
-        /// The child node that mismatched.
-        node: usize,
+        /// The child node that mismatched (index + width).
+        node: PathNode,
         /// Atom position where mismatch was detected.
         cursor_pos: usize,
-        /// Token index that was expected.
-        expected: usize,
-        /// Token index that was found in the graph.
-        actual: usize,
+        /// Token that was expected (index + width).
+        expected: PathNode,
+        /// Token that was found in the graph (index + width).
+        actual: PathNode,
     },
 
     /// Terminal event — the search operation completed.
@@ -196,8 +194,8 @@ pub enum Transition {
     /// **Frontend:** Node gets `viz-selected`. Remaining queue shown via
     ///   `LocationInfo.pending_parents` / `pending_children`.
     CandidateMismatch {
-        /// Node that was rejected.
-        node: usize,
+        /// Node that was rejected (index + width).
+        node: PathNode,
         /// Items left in queue after this rejection.
         queue_remaining: usize,
         /// `true` if this was a parent candidate, `false` for child.
@@ -212,10 +210,8 @@ pub enum Transition {
     /// **Frontend:** `root` gets `viz-root` (gold ring via `::before`).
     ///   Edge colored gold (`SP_ROOT_EDGE_COLOR`).
     CandidateMatch {
-        /// Root node being explored.
-        root: usize,
-        /// Width of the root node.
-        width: usize,
+        /// Root node being explored (index + width).
+        root: PathNode,
         /// Edge from start_path top → root.
         edge: EdgeRef,
     },
@@ -243,8 +239,8 @@ pub enum Transition {
     /// **Emitted by:** `context-insert/src/insert/context.rs`.
     /// **Frontend:** Node gets `viz-split-source` (warm orange, pulsing).
     SplitStart {
-        /// Token being split.
-        node: usize,
+        /// Token being split (index + width).
+        node: PathNode,
         /// Atom position where the split occurs.
         split_position: usize,
     },
@@ -320,10 +316,8 @@ pub enum Transition {
     /// **Emitted by:** `context-insert`.
     /// **Frontend:** Node gets `viz-new-root` (bright white-gold, pulsing).
     CreateRoot {
-        /// Newly created root token.
-        node: usize,
-        /// Width (atom count) of the new root.
-        width: usize,
+        /// Newly created root token (index + width).
+        node: PathNode,
     },
 
     /// An existing pattern's children were modified.

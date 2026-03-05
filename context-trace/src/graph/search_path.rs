@@ -7,6 +7,7 @@
 //! Both Rust and TypeScript can reconstruct the full path graph from a
 //! sequence of [`PathTransition`] steps read from a log file.
 
+use crate::Token;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -53,6 +54,15 @@ pub struct PathNode {
     pub index: usize,
     /// Token width (atom count).
     pub width: usize,
+}
+
+impl From<Token> for PathNode {
+    fn from(token: Token) -> Self {
+        PathNode {
+            index: token.index.0,
+            width: token.width.0,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +204,15 @@ pub struct VizPathGraph {
 
     /// Whether this path resulted in a match (only meaningful when `done`).
     pub success: bool,
+
+    /// Whether the current root is tentative (set by VisitParent, awaiting confirmation).
+    ///
+    /// - `true`: Root was set by `VisitParent` but not yet confirmed by `CandidateMatch`.
+    /// - `false`: Root is confirmed (after `CandidateMatch`) or no root is set.
+    ///
+    /// The frontend can use this for tentative styling (dimmed gold / pulsing).
+    #[serde(default)]
+    pub root_tentative: bool,
 }
 
 impl VizPathGraph {
@@ -217,14 +236,13 @@ impl VizPathGraph {
     ) -> Result<(), String> {
         use super::visualization::Transition;
         match transition {
-            Transition::StartNode { node, width } => {
+            Transition::StartNode { node } => {
                 if self.start_node.is_some() {
                     return Err("StartNode applied twice".into());
                 }
-                self.start_node =
-                    Some(PathNode { index: *node, width: *width });
+                self.start_node = Some(*node);
             },
-            Transition::VisitParent { to, width, edge, .. } => {
+            Transition::VisitParent { to, edge, .. } => {
                 if self.start_node.is_none() {
                     return Err("VisitParent before StartNode".into());
                 }
@@ -240,11 +258,12 @@ impl VizPathGraph {
                 // Set this parent candidate as the root so that subsequent
                 // VisitChild events can populate end_path immediately
                 // (child arrows appear during comparison, not after match).
-                let parent = PathNode { index: *to, width: *width };
-                self.root = Some(parent);
+                self.root = Some(*to);
                 self.root_entry_edge = Some(*edge);
+                // Mark as tentative until CandidateMatch confirms it.
+                self.root_tentative = true;
             },
-            Transition::CandidateMatch { root, width, edge } => {
+            Transition::CandidateMatch { root, edge } => {
                 // CandidateMatch signals that the candidate root matched.
                 // If VisitParent already set the root, this is informational.
                 // Only set root as fallback for non-parent candidates (e.g.
@@ -253,38 +272,36 @@ impl VizPathGraph {
                     if self.start_node.is_none() {
                         return Err("CandidateMatch before StartNode".into());
                     }
-                    let root_node =
-                        PathNode { index: *root, width: *width };
-                    if self.start_path.last().map(|n| n.index) == Some(*root)
+                    if self.start_path.last().map(|n| n.index) == Some(root.index)
                     {
                         self.start_path.pop();
-                        self.root = Some(root_node);
+                        self.root = Some(*root);
                         self.root_entry_edge =
                             self.start_edges.pop().or(Some(*edge));
                     } else {
-                        self.root = Some(root_node);
+                        self.root = Some(*root);
                         self.root_entry_edge = Some(*edge);
                     }
                 }
-                // else: root already set by VisitParent — no state change.
+                // Confirm the root — no longer tentative.
+                self.root_tentative = false;
             },
-            Transition::VisitChild { to, width, edge, replace, .. } => {
+            Transition::VisitChild { to, edge, replace, .. } => {
                 // Note: root may be None during comparison events for
                 // non-parent candidates after Expanded demotion. This is
                 // expected — CandidateMatch will set root afterward.
-                let child = PathNode { index: *to, width: *width };
                 if *replace {
                     if self.end_path.is_empty() {
                         return Err("VisitChild replace on empty end_path".into());
                     }
-                    *self.end_path.last_mut().unwrap() = child;
+                    *self.end_path.last_mut().unwrap() = *to;
                     *self.end_edges.last_mut().unwrap() = *edge;
                     // Update root_exit_edge if replacing the first child
                     if self.end_path.len() == 1 {
                         self.root_exit_edge = Some(*edge);
                     }
                 } else {
-                    self.end_path.push(child);
+                    self.end_path.push(*to);
                     self.end_edges.push(*edge);
                     // Set root_exit_edge on the first child pushed
                     if self.end_path.len() == 1 {
@@ -306,14 +323,15 @@ impl VizPathGraph {
                 // If the rejected node is the current root (set by
                 // VisitParent as a candidate), clear it along with any
                 // end_path entries built during child comparison.
-                if self.root.map(|n| n.index) == Some(*node) {
+                if self.root.map(|n| n.index) == Some(node.index) {
                     self.root = None;
                     self.root_entry_edge = None;
                     self.root_exit_edge = None;
                     self.end_path.clear();
                     self.end_edges.clear();
+                    self.root_tentative = false;
                 } else if self.start_path.last().map(|n| n.index)
-                    == Some(*node)
+                    == Some(node.index)
                 {
                     // Safety net: pop a rejected parent from start_path
                     // (shouldn't normally trigger since VisitParent now sets

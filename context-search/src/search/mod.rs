@@ -11,7 +11,7 @@ use crate::{
         PatternCursor,
     },
     r#match::{
-        iterator::{ProcessResult, SearchIterator},
+        iterator::{BfsStepResult, SearchIterator},
         root_cursor::{
             ConclusiveEnd,
             RootAdvanceResult,
@@ -19,7 +19,6 @@ use crate::{
             RootEndResult,
         },
         CompareInfo,
-        CompareOutcome,
         SearchNode,
         SearchNode::ParentCandidate,
     },
@@ -40,7 +39,7 @@ use context::{
 };
 use context_trace::{
     graph::{
-        search_path::{EdgeRef, VizPathGraph},
+        search_path::{EdgeRef, PathNode, VizPathGraph},
         visualization::{
             GraphOpEvent,
             LocationInfo,
@@ -60,6 +59,7 @@ use tracing::{
     trace,
 };
 pub mod context;
+pub(crate) mod events;
 pub(crate) mod searchable;
 
 pub(crate) type SearchResult = Result<Response, ErrorReason>;
@@ -140,6 +140,10 @@ pub struct SearchState<K: SearchKind> {
     pub(crate) viz_matched_positions: Vec<usize>,
     /// Collected graph-op events for testing and inspection.
     pub(crate) collected_events: Vec<GraphOpEvent>,
+    /// Unique identifier for the query path event stream.
+    pub(crate) query_path_id: String,
+    /// Accumulated path graph for query visualization.
+    pub(crate) query_viz_path: VizPathGraph,
 }
 
 impl<K: SearchKind> SearchState<K>
@@ -178,10 +182,10 @@ where
                     self.viz_matched_positions.push(*cursor_pos);
                 }
                 self.viz_cursor_pos = *cursor_pos;
-                (*cursor_pos, Some(*node))
+                (*cursor_pos, Some(node.index))
             },
             Transition::ChildMismatch { cursor_pos, node, .. } => {
-                (*cursor_pos, Some(*node))
+                (*cursor_pos, Some(node.index))
             },
             _ => (self.viz_cursor_pos, None),
         };
@@ -199,7 +203,7 @@ where
         };
 
         let query = QueryInfo {
-            query_tokens,
+            query_tokens: query_tokens.clone(),
             cursor_position: cursor_pos,
             query_width,
             matched_positions: self.viz_matched_positions.clone(),
@@ -209,7 +213,7 @@ where
         let event = GraphOpEvent {
             step,
             op_type: OperationType::Search,
-            transition,
+            transition: transition.clone(),
             location,
             query,
             description: description.into(),
@@ -219,24 +223,117 @@ where
         };
         event.emit();
         self.collected_events.push(event);
+
+        // Emit corresponding query path event for certain transitions
+        self.emit_query_event(&transition, query_tokens, query_width, cursor_pos);
+    }
+
+    /// Emit a query path event corresponding to a search transition.
+    ///
+    /// Query events track cursor advancement through the query pattern,
+    /// emitted on a separate `query_path_id` stream.
+    fn emit_query_event(
+        &mut self,
+        transition: &Transition,
+        query_tokens: Vec<usize>,
+        query_width: usize,
+        cursor_pos: usize,
+    ) {
+        // Only emit query events for transitions that affect the query cursor
+        let query_transition = match transition {
+            Transition::ChildMatch { cursor_pos, .. } => {
+                // Find the query token at this cursor position
+                let query_token_idx = self.query_token_at_pos(*cursor_pos);
+                Some(Transition::ChildMatch {
+                    node: PathNode { index: query_token_idx, width: 1 }, // Query token
+                    cursor_pos: *cursor_pos,
+                })
+            },
+            Transition::ChildMismatch { cursor_pos, expected, .. } => {
+                let query_token_idx = self.query_token_at_pos(*cursor_pos);
+                Some(Transition::ChildMismatch {
+                    node: PathNode { index: query_token_idx, width: 1 },
+                    cursor_pos: *cursor_pos,
+                    expected: *expected,
+                    actual: PathNode { index: query_token_idx, width: 1 },
+                })
+            },
+            Transition::StartNode { .. } => {
+                // Query starts at first token
+                let first_query_token = query_tokens.first().copied().unwrap_or(0);
+                Some(Transition::StartNode {
+                    node: PathNode { index: first_query_token, width: 1 },
+                })
+            },
+            Transition::Done { success, .. } => {
+                // Query done when search done
+                let last_query_token = query_tokens.last().copied();
+                Some(Transition::Done {
+                    final_node: last_query_token,
+                    success: *success,
+                })
+            },
+            _ => None,
+        };
+
+        if let Some(query_trans) = query_transition {
+            // Apply to query viz path
+            let _ = self.query_viz_path.apply_transition(&query_trans);
+
+            let query_info = QueryInfo {
+                query_tokens,
+                cursor_position: cursor_pos,
+                query_width,
+                matched_positions: self.viz_matched_positions.clone(),
+                active_token: None,
+            };
+
+            let query_event = GraphOpEvent {
+                step: self.step_counter - 1, // Same step as search event
+                op_type: OperationType::Query,
+                transition: query_trans,
+                location: LocationInfo::default(),
+                query: query_info,
+                description: "Query path event".to_string(),
+                path_id: self.query_path_id.clone(),
+                path_graph: self.query_viz_path.clone(),
+                graph_mutation: None,
+            };
+            query_event.emit();
+            self.collected_events.push(query_event);
+        }
+    }
+
+    /// Find the query token index at a given cursor position.
+    fn query_token_at_pos(&self, cursor_pos: usize) -> usize {
+        let tokens = self.query.path_root();
+        let mut pos = 0;
+        for token in tokens.iter() {
+            pos += *token.width();
+            if pos > cursor_pos {
+                return token.index.0;
+            }
+        }
+        // Fallback to last token
+        tokens.last().map(|t| t.index.0).unwrap_or(0)
     }
 
     /// Infer `(current_root, matched_nodes)` from a [`Transition`] variant.
     fn infer_location(transition: &Transition) -> (Option<usize>, Vec<usize>) {
         match transition {
-            Transition::StartNode { .. } => (None, vec![]),
-            Transition::VisitParent { from, .. } => (Some(*from), vec![*from]),
-            Transition::CandidateMatch { root, .. } => (Some(*root), vec![*root]),
-            Transition::VisitChild { from, .. } => (Some(*from), vec![*from]),
+            Transition::StartNode { node } => (Some(node.index), vec![]),
+            Transition::VisitParent { from, .. } => (Some(from.index), vec![from.index]),
+            Transition::CandidateMatch { root, .. } => (Some(root.index), vec![root.index]),
+            Transition::VisitChild { from, .. } => (Some(from.index), vec![from.index]),
             Transition::ParentExplore { current_root, .. } => {
                 (Some(*current_root), vec![*current_root])
             },
             Transition::Done { final_node, .. } => {
                 (*final_node, final_node.iter().copied().collect())
             },
-            Transition::ChildMatch { node, .. } => (Some(*node), vec![*node]),
-            Transition::ChildMismatch { node, .. } => (Some(*node), vec![]),
-            Transition::CandidateMismatch { node, .. } => (Some(*node), vec![]),
+            Transition::ChildMatch { node, .. } => (Some(node.index), vec![node.index]),
+            Transition::ChildMismatch { node, .. } => (Some(node.index), vec![]),
+            Transition::CandidateMismatch { node, .. } => (Some(node.index), vec![]),
             // Insert-specific transitions — not expected in search
             _ => (None, vec![]),
         }
@@ -263,88 +360,24 @@ where
     /// into graph-op events so the visualization stays in sync with the
     /// algorithm.
     fn emit_compare_events(&mut self, info: CompareInfo, parent_node: usize) {
-        match info.outcome {
-            CompareOutcome::Match => {
-                // Emit VisitChild to show the child being examined
-                let replace = !self.viz_path.end_path.is_empty();
-                self.emit_graph_op(
-                    Transition::VisitChild {
-                        from: parent_node,
-                        to: info.node,
-                        child_index: 0,
-                        width: info.node_width,
-                        edge: EdgeRef {
-                            from: parent_node,
-                            to: info.node,
-                            pattern_idx: 0,
-                            sub_index: 0,
-                        },
-                        replace,
-                    },
-                    format!("Comparing child node {}", info.node),
-                );
-                self.emit_graph_op(
-                    Transition::ChildMatch {
-                        node: info.node,
-                        cursor_pos: info.cursor_pos,
-                    },
-                    format!(
-                        "Child match at node {} (query pos {})",
-                        info.node, info.cursor_pos
-                    ),
-                );
-            },
-            CompareOutcome::Mismatch { expected, actual } => {
-                let replace = !self.viz_path.end_path.is_empty();
-                self.emit_graph_op(
-                    Transition::VisitChild {
-                        from: parent_node,
-                        to: info.node,
-                        child_index: 0,
-                        width: info.node_width,
-                        edge: EdgeRef {
-                            from: parent_node,
-                            to: info.node,
-                            pattern_idx: 0,
-                            sub_index: 0,
-                        },
-                        replace,
-                    },
-                    format!("Comparing child node {}", info.node),
-                );
-                self.emit_graph_op(
-                    Transition::ChildMismatch {
-                        node: info.node,
-                        cursor_pos: info.cursor_pos,
-                        expected,
-                        actual,
-                    },
-                    format!(
-                        "Child mismatch at node {} (expected {}, got {})",
-                        info.node, expected, actual
-                    ),
-                );
-            },
-            CompareOutcome::Prefixes(children) => {
-                for child in children {
-                    self.emit_graph_op(
-                        Transition::VisitChild {
-                            from: parent_node,
-                            to: child.child,
-                            child_index: 0,
-                            width: child.child_width,
-                            edge: EdgeRef {
-                                from: parent_node,
-                                to: child.child,
-                                pattern_idx: 0,
-                                sub_index: 0,
-                            },
-                            replace: false,
-                        },
-                        format!("Visiting prefix child {}", child.child),
-                    );
-                }
-            },
+        use events::{EventContext, IntoTransitions};
+
+        let ctx = EventContext::new(parent_node, self.viz_path.end_path.is_empty());
+        for (transition, description) in info.into_transitions(&ctx) {
+            self.emit_graph_op(transition, description);
+        }
+    }
+
+    /// Emit events from any [`IntoTransitions`] implementor.
+    ///
+    /// Creates an [`EventContext`] from the current visualization state and
+    /// emits all derived transitions.
+    fn emit_advance_events<T: events::IntoTransitions>(&mut self, data: T, parent_node: usize) {
+        use events::EventContext;
+
+        let ctx = EventContext::new(parent_node, self.viz_path.end_path.is_empty());
+        for (transition, description) in data.into_transitions(&ctx) {
+            self.emit_graph_op(transition, description);
         }
     }
 
@@ -380,8 +413,7 @@ where
         let edge_from = self.compute_candidate_edge_from(node_index);
         self.emit_graph_op(
             Transition::CandidateMatch {
-                root: node_index,
-                width: 1,
+                root: PathNode { index: node_index, width: 1 }, // TODO: get real width
                 edge: EdgeRef {
                     from: edge_from,
                     to: node_index,
@@ -400,8 +432,7 @@ where
         let start_width = *self.query.path_root()[0].width();
         self.emit_graph_op(
             Transition::StartNode {
-                node: self.start_node,
-                width: start_width,
+                node: PathNode { index: self.start_node, width: start_width },
             },
             "Search started — initial queue populated",
         );
@@ -535,41 +566,18 @@ where
                         "Match advanced - updating best_match"
                     );
 
-                    // Extract child info for end_path visualization
+                    // Extract child info and emit events via IntoTransitions
                     let trav = &self.matches.trace_ctx.trav;
                     let child_state = &next_match.state.child.current().child_state;
                     let child_token = child_state.path.role_rooted_leaf_token::<End, _>(trav);
-                    let child_idx = child_token.index.0;
-                    let child_width = child_token.width.0;
-                    let child_sub_index = child_state.root_child_index();
-
-                    // Emit VisitChild to show end_path
-                    let replace = !self.viz_path.end_path.is_empty();
-                    self.emit_graph_op(
-                        Transition::VisitChild {
-                            from: adv_root,
-                            to: child_idx,
-                            child_index: child_sub_index,
-                            width: child_width,
-                            edge: EdgeRef {
-                                from: adv_root,
-                                to: child_idx,
-                                pattern_idx: 0,
-                                sub_index: child_sub_index,
-                            },
-                            replace,
-                        },
-                        format!("Visiting child {child_idx} from root {adv_root}"),
+                    let event_data = events::MatchAdvanceData::new(
+                        adv_root,
+                        child_token.index.0,
+                        child_token.width.0,
+                        child_state.root_child_index(),
+                        checkpoint_pos,
                     );
-
-                    // Emit ChildMatch for the matched child
-                    self.emit_graph_op(
-                        Transition::ChildMatch {
-                            node: child_idx,
-                            cursor_pos: checkpoint_pos,
-                        },
-                        format!("Child token match at node {} (query pos {})", child_idx, checkpoint_pos),
-                    );
+                    self.emit_advance_events(event_data, adv_root);
 
                     // Continue with the new matched cursor
                     last_match = next_match.state;
@@ -586,45 +594,24 @@ where
                                     trace!(
                                         "Conclusive end: Mismatch - keeping best match"
                                     );
-                                    // Extract token info for mismatch visualization
+                                    // Extract token info and emit mismatch events via IntoTransitions
                                     let trav = &self.matches.trace_ctx.trav;
                                     let child_state = &candidate_cursor.state.child.candidate().child_state;
                                     let child_token = child_state.path.role_rooted_leaf_token::<End, _>(trav);
-                                    let child_idx = child_token.index.0;
-                                    let child_width = child_token.width.0;
-                                    let child_sub_index = child_state.root_child_index();
                                     let adv_root = child_state.root_parent().index.0;
-                                    let cursor_pos = *candidate_cursor.state.query.candidate().atom_position.as_ref();
                                     let query_token = candidate_cursor.state.query.candidate().path.role_rooted_leaf_token::<End, _>(trav);
-                                    let expected_idx = query_token.index.0;
+                                    let cursor_pos = *candidate_cursor.state.query.candidate().atom_position.as_ref();
 
-                                    // Emit VisitChild + ChildMismatch
-                                    let replace = !self.viz_path.end_path.is_empty();
-                                    self.emit_graph_op(
-                                        Transition::VisitChild {
-                                            from: adv_root,
-                                            to: child_idx,
-                                            child_index: child_sub_index,
-                                            width: child_width,
-                                            edge: EdgeRef {
-                                                from: adv_root,
-                                                to: child_idx,
-                                                pattern_idx: 0,
-                                                sub_index: child_sub_index,
-                                            },
-                                            replace,
-                                        },
-                                        format!("Visiting child {child_idx} from root {adv_root}"),
+                                    let event_data = events::MismatchAdvanceData::new(
+                                        adv_root,
+                                        child_token.index.0,
+                                        child_token.width.0,
+                                        query_token.index.0,
+                                        query_token.width.0,
+                                        child_state.root_child_index(),
+                                        cursor_pos,
                                     );
-                                    self.emit_graph_op(
-                                        Transition::ChildMismatch {
-                                            node: child_idx,
-                                            cursor_pos,
-                                            expected: expected_idx,
-                                            actual: child_idx,
-                                        },
-                                        format!("Child mismatch at node {child_idx} (expected {expected_idx}, got {child_idx})"),
-                                    );
+                                    self.emit_advance_events(event_data, adv_root);
                                     // Continue searching from queue (no parent exploration for mismatch)
                                 },
                                 ConclusiveEnd::Exhausted => {
@@ -757,18 +744,20 @@ where
         // doesn't produce a root match).
         //
         // Flow: pop → VisitParent (if parent) → process → compare_events → result events
-        // No look-ahead or caching — events are emitted in natural algorithm order.
+        // BfsStepResult carries node_index and is_parent for event emission.
         let matched_state = loop {
-            let popped = match self.matches.pop_node() {
-                Some(p) => p,
-                None => {
+            let step_result = self.matches.pop_and_process_one();
+
+            // Extract node_index and is_parent from all non-Empty variants
+            let (node_index, is_parent) = match &step_result {
+                BfsStepResult::Expanded { node_index, is_parent, .. } |
+                BfsStepResult::FoundMatch { node_index, is_parent, .. } |
+                BfsStepResult::Skipped { node_index, is_parent, .. } => (*node_index, *is_parent),
+                BfsStepResult::Empty => {
                     trace!("no more matches found");
                     return None;
                 },
             };
-
-            let node_index = popped.node_index;
-            let is_parent = popped.is_parent;
 
             // Emit VisitParent BEFORE processing so the visualization shows
             // navigation to the candidate before any child comparison.
@@ -780,10 +769,9 @@ where
                 };
                 self.emit_graph_op(
                     Transition::VisitParent {
-                        from: push_from,
-                        to: node_index,
+                        from: PathNode { index: push_from, width: 1 }, // TODO: get real width
+                        to: PathNode { index: node_index, width: 1 },   // TODO: get real width
                         entry_pos: 0,
-                        width: 1,
                         edge: EdgeRef {
                             from: push_from,
                             to: node_index,
@@ -795,8 +783,8 @@ where
                 );
             }
 
-            match self.matches.process_node(popped) {
-                ProcessResult::Expanded(info) => {
+            match step_result {
+                BfsStepResult::Expanded { info, node_index, is_parent } => {
                     // Clear transient end_path from any previous comparison
                     // before starting a new comparison for this candidate.
                     self.viz_path.end_path.clear();
@@ -831,7 +819,7 @@ where
                     }
                     continue;
                 },
-                ProcessResult::FoundMatch(state, info) => {
+                BfsStepResult::FoundMatch { state, info, node_index, .. } => {
                     // Clear transient end_path from any previous comparison.
                     self.viz_path.end_path.clear();
                     self.viz_path.end_edges.clear();
@@ -863,7 +851,7 @@ where
                     );
                     break state;
                 },
-                ProcessResult::Skipped(info) => {
+                BfsStepResult::Skipped { info, node_index, is_parent } => {
                     // Clear transient end_path from any previous comparison.
                     self.viz_path.end_path.clear();
                     self.viz_path.end_edges.clear();
@@ -876,7 +864,7 @@ where
 
                     self.emit_graph_op(
                         Transition::CandidateMismatch {
-                            node: node_index,
+                            node: PathNode { index: node_index, width: 1 }, // TODO: get real width
                             queue_remaining: self.matches.queue.nodes.len(),
                             is_parent,
                         },
@@ -884,7 +872,8 @@ where
                     );
                     continue;
                 },
-                ProcessResult::NoResult => {
+                BfsStepResult::Empty => {
+                    // Already handled above, but included for exhaustive matching
                     trace!("no more matches found");
                     return None;
                 },
