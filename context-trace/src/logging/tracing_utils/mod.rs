@@ -68,7 +68,12 @@ macro_rules! init_test_tracing {
                 .and_then(|s| s.split("::").last())
                 .unwrap_or("unknown")
         };
-        $crate::logging::tracing_utils::TestTracing::init(test_name)
+        let _tracing = $crate::logging::tracing_utils::TestTracing::init(test_name);
+        // Emit an event at the macro call site to record the test file and line.
+        // Because this tracing::info! call is inside a macro_rules! body, it
+        // expands at the call site, so file!() and line!() capture the test location.
+        $crate::__tracing::info!(test_name = %test_name, "test started");
+        _tracing
     }};
 
     // With graph only
@@ -101,37 +106,42 @@ macro_rules! init_test_tracing {
                 .unwrap_or("unknown")
         };
         #[cfg(any(test, feature = "test-api"))]
-        {
+        let _tracing = {
             $crate::logging::tracing_utils::TestTracing::init_with_config_and_graph(
                 test_name, $config, $graph
             )
-        }
+        };
         #[cfg(not(any(test, feature = "test-api")))]
-        {
+        let _tracing = {
             // Fallback - just use config if test_graph is not available
             $crate::logging::tracing_utils::TestTracing::init_with_config(
                 test_name, $config
             )
-        }
+        };
+        $crate::__tracing::info!(test_name = %test_name, "test started");
+        _tracing
     }};
 
     // Internal rule to detect graph vs config
     (@detect $test_name:expr, $arg:expr) => {{
         // This is a bit of a hack, but we try to call init_with_graph
         // and if that fails to compile, the user should use the two-arg form
+        let test_name = $test_name;
         #[cfg(any(test, feature = "test-api"))]
-        {
+        let _tracing = {
             $crate::logging::tracing_utils::TestTracing::init_with_graph(
-                $test_name, $arg
+                test_name, $arg
             )
-        }
+        };
         #[cfg(not(any(test, feature = "test-api")))]
-        {
+        let _tracing = {
             // Fallback to config-based init if test_graph is not available
             $crate::logging::tracing_utils::TestTracing::init_with_config(
-                $test_name, $arg
+                test_name, $arg
             )
-        }
+        };
+        $crate::__tracing::info!(test_name = %test_name, "test started");
+        _tracing
     }};
 }
 

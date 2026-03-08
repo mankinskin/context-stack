@@ -19,6 +19,10 @@ pub mod trace;
 // Logging utilities (tracing and formatting)
 pub mod logging;
 
+// Hidden re-export for use in macros only (not part of public API)
+#[doc(hidden)]
+pub use tracing as __tracing;
+
 // Re-export proc macros
 pub use context_trace_macros::{
     TypedDebug,
