@@ -114,7 +114,7 @@ fn find_ancestor1_a_bc() {
         down(aba, a, false),                                                       // 10
         mismatched(a, 3, c, a),                                                    // 11
         skip(aba, 8, true),                                                        // 12
-        up(a, abc),                                                                // 13
+        up(ab, abc),                                                               // 13
         down(abc, c, false),                                                       // 14
         matched(c, 3),                                                             // 15
         root_match(abc),                                                           // 16
@@ -195,7 +195,7 @@ fn find_ancestor1_a_bc_d() {
         down(aba, a, false),                                                               // 10
         mismatched(a, 3, c, a),                                                            // 11
         skip(aba, 8, true),                                                                // 12
-        up(a, abc),                                                                        // 13
+        up(ab, abc),                                                                        // 13
         down(abc, c, false),                                                               // 14
         matched(c, 3),                                                                     // 15
         root_match(abc),                                                                   // 16
@@ -243,7 +243,7 @@ fn find_ancestor1_a_b_c() {
         down(aba, a, false),                                                               // 8
         mismatched(a, 3, c, a),                                                            // 9
         skip(aba, 8, true),                                                                // 10
-        up(a, abc),                                                                        // 11
+        up(ab, abc),                                                                        // 11
         down(abc, c, false),                                                               // 12
         matched(c, 3),                                                                     // 13
         root_match(abc),                                                                   // 14
@@ -290,7 +290,7 @@ fn find_ancestor1_a_b_c_c() {
         down(aba, a, false),                                                               // 8
         mismatched(a, 3, c, a),                                                            // 9
         skip(aba, 8, true),                                                                // 10
-        up(a, abc),                                                                        // 11
+        up(ab, abc),                                                                        // 11
         down(abc, c, false),                                                               // 12
         matched(c, 3),                                                                     // 13
         root_match(abc),                                                                   // 14
@@ -299,7 +299,7 @@ fn find_ancestor1_a_b_c_c() {
         down(abcd, d, false),                                                              // 17
         mismatched(d, 4, c, d),                                                            // 18
         skip(abcd, 1, true),                                                               // 19
-        up(a, abcdef),                                                                     // 20
+        up(abc, abcdef),                                                                   // 20
         down(abcdef, d, false),                                                            // 21
         explore(abcdef, &[]),                                                               // 22
         down(abcdef, d, false),                                                            // 23
@@ -375,9 +375,9 @@ fn find_ancestor1_long_pattern() {
         up(abab, ababab),                                                                  // 17
         down(ababab, a, false),                                                            // 18
         explore(ababab, &[ababab, ababcd, ababababcdefghi, ababababcd]),                    // 19
-        up(a, ababab),                                                                     // 20
+        up(ababab, ababab),                                                                // 20
         explore(ababab, &[ababcd, ababababcdefghi, ababababcd, ababababcd, ababababcdefghi]), // 21
-        up(a, ababcd),                                                                     // 22
+        up(ababab, ababcd),                                                                // 22
         down(ababcd, c, false),                                                            // 23
         explore(ababcd, &[ababababcd, ababababcd, ababababcdefghi, ababababcdefghi]),        // 24
         down(ababab, a, false),                                                            // 25
@@ -535,7 +535,7 @@ fn find_ancestor2() {
         explore(&by, &[&xaby]),                           // 1
         up(&by, &xaby),                                   // 2
         explore(&xaby, &[&xabyz]),                        // 3
-        up(&by, &xabyz),                                  // 4
+        up(&xaby, &xabyz),                                // 4
         down(&xabyz, &z, false),                          // 5
         matched(&z, 3),                                   // 6
         root_match(&xabyz),                               // 7
@@ -670,7 +670,7 @@ fn find_ancestor3() {
         explore(&ab, &[&xab]),                             // 1
         up(&ab, &xab),                                     // 2
         explore(&xab, &[&xaby, &_xabyz]),                  // 3
-        up(&ab, &xaby),                                    // 4
+        up(&xab, &xaby),                                   // 4
         down(&xaby, &y, false),                            // 5
         matched(&y, 3),                                    // 6
         root_match(&xaby),                                 // 7

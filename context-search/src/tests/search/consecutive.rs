@@ -128,27 +128,27 @@ fn find_consecutive1() {
         explore(ghi, &[efghi, abcdefghi]),                                                 // 11
         up(ghi, efghi),                                                                    // 12
         explore(efghi, &[abcdefghi, abcdefghi, ababcdefghi, ababababcdefghi]),              // 13
-        up(g, abcdefghi),                                                                  // 14
+        up(efghi, abcdefghi),                                                              // 14
         explore(abcdefghi, &[abcdefghi, ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi]), // 15
-        up(g, abcdefghi),                                                                  // 16
+        up(abcdefghi, abcdefghi),                                                          // 16
         explore(abcdefghi, &[ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi, ababcdefghi, ababababcdefghi]), // 17
-        up(g, ababcdefghi),                                                                // 18
+        up(abcdefghi, ababcdefghi),                                                        // 18
         explore(ababcdefghi, &[ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 19
-        up(g, ababcdefghi),                                                                // 20
+        up(ababcdefghi, ababcdefghi),                                                      // 20
         explore(ababcdefghi, &[ababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 21
-        up(g, ababcdefghi),                                                                // 22
+        up(ababcdefghi, ababcdefghi),                                                      // 22
         explore(ababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 23
-        up(g, ababababcdefghi),                                                            // 24
+        up(ababcdefghi, ababababcdefghi),                                                  // 24
         explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 25
-        up(g, ababababcdefghi),                                                            // 26
+        up(ababababcdefghi, ababababcdefghi),                                              // 26
         explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 27
-        up(g, ababababcdefghi),                                                            // 28
+        up(ababababcdefghi, ababababcdefghi),                                              // 28
         explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi]),      // 29
-        up(g, ababababcdefghi),                                                            // 30
+        up(ababababcdefghi, ababababcdefghi),                                              // 30
         explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi]),                       // 31
-        up(g, ababababcdefghi),                                                            // 32
+        up(ababababcdefghi, ababababcdefghi),                                              // 32
         explore(ababababcdefghi, &[ababababcdefghi]),                                       // 33
-        up(g, ababababcdefghi),                                                            // 34
+        up(ababababcdefghi, ababababcdefghi),                                              // 34
         explore(ababababcdefghi, &[]),                                                     // 35
         done_ok(ghi),                                                                      // 36
     ]);
@@ -201,7 +201,7 @@ fn find_consecutive1() {
         down(aba, a, false),                                                               // 8
         mismatched(a, 6, c, a),                                                            // 9
         skip(aba, 8, true),                                                                // 10
-        up(a, abc),                                                                        // 11
+        up(ab, abc),                                                                       // 11
         down(abc, c, false),                                                               // 12
         matched(c, 6),                                                                     // 13
         root_match(abc),                                                                   // 14
