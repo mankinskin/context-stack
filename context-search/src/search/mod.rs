@@ -764,6 +764,11 @@ where
             if is_parent {
                 let push_from = if let Some(current_root_node) = self.viz_path.root {
                     current_root_node.index
+                } else if let Some(top) = self.viz_path.start_path.last() {
+                    // After CandidateMismatch clears root, the top of
+                    // start_path is the last confirmed ancestor — use it
+                    // so the edge connects correctly (e.g. ab → abc).
+                    top.index
                 } else {
                     self.viz_path.start_node.map(|n| n.index).unwrap_or(self.start_node)
                 };
