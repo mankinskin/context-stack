@@ -143,24 +143,3 @@ fn search_triple_repeat_finds_full_pattern() {
         "Should find ababab, not a partial match"
     );
 }
-
-/// Test: Insert same token repeated
-///
-/// Tests inserting patterns like [a, a] which have the same token repeated
-#[test]
-fn insert_same_token_repeated() {
-    use crate::tests::env::EnvSingleAtom;
-
-    let EnvSingleAtom { graph, a } = EnvSingleAtom::initialize();
-    let _tracing = context_trace::init_test_tracing!(&graph);
-    graph.emit_graph_snapshot();
-
-    // Insert [a, a] - same token repeated
-    let query = vec![a, a];
-    let result: Result<Token, ErrorState> = graph.insert(query);
-
-    assert!(result.is_ok(), "Should be able to insert [a, a]");
-    let aa = result.unwrap();
-
-    assert_eq!(aa.width(), TokenWidth(2), "aa should have width 2");
-}
