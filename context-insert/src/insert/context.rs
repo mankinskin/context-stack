@@ -75,8 +75,11 @@ impl<R: InsertResult> InsertCtx<R> {
             emit_insert_node_with_delta,
             reset_step_counter,
         };
-        use context_trace::graph::{
-            visualization::{DeltaOp, GraphMutation, PathNode, Transition},
+        use context_trace::graph::visualization::{
+            DeltaOp,
+            GraphMutation,
+            PathNode,
+            Transition,
         };
 
         // Reset step counter for new insert operation
@@ -87,13 +90,28 @@ impl<R: InsertResult> InsertCtx<R> {
             return Err(ErrorReason::InvalidEndBound.into());
         }
 
+        // Validate that the cache contains an entry for the root token.
+        // A missing entry means the TraceCache was built incorrectly
+        // (e.g. context-read returned a root that was never traversed).
+        // Without this check the split pipeline would panic on an empty
+        // positions map inside OffsetIndexRange::get_splits.
+        if !init.cache.entries.contains_key(&init.root.vertex_index()) {
+            return Err(ErrorReason::MissingCacheEntry(
+                init.root.vertex_index(),
+            )
+            .into());
+        }
+
         let root_idx = init.root.index.0;
         let root_width = init.root.width.0;
 
         // Emit: Split phase starting
         emit_insert_node(
             Transition::SplitStart {
-                node: PathNode { index: root_idx, width: root_width },
+                node: PathNode {
+                    index: root_idx,
+                    width: root_width,
+                },
                 split_position: *init.end_bound.as_ref(),
             },
             format!("Starting split phase on root {root_idx}"),
@@ -101,7 +119,8 @@ impl<R: InsertResult> InsertCtx<R> {
         );
 
         // With interior mutability, we just pass a reference to the graph
-        let interval = IntervalGraph::from((&*self.graph, init));
+        let interval = IntervalGraph::try_from_init(&*self.graph, init)
+            .map_err(|e| ErrorState::from(e))?;
 
         // Emit: Split phase complete — include delta with split info
         {

@@ -13,7 +13,10 @@ use crate::split::{
         position::SubSplitLocation,
     },
 };
-use context_trace::*;
+use context_trace::{
+    graph::getters::ErrorReason,
+    *,
+};
 use derive_more::derive::{
     Deref,
     DerefMut,
@@ -28,9 +31,21 @@ pub(crate) struct SplitCacheCtx<G: HasGraph> {
     pub(crate) cache: SplitCache,
 }
 impl<G: HasGraph> SplitCacheCtx<G> {
-    pub(crate) fn init(mut states_ctx: SplitTraceStatesCtx<G>) -> Self {
+    pub(crate) fn init(
+        mut states_ctx: SplitTraceStatesCtx<G>
+    ) -> Result<Self, ErrorReason> {
         let (offsets, root_mode) =
             states_ctx.completed_splits::<RootNode>(&states_ctx.ctx.root);
+
+        // Guard: if the TraceCache had no entry for the root token,
+        // completed_splits returns empty offsets.  Continuing with an
+        // empty positions map would cause a panic later in get_splits.
+        if offsets.is_empty() {
+            return Err(ErrorReason::MissingCacheEntry(
+                states_ctx.ctx.root.vertex_index(),
+            ));
+        }
+
         let pos_splits = states_ctx
             .states
             .leaves
@@ -63,7 +78,7 @@ impl<G: HasGraph> SplitCacheCtx<G> {
             FromIterator::from_iter([(states_ctx.ctx.root.index, root_vertex)]),
         );
 
-        Self { states_ctx, cache }
+        Ok(Self { states_ctx, cache })
     }
     pub(crate) fn apply_trace_state(
         &mut self,

@@ -47,27 +47,25 @@ pub(crate) trait OffsetIndexRange<R: RangeRole>: RangeIndex {
     fn get_splits(
         &self,
         vertex: &SplitVertexCache,
-    ) -> R::Splits;
+    ) -> Option<R::Splits>;
 }
 
 impl<M: InVisitMode> OffsetIndexRange<In<M>> for Range<usize> {
     fn get_splits(
         &self,
         vertex: &SplitVertexCache,
-    ) -> <In<M> as RangeRole>::Splits {
+    ) -> Option<<In<M> as RangeRole>::Splits> {
         let lo = vertex
             .positions
             .iter()
             .map(PosSplitCtx::from)
-            .nth(self.start)
-            .unwrap();
+            .nth(self.start)?;
         let ro = vertex
             .positions
             .iter()
             .map(PosSplitCtx::from)
-            .nth(self.end)
-            .unwrap();
-        (lo.to_vertex_splits(), ro.to_vertex_splits())
+            .nth(self.end)?;
+        Some((lo.to_vertex_splits(), ro.to_vertex_splits()))
     }
 }
 
@@ -75,14 +73,13 @@ impl<M: PreVisitMode> OffsetIndexRange<Pre<M>> for RangeTo<usize> {
     fn get_splits(
         &self,
         vertex: &SplitVertexCache,
-    ) -> <Pre<M> as RangeRole>::Splits {
+    ) -> Option<<Pre<M> as RangeRole>::Splits> {
         let ro = vertex
             .positions
             .iter()
             .map(PosSplitCtx::from)
-            .nth(self.end)
-            .unwrap();
-        ro.to_vertex_splits()
+            .nth(self.end)?;
+        Some(ro.to_vertex_splits())
     }
 }
 
@@ -129,14 +126,13 @@ impl<M: PostVisitMode> OffsetIndexRange<Post<M>> for RangeFrom<usize> {
     fn get_splits(
         &self,
         vertex: &SplitVertexCache,
-    ) -> <Post<M> as RangeRole>::Splits {
+    ) -> Option<<Post<M> as RangeRole>::Splits> {
         let lo = vertex
             .positions
             .iter()
             .map(PosSplitCtx::from)
-            .nth(self.start)
-            .unwrap();
-        lo.to_vertex_splits()
+            .nth(self.start)?;
+        Some(lo.to_vertex_splits())
     }
 }
 pub(crate) trait RangeOffsets<R: RangeRole>:

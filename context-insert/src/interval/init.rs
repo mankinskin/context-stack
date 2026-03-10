@@ -5,7 +5,10 @@ use crate::split::{
     trace::states::context::SplitTraceStatesCtx,
 };
 use context_search::*;
-use context_trace::*;
+use context_trace::{
+    graph::getters::ErrorReason,
+    *,
+};
 
 use crate::interval::IntervalGraph;
 
@@ -33,8 +36,11 @@ impl From<Response> for InitInterval {
 ///
 /// With interior mutability, we only need `&G` since graph mutations
 /// happen through per-vertex locks inside the graph.
-impl<'a, G: HasGraph + 'a> From<(&'a G, InitInterval)> for IntervalGraph {
-    fn from((trav, init): (&'a G, InitInterval)) -> Self {
+impl IntervalGraph {
+    pub(crate) fn try_from_init<'a, G: HasGraph + 'a>(
+        trav: &'a G,
+        init: InitInterval,
+    ) -> Result<Self, ErrorReason> {
         let InitInterval {
             root,
             cache,
@@ -43,6 +49,6 @@ impl<'a, G: HasGraph + 'a> From<(&'a G, InitInterval)> for IntervalGraph {
         } = init;
         let ctx = TraceCtx { trav, cache };
         let iter = SplitTraceStatesCtx::new(ctx, root, end_bound);
-        Self::from(SplitCacheCtx::init(iter))
+        Self::try_from(SplitCacheCtx::init(iter)?)
     }
 }

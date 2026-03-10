@@ -246,7 +246,7 @@ fn interval_graph1() {
     let res = graph.find_ancestor(query).unwrap();
     assert!(res.query_exhausted());
     let init = InitInterval::from(res);
-    let interval = IntervalGraph::from((&*graph, init));
+    let interval = IntervalGraph::try_from_init(&*graph, init).unwrap();
 
     // Build expected required partitions
     // For prefix mode with a single target position, we get target_range 0..=0
@@ -306,7 +306,8 @@ fn interval_graph2() {
     let cd_efghi_id = cdefghi_ids[1];
 
     // With interior mutability, we only need &graph for IntervalGraph creation
-    let interval = IntervalGraph::from((&*trace_test.env.graph, init));
+    let interval =
+        IntervalGraph::try_from_init(&*trace_test.env.graph, init).unwrap();
 
     // Check root and states
     assert_eq!(interval.root, cdefghi);

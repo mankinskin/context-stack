@@ -12,7 +12,10 @@ use crate::{
         trace::SplitTraceState,
     },
 };
-use context_trace::*;
+use context_trace::{
+    graph::getters::ErrorReason,
+    *,
+};
 
 #[derive(Debug)]
 pub(crate) struct SplitRunStep;
@@ -25,7 +28,10 @@ pub(crate) struct SplitRun<G: HasGraph> {
 impl<G: HasGraph> SplitRun<G> {
     pub(crate) fn init(
         &mut self
-    ) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
+    ) -> Result<
+        (Vec<SplitTraceState>, PartitionRange, RequiredPartitions),
+        ErrorReason,
+    > {
         self.ctx.cache.augment_root(
             &self.ctx.states_ctx.trav,
             self.ctx.states_ctx.ctx.root,
@@ -62,27 +68,29 @@ impl<G: HasGraph> From<SplitCacheCtx<G>> for SplitRun<G> {
         }
     }
 }
-impl<G: HasGraph> From<SplitCacheCtx<G>> for IntervalGraph {
-    fn from(cache: SplitCacheCtx<G>) -> Self {
-        Self::from(SplitRun::from(cache))
+impl<G: HasGraph> TryFrom<SplitCacheCtx<G>> for IntervalGraph {
+    type Error = ErrorReason;
+    fn try_from(cache: SplitCacheCtx<G>) -> Result<Self, Self::Error> {
+        Self::try_from(SplitRun::from(cache))
     }
 }
-impl<G: HasGraph> From<SplitRun<G>> for IntervalGraph {
-    fn from(mut run: SplitRun<G>) -> Self {
-        debug!("IntervalGraph::from - init");
-        let (next, target_range, required) = run.init();
+impl<G: HasGraph> TryFrom<SplitRun<G>> for IntervalGraph {
+    type Error = ErrorReason;
+    fn try_from(mut run: SplitRun<G>) -> Result<Self, Self::Error> {
+        debug!("IntervalGraph::try_from - init");
+        let (next, target_range, required) = run.init()?;
         run.ctx.states.queue.extend(next);
-        debug!("IntervalGraph::from - run iterator to end");
+        debug!("IntervalGraph::try_from - run iterator to end");
         run.all(|_| true); // run iterator to end
-        debug!("SplitRun::from - calling finish");
+        debug!("SplitRun::try_from - calling finish");
         let cache = run.finish();
-        debug!("SplitRun::from - finish done, creating IntervalGraph");
-        Self {
+        debug!("SplitRun::try_from - finish done, creating IntervalGraph");
+        Ok(Self {
             root: cache.states_ctx.ctx.root,
             states: cache.states_ctx.states,
             cache: cache.cache,
             target_range,
             required,
-        }
+        })
     }
 }

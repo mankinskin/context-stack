@@ -38,6 +38,10 @@ use crate::{
         },
     },
 };
+use context_trace::{
+    HasVertexIndex,
+    graph::getters::ErrorReason,
+};
 use derive_more::derive::{
     Deref,
     DerefMut,
@@ -188,8 +192,11 @@ impl SplitVertexCache {
         let mut states = Vec::new();
         for len in 1..num_offsets {
             for start in 0..num_offsets - len + 1 {
-                let part = self
-                    .offset_range_partition::<In<Trace>>(start..start + len);
+                let Some(part) = self
+                    .offset_range_partition::<In<Trace>>(start..start + len)
+                else {
+                    continue;
+                };
                 let (splits, next) = Self::add_inner_offsets(ctx.clone(), part);
                 self.positions.extend(splits);
                 states.extend(next);
@@ -201,26 +208,35 @@ impl SplitVertexCache {
         &mut self,
         ctx: NodeTraceCtx,
         root_mode: RootMode,
-    ) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
+    ) -> Result<
+        (Vec<SplitTraceState>, PartitionRange, RequiredPartitions),
+        ErrorReason,
+    > {
         let target_positions = self.positions.keys().cloned().collect_vec();
         debug!(?root_mode, ?target_positions,
             root_patterns = ?ctx.patterns,
             "root_augmentation"
         );
 
+        let missing =
+            || ErrorReason::MissingCacheEntry(ctx.index.vertex_index());
+
         // First add inner offsets for the target partition
         let (splits, next) = match root_mode {
             RootMode::Infix => Self::add_inner_offsets(
                 ctx.clone(),
-                OffsetIndexRange::<In<Trace>>::get_splits(&(0..1), self),
+                OffsetIndexRange::<In<Trace>>::get_splits(&(0..1), self)
+                    .ok_or_else(missing)?,
             ),
             RootMode::Prefix => Self::add_inner_offsets::<Pre<Trace>, _>(
                 ctx.clone(),
-                OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self),
+                OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self)
+                    .ok_or_else(missing)?,
             ),
             RootMode::Postfix => Self::add_inner_offsets::<Post<Trace>, _>(
                 ctx.clone(),
-                OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self),
+                OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self)
+                    .ok_or_else(missing)?,
             ),
         };
         debug!(
@@ -319,7 +335,7 @@ impl SplitVertexCache {
             self.compute_required_partitions(&target_range, &wrapper_range);
         debug!(required = ?required.iter().collect::<Vec<_>>(), "computed required partitions");
 
-        (next, target_range, required)
+        Ok((next, target_range, required))
     }
 
     /// Compute required partitions from target and wrapper ranges.
@@ -400,8 +416,8 @@ impl SplitVertexCache {
     pub(crate) fn offset_range_partition<K: RangeRole>(
         &self,
         range: K::OffsetRange,
-    ) -> Partition<K> {
-        range.get_splits(self).to_partition()
+    ) -> Option<Partition<K>> {
+        Some(range.get_splits(self)?.to_partition())
     }
     pub(crate) fn inner_offsets<
         R: RangeRole<Mode = Trace>,

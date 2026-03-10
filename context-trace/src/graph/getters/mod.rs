@@ -66,6 +66,7 @@ pub enum ErrorReason {
     Unnecessary,
     EmptyRange,
     InvalidEndBound,
+    MissingCacheEntry(VertexIndex),
 }
 
 impl<G: GraphKind> Hypergraph<G> {

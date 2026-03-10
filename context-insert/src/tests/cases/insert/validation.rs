@@ -24,6 +24,7 @@ use context_trace::{
     tests::test_case::TestEnv,
     *,
 };
+use pretty_assertions::assert_matches;
 
 // ============================================================================
 // InitInterval Validation Tests
@@ -103,11 +104,14 @@ fn reject_init_interval_with_missing_root_entry() {
     // Should return an error, not panic at splits.rs:63
     let result: Result<Token, ErrorState> = graph.insert_init((), invalid_init);
 
-    assert!(
-        result.is_err(),
-        "Expected error for InitInterval with cache missing root entry"
+    assert_matches!(
+        result,
+        Err(ErrorState {
+            reason: ErrorReason::MissingCacheEntry(_),
+            ..
+        }),
+        "Expected MissingCacheEntry error for InitInterval with cache missing root entry"
     );
-    // The specific error type may need to be defined
 }
 
 // ============================================================================

@@ -15,7 +15,10 @@ use crate::{
         },
     },
 };
-use context_trace::*;
+use context_trace::{
+    graph::getters::ErrorReason,
+    *,
+};
 use derive_more::derive::{
     Deref,
     DerefMut,
@@ -53,13 +56,16 @@ impl SplitCache {
         &mut self,
         trav: impl HasGraph,
         root: Token,
-    ) -> (Vec<SplitTraceState>, PartitionRange, RequiredPartitions) {
+    ) -> Result<
+        (Vec<SplitTraceState>, PartitionRange, RequiredPartitions),
+        ErrorReason,
+    > {
         let graph = trav.graph();
         let ctx = NodeTraceCtx::from_index(&graph, root);
         let index = root.vertex_index();
         let root_mode = self.root_mode;
         self.get_mut(&index)
-            .unwrap()
+            .ok_or(ErrorReason::MissingCacheEntry(index))?
             .root_augmentation(ctx, root_mode)
     }
     pub(crate) fn augment_nodes<G: HasGraph, I: IntoIterator<Item = Token>>(
