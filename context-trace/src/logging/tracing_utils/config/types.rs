@@ -97,6 +97,8 @@ pub struct PanicConfig {
     /// Show stderr output (🔥 PANIC: ...)
     #[serde(default = "default_true")]
     pub show_stderr: bool,
+    /// Show stderr output (🔥 PANIC: ...)
+    pub show_backtrace: bool,
     /// Call the default panic hook (which prints to stderr)
     /// Set to false to suppress stderr output and only log to file
     #[serde(default = "default_true")]
@@ -109,6 +111,7 @@ impl Default for PanicConfig {
             show: true,
             show_message: true,
             show_stderr: true,
+            show_backtrace: false,
             show_default_hook: true,
         }
     }

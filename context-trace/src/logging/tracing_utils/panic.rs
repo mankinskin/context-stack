@@ -57,6 +57,8 @@ pub(super) fn install_panic_hook(config: PanicConfig) {
             // Also write to stderr for visibility (if enabled)
             if config.show_stderr {
                 eprintln!("\n🔥 PANIC: {}", panic_info);
+            }
+            if config.show_backtrace {
                 eprintln!("Backtrace:\n{}", backtrace);
             }
 
