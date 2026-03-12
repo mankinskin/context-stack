@@ -1,0 +1,30 @@
+[package]
+name = "context-api"
+version = "0.1.0"
+edition = "2024"
+description = "Unified API for hypergraph workspace management and operations"
+
+[features]
+default = []
+ts-gen = ["ts-rs"]
+dev = []
+
+[dependencies]
+context-trace = { path = "../context-trace", features = ["test-api"] }
+context-search = { path = "../context-search", features = ["test-api"] }
+context-insert = { path = "../context-insert", features = ["test-api"] }
+context-read = { path = "../context-read", features = ["test-api"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+thiserror = "2"
+fs2 = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+
+ts-rs = { version = "10", features = ["serde-json-impl"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+pretty_assertions = "1"

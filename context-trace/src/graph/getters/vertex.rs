@@ -332,7 +332,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
 
     /// Iterate over all vertices (key, data pairs) - returns cloned data.
-    pub(crate) fn vertex_iter(
+    pub fn vertex_iter(
         &self
     ) -> impl Iterator<Item = (VertexKey, VertexData)> + '_ {
         self.graph

@@ -51,6 +51,11 @@ impl VertexData {
         self.token
     }
 
+    /// Get the vertex key.
+    pub fn key(&self) -> VertexKey {
+        self.key
+    }
+
     /// Get immutable reference to parent relationships
     pub fn parents(&self) -> &VertexParents {
         &self.parents

@@ -59,7 +59,7 @@ impl ReadCtx {
         self.root.as_ref().and_then(|r| r.root)
     }
 
-    pub(crate) fn read_sequence(&mut self) -> Option<Token> {
+    pub fn read_sequence(&mut self) -> Option<Token> {
         self.find_map(|_| None as Option<()>);
         self.root.as_ref().and_then(|r| r.root)
     }

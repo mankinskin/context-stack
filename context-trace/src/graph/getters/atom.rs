@@ -40,7 +40,7 @@ impl<G: GraphKind> Hypergraph<G> {
             .into_pattern()
     }
     #[track_caller]
-    pub(crate) fn expect_atom_index(
+    pub fn expect_atom_index(
         &self,
         atom: impl AsAtom<G::Atom>,
     ) -> VertexIndex {
@@ -53,14 +53,14 @@ impl<G: GraphKind> Hypergraph<G> {
         self.to_atom_children_iter(atoms)
             .collect::<Result<Pattern, _>>()
     }
-    pub(crate) fn get_atom_index(
+    pub fn get_atom_index(
         &self,
         atom: impl AsAtom<G::Atom>,
     ) -> Result<VertexIndex, ErrorReason> {
         let key = self.get_atom_key(atom.as_atom())?;
         self.get_index_for_key(&key)
     }
-    pub(crate) fn get_atom_key(
+    pub fn get_atom_key(
         &self,
         atom: impl AsAtom<G::Atom>,
     ) -> Result<VertexKey, ErrorReason> {
@@ -68,6 +68,20 @@ impl<G: GraphKind> Hypergraph<G> {
             .get(&atom.as_atom())
             .map(|r| *r)
             .ok_or(ErrorReason::UnknownAtom)
+    }
+    /// Iterate over all atoms in the graph, yielding `(Atom<G::Atom>, Token)` pairs.
+    ///
+    /// The iterator yields cloned atom values and their corresponding tokens.
+    pub fn atom_iter(
+        &self
+    ) -> impl Iterator<Item = (Atom<G::Atom>, Token)> + '_ {
+        self.atom_keys.iter().filter_map(|entry| {
+            let atom = entry.key().clone();
+            let key = *entry.value();
+            self.get_index_for_key(&key)
+                .ok()
+                .map(|index| (atom, Token::new(index, 1)))
+        })
     }
     pub(crate) fn to_atom_index_iter<'a>(
         &'a self,

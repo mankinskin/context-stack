@@ -3,7 +3,10 @@
 //! Emits a compact JSON representation of the hypergraph as a tracing event
 //! so the log-viewer frontend can reconstruct and render the 3D graph.
 
-use serde::Serialize;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use ts_rs::TS;
 
 use crate::graph::{
@@ -12,7 +15,7 @@ use crate::graph::{
 };
 
 /// A compact, serializable snapshot of the hypergraph topology.
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
@@ -25,7 +28,7 @@ pub struct GraphSnapshot {
 }
 
 /// A single vertex in the snapshot.
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
@@ -40,7 +43,7 @@ pub struct SnapshotNode {
 }
 
 /// A directed edge from parent vertex to child vertex.
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(
     export,
     export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
