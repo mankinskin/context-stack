@@ -45,7 +45,16 @@ pub use context_trace::graph::snapshot::{
 ///
 /// Adapters (CLI, MCP, HTTP) serialize this as part of command payloads.
 /// Resolution into an actual vertex happens inside the API layer.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(untagged)]
 pub enum TokenRef {
     /// Direct vertex index (numeric).
@@ -71,7 +80,9 @@ impl std::fmt::Display for TokenRef {
 // ---------------------------------------------------------------------------
 
 /// Information about a single atom (character) vertex.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct AtomInfo {
     /// Vertex index in the hypergraph.
     pub index: usize,
@@ -97,7 +108,9 @@ impl AtomInfo {
 // ---------------------------------------------------------------------------
 
 /// Lightweight information about any vertex (atom or pattern).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct TokenInfo {
     /// Vertex index in the hypergraph.
     pub index: usize,
@@ -145,7 +158,9 @@ impl TokenInfo {
 // ---------------------------------------------------------------------------
 
 /// Information about a newly created pattern vertex.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct PatternInfo {
     /// Vertex index of the new pattern.
     pub index: usize,
@@ -162,7 +177,9 @@ pub struct PatternInfo {
 // ---------------------------------------------------------------------------
 
 /// Detailed information about a single vertex (atom or pattern).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct VertexInfo {
     /// Vertex index in the hypergraph.
     pub index: usize,
@@ -227,7 +244,9 @@ impl VertexInfo {
 // ---------------------------------------------------------------------------
 
 /// Summary information about a workspace.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct WorkspaceInfo {
     /// Workspace name (also the directory name under `.context-engine/`).
     pub name: String,
@@ -248,7 +267,9 @@ pub struct WorkspaceInfo {
 // ---------------------------------------------------------------------------
 
 /// Aggregate statistics about the graph inside a workspace.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct GraphStatistics {
     /// Total number of vertices.
     pub vertex_count: usize,
@@ -310,7 +331,9 @@ impl GraphStatistics {
 ///
 /// Indicates whether the query was found as a complete vertex, partially
 /// matched, or not found at all.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct SearchResult {
     /// Whether the full query was found as a single existing vertex.
     pub complete: bool,
@@ -323,7 +346,9 @@ pub struct SearchResult {
 }
 
 /// Details about a partial match from a search operation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct PartialMatchInfo {
     /// How the query was partially matched.
     pub kind: PartialMatchKind,
@@ -332,7 +357,9 @@ pub struct PartialMatchInfo {
 }
 
 /// The kind of partial match found during a search.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub enum PartialMatchKind {
     /// Matched from the start of the query (postfix remaining).
     Postfix,
@@ -348,7 +375,9 @@ pub enum PartialMatchKind {
 ///
 /// Contains the token representing the inserted (or already-existing) vertex,
 /// plus a flag indicating whether the vertex was newly created.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct InsertResult {
     /// The token representing the inserted or existing pattern.
     pub token: TokenInfo,
@@ -361,7 +390,9 @@ pub struct InsertResult {
 ///
 /// Contains the root vertex info, its full leaf text, and a recursive
 /// decomposition tree.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct PatternReadResult {
     /// The root vertex being read.
     pub root: TokenInfo,
@@ -375,7 +406,9 @@ pub struct PatternReadResult {
 ///
 /// Atoms are leaf nodes (no children). Pattern vertices have children
 /// representing one decomposition of the pattern.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct ReadNode {
     /// The token at this node.
     pub token: TokenInfo,
@@ -384,7 +417,9 @@ pub struct ReadNode {
 }
 
 /// Report from a graph validation check.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct ValidationReport {
     /// Whether the graph passed all checks.
     pub valid: bool,

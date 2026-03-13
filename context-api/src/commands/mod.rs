@@ -417,7 +417,7 @@ impl WorkspaceApi for WorkspaceManager {
 /// The enum is tagged with `#[serde(tag = "command", rename_all = "snake_case")]`
 /// so that the JSON representation includes a `"command"` field identifying the
 /// variant.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum Command {
     // -- Workspace lifecycle ------------------------------------------------
@@ -530,7 +530,7 @@ pub enum Command {
 /// Each variant wraps the return type of the corresponding `WorkspaceApi`
 /// method. Adapters serialize this to JSON (or another format) for their
 /// response.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandResult {
     /// Result of `create_workspace` or `open_workspace`.
@@ -573,7 +573,7 @@ pub enum CommandResult {
     Text { text: String },
 
     /// Result of `get_snapshot`.
-    Snapshot(GraphSnapshot),
+    Snapshot(#[schemars(with = "serde_json::Value")] GraphSnapshot),
 
     /// Result of `get_statistics`.
     Statistics(GraphStatistics),

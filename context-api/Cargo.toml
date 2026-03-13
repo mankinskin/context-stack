@@ -23,6 +23,7 @@ fs2 = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 
+schemars = "1"
 ts-rs = { version = "10", features = ["serde-json-impl"], optional = true }
 
 [dev-dependencies]
