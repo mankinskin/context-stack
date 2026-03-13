@@ -5,6 +5,8 @@
 //! debugging.
 
 use context_trace::{
+    VertexData,
+    VertexIndex,
     VertexSet,
     graph::snapshot::GraphSnapshot,
 };
@@ -116,6 +118,185 @@ impl WorkspaceManager {
             issues,
         })
     }
+
+    /// Produce a human-readable visualization of the entire workspace graph.
+    ///
+    /// Shows all vertices sorted by index, with their children and parents.
+    ///
+    /// # Errors
+    ///
+    /// - `ApiError::Workspace(WorkspaceError::NotOpen)` if the workspace is not
+    ///   currently open.
+    pub fn show_graph(
+        &self,
+        ws_name: &str,
+    ) -> Result<String, ApiError> {
+        let ws = self.get_workspace(ws_name)?;
+        let graph = ws.graph();
+
+        if graph.vertex_count() == 0 {
+            return Ok("(empty graph)".to_string());
+        }
+
+        // Collect all vertices sorted by index
+        let mut entries: Vec<(usize, VertexData)> = graph
+            .vertex_iter()
+            .map(|(_key, data)| (data.to_token().index.0, data))
+            .collect();
+        entries.sort_by_key(|(idx, _)| *idx);
+
+        let mut lines = Vec::new();
+        lines.push(format!("Graph: {} vertices", entries.len()));
+        lines.push(String::new());
+
+        for (idx, data) in &entries {
+            let token = data.to_token();
+            let label = graph.vertex_data_string(data.clone());
+            let is_atom = graph.get_atom_by_key(&data.key()).is_some();
+            let kind = if is_atom { "atom" } else { "pattern" };
+
+            lines.push(format!(
+                "[{:>4}] \"{}\" (w:{}, {})",
+                idx, label, token.width.0, kind
+            ));
+
+            // Show children
+            if !data.child_patterns().is_empty() {
+                let mut sorted_patterns: Vec<_> =
+                    data.child_patterns().iter().collect();
+                sorted_patterns.sort_by_key(|(pid, _)| *pid);
+
+                for (i, (_pid, pattern)) in sorted_patterns.iter().enumerate() {
+                    let children_str: String = pattern
+                        .iter()
+                        .map(|t| {
+                            let child_label = graph.index_string(t.index);
+                            format!("\"{}\"({})", child_label, t.index.0)
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" -> ");
+                    if sorted_patterns.len() == 1 {
+                        lines
+                            .push(format!("       children: {}", children_str));
+                    } else {
+                        lines.push(format!(
+                            "       children[{}]: {}",
+                            i, children_str
+                        ));
+                    }
+                }
+            }
+
+            // Show parents
+            let parents = data.parents();
+            if !parents.is_empty() {
+                let mut parent_indices: Vec<usize> =
+                    parents.keys().map(|vi| vi.0).collect();
+                parent_indices.sort();
+                let parents_str: String = parent_indices
+                    .iter()
+                    .map(|pi| {
+                        let parent_label = graph.index_string(VertexIndex(*pi));
+                        format!("\"{}\"({})", parent_label, pi)
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                lines.push(format!("       parents:  {}", parents_str));
+            }
+        }
+
+        Ok(lines.join("\n"))
+    }
+
+    /// Produce a human-readable visualization of a single vertex.
+    ///
+    /// Shows the vertex with its label, type, width, all child patterns,
+    /// and all parent vertices.
+    ///
+    /// # Errors
+    ///
+    /// - `ApiError::Workspace(WorkspaceError::NotOpen)` if the workspace is not
+    ///   currently open.
+    pub fn show_vertex(
+        &self,
+        ws_name: &str,
+        index: usize,
+    ) -> Result<String, ApiError> {
+        let ws = self.get_workspace(ws_name)?;
+        let graph = ws.graph();
+
+        let vi = VertexIndex(index);
+        let data = match graph.get_vertex_data(vi) {
+            Ok(d) => d,
+            Err(_) => return Ok(format!("Vertex {} not found.", index)),
+        };
+
+        let token = data.to_token();
+        let label = graph.vertex_data_string(data.clone());
+        let is_atom = graph.get_atom_by_key(&data.key()).is_some();
+        let kind = if is_atom { "atom" } else { "pattern" };
+
+        let mut lines = Vec::new();
+        lines.push(format!(
+            "Vertex [{}] \"{}\" (width: {}, {})",
+            index, label, token.width.0, kind
+        ));
+
+        // Children
+        if data.child_patterns().is_empty() {
+            lines.push("  Children: (none)".to_string());
+        } else {
+            let mut sorted_patterns: Vec<_> =
+                data.child_patterns().iter().collect();
+            sorted_patterns.sort_by_key(|(pid, _)| *pid);
+
+            for (i, (_pid, pattern)) in sorted_patterns.iter().enumerate() {
+                let children_str: String = pattern
+                    .iter()
+                    .map(|t| {
+                        let child_label = graph.index_string(t.index);
+                        format!(
+                            "\"{}\" [{}] (w:{})",
+                            child_label, t.index.0, t.width.0
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" -> ");
+                if sorted_patterns.len() == 1 {
+                    lines.push(format!("  Children: {}", children_str));
+                } else {
+                    lines.push(format!("  Children[{}]: {}", i, children_str));
+                }
+            }
+        }
+
+        // Parents
+        let parents = data.parents();
+        if parents.is_empty() {
+            lines.push("  Parents:  (none)".to_string());
+        } else {
+            let mut parent_entries: Vec<(usize, String)> = parents
+                .keys()
+                .map(|vi| {
+                    let parent_label = graph.index_string(*vi);
+                    (vi.0, parent_label)
+                })
+                .collect();
+            parent_entries.sort_by_key(|(idx, _)| *idx);
+
+            for (pi, parent_label) in &parent_entries {
+                let parent_data = graph.get_vertex_data(VertexIndex(*pi));
+                let parent_width =
+                    parent_data.map(|d| d.to_token().width.0).unwrap_or(0);
+                lines.push(format!(
+                    "  Parent:   \"{}\" [{}] (w:{})",
+                    parent_label, pi, parent_width
+                ));
+            }
+        }
+
+        Ok(lines.join("\n"))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +306,6 @@ impl WorkspaceManager {
 #[cfg(test)]
 mod tests {
     use crate::workspace::manager::WorkspaceManager;
-    use std::collections::HashSet;
 
     /// Helper: create a `WorkspaceManager` backed by a temporary directory
     /// with a workspace already created and open.
@@ -142,8 +322,8 @@ mod tests {
         ws: &str,
         chars: &str,
     ) {
-        let char_set: HashSet<char> = chars.chars().collect();
-        mgr.add_atoms(ws, char_set).unwrap();
+        let char_vec: Vec<char> = chars.chars().collect();
+        mgr.add_atoms(ws, char_vec).unwrap();
     }
 
     // -- validate_graph ------------------------------------------------------
@@ -181,7 +361,7 @@ mod tests {
     #[test]
     fn validate_graph_after_insert() {
         let (_tmp, mut mgr) = setup("ws");
-        mgr.insert_sequence("ws", "hello world").unwrap();
+        mgr.insert_sequence("ws", "abcdefg").unwrap();
 
         let report = mgr.validate_graph("ws").unwrap();
         assert!(report.valid, "issues: {:?}", report.issues);

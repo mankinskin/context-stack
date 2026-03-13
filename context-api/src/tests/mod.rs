@@ -48,8 +48,8 @@ fn add_atoms_str(
     ws: &str,
     chars: &str,
 ) -> Vec<AtomInfo> {
-    let char_set: HashSet<char> = chars.chars().collect();
-    mgr.add_atoms(ws, char_set).unwrap()
+    let char_vec: Vec<char> = chars.chars().collect();
+    mgr.add_atoms(ws, char_vec).unwrap()
 }
 
 // ===========================================================================
@@ -494,7 +494,7 @@ fn atom_deduplication_across_operations() {
     assert_eq!(a1.index, a2.index, "same char must give same index");
 
     // Also via bulk add
-    let chars: HashSet<char> = ['a', 'b'].into_iter().collect();
+    let chars: Vec<char> = vec!['a', 'b'];
     let bulk = mgr.add_atoms("ws", chars).unwrap();
     let a_bulk = bulk.iter().find(|i| i.ch == 'a').unwrap();
     assert_eq!(a_bulk.index, a1.index, "bulk add should also deduplicate");

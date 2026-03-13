@@ -1,4 +1,4 @@
-//! Insert commands — insert patterns and sequences into the hypergraph.
+//! Insert commands — thin wrappers that forward directly to `context-insert`.
 //!
 //! Provides three entry points for inserting data into the graph:
 //!
@@ -7,20 +7,21 @@
 //! - `insert_sequence` — insert a text string (auto-creates atoms as needed).
 //! - `insert_sequences` — bulk insert a set of text strings.
 //!
-//! Insertions use the direct `graph.insert_pattern()` API which correctly
-//! handles building new vertices from token sequences. The search crate is
-//! used to check for existing sequences before inserting.
+//! ## Insertion strategy
 //!
-//! All return [`InsertResult`] indicating the resulting token and whether it
-//! already existed.
+//! All insertion is delegated directly to `context-insert`'s `insert()` pipeline
+//! (search → split → join). No short-circuits, no `ReadCtx`, no `insert_pattern`
+//! fallbacks. The API layer is intentionally thin — it exposes the exact
+//! semantics of the `context-insert` crate.
 
 use std::collections::HashSet;
 
-use context_search::Find;
+use context_insert::ToInsertCtx;
 use context_trace::graph::vertex::{
     atom::Atom,
     token::Token,
 };
+use tracing::debug;
 
 use crate::{
     error::InsertError,
@@ -37,15 +38,8 @@ impl WorkspaceManager {
     /// Insert a pattern specified by a list of token references.
     ///
     /// Each `TokenRef` is resolved to a concrete `Token` in the graph (by
-    /// index or label). If the resolved token sequence already exists as a
-    /// single vertex, the existing vertex is returned with
-    /// `already_existed: true`. Otherwise, the sequence is inserted into
-    /// the graph, splitting and joining as needed.
-    ///
-    /// # Arguments
-    ///
-    /// * `ws_name` — name of the open workspace.
-    /// * `query` — ordered list of token references forming the pattern to insert.
+    /// index or label). The resolved tokens are passed directly to
+    /// `context-insert`'s `insert_or_get_complete()` pipeline.
     ///
     /// # Errors
     ///
@@ -72,66 +66,64 @@ impl WorkspaceManager {
         // Resolve TokenRefs to Tokens
         let tokens = resolve_token_refs(&graph_ref, &query)?;
 
-        // First, check if this exact sequence already exists
-        match graph_ref.find_ancestor(tokens.as_slice()) {
-            Ok(response)
-                if response.is_entire_root() && response.query_exhausted() =>
-            {
-                let root = response.root_token();
-                let token_info = TokenInfo::from_graph(&graph_ref, root)
-                    .unwrap_or_else(|| TokenInfo {
-                        index: root.index.0,
-                        label: String::new(),
-                        width: root.width.0,
-                    });
-                return Ok(InsertResult {
-                    token: token_info,
-                    already_existed: true,
-                });
+        debug!(
+            token_count = tokens.len(),
+            tokens = ?tokens,
+            "insert_first_match: resolved tokens"
+        );
+
+        // Delegate directly to context-insert's insert_or_get_complete
+        let result = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_or_get_complete(
+            &graph_ref,
+            tokens,
+        )
+        .map_err(|e| {
+            InsertError::InternalError(format!(
+                "insert_or_get_complete failed: {e:?}"
+            ))
+        })?;
+
+        let (token, already_existed) = match result {
+            Ok(iwp) => {
+                // Newly created via split+join
+                debug!(token = ?iwp.index, "insert_first_match: newly inserted");
+                (iwp.index, false)
             },
-            _ => {
-                // Not found or partial — proceed to insert
+            Err(iwp) => {
+                // Already existed — full match found
+                debug!(token = ?iwp.index, "insert_first_match: already existed");
+                (iwp.index, true)
             },
+        };
+
+        // Mark workspace dirty only if we created something new
+        if !already_existed {
+            let ws = self.get_workspace_mut(ws_name).map_err(|_| {
+                InsertError::WorkspaceNotOpen {
+                    workspace: ws_name.to_string(),
+                }
+            })?;
+            ws.mark_dirty();
         }
 
-        // Insert the pattern directly using the graph API.
-        // The resolved tokens are already concrete vertices in the graph,
-        // so we can call insert_pattern directly.
-        let result_token = graph_ref.insert_pattern(tokens);
-
-        // Mark workspace dirty
-        let ws = self.get_workspace_mut(ws_name).map_err(|_| {
-            InsertError::WorkspaceNotOpen {
-                workspace: ws_name.to_string(),
-            }
-        })?;
-        ws.mark_dirty();
-
-        let token_info = TokenInfo::from_graph(&graph_ref, result_token)
+        let token_info = TokenInfo::from_graph(&graph_ref, token)
             .unwrap_or_else(|| TokenInfo {
-                index: result_token.index.0,
+                index: token.index.0,
                 label: String::new(),
-                width: result_token.width.0,
+                width: token.width.0,
             });
 
         Ok(InsertResult {
             token: token_info,
-            already_existed: false,
+            already_existed,
         })
     }
 
     /// Insert a text sequence into the graph.
     ///
     /// Each character in the text is ensured to exist as an atom (auto-created
-    /// if missing). If the full sequence already exists as a single vertex,
-    /// the existing vertex is returned with `already_existed: true`. Otherwise,
-    /// atoms are created for each character and the full token sequence is
-    /// inserted via `graph.insert_pattern()`.
-    ///
-    /// # Arguments
-    ///
-    /// * `ws_name` — name of the open workspace.
-    /// * `text` — the text string to insert (must be at least 2 characters).
+    /// if missing). The atom tokens are then passed directly to
+    /// `context-insert`'s `insert_or_get_complete()` pipeline.
     ///
     /// # Errors
     ///
@@ -154,43 +146,10 @@ impl WorkspaceManager {
         })?;
         let graph_ref = ws.graph_ref();
 
-        // First check if the sequence already exists in the graph.
-        // We need all atoms to exist for the search to work, so we check
-        // whether all chars are known atoms first.
-        let all_atoms_exist = text
-            .chars()
-            .all(|ch| graph_ref.get_atom_index(Atom::Element(ch)).is_ok());
+        debug!(text, "insert_sequence: starting");
 
-        if all_atoms_exist {
-            match graph_ref.find_ancestor(text.chars()) {
-                Ok(response)
-                    if response.is_entire_root()
-                        && response.query_exhausted() =>
-                {
-                    let root = response.root_token();
-                    let token_info = TokenInfo::from_graph(&graph_ref, root)
-                        .unwrap_or_else(|| TokenInfo {
-                            index: root.index.0,
-                            label: String::new(),
-                            width: root.width.0,
-                        });
-
-                    // Mark dirty in case we want to track reads
-                    return Ok(InsertResult {
-                        token: token_info,
-                        already_existed: true,
-                    });
-                },
-                _ => {
-                    // Not found or partial — proceed to insert
-                },
-            }
-        }
-
-        // Ensure all atoms exist (auto-create missing ones) and build
-        // the token sequence preserving the original character order
-        // (including duplicate characters).
-        let tokens: Vec<_> = text
+        // Ensure all atoms exist (auto-create missing ones)
+        let tokens: Vec<Token> = text
             .chars()
             .map(|ch| {
                 let atom = Atom::Element(ch);
@@ -201,35 +160,56 @@ impl WorkspaceManager {
             })
             .collect();
 
-        // Insert the full pattern directly.
-        let result_token = graph_ref.insert_pattern(tokens);
-
-        // Mark workspace dirty
-        let ws = self.get_workspace_mut(ws_name).map_err(|_| {
-            InsertError::WorkspaceNotOpen {
-                workspace: ws_name.to_string(),
-            }
+        // Delegate directly to context-insert's insert_or_get_complete
+        let result = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_or_get_complete(
+            &graph_ref,
+            tokens,
+        )
+        .map_err(|e| {
+            InsertError::InternalError(format!(
+                "insert_or_get_complete failed: {e:?}"
+            ))
         })?;
-        ws.mark_dirty();
 
-        let token_info = TokenInfo::from_graph(&graph_ref, result_token)
+        let (token, already_existed) = match result {
+            Ok(iwp) => {
+                debug!(token = ?iwp.index, "insert_sequence: newly inserted");
+                (iwp.index, false)
+            },
+            Err(iwp) => {
+                debug!(token = ?iwp.index, "insert_sequence: already existed");
+                (iwp.index, true)
+            },
+        };
+
+        // Mark workspace dirty only if we created something new
+        if !already_existed {
+            let ws = self.get_workspace_mut(ws_name).map_err(|_| {
+                InsertError::WorkspaceNotOpen {
+                    workspace: ws_name.to_string(),
+                }
+            })?;
+            ws.mark_dirty();
+        }
+
+        let token_info = TokenInfo::from_graph(&graph_ref, token)
             .unwrap_or_else(|| TokenInfo {
-                index: result_token.index.0,
+                index: token.index.0,
                 label: String::new(),
-                width: result_token.width.0,
+                width: token.width.0,
             });
 
         Ok(InsertResult {
             token: token_info,
-            already_existed: false,
+            already_existed,
         })
     }
 
     /// Bulk insert multiple text sequences into the graph.
     ///
-    /// Each sequence is inserted independently. The order of processing is
-    /// not guaranteed (the input is a `HashSet`). Results are returned in
-    /// the order they were processed.
+    /// Each sequence is inserted independently via `insert_sequence`. The
+    /// order of processing is not guaranteed (the input is a `HashSet`).
+    /// Results are returned in the order they were processed.
     ///
     /// # Arguments
     ///
@@ -253,10 +233,6 @@ impl WorkspaceManager {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use crate::workspace::manager::WorkspaceManager;
@@ -277,8 +253,8 @@ mod tests {
         ws: &str,
         chars: &str,
     ) {
-        let char_set: HashSet<char> = chars.chars().collect();
-        mgr.add_atoms(ws, char_set).unwrap();
+        let char_vec: Vec<char> = chars.chars().collect();
+        mgr.add_atoms(ws, char_vec).unwrap();
     }
 
     // -- insert_sequence -----------------------------------------------------
@@ -297,13 +273,13 @@ mod tests {
         let (_tmp, mut mgr) = setup("ws");
         // No atoms added yet — insert_sequence should auto-create them
 
-        let result = mgr.insert_sequence("ws", "hello").unwrap();
+        let result = mgr.insert_sequence("ws", "abcde").unwrap();
         assert!(!result.already_existed);
 
         // Verify atoms were created
         let atoms = mgr.list_atoms("ws").unwrap();
         let atom_chars: HashSet<char> = atoms.iter().map(|a| a.ch).collect();
-        for ch in "helo".chars() {
+        for ch in "abcde".chars() {
             assert!(
                 atom_chars.contains(&ch),
                 "atom '{ch}' should have been auto-created"
@@ -481,6 +457,105 @@ mod tests {
         mgr.insert_sequence("ws", "abcd").unwrap();
 
         // Validate graph integrity
+        let report = mgr.validate_graph("ws").unwrap();
+        assert!(report.valid, "graph should be valid: {:?}", report.issues);
+    }
+
+    // -- overlap / extension tests ------------------------------------------
+
+    #[test]
+    fn insert_overlapping_sequences_shares_subpatterns() {
+        let (_tmp, mut mgr) = setup("ws");
+
+        // Insert "ab" then "bc" — they overlap on 'b'
+        let ab = mgr.insert_sequence("ws", "ab").unwrap();
+        let _bc = mgr.insert_sequence("ws", "bc").unwrap();
+
+        assert!(!ab.already_existed);
+
+        // "ab" should still be searchable after inserting "bc"
+        let r1 = mgr.search_sequence("ws", "ab").unwrap();
+        assert!(r1.complete, "ab should be found");
+
+        // Graph should be valid
+        let report = mgr.validate_graph("ws").unwrap();
+        assert!(report.valid, "graph should be valid: {:?}", report.issues);
+    }
+
+    #[test]
+    fn insert_supersequence_of_existing() {
+        let (_tmp, mut mgr) = setup("ws");
+
+        // Insert "ab" first, then "abc" which extends it
+        mgr.insert_sequence("ws", "ab").unwrap();
+        let abc = mgr.insert_sequence("ws", "abc").unwrap();
+
+        assert!(!abc.already_existed);
+        assert_eq!(abc.token.width, 3);
+
+        // "ab" should still be searchable
+        let r1 = mgr.search_sequence("ws", "ab").unwrap();
+        assert!(r1.complete, "ab should still be found");
+
+        let report = mgr.validate_graph("ws").unwrap();
+        assert!(report.valid, "graph should be valid: {:?}", report.issues);
+    }
+
+    #[test]
+    fn insert_subsequence_of_existing() {
+        let (_tmp, mut mgr) = setup("ws");
+
+        // Insert "abcd" first, then "bc" which is a subsequence
+        mgr.insert_sequence("ws", "abcd").unwrap();
+        let _bc = mgr.insert_sequence("ws", "bc").unwrap();
+
+        let report = mgr.validate_graph("ws").unwrap();
+        assert!(report.valid, "graph should be valid: {:?}", report.issues);
+    }
+
+    #[test]
+    fn insert_sequence_with_repeated_chars() {
+        let (_tmp, mut mgr) = setup("ws");
+
+        // "hello" has repeated 'l'
+        let result = mgr.insert_sequence("ws", "hello").unwrap();
+        assert!(!result.already_existed);
+        assert_eq!(result.token.width, 5);
+        assert_eq!(result.token.label, "hello");
+
+        // Read back as text to verify the graph structure is correct
+        let text_result = mgr.read_as_text("ws", result.token.index).unwrap();
+        assert_eq!(text_result, "hello");
+
+        let report = mgr.validate_graph("ws").unwrap();
+        assert!(report.valid, "graph should be valid: {:?}", report.issues);
+    }
+
+    #[test]
+    fn insert_sequence_correct_label() {
+        let (_tmp, mut mgr) = setup("ws");
+
+        let result = mgr.insert_sequence("ws", "xyz").unwrap();
+        assert_eq!(result.token.label, "xyz");
+        assert_eq!(result.token.width, 3);
+    }
+
+    #[test]
+    fn insert_disjoint_sequences_are_independent() {
+        let (_tmp, mut mgr) = setup("ws");
+
+        // Insert two sequences with no shared characters
+        let r1 = mgr.insert_sequence("ws", "ab").unwrap();
+        let r2 = mgr.insert_sequence("ws", "cd").unwrap();
+
+        assert_ne!(r1.token.index, r2.token.index);
+
+        let s1 = mgr.search_sequence("ws", "ab").unwrap();
+        assert!(s1.complete, "ab should be found");
+
+        let s2 = mgr.search_sequence("ws", "cd").unwrap();
+        assert!(s2.complete, "cd should be found");
+
         let report = mgr.validate_graph("ws").unwrap();
         assert!(report.valid, "graph should be valid: {:?}", report.issues);
     }

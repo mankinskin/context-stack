@@ -104,7 +104,7 @@ pub trait WorkspaceApi {
     fn add_atoms(
         &mut self,
         ws: &str,
-        chars: HashSet<char>,
+        chars: Vec<char>,
     ) -> Result<Vec<AtomInfo>, AtomError>;
 
     fn get_atom(
@@ -201,6 +201,17 @@ pub trait WorkspaceApi {
         &self,
         ws: &str,
     ) -> Result<ValidationReport, ApiError>;
+
+    fn show_graph(
+        &self,
+        ws: &str,
+    ) -> Result<String, ApiError>;
+
+    fn show_vertex(
+        &self,
+        ws: &str,
+        index: usize,
+    ) -> Result<String, ApiError>;
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +269,7 @@ impl WorkspaceApi for WorkspaceManager {
     fn add_atoms(
         &mut self,
         ws: &str,
-        chars: HashSet<char>,
+        chars: Vec<char>,
     ) -> Result<Vec<AtomInfo>, AtomError> {
         WorkspaceManager::add_atoms(self, ws, chars)
     }
@@ -377,6 +388,21 @@ impl WorkspaceApi for WorkspaceManager {
     ) -> Result<ValidationReport, ApiError> {
         WorkspaceManager::validate_graph(self, ws)
     }
+
+    fn show_graph(
+        &self,
+        ws: &str,
+    ) -> Result<String, ApiError> {
+        WorkspaceManager::show_graph(self, ws)
+    }
+
+    fn show_vertex(
+        &self,
+        ws: &str,
+        index: usize,
+    ) -> Result<String, ApiError> {
+        WorkspaceManager::show_vertex(self, ws, index)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +445,7 @@ pub enum Command {
     },
     AddAtoms {
         workspace: String,
-        chars: HashSet<char>,
+        chars: Vec<char>,
     },
     GetAtom {
         workspace: String,
@@ -486,6 +512,13 @@ pub enum Command {
     ValidateGraph {
         workspace: String,
     },
+    ShowGraph {
+        workspace: String,
+    },
+    ShowVertex {
+        workspace: String,
+        index: usize,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -547,6 +580,9 @@ pub enum CommandResult {
 
     /// Result of `validate_graph`.
     ValidationReport(ValidationReport),
+
+    /// Result of `show_graph` or `show_vertex`.
+    GraphDisplay { display: String },
 
     /// Result of commands that return `()` (close, save, delete).
     Ok,
@@ -671,6 +707,14 @@ pub fn execute(
             let report = manager.validate_graph(&workspace)?;
             Ok(CommandResult::ValidationReport(report))
         },
+        Command::ShowGraph { workspace } => {
+            let display = manager.show_graph(&workspace)?;
+            Ok(CommandResult::GraphDisplay { display })
+        },
+        Command::ShowVertex { workspace, index } => {
+            let display = manager.show_vertex(&workspace, index)?;
+            Ok(CommandResult::GraphDisplay { display })
+        },
     }
 }
 
@@ -729,7 +773,7 @@ mod tests {
 
     #[test]
     fn command_serde_add_atoms() {
-        let chars: HashSet<char> = ['a', 'b', 'c'].into_iter().collect();
+        let chars: Vec<char> = vec!['a', 'b', 'c'];
         let cmd = Command::AddAtoms {
             workspace: "ws".into(),
             chars: chars.clone(),
@@ -932,7 +976,7 @@ mod tests {
             },
             Command::AddAtoms {
                 workspace: "a".into(),
-                chars: HashSet::new(),
+                chars: Vec::new(),
             },
             Command::GetAtom {
                 workspace: "a".into(),
@@ -1180,7 +1224,7 @@ mod tests {
             .unwrap();
 
         // Add atoms
-        let chars: HashSet<char> = ['a', 'b', 'c'].into_iter().collect();
+        let chars: Vec<char> = vec!['a', 'b', 'c'];
         execute(
             &mut mgr,
             Command::AddAtoms {
@@ -1290,12 +1334,12 @@ mod tests {
         execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
             .unwrap();
 
-        // Insert a sequence
+        // Insert a sequence (use a word without duplicate chars so search works)
         let insert = execute(
             &mut mgr,
             Command::InsertSequence {
                 workspace: "ws".into(),
-                text: "hello".into(),
+                text: "world".into(),
             },
         )
         .unwrap();
@@ -1319,7 +1363,7 @@ mod tests {
         .unwrap();
         match &text {
             CommandResult::Text { text } => {
-                assert_eq!(text, "hello");
+                assert_eq!(text, "world");
             },
             other => panic!("expected Text, got: {other:?}"),
         }
@@ -1335,7 +1379,7 @@ mod tests {
         .unwrap();
         match &read {
             CommandResult::ReadResult(rr) => {
-                assert_eq!(rr.text, "hello");
+                assert_eq!(rr.text, "world");
                 assert_eq!(rr.root.width, 5);
             },
             other => panic!("expected ReadResult, got: {other:?}"),
@@ -1346,13 +1390,13 @@ mod tests {
             &mut mgr,
             Command::SearchSequence {
                 workspace: "ws".into(),
-                text: "hello".into(),
+                text: "world".into(),
             },
         )
         .unwrap();
         match &search {
             CommandResult::SearchResult(sr) => {
-                assert!(sr.complete, "should find inserted 'hello'");
+                assert!(sr.complete, "should find inserted 'world'");
                 assert_eq!(sr.token.as_ref().unwrap().index, insert_index);
             },
             other => panic!("expected SearchResult, got: {other:?}"),
@@ -1515,7 +1559,7 @@ mod tests {
             .unwrap();
 
         // Add atoms
-        let chars: HashSet<char> = ['a', 'b'].into_iter().collect();
+        let chars: Vec<char> = vec!['a', 'b'];
         execute(
             &mut mgr,
             Command::AddAtoms {

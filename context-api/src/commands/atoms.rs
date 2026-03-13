@@ -55,8 +55,8 @@ impl WorkspaceManager {
     /// Add multiple atoms (characters) to the graph in bulk.
     ///
     /// Each character is deduplicated individually — existing atoms are
-    /// returned without creating duplicates. The result order is **not**
-    /// guaranteed to match the input order (the input is a `HashSet`).
+    /// returned without creating duplicates. The result preserves the
+    /// insertion order of the input `Vec`, skipping duplicate characters.
     ///
     /// # Errors
     ///
@@ -64,7 +64,7 @@ impl WorkspaceManager {
     pub fn add_atoms(
         &mut self,
         ws_name: &str,
-        chars: HashSet<char>,
+        chars: Vec<char>,
     ) -> Result<Vec<AtomInfo>, AtomError> {
         let ws = self.get_workspace_mut(ws_name).map_err(|_| {
             AtomError::WorkspaceNotOpen {
@@ -73,8 +73,13 @@ impl WorkspaceManager {
         })?;
         let graph = ws.graph_mut();
 
+        let mut seen = HashSet::with_capacity(chars.len());
         let mut results = Vec::with_capacity(chars.len());
         for ch in chars {
+            // Skip duplicate characters in the input, preserving first occurrence order.
+            if !seen.insert(ch) {
+                continue;
+            }
             // Deduplicate: check for existing atom first.
             let index = if let Ok(idx) = graph.get_atom_index(Atom::Element(ch))
             {
@@ -85,8 +90,6 @@ impl WorkspaceManager {
             results.push(AtomInfo { index, ch });
         }
 
-        // Sort by index for deterministic output.
-        results.sort_by_key(|a| a.index);
         Ok(results)
     }
 
@@ -195,12 +198,13 @@ mod tests {
     #[test]
     fn add_atoms_bulk() {
         let (_tmp, mut mgr) = setup("ws");
-        let chars: HashSet<char> = ['a', 'b', 'c'].into_iter().collect();
+        let chars: Vec<char> = vec!['a', 'b', 'c'];
         let infos = mgr.add_atoms("ws", chars).unwrap();
         assert_eq!(infos.len(), 3);
-        // Should be sorted by index.
-        assert!(infos[0].index < infos[1].index);
-        assert!(infos[1].index < infos[2].index);
+        // Should preserve input order.
+        assert_eq!(infos[0].ch, 'a');
+        assert_eq!(infos[1].ch, 'b');
+        assert_eq!(infos[2].ch, 'c');
     }
 
     #[test]
@@ -208,7 +212,7 @@ mod tests {
         let (_tmp, mut mgr) = setup("ws");
         let first = mgr.add_atom("ws", 'a').unwrap();
 
-        let chars: HashSet<char> = ['a', 'b'].into_iter().collect();
+        let chars: Vec<char> = vec!['a', 'b'];
         let infos = mgr.add_atoms("ws", chars).unwrap();
 
         // 'a' should keep its original index.

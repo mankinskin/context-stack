@@ -154,7 +154,6 @@ impl WorkspaceManager {
 mod tests {
     use super::*;
     use crate::workspace::manager::WorkspaceManager;
-    use std::collections::HashSet;
 
     /// Helper: create a `WorkspaceManager` backed by a temporary directory
     /// with a workspace already created and open.
@@ -171,8 +170,8 @@ mod tests {
         ws: &str,
         chars: &str,
     ) {
-        let char_set: HashSet<char> = chars.chars().collect();
-        mgr.add_atoms(ws, char_set).unwrap();
+        let char_vec: Vec<char> = chars.chars().collect();
+        mgr.add_atoms(ws, char_vec).unwrap();
     }
 
     // -- add_simple_pattern --------------------------------------------------

@@ -214,7 +214,6 @@ fn collect_leaf_text(
 #[cfg(test)]
 mod tests {
     use crate::workspace::manager::WorkspaceManager;
-    use std::collections::HashSet;
 
     /// Helper: create a `WorkspaceManager` backed by a temporary directory
     /// with a workspace already created and open.
@@ -231,8 +230,8 @@ mod tests {
         ws: &str,
         chars: &str,
     ) {
-        let char_set: HashSet<char> = chars.chars().collect();
-        mgr.add_atoms(ws, char_set).unwrap();
+        let char_vec: Vec<char> = chars.chars().collect();
+        mgr.add_atoms(ws, char_vec).unwrap();
     }
 
     // -- read_pattern --------------------------------------------------------
@@ -340,14 +339,14 @@ mod tests {
         let (_tmp, mut mgr) = setup("ws");
 
         // Insert a sequence and then read it back
-        let insert_result = mgr.insert_sequence("ws", "hello").unwrap();
+        let insert_result = mgr.insert_sequence("ws", "abcde").unwrap();
 
         let read_result =
             mgr.read_pattern("ws", insert_result.token.index).unwrap();
-        assert_eq!(read_result.text, "hello");
+        assert_eq!(read_result.text, "abcde");
         assert_eq!(read_result.root.width, 5);
 
         let text = mgr.read_as_text("ws", insert_result.token.index).unwrap();
-        assert_eq!(text, "hello");
+        assert_eq!(text, "abcde");
     }
 }
