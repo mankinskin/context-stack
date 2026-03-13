@@ -13,8 +13,10 @@ use context_trace::{
     Pattern,
     Token,
     VertexSet,
-    graph::{
-        visualization::{DeltaOp, GraphMutation, Transition},
+    graph::visualization::{
+        DeltaOp,
+        GraphMutation,
+        Transition,
     },
 };
 use tracing::debug;
@@ -39,7 +41,7 @@ use crate::{
         Pre,
     },
     join::partition::Join,
-    visualization::{emit_insert_node_with_delta},
+    visualization::emit_insert_node_with_delta,
 };
 
 /// Context for iterating over partitions and merging them.
@@ -172,9 +174,15 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
     /// - Prefix: partition num_offsets (postfix) is outside
     /// - Infix: both partition 0 and num_offsets are outside
     ///
-    /// IMPORTANT: Edge partitions are merged using `merge_token_only` which
-    /// does NOT modify the root pattern. This avoids corrupting the existing
-    /// pattern structure. The tokens are only needed for `add_root_pattern`.
+    /// Edge partitions represent the context surrounding the insert target.
+    ///
+    /// When the split boundary aligns with original child-token boundaries
+    /// we skip vertex creation entirely — `add_root_pattern` will splice the
+    /// original child tokens into the new pattern instead.
+    ///
+    /// When the boundary falls inside a compound child we must create a
+    /// token via `merge_token_only` so that `add_root_pattern` can reference
+    /// it.
     fn populate_edge_partitions(&mut self) {
         let num_offsets = self.ctx.offsets.len();
         let op_start = *self.operating_range.start();
@@ -183,34 +191,57 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
         // Check if there's a prefix edge partition (partition 0 is outside operating range)
         if op_start > 0 {
             let prefix_range = PartitionRange::from(0);
-            debug!(
-                ?prefix_range,
-                "Merging edge partition (prefix) - token only, no pattern modification"
-            );
-            let prefix_token = MergePartitionCtx::<Pre<Join>>::from_merge_ctx(
-                self.ctx,
-                &self.range_map,
-                prefix_range.clone(),
-            )
-            .merge_token_only();
-            self.range_map.insert(prefix_range, prefix_token);
+            let boundary = self.ctx.offset_width_at_index(op_start - 1);
+
+            if self.ctx.try_original_prefix_tokens(boundary).is_some() {
+                debug!(
+                    ?prefix_range,
+                    boundary,
+                    "Skipping prefix edge — boundary aligns with child tokens"
+                );
+            } else {
+                debug!(
+                    ?prefix_range,
+                    boundary,
+                    "Merging prefix edge — boundary inside compound child"
+                );
+                let prefix_token =
+                    MergePartitionCtx::<Pre<Join>>::from_merge_ctx(
+                        self.ctx,
+                        &self.range_map,
+                        prefix_range.clone(),
+                    )
+                    .merge_token_only();
+                self.range_map.insert(prefix_range, prefix_token);
+            }
         }
 
         // Check if there's a postfix edge partition (last partition is outside operating range)
         if op_end < num_offsets {
             let postfix_range = PartitionRange::from(num_offsets);
-            debug!(
-                ?postfix_range,
-                "Merging edge partition (postfix) - token only, no pattern modification"
-            );
-            let postfix_token =
-                MergePartitionCtx::<Post<Join>>::from_merge_ctx(
-                    self.ctx,
-                    &self.range_map,
-                    postfix_range.clone(),
-                )
-                .merge_token_only();
-            self.range_map.insert(postfix_range, postfix_token);
+            let boundary = self.ctx.offset_width_at_index(op_end);
+
+            if self.ctx.try_original_postfix_tokens(boundary).is_some() {
+                debug!(
+                    ?postfix_range,
+                    boundary,
+                    "Skipping postfix edge — boundary aligns with child tokens"
+                );
+            } else {
+                debug!(
+                    ?postfix_range,
+                    boundary,
+                    "Merging postfix edge — boundary inside compound child"
+                );
+                let postfix_token =
+                    MergePartitionCtx::<Post<Join>>::from_merge_ctx(
+                        self.ctx,
+                        &self.range_map,
+                        postfix_range.clone(),
+                    )
+                    .merge_token_only();
+                self.range_map.insert(postfix_range, postfix_token);
+            }
         }
     }
 
@@ -491,19 +522,96 @@ pub(crate) struct MergeIterResult {
 
 /// Extension methods for MergeCtx to add root patterns.
 impl<'a> MergeCtx<'a> {
+    /// Try to extract original child tokens from the root's first pattern
+    /// that fall before the given width boundary.
+    ///
+    /// Returns `Some(tokens)` when the boundary aligns exactly with a child
+    /// token boundary, `None` when it falls inside a compound child.
+    fn try_original_prefix_tokens(
+        &self,
+        boundary_width: usize,
+    ) -> Option<Vec<Token>> {
+        let root = self.ctx.index;
+        let (_, first_pattern) = self
+            .ctx
+            .trav
+            .expect_child_patterns(root)
+            .into_iter()
+            .next()
+            .expect("root must have at least one child pattern");
+        let mut cumulative = 0usize;
+        let mut tokens = Vec::new();
+        for tok in first_pattern.iter() {
+            if cumulative == boundary_width {
+                return Some(tokens);
+            }
+            cumulative += tok.width.0;
+            tokens.push(*tok);
+        }
+        if cumulative == boundary_width {
+            Some(tokens)
+        } else {
+            None // boundary fell inside a compound child
+        }
+    }
+
+    /// Try to extract original child tokens from the root's first pattern
+    /// that fall after the given width boundary.
+    ///
+    /// Returns `Some(tokens)` when the boundary aligns exactly with a child
+    /// token boundary, `None` when it falls inside a compound child.
+    fn try_original_postfix_tokens(
+        &self,
+        boundary_width: usize,
+    ) -> Option<Vec<Token>> {
+        let root = self.ctx.index;
+        let (_, first_pattern) = self
+            .ctx
+            .trav
+            .expect_child_patterns(root)
+            .into_iter()
+            .next()
+            .expect("root must have at least one child pattern");
+        let mut cumulative = 0usize;
+        let mut tokens = Vec::new();
+        let mut found_boundary = false;
+        for tok in first_pattern.iter() {
+            if cumulative == boundary_width {
+                found_boundary = true;
+            }
+            if found_boundary {
+                tokens.push(*tok);
+            }
+            cumulative += tok.width.0;
+        }
+        if found_boundary { Some(tokens) } else { None }
+    }
+
+    /// Get the width-based offset value for a given offset index.
+    ///
+    /// Offset index 0 is the first (smallest) offset, index 1 is the second, etc.
+    fn offset_width_at_index(
+        &self,
+        index: usize,
+    ) -> usize {
+        self.offsets
+            .iter()
+            .nth(index)
+            .map(|(offset, _)| offset.get())
+            .expect("offset index out of bounds")
+    }
+
     /// Add a root pattern that includes the merged operating range token.
     ///
     /// For Root merge modes, this adds a new pattern to the root node that
-    /// decomposes into [prefix..., operating_token, ...postfix] based on the mode:
-    /// - Prefix: [operating_token, postfix]
-    /// - Postfix: [prefix, operating_token]  
-    /// - Infix: [prefix, operating_token, postfix]
+    /// decomposes into context + operating_token based on the mode.
     ///
-    /// Note: The operating_token is the result of merging the full operating range,
-    /// NOT just the target_range. For example, for Postfix mode:
-    /// - target_range might be 2..=2 (just the new token "bcd")
-    /// - operating_range is 1..=2 (includes wrapper, producing "abcd")
-    /// - The root pattern uses the operating_range result: [prefix, abcd]
+    /// When a split boundary aligns with original child-token boundaries the
+    /// context portion is expressed as the original individual tokens (e.g.
+    /// inserting "abc" into [a,b,c,d,e,f,g,h,i] → [abc, d, e, f, g, h, i]).
+    ///
+    /// When the boundary falls inside a compound child the context is the
+    /// single compound edge token produced by `populate_edge_partitions`.
     pub(crate) fn add_root_pattern(
         &mut self,
         range_map: &RangeMap,
@@ -522,59 +630,96 @@ impl<'a> MergeCtx<'a> {
             )
         });
 
-        // Build the pattern based on root mode
+        // Build the pattern based on root mode.
+        // For each edge (prefix/postfix context), try to use original child
+        // tokens when the boundary aligns, otherwise fall back to the compound
+        // edge token from the range_map.
         let pattern = match self.mode {
             MergeMode::Root(RootMode::Prefix) => {
-                // Pattern: [operating_token, postfix]
-                // Postfix is the last partition (after all offsets)
+                let boundary = self.offset_width_at_index(num_offsets - 1);
                 let postfix_range = PartitionRange::from(num_offsets);
-                let postfix =
-                    range_map.get(&postfix_range).unwrap_or_else(|| {
-                        panic!(
-                            "Postfix partition {:?} not found. Available: {:?}",
-                            postfix_range,
-                            range_map.map.keys().collect::<Vec<_>>()
-                        )
-                    });
-                Pattern::from(vec![*operating_token, *postfix])
+                let mut pat = vec![*operating_token];
+                if let Some(postfix_tokens) =
+                    self.try_original_postfix_tokens(boundary)
+                {
+                    debug!(?postfix_tokens, "Using original postfix tokens");
+                    pat.extend(postfix_tokens);
+                } else {
+                    let postfix =
+                        range_map.get(&postfix_range).unwrap_or_else(|| {
+                            panic!(
+                                "Postfix partition {:?} not found. Available: {:?}",
+                                postfix_range,
+                                range_map.map.keys().collect::<Vec<_>>()
+                            )
+                        });
+                    pat.push(*postfix);
+                }
+                Pattern::from(pat)
             },
             MergeMode::Root(RootMode::Postfix) => {
-                // Pattern: [prefix, operating_token]
-                // Prefix is the first partition (before first offset)
+                let boundary = self.offset_width_at_index(0);
                 let prefix_range = PartitionRange::from(0);
-                let prefix =
-                    range_map.get(&prefix_range).unwrap_or_else(|| {
-                        panic!(
-                            "Prefix partition {:?} not found. Available: {:?}",
-                            prefix_range,
-                            range_map.map.keys().collect::<Vec<_>>()
-                        )
-                    });
-                Pattern::from(vec![*prefix, *operating_token])
+                let mut pat: Vec<Token> = if let Some(prefix_tokens) =
+                    self.try_original_prefix_tokens(boundary)
+                {
+                    debug!(?prefix_tokens, "Using original prefix tokens");
+                    prefix_tokens
+                } else {
+                    let prefix =
+                            range_map.get(&prefix_range).unwrap_or_else(|| {
+                                panic!(
+                                    "Prefix partition {:?} not found. Available: {:?}",
+                                    prefix_range,
+                                    range_map.map.keys().collect::<Vec<_>>()
+                                )
+                            });
+                    vec![*prefix]
+                };
+                pat.push(*operating_token);
+                Pattern::from(pat)
             },
             MergeMode::Root(RootMode::Infix) => {
-                // Pattern: [prefix, operating_token, postfix]
+                let prefix_boundary = self.offset_width_at_index(0);
+                let postfix_boundary =
+                    self.offset_width_at_index(num_offsets - 1);
                 let prefix_range = PartitionRange::from(0);
                 let postfix_range = PartitionRange::from(num_offsets);
 
-                let prefix =
-                    range_map.get(&prefix_range).unwrap_or_else(|| {
-                        panic!(
-                            "Prefix partition {:?} not found. Available: {:?}",
-                            prefix_range,
-                            range_map.map.keys().collect::<Vec<_>>()
-                        )
-                    });
-                let postfix =
-                    range_map.get(&postfix_range).unwrap_or_else(|| {
-                        panic!(
-                            "Postfix partition {:?} not found. Available: {:?}",
-                            postfix_range,
-                            range_map.map.keys().collect::<Vec<_>>()
-                        )
-                    });
-
-                Pattern::from(vec![*prefix, *operating_token, *postfix])
+                let mut pat: Vec<Token> = if let Some(prefix_tokens) =
+                    self.try_original_prefix_tokens(prefix_boundary)
+                {
+                    debug!(?prefix_tokens, "Using original prefix tokens");
+                    prefix_tokens
+                } else {
+                    let prefix =
+                            range_map.get(&prefix_range).unwrap_or_else(|| {
+                                panic!(
+                                    "Prefix partition {:?} not found. Available: {:?}",
+                                    prefix_range,
+                                    range_map.map.keys().collect::<Vec<_>>()
+                                )
+                            });
+                    vec![*prefix]
+                };
+                pat.push(*operating_token);
+                if let Some(postfix_tokens) =
+                    self.try_original_postfix_tokens(postfix_boundary)
+                {
+                    debug!(?postfix_tokens, "Using original postfix tokens");
+                    pat.extend(postfix_tokens);
+                } else {
+                    let postfix =
+                        range_map.get(&postfix_range).unwrap_or_else(|| {
+                            panic!(
+                                "Postfix partition {:?} not found. Available: {:?}",
+                                postfix_range,
+                                range_map.map.keys().collect::<Vec<_>>()
+                            )
+                        });
+                    pat.push(*postfix);
+                }
+                Pattern::from(pat)
             },
             MergeMode::Full => {
                 // No root pattern needed for intermediary nodes
