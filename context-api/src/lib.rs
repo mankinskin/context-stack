@@ -103,6 +103,7 @@ pub mod prelude {
             CommandResult,
             WorkspaceApi,
             execute,
+            export_import::ExportFormat,
         },
         error::{
             ApiError,

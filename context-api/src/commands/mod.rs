@@ -14,6 +14,7 @@
 
 pub mod atoms;
 pub mod debug;
+pub mod export_import;
 pub mod insert;
 pub mod logs;
 pub mod patterns;
@@ -26,6 +27,8 @@ use serde::{
     Deserialize,
     Serialize,
 };
+
+use self::export_import::ExportFormat;
 
 use context_trace::graph::snapshot::GraphSnapshot;
 
@@ -224,6 +227,30 @@ pub trait WorkspaceApi {
         ws: &str,
         index: usize,
     ) -> Result<String, ApiError>;
+
+    // -- Export / Import (Phase 5) ------------------------------------------
+
+    /// Export a workspace to JSON or bincode format.
+    ///
+    /// If `path` is `Some`, writes to the given file and returns `None`.
+    /// If `path` is `None`, returns the raw export bytes as `Some(bytes)`.
+    fn export_workspace(
+        &self,
+        ws: &str,
+        format: ExportFormat,
+        path: Option<&str>,
+    ) -> Result<Option<Vec<u8>>, WorkspaceError>;
+
+    /// Import a workspace from a previously exported file.
+    ///
+    /// If `overwrite` is true, an existing workspace with the same name
+    /// will be replaced.
+    fn import_workspace(
+        &mut self,
+        name: &str,
+        path: &str,
+        overwrite: bool,
+    ) -> Result<WorkspaceInfo, WorkspaceError>;
 }
 
 // ---------------------------------------------------------------------------
@@ -415,6 +442,24 @@ impl WorkspaceApi for WorkspaceManager {
     ) -> Result<String, ApiError> {
         WorkspaceManager::show_vertex(self, ws, index)
     }
+
+    fn export_workspace(
+        &self,
+        ws: &str,
+        format: ExportFormat,
+        path: Option<&str>,
+    ) -> Result<Option<Vec<u8>>, WorkspaceError> {
+        export_import::export_workspace(self, ws, format, path)
+    }
+
+    fn import_workspace(
+        &mut self,
+        name: &str,
+        path: &str,
+        overwrite: bool,
+    ) -> Result<WorkspaceInfo, WorkspaceError> {
+        export_import::import_workspace(self, name, path, overwrite)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -433,10 +478,7 @@ impl WorkspaceApi for WorkspaceManager {
 #[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
 #[cfg_attr(
     feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../packages/context-types/src/generated/"
-    )
+    ts(export, export_to = "../../../packages/context-types/src/generated/")
 )]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum Command {
@@ -591,6 +633,28 @@ pub enum Command {
         #[serde(default)]
         older_than_days: Option<u32>,
     },
+
+    // -- Export / Import (Phase 5) ------------------------------------------
+    /// Export a workspace to JSON or bincode format.
+    ///
+    /// If `path` is `Some`, writes to the given file and returns `Ok`.
+    /// If `path` is `None`, returns the export data inline as `ExportData`.
+    ExportWorkspace {
+        workspace: String,
+        format: ExportFormat,
+        #[serde(default)]
+        path: Option<String>,
+    },
+    /// Import a workspace from a previously exported file.
+    ///
+    /// If `overwrite` is true, an existing workspace with the same name
+    /// will be replaced. Otherwise, `AlreadyExists` is returned.
+    ImportWorkspace {
+        name: String,
+        path: String,
+        #[serde(default)]
+        overwrite: bool,
+    },
 }
 
 fn default_log_limit() -> usize {
@@ -618,10 +682,7 @@ fn default_search_limit_per_file() -> usize {
 #[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
 #[cfg_attr(
     feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../packages/context-types/src/generated/"
-    )
+    ts(export, export_to = "../../../packages/context-types/src/generated/")
 )]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandResult {
@@ -707,6 +768,20 @@ pub enum CommandResult {
     },
     /// Result of `delete_logs`.
     LogDeleteResult(LogDeleteResult),
+
+    // -- Export / Import (Phase 5) ------------------------------------------
+    /// Result of `export_workspace` when no output path is specified.
+    ///
+    /// Contains the raw serialized bytes of the export. Adapters can
+    /// base64-encode or stream this to the caller.
+    ExportData {
+        /// The raw export bytes (JSON or bincode depending on the requested format).
+        #[schemars(with = "String")]
+        #[cfg_attr(feature = "ts-gen", ts(type = "number[]"))]
+        data: Vec<u8>,
+        /// The format used for the export.
+        format: ExportFormat,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -932,6 +1007,34 @@ pub fn execute(
                 .map_err(|e| ApiError::Log(e))?;
             Ok(CommandResult::LogDeleteResult(result))
         },
+
+        // -- Export / Import (Phase 5) --------------------------------------
+        Command::ExportWorkspace {
+            workspace,
+            format,
+            path,
+        } => {
+            let result = export_import::export_workspace(
+                manager,
+                &workspace,
+                format,
+                path.as_deref(),
+            )?;
+            match result {
+                Some(data) => Ok(CommandResult::ExportData { data, format }),
+                None => Ok(CommandResult::Ok),
+            }
+        },
+        Command::ImportWorkspace {
+            name,
+            path,
+            overwrite,
+        } => {
+            let info = export_import::import_workspace(
+                manager, &name, &path, overwrite,
+            )?;
+            Ok(CommandResult::WorkspaceInfo(info))
+        },
     }
 }
 
@@ -1007,6 +1110,8 @@ impl Command {
             Command::SearchLogs { .. } => "search_logs",
             Command::DeleteLog { .. } => "delete_log",
             Command::DeleteLogs { .. } => "delete_logs",
+            Command::ExportWorkspace { .. } => "export_workspace",
+            Command::ImportWorkspace { .. } => "import_workspace",
         }
     }
 }
@@ -1325,6 +1430,26 @@ mod tests {
             },
             Command::ValidateGraph {
                 workspace: "a".into(),
+            },
+            Command::ExportWorkspace {
+                workspace: "a".into(),
+                format: export_import::ExportFormat::Json,
+                path: None,
+            },
+            Command::ExportWorkspace {
+                workspace: "a".into(),
+                format: export_import::ExportFormat::Bincode,
+                path: Some("/tmp/test.bin".into()),
+            },
+            Command::ImportWorkspace {
+                name: "a".into(),
+                path: "/tmp/test.json".into(),
+                overwrite: false,
+            },
+            Command::ImportWorkspace {
+                name: "a".into(),
+                path: "/tmp/test.bin".into(),
+                overwrite: true,
             },
         ];
 
