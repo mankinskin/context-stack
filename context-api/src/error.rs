@@ -36,6 +36,10 @@ pub enum ApiError {
     /// Read operation errors (Phase 2).
     #[error(transparent)]
     Read(#[from] ReadError),
+
+    /// Log operation errors (Phase 3.1).
+    #[error(transparent)]
+    Log(#[from] LogError),
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +191,30 @@ pub enum ReadError {
 }
 
 // ---------------------------------------------------------------------------
+// Log errors
+// ---------------------------------------------------------------------------
+
+/// Errors related to log operations.
+#[derive(Debug, thiserror::Error)]
+pub enum LogError {
+    /// The log file was not found.
+    #[error("log file not found: '{filename}'")]
+    FileNotFound { filename: String },
+
+    /// An I/O error occurred during a log operation.
+    #[error("log I/O error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    /// A JQ query failed to compile or execute.
+    #[error("JQ query error: {0}")]
+    QueryError(String),
+
+    /// The workspace's log directory could not be accessed.
+    #[error("log directory error: {0}")]
+    DirectoryError(String),
+}
+
+// ---------------------------------------------------------------------------
 // Display for ApiError variants in JSON-friendly contexts
 // ---------------------------------------------------------------------------
 
@@ -202,6 +230,7 @@ impl ApiError {
             ApiError::Search(_) => "search",
             ApiError::Insert(_) => "insert",
             ApiError::Read(_) => "read",
+            ApiError::Log(_) => "log",
         }
     }
 }

@@ -24,7 +24,7 @@ use tracing_subscriber::{
 /// These are captured during span creation by `SpecialFieldExtractor` and stored
 /// in span extensions for direct access by the event formatter.
 #[derive(Clone, Debug, Default)]
-pub(super) struct SpecialFields {
+pub struct SpecialFields {
     /// Function signature (from `fn_sig` field)
     pub fn_sig: Option<String>,
     /// Self type for trait implementations (from `self_type` field)
@@ -48,7 +48,7 @@ impl SpecialFields {
 ///
 /// Special fields are: `fn_sig`, `trait_name`, and anything ending with `_type`
 /// (including `self_type` and associated type fields like `next_type`, `error_type`).
-pub(super) fn is_special_field(name: &str) -> bool {
+pub fn is_special_field(name: &str) -> bool {
     name == "fn_sig" || name == "trait_name" || name.ends_with("_type")
 }
 
@@ -102,7 +102,7 @@ impl Visit for SpecialFieldVisitor {
 ///
 /// This layer should be added BEFORE the fmt layer in the subscriber stack
 /// so that special fields are available when `format_event` runs.
-pub(super) struct SpecialFieldExtractor;
+pub struct SpecialFieldExtractor;
 
 impl<S> Layer<S> for SpecialFieldExtractor
 where

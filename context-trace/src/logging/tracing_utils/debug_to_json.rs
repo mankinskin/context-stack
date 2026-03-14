@@ -9,7 +9,10 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc,
+        Mutex,
+    },
 };
 
 /// Thread-safe store for collecting function signatures during logging.
@@ -17,10 +20,10 @@ use std::{
 /// Maps function name to its parsed fn_sig JSON object.
 /// Signatures are collected during log writing and later dumped to
 /// `target/debug_signatures/<test_name>.json`.
-pub(super) type SignatureStore = Arc<Mutex<HashMap<String, serde_json::Value>>>;
+pub type SignatureStore = Arc<Mutex<HashMap<String, serde_json::Value>>>;
 
 /// Create a new empty signature store.
-pub(super) fn new_signature_store() -> SignatureStore {
+pub fn new_signature_store() -> SignatureStore {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
@@ -547,7 +550,7 @@ fn try_parse_string_to_json(
 ///
 /// Also collects fn_sig entries into the signature store (if provided) and
 /// strips them from the output to reduce log file size.
-pub(super) fn transform_structured_fields(
+pub fn transform_structured_fields(
     value: &mut serde_json::Value,
     signatures: Option<&SignatureStore>,
 ) {
@@ -640,10 +643,7 @@ fn collect_and_strip_fn_sigs(
     // Process "span" object → replace with name string
     if let Some(serde_json::Value::Object(span_obj)) = obj.get_mut("span") {
         if let Some(name) = collect_from_span_obj(span_obj, signatures) {
-            obj.insert(
-                "span".to_string(),
-                serde_json::Value::String(name),
-            );
+            obj.insert("span".to_string(), serde_json::Value::String(name));
         }
     }
 
@@ -659,10 +659,8 @@ fn collect_and_strip_fn_sigs(
         let simplified: Vec<serde_json::Value> = spans
             .iter()
             .map(|s| match s {
-                serde_json::Value::Object(obj) => obj
-                    .get("name")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null),
+                serde_json::Value::Object(obj) =>
+                    obj.get("name").cloned().unwrap_or(serde_json::Value::Null),
                 other => other.clone(),
             })
             .collect();
@@ -673,7 +671,8 @@ fn collect_and_strip_fn_sigs(
     if let Some(serde_json::Value::Object(fields_obj)) = obj.get_mut("fields") {
         if let Some(fn_sig) = fields_obj.remove("fn_sig") {
             if let Some(store) = signatures {
-                if let Some(name) = fn_sig.get("name").and_then(|n| n.as_str()) {
+                if let Some(name) = fn_sig.get("name").and_then(|n| n.as_str())
+                {
                     if let Ok(mut sigs) = store.lock() {
                         sigs.entry(name.to_string()).or_insert(fn_sig);
                     }
@@ -686,7 +685,7 @@ fn collect_and_strip_fn_sigs(
 }
 
 /// Recursively convert all path-like strings in a JSON value to Unix format
-pub(super) fn convert_paths_to_unix(value: &mut serde_json::Value) {
+pub fn convert_paths_to_unix(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::String(s) => {
             // Convert if it looks like a path (contains backslash)

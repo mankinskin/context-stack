@@ -15,6 +15,7 @@
 pub mod atoms;
 pub mod debug;
 pub mod insert;
+pub mod logs;
 pub mod patterns;
 pub mod read;
 pub mod search;
@@ -38,15 +39,26 @@ use crate::{
         SearchError,
         WorkspaceError,
     },
+    tracing_capture::{
+        CaptureConfig,
+        CaptureResult,
+        capture_traced,
+    },
     types::{
         AtomInfo,
         GraphStatistics,
         InsertResult,
+        LogAnalysis,
+        LogDeleteResult,
+        LogEntryInfo,
+        LogFileInfo,
+        LogFileSearchResult,
         PatternInfo,
         PatternReadResult,
         SearchResult,
         TokenInfo,
         TokenRef,
+        TraceSummary,
         ValidationReport,
         VertexInfo,
         WorkspaceInfo,
@@ -519,6 +531,70 @@ pub enum Command {
         workspace: String,
         index: usize,
     },
+
+    // -- Logs (Phase 3.1) ---------------------------------------------------
+    /// List trace log files for a workspace.
+    ListLogs {
+        workspace: String,
+        #[serde(default)]
+        pattern: Option<String>,
+        #[serde(default = "default_log_limit")]
+        limit: usize,
+    },
+    /// Read a trace log file with optional level filter and pagination.
+    GetLog {
+        workspace: String,
+        filename: String,
+        #[serde(default)]
+        filter: Option<String>,
+        #[serde(default = "default_log_limit")]
+        limit: usize,
+        #[serde(default)]
+        offset: usize,
+    },
+    /// Run a JQ query against a trace log file.
+    QueryLog {
+        workspace: String,
+        filename: String,
+        query: String,
+        #[serde(default = "default_query_limit")]
+        limit: usize,
+    },
+    /// Analyze a trace log file (statistics by level, event type, spans).
+    AnalyzeLog {
+        workspace: String,
+        filename: String,
+    },
+    /// Search across all trace logs in a workspace with a JQ query.
+    SearchLogs {
+        workspace: String,
+        query: String,
+        #[serde(default = "default_search_limit_per_file")]
+        limit_per_file: usize,
+    },
+    /// Delete a specific trace log file.
+    DeleteLog {
+        workspace: String,
+        filename: String,
+    },
+    /// Delete trace log files, optionally only those older than N days.
+    DeleteLogs {
+        workspace: String,
+        #[serde(default)]
+        older_than_days: Option<u32>,
+    },
+}
+
+fn default_log_limit() -> usize {
+    100
+}
+
+fn default_query_limit() -> usize {
+    100
+}
+
+fn default_search_limit_per_file() -> usize {
+    10
 }
 
 // ---------------------------------------------------------------------------
@@ -586,6 +662,35 @@ pub enum CommandResult {
 
     /// Result of commands that return `()` (close, save, delete).
     Ok,
+
+    // -- Log results (Phase 3.1) --------------------------------------------
+    /// Result of `list_logs`.
+    LogList { logs: Vec<LogFileInfo> },
+    /// Result of `get_log`.
+    LogEntries {
+        filename: String,
+        total: usize,
+        offset: usize,
+        limit: usize,
+        returned: usize,
+        entries: Vec<LogEntryInfo>,
+    },
+    /// Result of `query_log`.
+    LogQueryResult {
+        query: String,
+        matches: usize,
+        entries: Vec<LogEntryInfo>,
+    },
+    /// Result of `analyze_log`.
+    LogAnalysis(LogAnalysis),
+    /// Result of `search_logs`.
+    LogSearchResult {
+        query: String,
+        files_with_matches: usize,
+        results: Vec<LogFileSearchResult>,
+    },
+    /// Result of `delete_logs`.
+    LogDeleteResult(LogDeleteResult),
 }
 
 // ---------------------------------------------------------------------------
@@ -715,6 +820,178 @@ pub fn execute(
             let display = manager.show_vertex(&workspace, index)?;
             Ok(CommandResult::GraphDisplay { display })
         },
+
+        // -- Logs (Phase 3.1) -----------------------------------------------
+        Command::ListLogs {
+            workspace,
+            pattern,
+            limit,
+        } => {
+            let log_dir = manager.log_dir(&workspace)?;
+            let log_list = logs::list_logs(&log_dir, pattern.as_deref(), limit)
+                .map_err(|e| ApiError::Log(e))?;
+            Ok(CommandResult::LogList { logs: log_list })
+        },
+        Command::GetLog {
+            workspace,
+            filename,
+            filter,
+            limit,
+            offset,
+        } => {
+            let log_dir = manager.log_dir(&workspace)?;
+            let (entries, total) = logs::get_log(
+                &log_dir,
+                &filename,
+                filter.as_deref(),
+                limit,
+                offset,
+            )
+            .map_err(|e| ApiError::Log(e))?;
+            let returned = entries.len();
+            Ok(CommandResult::LogEntries {
+                filename,
+                total,
+                offset,
+                limit,
+                returned,
+                entries,
+            })
+        },
+        Command::QueryLog {
+            workspace,
+            filename,
+            query,
+            limit,
+        } => {
+            let log_dir = manager.log_dir(&workspace)?;
+            let (entries, total) =
+                logs::query_log(&log_dir, &filename, &query, limit)
+                    .map_err(|e| ApiError::Log(e))?;
+            Ok(CommandResult::LogQueryResult {
+                query,
+                matches: total,
+                entries,
+            })
+        },
+        Command::AnalyzeLog {
+            workspace,
+            filename,
+        } => {
+            let log_dir = manager.log_dir(&workspace)?;
+            let analysis = logs::analyze_log(&log_dir, &filename)
+                .map_err(|e| ApiError::Log(e))?;
+            Ok(CommandResult::LogAnalysis(analysis))
+        },
+        Command::SearchLogs {
+            workspace,
+            query,
+            limit_per_file,
+        } => {
+            let log_dir = manager.log_dir(&workspace)?;
+            let (results, files_with_matches) =
+                logs::search_logs(&log_dir, &query, limit_per_file)
+                    .map_err(|e| ApiError::Log(e))?;
+            Ok(CommandResult::LogSearchResult {
+                query,
+                files_with_matches,
+                results,
+            })
+        },
+        Command::DeleteLog {
+            workspace,
+            filename,
+        } => {
+            let log_dir = manager.log_dir(&workspace)?;
+            logs::delete_log(&log_dir, &filename)
+                .map_err(|e| ApiError::Log(e))?;
+            Ok(CommandResult::Ok)
+        },
+        Command::DeleteLogs {
+            workspace,
+            older_than_days,
+        } => {
+            let log_dir = manager.log_dir(&workspace)?;
+            let result = logs::delete_logs(&log_dir, older_than_days)
+                .map_err(|e| ApiError::Log(e))?;
+            Ok(CommandResult::LogDeleteResult(result))
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Traced execution
+// ---------------------------------------------------------------------------
+
+/// Execute a command with optional tracing capture.
+///
+/// If `config` is `Some` and `config.enabled` is true, the command
+/// executes under a scoped tracing dispatcher that writes structured
+/// JSON events to a log file. The `TraceSummary` is returned alongside
+/// the result.
+pub fn execute_traced(
+    manager: &mut WorkspaceManager,
+    cmd: Command,
+    config: Option<&CaptureConfig>,
+) -> Result<(CommandResult, Option<TraceSummary>), ApiError> {
+    match config {
+        Some(cfg) if cfg.enabled => {
+            let command_name = cmd.command_name();
+            // We need to clone the command since execute takes ownership
+            let cmd_clone = cmd;
+            let capture: CaptureResult<Result<CommandResult, ApiError>> =
+                capture_traced(cfg, command_name, || {
+                    execute(manager, cmd_clone)
+                });
+            let result = capture.result?;
+            Ok((result, capture.summary))
+        },
+        _ => {
+            let result = execute(manager, cmd)?;
+            Ok((result, None))
+        },
+    }
+}
+
+impl Command {
+    /// Returns the snake_case name of this command variant.
+    ///
+    /// Used for log filename generation and display purposes.
+    pub fn command_name(&self) -> &'static str {
+        match self {
+            Command::CreateWorkspace { .. } => "create_workspace",
+            Command::OpenWorkspace { .. } => "open_workspace",
+            Command::CloseWorkspace { .. } => "close_workspace",
+            Command::SaveWorkspace { .. } => "save_workspace",
+            Command::ListWorkspaces => "list_workspaces",
+            Command::DeleteWorkspace { .. } => "delete_workspace",
+            Command::AddAtom { .. } => "add_atom",
+            Command::AddAtoms { .. } => "add_atoms",
+            Command::GetAtom { .. } => "get_atom",
+            Command::ListAtoms { .. } => "list_atoms",
+            Command::AddSimplePattern { .. } => "add_simple_pattern",
+            Command::GetVertex { .. } => "get_vertex",
+            Command::ListVertices { .. } => "list_vertices",
+            Command::SearchPattern { .. } => "search_pattern",
+            Command::SearchSequence { .. } => "search_sequence",
+            Command::InsertFirstMatch { .. } => "insert_first_match",
+            Command::InsertSequence { .. } => "insert_sequence",
+            Command::InsertSequences { .. } => "insert_sequences",
+            Command::ReadPattern { .. } => "read_pattern",
+            Command::ReadAsText { .. } => "read_as_text",
+            Command::GetSnapshot { .. } => "get_snapshot",
+            Command::GetStatistics { .. } => "get_statistics",
+            Command::ValidateGraph { .. } => "validate_graph",
+            Command::ShowGraph { .. } => "show_graph",
+            Command::ShowVertex { .. } => "show_vertex",
+            Command::ListLogs { .. } => "list_logs",
+            Command::GetLog { .. } => "get_log",
+            Command::QueryLog { .. } => "query_log",
+            Command::AnalyzeLog { .. } => "analyze_log",
+            Command::SearchLogs { .. } => "search_logs",
+            Command::DeleteLog { .. } => "delete_log",
+            Command::DeleteLogs { .. } => "delete_logs",
+        }
     }
 }
 

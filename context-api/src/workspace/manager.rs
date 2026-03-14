@@ -345,6 +345,31 @@ impl WorkspaceManager {
     ) -> bool {
         self.workspaces.contains_key(name)
     }
+
+    /// Get the log directory path for a workspace.
+    ///
+    /// Creates the directory if it doesn't exist. The log directory lives
+    /// inside the workspace's persistence directory at `<workspace_dir>/logs/`.
+    ///
+    /// # Errors
+    ///
+    /// - `WorkspaceError::NotFound` if no workspace directory exists on disk.
+    /// - `WorkspaceError::IoError` on filesystem failures.
+    pub fn log_dir(
+        &self,
+        workspace_name: &str,
+    ) -> Result<std::path::PathBuf, WorkspaceError> {
+        let ws_dir =
+            super::persistence::workspace_dir(&self.base_dir, workspace_name);
+        if !ws_dir.exists() {
+            return Err(WorkspaceError::NotFound {
+                name: workspace_name.to_string(),
+            });
+        }
+        let dir = ws_dir.join("logs");
+        std::fs::create_dir_all(&dir).map_err(WorkspaceError::IoError)?;
+        Ok(dir)
+    }
 }
 
 // ---------------------------------------------------------------------------

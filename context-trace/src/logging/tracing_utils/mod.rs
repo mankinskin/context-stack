@@ -6,6 +6,7 @@
 //!
 
 // Internal modules
+pub mod capture;
 mod config;
 mod debug_to_json;
 mod field_visitor;
@@ -21,9 +22,22 @@ mod timer;
 mod writers;
 
 // Re-export public API
+pub use capture::{
+    CaptureDispatch,
+    build_capture_dispatch,
+};
 pub use config::TracingConfig;
+pub use debug_to_json::{
+    SignatureStore,
+    new_signature_store,
+};
 pub use span_fields::SpanFieldFormatter;
+pub use special_fields::SpecialFieldExtractor;
 pub use test_tracing::TestTracing;
+pub use writers::{
+    FlushingWriter,
+    PrettyJsonWriter,
+};
 
 /// Convenience macro to initialize tracing for a test
 ///

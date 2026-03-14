@@ -5,8 +5,9 @@ edition = "2024"
 description = "Unified API for hypergraph workspace management and operations"
 
 [features]
-default = []
+default = ["jq"]
 ts-gen = ["ts-rs"]
+jq = ["jaq-core", "jaq-std", "jaq-interpret", "jaq-syn"]
 dev = []
 
 [dependencies]
@@ -25,6 +26,16 @@ tracing = "0.1"
 
 schemars = "1"
 ts-rs = { version = "10", features = ["serde-json-impl"], optional = true }
+
+# Log parsing
+regex = "1"
+once_cell = "1"
+
+# JQ query engine (feature-gated)
+jaq-core = { version = "1", optional = true }
+jaq-std = { version = "1", optional = true }
+jaq-interpret = { version = "1", optional = true }
+jaq-syn = { version = "1", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

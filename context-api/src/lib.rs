@@ -53,7 +53,10 @@
 // Public modules
 pub mod commands;
 pub mod error;
+pub mod jq;
+pub mod log_parser;
 pub mod resolve;
+pub mod tracing_capture;
 pub mod types;
 pub mod validation;
 pub mod workspace;
@@ -80,6 +83,7 @@ pub mod prelude {
             AtomError,
             ErrorResponse,
             InsertError,
+            LogError,
             PatternError,
             ReadError,
             SearchError,
@@ -89,14 +93,21 @@ pub mod prelude {
             AtomInfo,
             GraphStatistics,
             InsertResult,
+            LogAnalysis,
+            LogDeleteResult,
+            LogEntryInfo,
+            LogFileInfo,
+            LogFileSearchResult,
             PartialMatchInfo,
             PartialMatchKind,
             PatternInfo,
             PatternReadResult,
             ReadNode,
             SearchResult,
+            SpanSummary,
             TokenInfo,
             TokenRef,
+            TraceSummary,
             ValidationReport,
             VertexInfo,
             WorkspaceInfo,

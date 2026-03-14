@@ -13,8 +13,8 @@ use std::{
 };
 
 use super::debug_to_json::{
-    convert_paths_to_unix,
     SignatureStore,
+    convert_paths_to_unix,
     transform_structured_fields,
 };
 
@@ -23,12 +23,12 @@ use super::debug_to_json::{
 /// This is necessary because when a test panics, buffered data may not be flushed
 /// to disk, resulting in truncated log files.
 #[derive(Clone)]
-pub(super) struct FlushingWriter {
+pub struct FlushingWriter {
     file: Arc<Mutex<fs::File>>,
 }
 
 impl FlushingWriter {
-    pub(super) fn new(file: fs::File) -> Self {
+    pub fn new(file: fs::File) -> Self {
         Self {
             file: Arc::new(Mutex::new(file)),
         }
@@ -73,14 +73,17 @@ impl Write for FlushingWriter {
 /// Also collects fn_sig entries into a shared signature store and strips
 /// them from the output.
 #[derive(Clone)]
-pub(super) struct PrettyJsonWriter<W> {
+pub struct PrettyJsonWriter<W> {
     inner: W,
     buffer: Arc<Mutex<Vec<u8>>>,
     signatures: SignatureStore,
 }
 
 impl<W: Clone> PrettyJsonWriter<W> {
-    pub(super) fn new(writer: W, signatures: SignatureStore) -> Self {
+    pub fn new(
+        writer: W,
+        signatures: SignatureStore,
+    ) -> Self {
         Self {
             inner: writer,
             buffer: Arc::new(Mutex::new(Vec::new())),
@@ -115,7 +118,10 @@ impl<W: Write + Clone> Write for PrettyJsonWriter<W> {
 
                         // Transform structured fields (fn_sig, etc.) into JSON objects
                         // This also collects fn_sig entries and strips them from output
-                        transform_structured_fields(&mut value, Some(&self.signatures));
+                        transform_structured_fields(
+                            &mut value,
+                            Some(&self.signatures),
+                        );
 
                         // Write pretty-printed JSON
                         let pretty = serde_json::to_string_pretty(&value)

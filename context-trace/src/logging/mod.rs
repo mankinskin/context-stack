@@ -25,7 +25,15 @@ pub use format_utils::{
     pretty,
 };
 pub use tracing_utils::{
+    CaptureDispatch,
+    FlushingWriter,
+    PrettyJsonWriter,
+    SignatureStore,
+    SpanFieldFormatter,
+    SpecialFieldExtractor,
     TestTracing,
     TracingConfig,
+    build_capture_dispatch,
+    new_signature_store,
 };
 pub use typed_debug::TypedDebug;
