@@ -6,7 +6,10 @@
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::search_path::{EdgeRef, VizPathGraph};
+use super::search_path::{
+    EdgeRef,
+    VizPathGraph,
+};
 
 // Re-export PathNode for downstream crates
 pub use super::search_path::PathNode;
@@ -15,13 +18,11 @@ pub use super::search_path::PathNode;
 // Operation Types
 // ---------------------------------------------------------------------------
 
+// ts-rs export_to path: see context_api::TS_EXPORT_DIR for the convention.
 /// Operation type for categorizing events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub enum OperationType {
     Search,
     Insert,
@@ -89,15 +90,11 @@ impl OperationType {
 /// draw trace paths.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub enum Transition {
     // ══════════════════════════════════════════════════════════════════════
     // Search-specific transitions (only emitted by context-search)
     // ══════════════════════════════════════════════════════════════════════
-
     /// Initial entry point — the first event for a search operation.
     ///
     /// **Emitted by:** `context-search` (search start).
@@ -233,7 +230,6 @@ pub enum Transition {
     // ══════════════════════════════════════════════════════════════════════
     // Insert-specific transitions (only emitted by context-insert)
     // ══════════════════════════════════════════════════════════════════════
-
     /// Beginning a split operation — a token must be broken at `split_position`.
     ///
     /// **Emitted by:** `context-insert/src/insert/context.rs`.
@@ -353,10 +349,7 @@ pub enum Transition {
 /// - `completed_nodes` → green
 /// - `pending_nodes` → orange (parents) / purple (children)
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub struct LocationInfo {
     /// Primary node being operated on (selected in UI)
     pub selected_node: Option<usize>,
@@ -384,10 +377,7 @@ pub struct LocationInfo {
 
 /// Information about the search/insert query.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub struct QueryInfo {
     /// Token indices in the query pattern
     pub query_tokens: Vec<usize>,
@@ -420,10 +410,7 @@ pub struct QueryInfo {
 /// newly created or removed nodes/edges.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "op", rename_all = "snake_case")]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub enum DeltaOp {
     /// A new node (token) was created in the graph
     AddNode {
@@ -458,10 +445,7 @@ pub enum DeltaOp {
 /// Carried as an optional field on `GraphOpEvent` so the frontend can
 /// display before/after graph states during insert operations.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub struct GraphMutation {
     /// Mutation operations applied at this step, in order.
     pub ops: Vec<DeltaOp>,
@@ -503,10 +487,7 @@ impl GraphMutation {
 /// event.emit();
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub struct GraphOpEvent {
     /// Monotonically increasing step counter (per operation)
     pub step: usize,

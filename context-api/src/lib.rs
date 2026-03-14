@@ -61,6 +61,32 @@ pub mod types;
 pub mod validation;
 pub mod workspace;
 
+// ---------------------------------------------------------------------------
+// TypeScript type generation (ts-rs) — path conventions
+// ---------------------------------------------------------------------------
+
+/// Canonical `export_to` path for ts-rs `#[ts(export_to = "...")]` attributes
+/// used by crates at the `crates/<name>/` or `tools/<name>/` level.
+///
+/// ts-rs resolves `export_to` relative to `<CARGO_MANIFEST_DIR>/bindings/`,
+/// so three `../` segments are needed to reach the workspace root:
+///
+/// ```text
+/// <crate>/bindings/../../../packages/context-types/src/generated/
+/// ^^^^^^^           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/// ts-rs default     3x ../ to repo root, then into packages/
+/// ```
+///
+/// All crates that derive `TS` **must** use this exact string as their
+/// `export_to` value.  Because `#[ts(export_to)]` is a proc-macro attribute
+/// it requires a string literal — this constant exists for documentation,
+/// grep-ability, and use in generation scripts, not for direct interpolation
+/// into the attribute.
+///
+/// **Grep anchor:** search for `TS_EXPORT_DIR` to find every usage site.
+pub const TS_EXPORT_DIR: &str =
+    "../../../packages/context-types/src/generated/";
+
 // Tests (integration-level, in addition to per-module unit tests)
 #[cfg(test)]
 mod tests;

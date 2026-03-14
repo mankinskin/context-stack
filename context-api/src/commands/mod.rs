@@ -430,6 +430,14 @@ impl WorkspaceApi for WorkspaceManager {
 /// so that the JSON representation includes a `"command"` field identifying the
 /// variant.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../packages/context-types/src/generated/"
+    )
+)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum Command {
     // -- Workspace lifecycle ------------------------------------------------
@@ -607,6 +615,14 @@ fn default_search_limit_per_file() -> usize {
 /// method. Adapters serialize this to JSON (or another format) for their
 /// response.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../packages/context-types/src/generated/"
+    )
+)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandResult {
     /// Result of `create_workspace` or `open_workspace`.

@@ -237,6 +237,14 @@ impl ApiError {
 
 /// Serializable error response for adapter layers.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct ErrorResponse {
     /// Error category tag (e.g. "workspace", "atom", "pattern").
     pub kind: String,

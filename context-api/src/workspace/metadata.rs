@@ -13,6 +13,14 @@ use serde::{
 
 /// Persistent metadata for a workspace, stored as `metadata.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct WorkspaceMetadata {
     /// Workspace name (matches the directory name under `.context-engine/`).
     pub name: String,
@@ -22,9 +30,11 @@ pub struct WorkspaceMetadata {
     pub description: Option<String>,
 
     /// Timestamp when the workspace was first created.
+    #[cfg_attr(feature = "ts-gen", ts(type = "string"))]
     pub created_at: DateTime<Utc>,
 
     /// Timestamp of the last explicit save (`save_workspace`).
+    #[cfg_attr(feature = "ts-gen", ts(type = "string"))]
     pub modified_at: DateTime<Utc>,
 }
 

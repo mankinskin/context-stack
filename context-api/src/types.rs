@@ -11,6 +11,17 @@
 //! - [`InsertResult`] — result of an insert operation (new or existing)
 //! - [`PatternReadResult`] / [`ReadNode`] — recursive decomposition tree
 //! - [`ValidationReport`] — graph integrity check results
+//!
+//! ## TypeScript type generation (ts-rs)
+//!
+//! Types annotated with `#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]`
+//! export TypeScript definitions when `cargo test --features ts-gen` runs.
+//!
+//! All `export_to` paths use the value of [`crate::TS_EXPORT_DIR`]:
+//! `"../../../packages/context-types/src/generated/"`.  ts-rs resolves this
+//! relative to `<CARGO_MANIFEST_DIR>/bindings/`, so three `../` segments
+//! reach the workspace root.  Search for **`TS_EXPORT_DIR`** to locate every
+//! usage site across the codebase.
 
 use std::collections::HashMap;
 
@@ -57,6 +68,14 @@ pub use context_trace::graph::snapshot::{
     Deserialize,
     schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 #[serde(untagged)]
 pub enum TokenRef {
     /// Direct vertex index (numeric).
@@ -85,6 +104,14 @@ impl std::fmt::Display for TokenRef {
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct AtomInfo {
     /// Vertex index in the hypergraph.
     pub index: usize,
@@ -112,6 +139,14 @@ impl AtomInfo {
 /// Lightweight information about any vertex (atom or pattern).
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
 )]
 pub struct TokenInfo {
     /// Vertex index in the hypergraph.
@@ -163,6 +198,14 @@ impl TokenInfo {
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct PatternInfo {
     /// Vertex index of the new pattern.
     pub index: usize,
@@ -181,6 +224,14 @@ pub struct PatternInfo {
 /// Detailed information about a single vertex (atom or pattern).
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
 )]
 pub struct VertexInfo {
     /// Vertex index in the hypergraph.
@@ -249,6 +300,14 @@ impl VertexInfo {
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct WorkspaceInfo {
     /// Workspace name (also the directory name under `.context-engine/`).
     pub name: String,
@@ -271,6 +330,14 @@ pub struct WorkspaceInfo {
 /// Aggregate statistics about the graph inside a workspace.
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
 )]
 pub struct GraphStatistics {
     /// Total number of vertices.
@@ -336,6 +403,14 @@ impl GraphStatistics {
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct SearchResult {
     /// Whether the full query was found as a single existing vertex.
     pub complete: bool,
@@ -351,6 +426,14 @@ pub struct SearchResult {
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct PartialMatchInfo {
     /// How the query was partially matched.
     pub kind: PartialMatchKind,
@@ -361,6 +444,14 @@ pub struct PartialMatchInfo {
 /// The kind of partial match found during a search.
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
 )]
 pub enum PartialMatchKind {
     /// Matched from the start of the query (postfix remaining).
@@ -380,6 +471,14 @@ pub enum PartialMatchKind {
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct InsertResult {
     /// The token representing the inserted or existing pattern.
     pub token: TokenInfo,
@@ -394,6 +493,14 @@ pub struct InsertResult {
 /// decomposition tree.
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
 )]
 pub struct PatternReadResult {
     /// The root vertex being read.
@@ -411,6 +518,14 @@ pub struct PatternReadResult {
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
 )]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
+)]
 pub struct ReadNode {
     /// The token at this node.
     pub token: TokenInfo,
@@ -421,6 +536,14 @@ pub struct ReadNode {
 /// Report from a graph validation check.
 #[derive(
     Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts-gen",
+    ts(
+        export,
+        export_to = "../../../../packages/context-types/src/generated/"
+    )
 )]
 pub struct ValidationReport {
     /// Whether the graph passed all checks.

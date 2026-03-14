@@ -14,12 +14,10 @@ use crate::graph::{
     kind::GraphKind,
 };
 
+// ts-rs export_to path: see context_api::TS_EXPORT_DIR for the convention.
 /// A compact, serializable snapshot of the hypergraph topology.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub struct GraphSnapshot {
     /// All vertices in the graph.
     pub nodes: Vec<SnapshotNode>,
@@ -29,10 +27,7 @@ pub struct GraphSnapshot {
 
 /// A single vertex in the snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub struct SnapshotNode {
     /// Vertex index (numeric id).
     pub index: usize,
@@ -44,10 +39,7 @@ pub struct SnapshotNode {
 
 /// A directed edge from parent vertex to child vertex.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = "../../../tools/log-viewer/frontend/src/types/generated/"
-)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
 pub struct SnapshotEdge {
     /// Parent vertex index.
     pub from: usize,

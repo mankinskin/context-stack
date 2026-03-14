@@ -49,7 +49,7 @@ fn parse_panic_location(message: &str) -> Option<(String, u32, u32)> {
     feature = "ts-gen",
     ts(
         export,
-        export_to = "../../../../packages/context-types/src/generated/"
+        export_to = "../../../packages/context-types/src/generated/"
     )
 )]
 pub struct AssertionDiff {
@@ -97,7 +97,7 @@ fn parse_assertion_diff(message: &str) -> Option<AssertionDiff> {
     feature = "ts-gen",
     ts(
         export,
-        export_to = "../../../../packages/context-types/src/generated/"
+        export_to = "../../../packages/context-types/src/generated/"
     )
 )]
 pub struct LogEntry {
