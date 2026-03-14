@@ -188,6 +188,14 @@ pub enum ReadError {
     /// An internal error from the underlying read algorithm.
     #[error("internal read error: {0}")]
     InternalError(String),
+
+    /// The input text sequence is too short (must be at least 1 character).
+    #[error("sequence too short: need at least 1 character, got {len}")]
+    SequenceTooShort { len: usize },
+
+    /// Could not read the input file.
+    #[error("failed to read file '{path}': {reason}")]
+    FileReadError { path: String, reason: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -240,10 +248,7 @@ impl ApiError {
 #[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
 #[cfg_attr(
     feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../packages/context-types/src/generated/"
-    )
+    ts(export, export_to = "../../../packages/context-types/src/generated/")
 )]
 pub struct ErrorResponse {
     /// Error category tag (e.g. "workspace", "atom", "pattern").

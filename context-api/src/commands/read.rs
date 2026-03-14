@@ -115,6 +115,109 @@ impl WorkspaceManager {
 
         Ok(collect_leaf_text(graph, data.to_token()))
     }
+
+    /// Read a text sequence through the graph.
+    ///
+    /// Each character in the text is ensured to exist as an atom (auto-created
+    /// if missing). The atom sequence is then passed to `context-read`'s
+    /// `ReadCtx::read_sequence` to find the largest-match decomposition.
+    ///
+    /// # Errors
+    ///
+    /// - `ReadError::WorkspaceNotOpen` if the workspace is not currently open.
+    /// - `ReadError::SequenceTooShort` if the text is empty.
+    /// - `ReadError::InternalError` on unexpected failures from the read algorithm.
+    pub fn read_sequence(
+        &mut self,
+        ws_name: &str,
+        text: &str,
+    ) -> Result<PatternReadResult, ReadError> {
+        let char_count = text.chars().count();
+        if char_count == 0 {
+            return Err(ReadError::SequenceTooShort { len: 0 });
+        }
+
+        // For single characters, just ensure the atom exists and read it
+        if char_count == 1 {
+            let ch = text.chars().next().unwrap();
+            let ws = self.get_workspace(ws_name).map_err(|_| {
+                ReadError::WorkspaceNotOpen {
+                    workspace: ws_name.to_string(),
+                }
+            })?;
+            let graph = ws.graph();
+
+            // Ensure atom exists
+            let atom = context_trace::graph::vertex::atom::Atom::Element(ch);
+            let token = match graph.get_atom_index(atom) {
+                Ok(idx) =>
+                    context_trace::graph::vertex::token::Token::new(idx, 1),
+                Err(_) => graph.insert_atom(atom),
+            };
+
+            // Read the single atom as a pattern
+            return self.read_pattern(ws_name, token.index.0);
+        }
+
+        // Multi-character path: use context-read's ReadCtx
+        {
+            let ws = self.get_workspace(ws_name).map_err(|_| {
+                ReadError::WorkspaceNotOpen {
+                    workspace: ws_name.to_string(),
+                }
+            })?;
+            let graph_ref = ws.graph_ref();
+
+            let mut read_ctx =
+                context_read::context::ReadCtx::new(graph_ref, text.chars());
+
+            let root_token = read_ctx.read_sequence();
+
+            match root_token {
+                Some(token) => {
+                    // Mark workspace dirty (atoms may have been created)
+                    drop(read_ctx);
+                    let ws = self.get_workspace_mut(ws_name).map_err(|_| {
+                        ReadError::WorkspaceNotOpen {
+                            workspace: ws_name.to_string(),
+                        }
+                    })?;
+                    ws.mark_dirty();
+
+                    // Build PatternReadResult from the root token
+                    self.read_pattern(ws_name, token.index.0)
+                },
+                None => Err(ReadError::InternalError(format!(
+                    "read_sequence returned None for text of length \
+                     {char_count}"
+                ))),
+            }
+        }
+    }
+
+    /// Read a file's contents through the graph.
+    ///
+    /// Reads the file at `path` to a string, then delegates to
+    /// `read_sequence`.
+    ///
+    /// # Errors
+    ///
+    /// - `ReadError::FileReadError` if the file cannot be read.
+    /// - All errors from `read_sequence`.
+    pub fn read_file(
+        &mut self,
+        ws_name: &str,
+        path: &str,
+    ) -> Result<PatternReadResult, ReadError> {
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            ReadError::FileReadError {
+                path: path.to_string(),
+                reason: e.to_string(),
+            }
+        })?;
+
+        self.read_sequence(ws_name, &content)
+    }
 }
 
 /// Recursively build a `ReadNode` tree by expanding child patterns.
@@ -348,5 +451,61 @@ mod tests {
 
         let text = mgr.read_as_text("ws", insert_result.token.index).unwrap();
         assert_eq!(text, "abcde");
+    }
+
+    #[test]
+    fn read_sequence_basic() {
+        let (_tmp, mut mgr) = setup("ws");
+        let result = mgr.read_sequence("ws", "ab").unwrap();
+        assert_eq!(result.text, "ab");
+        assert_eq!(result.root.width, 2);
+    }
+
+    #[test]
+    fn read_sequence_single_char() {
+        let (_tmp, mut mgr) = setup("ws");
+        let result = mgr.read_sequence("ws", "x").unwrap();
+        assert_eq!(result.text, "x");
+        assert_eq!(result.root.width, 1);
+        assert!(
+            result.tree.children.is_empty(),
+            "atom should have no children"
+        );
+    }
+
+    #[test]
+    fn read_sequence_empty_returns_error() {
+        let (_tmp, mut mgr) = setup("ws");
+        let err = mgr.read_sequence("ws", "").unwrap_err();
+        match err {
+            crate::error::ReadError::SequenceTooShort { len } => {
+                assert_eq!(len, 0);
+            },
+            other => panic!("expected SequenceTooShort, got: {other}"),
+        }
+    }
+
+    #[test]
+    fn read_sequence_workspace_not_open() {
+        let (_tmp, mut mgr) = setup("ws");
+        let err = mgr.read_sequence("nonexistent", "hello").unwrap_err();
+        match err {
+            crate::error::ReadError::WorkspaceNotOpen { workspace } => {
+                assert_eq!(workspace, "nonexistent");
+            },
+            other => panic!("expected WorkspaceNotOpen, got: {other}"),
+        }
+    }
+
+    #[test]
+    fn read_file_not_found() {
+        let (_tmp, mut mgr) = setup("ws");
+        let err = mgr.read_file("ws", "/nonexistent/path.txt").unwrap_err();
+        match err {
+            crate::error::ReadError::FileReadError { path, .. } => {
+                assert_eq!(path, "/nonexistent/path.txt");
+            },
+            other => panic!("expected FileReadError, got: {other}"),
+        }
     }
 }

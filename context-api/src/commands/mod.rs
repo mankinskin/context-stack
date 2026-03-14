@@ -200,6 +200,18 @@ pub trait WorkspaceApi {
         index: usize,
     ) -> Result<String, ReadError>;
 
+    fn read_sequence(
+        &mut self,
+        ws: &str,
+        text: &str,
+    ) -> Result<PatternReadResult, ReadError>;
+
+    fn read_file(
+        &mut self,
+        ws: &str,
+        path: &str,
+    ) -> Result<PatternReadResult, ReadError>;
+
     // -- Debug / Introspection ----------------------------------------------
 
     fn get_snapshot(
@@ -407,6 +419,22 @@ impl WorkspaceApi for WorkspaceManager {
         WorkspaceManager::read_as_text(self, ws, index)
     }
 
+    fn read_sequence(
+        &mut self,
+        ws: &str,
+        text: &str,
+    ) -> Result<PatternReadResult, ReadError> {
+        WorkspaceManager::read_sequence(self, ws, text)
+    }
+
+    fn read_file(
+        &mut self,
+        ws: &str,
+        path: &str,
+    ) -> Result<PatternReadResult, ReadError> {
+        WorkspaceManager::read_file(self, ws, path)
+    }
+
     fn get_snapshot(
         &self,
         ws: &str,
@@ -562,6 +590,16 @@ pub enum Command {
     ReadAsText {
         workspace: String,
         index: usize,
+    },
+    /// Read a text sequence through the graph (auto-creates atoms, builds decomposition).
+    ReadSequence {
+        workspace: String,
+        text: String,
+    },
+    /// Read a file's contents through the graph.
+    ReadFile {
+        workspace: String,
+        path: String,
     },
 
     // -- Debug / Introspection ----------------------------------------------
@@ -889,6 +927,14 @@ pub fn execute(
             let text = manager.read_as_text(&workspace, index)?;
             Ok(CommandResult::Text { text })
         },
+        Command::ReadSequence { workspace, text } => {
+            let result = manager.read_sequence(&workspace, &text)?;
+            Ok(CommandResult::ReadResult(result))
+        },
+        Command::ReadFile { workspace, path } => {
+            let result = manager.read_file(&workspace, &path)?;
+            Ok(CommandResult::ReadResult(result))
+        },
 
         // -- Debug / Introspection ------------------------------------------
         Command::GetSnapshot { workspace } => {
@@ -1098,6 +1144,8 @@ impl Command {
             Command::InsertSequences { .. } => "insert_sequences",
             Command::ReadPattern { .. } => "read_pattern",
             Command::ReadAsText { .. } => "read_as_text",
+            Command::ReadSequence { .. } => "read_sequence",
+            Command::ReadFile { .. } => "read_file",
             Command::GetSnapshot { .. } => "get_snapshot",
             Command::GetStatistics { .. } => "get_statistics",
             Command::ValidateGraph { .. } => "validate_graph",
@@ -1421,6 +1469,14 @@ mod tests {
             Command::ReadAsText {
                 workspace: "a".into(),
                 index: 0,
+            },
+            Command::ReadSequence {
+                workspace: "a".into(),
+                text: "hello".into(),
+            },
+            Command::ReadFile {
+                workspace: "a".into(),
+                path: "/tmp/test.txt".into(),
             },
             Command::GetSnapshot {
                 workspace: "a".into(),
