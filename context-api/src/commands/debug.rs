@@ -12,6 +12,11 @@ use context_trace::{
 };
 
 use crate::{
+    ascii_graph::{
+        AsciiRenderMode,
+        AsciiOwnedRule,
+        render_layered_ascii_owned_with_mode,
+    },
     error::ApiError,
     types::{
         GraphStatistics,
@@ -296,6 +301,58 @@ impl WorkspaceManager {
         }
 
         Ok(lines.join("\n"))
+    }
+
+    /// Render the workspace graph as an ASCII DAG using the shared renderer.
+    pub fn render_ascii_graph(
+        &self,
+        ws_name: &str,
+        ascii_dag: bool,
+    ) -> Result<String, ApiError> {
+        let ws = self.get_workspace(ws_name)?;
+        let graph = ws.graph();
+
+        let mut rules = Vec::<AsciiOwnedRule>::new();
+        for (_key, data) in graph.vertex_iter() {
+            if data.child_patterns().is_empty() {
+                continue;
+            }
+
+            let parent = graph.vertex_data_string(data.clone());
+            let mut patterns: Vec<(_, Vec<String>)> = data
+                .child_patterns()
+                .iter()
+                .map(|(pid, pattern)| {
+                    (
+                        *pid,
+                        pattern
+                            .iter()
+                            .map(|t| graph.index_string(t.index))
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect();
+            patterns.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+            rules.push(AsciiOwnedRule {
+                parent,
+                patterns: patterns.into_iter().map(|(_, p)| p).collect(),
+            });
+        }
+
+        let mode = if ascii_dag {
+            AsciiRenderMode::Dag
+        } else {
+            AsciiRenderMode::Grammar
+        };
+
+        render_layered_ascii_owned_with_mode(&rules, mode).map_err(|e| {
+            crate::error::ReadError::InternalError(format!(
+                "failed to render ascii graph: {}",
+                e
+            ))
+            .into()
+        })
     }
 }
 

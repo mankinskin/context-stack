@@ -24,6 +24,28 @@ use std::{
         Path,
         PathBuf,
     },
+    sync::{
+        Arc,
+        atomic::{
+            AtomicBool,
+            Ordering,
+        },
+    },
+    thread,
+    time::{
+        Duration,
+        Instant,
+    },
+};
+
+use ngrams::{
+    Status,
+    graph::{
+        Corpus,
+        StatusHandle,
+        parse_corpus,
+        traversal::pass::CancelReason,
+    },
 };
 
 use context_trace::graph::{
@@ -135,6 +157,76 @@ impl WorkspaceManager {
         let info = ws.to_info();
         self.workspaces.insert(name.to_string(), ws);
         Ok(info)
+    }
+
+    /// Create a workspace by parsing a text with the slow but canonical ngrams algorithm.
+    ///
+    /// This is primarily intended for validation workflows against `context-read`.
+    /// A timeout is mandatory at call sites and should default to 60s in adapters.
+    pub fn create_workspace_from_ngrams_text(
+        &mut self,
+        name: &str,
+        text: &str,
+        timeout_secs: u64,
+    ) -> Result<WorkspaceInfo, WorkspaceError> {
+        let timeout_secs = timeout_secs.max(1);
+        self.create_workspace(name)?;
+
+        let texts = vec![text.to_string()];
+        let corpus = Corpus::new(format!("ngrams_{}", name), texts.clone());
+        let status = StatusHandle::from(Status::new(texts));
+
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let done = Arc::new(AtomicBool::new(false));
+
+        let cancelled_for_watchdog = Arc::clone(&cancelled);
+        let done_for_watchdog = Arc::clone(&done);
+        let watchdog = thread::spawn(move || {
+            let start = Instant::now();
+            let timeout = Duration::from_secs(timeout_secs);
+            while !done_for_watchdog.load(Ordering::SeqCst) {
+                if start.elapsed() >= timeout {
+                    cancelled_for_watchdog.store(true, Ordering::SeqCst);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+        });
+
+        let parse_result = parse_corpus(
+            corpus,
+            status,
+            Arc::clone(&cancelled),
+        );
+
+        done.store(true, Ordering::SeqCst);
+        let _ = watchdog.join();
+
+        let parsed = match parse_result {
+            Ok(p) => p,
+            Err(CancelReason::Cancelled) => {
+                self.rollback_workspace_creation(name);
+                return Err(WorkspaceError::NgramsTimeout {
+                    seconds: timeout_secs,
+                });
+            },
+            Err(other) => {
+                self.rollback_workspace_creation(name);
+                return Err(WorkspaceError::NgramsFailed {
+                    reason: format!("{:?}", other),
+                });
+            },
+        };
+
+        {
+            let ws = self.get_workspace_mut(name)?;
+            ws.graph = HypergraphRef::from(parsed.graph);
+            ws.metadata.touch();
+            ws.dirty = true;
+        }
+
+        self.save_workspace(name)?;
+        Ok(self.get_workspace(name)?.to_info())
     }
 
     /// Open an existing workspace from disk.
@@ -300,6 +392,15 @@ impl WorkspaceManager {
 
         fs::remove_dir_all(&dir).map_err(WorkspaceError::IoError)?;
         Ok(())
+    }
+
+    fn rollback_workspace_creation(
+        &mut self,
+        name: &str,
+    ) {
+        self.workspaces.remove(name);
+        let dir = persistence::workspace_dir(&self.base_dir, name);
+        let _ = fs::remove_dir_all(dir);
     }
 
     // -------------------------------------------------------------------

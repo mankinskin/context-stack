@@ -252,3 +252,46 @@ fn validate_triple_repeat() {
     let _tracing = init_test_tracing!(&graph);
     assert_graphs_equivalent(&graph, "ababab");
 }
+
+/// ngrams reference output for "abcabababcaba" (printed and verified 2026-03-14):
+///
+/// (ab)            -> [a, b]
+/// (aba)           -> [ab, a]
+/// (abab)          -> [ab, ab], [aba, b]
+/// (ababa)         -> [ab, aba], [abab, a]
+/// (ababab)        -> [ab, abab], [ababa, b]
+/// (abababcaba)    -> [ab, ababcaba], [ababab, caba]
+/// (ababcaba)      -> [ab, abcaba], [abab, caba]
+/// (abc)           -> [ab, c]
+/// (abcaba)        -> [ab, caba], [abc, aba]
+/// (abcabab)       -> [abc, abab], [abcaba, b]
+/// (abcababa)      -> [abc, ababa], [abcabab, a]
+/// (abcababab)     -> [abc, ababab], [abcababa, b]
+/// (abcabababcaba) -> [abc, abababcaba], [abcababab, caba]
+/// (caba)          -> [c, aba]
+#[test]
+fn ngrams_inspect_abcabababcaba() {
+    let _dummy = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&_dummy);
+    let input = "abcabababcaba";
+
+    let ngrams_graph = build_ngrams_graph(input)
+        .expect("ngrams should produce a graph for this input");
+
+    let canonical = CanonicalGraph::from_hypergraph(&ngrams_graph);
+    println!("\n=== ngrams canonical graph for {:?} ===", input);
+    for (vertex, patterns) in &canonical.vertices {
+        for pattern in patterns {
+            println!("  ({}) -> [{}]", vertex, pattern.join(", "));
+        }
+    }
+    println!("=== end ===\n");
+
+    // Verify all expected tokens are present
+    let vertices = canonical.vertex_strings();
+    for expected in &["ab", "aba", "abab", "ababa", "ababab", "caba", "abc",
+                      "abcaba", "abcabab", "abcababa", "abcababab",
+                      "ababcaba", "abababcaba", "abcabababcaba"] {
+        assert!(vertices.contains(*expected), "missing token: {}", expected);
+    }
+}

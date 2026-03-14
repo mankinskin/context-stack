@@ -51,6 +51,7 @@
 //! ```
 
 // Public modules
+pub mod ascii_graph;
 pub mod commands;
 pub mod error;
 pub mod jq;

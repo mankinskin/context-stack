@@ -86,6 +86,13 @@ pub trait WorkspaceApi {
         name: &str,
     ) -> Result<WorkspaceInfo, WorkspaceError>;
 
+    fn create_workspace_from_ngrams_text(
+        &mut self,
+        name: &str,
+        text: &str,
+        timeout_secs: u64,
+    ) -> Result<WorkspaceInfo, WorkspaceError>;
+
     fn open_workspace(
         &mut self,
         name: &str,
@@ -240,6 +247,12 @@ pub trait WorkspaceApi {
         index: usize,
     ) -> Result<String, ApiError>;
 
+    fn render_ascii_graph(
+        &self,
+        ws: &str,
+        ascii_dag: bool,
+    ) -> Result<String, ApiError>;
+
     // -- Export / Import (Phase 5) ------------------------------------------
 
     /// Export a workspace to JSON or bincode format.
@@ -275,6 +288,20 @@ impl WorkspaceApi for WorkspaceManager {
         name: &str,
     ) -> Result<WorkspaceInfo, WorkspaceError> {
         WorkspaceManager::create_workspace(self, name)
+    }
+
+    fn create_workspace_from_ngrams_text(
+        &mut self,
+        name: &str,
+        text: &str,
+        timeout_secs: u64,
+    ) -> Result<WorkspaceInfo, WorkspaceError> {
+        WorkspaceManager::create_workspace_from_ngrams_text(
+            self,
+            name,
+            text,
+            timeout_secs,
+        )
     }
 
     fn open_workspace(
@@ -471,6 +498,14 @@ impl WorkspaceApi for WorkspaceManager {
         WorkspaceManager::show_vertex(self, ws, index)
     }
 
+    fn render_ascii_graph(
+        &self,
+        ws: &str,
+        ascii_dag: bool,
+    ) -> Result<String, ApiError> {
+        WorkspaceManager::render_ascii_graph(self, ws, ascii_dag)
+    }
+
     fn export_workspace(
         &self,
         ws: &str,
@@ -513,6 +548,12 @@ pub enum Command {
     // -- Workspace lifecycle ------------------------------------------------
     CreateWorkspace {
         name: String,
+    },
+    CreateWorkspaceFromNgrams {
+        name: String,
+        text: String,
+        #[serde(default = "default_ngrams_timeout_secs")]
+        timeout_secs: u64,
     },
     OpenWorkspace {
         name: String,
@@ -619,6 +660,11 @@ pub enum Command {
         workspace: String,
         index: usize,
     },
+    RenderAsciiGraph {
+        workspace: String,
+        #[serde(default)]
+        ascii_dag: bool,
+    },
 
     // -- Logs (Phase 3.1) ---------------------------------------------------
     /// List trace log files for a workspace.
@@ -705,6 +751,10 @@ fn default_query_limit() -> usize {
 
 fn default_search_limit_per_file() -> usize {
     10
+}
+
+fn default_ngrams_timeout_secs() -> u64 {
+    60
 }
 
 // ---------------------------------------------------------------------------
@@ -841,6 +891,18 @@ pub fn execute(
             let info = manager.create_workspace(&name)?;
             Ok(CommandResult::WorkspaceInfo(info))
         },
+        Command::CreateWorkspaceFromNgrams {
+            name,
+            text,
+            timeout_secs,
+        } => {
+            let info = manager.create_workspace_from_ngrams_text(
+                &name,
+                &text,
+                timeout_secs,
+            )?;
+            Ok(CommandResult::WorkspaceInfo(info))
+        },
         Command::OpenWorkspace { name } => {
             let info = manager.open_workspace(&name)?;
             Ok(CommandResult::WorkspaceInfo(info))
@@ -955,6 +1017,13 @@ pub fn execute(
         },
         Command::ShowVertex { workspace, index } => {
             let display = manager.show_vertex(&workspace, index)?;
+            Ok(CommandResult::GraphDisplay { display })
+        },
+        Command::RenderAsciiGraph {
+            workspace,
+            ascii_dag,
+        } => {
+            let display = manager.render_ascii_graph(&workspace, ascii_dag)?;
             Ok(CommandResult::GraphDisplay { display })
         },
 
@@ -1125,6 +1194,8 @@ impl Command {
     pub fn command_name(&self) -> &'static str {
         match self {
             Command::CreateWorkspace { .. } => "create_workspace",
+            Command::CreateWorkspaceFromNgrams { .. } =>
+                "create_workspace_from_ngrams",
             Command::OpenWorkspace { .. } => "open_workspace",
             Command::CloseWorkspace { .. } => "close_workspace",
             Command::SaveWorkspace { .. } => "save_workspace",
@@ -1151,6 +1222,7 @@ impl Command {
             Command::ValidateGraph { .. } => "validate_graph",
             Command::ShowGraph { .. } => "show_graph",
             Command::ShowVertex { .. } => "show_vertex",
+            Command::RenderAsciiGraph { .. } => "render_ascii_graph",
             Command::ListLogs { .. } => "list_logs",
             Command::GetLog { .. } => "get_log",
             Command::QueryLog { .. } => "query_log",

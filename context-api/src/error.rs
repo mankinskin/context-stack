@@ -78,6 +78,14 @@ pub enum WorkspaceError {
     /// Serialization or deserialization failed (bincode or JSON).
     #[error("serialization error: {0}")]
     SerializationError(String),
+
+    /// Ngrams graph creation exceeded timeout.
+    #[error("ngrams workspace creation timed out after {seconds}s")]
+    NgramsTimeout { seconds: u64 },
+
+    /// Ngrams graph creation failed for another reason.
+    #[error("ngrams workspace creation failed: {reason}")]
+    NgramsFailed { reason: String },
 }
 
 // ---------------------------------------------------------------------------

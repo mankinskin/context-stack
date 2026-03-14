@@ -15,6 +15,8 @@ context-trace = { path = "../context-trace", features = ["test-api"] }
 context-search = { path = "../context-search", features = ["test-api"] }
 context-insert = { path = "../context-insert", features = ["test-api"] }
 context-read = { path = "../context-read", features = ["test-api"] }
+ngrams = { path = "../ngrams" }
+ascii-dag = "0.9"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

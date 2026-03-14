@@ -65,3 +65,57 @@ fn repetition_xyzxyzxyz() {
         root => [[xyzxyz, xyz], [xyz, xyzxyz]]
     );
 }
+
+/// Test "abcabababcaba" - complex overlapping pattern with mixed repeats.
+///
+/// Correct structure derived from the ngrams reference algorithm:
+/// (ab)            -> [a, b]
+/// (aba)           -> [ab, a]
+/// (abab)          -> { [ab, ab], [aba, b] }
+/// (ababa)         -> { [ab, aba], [abab, a] }
+/// (ababab)        -> { [ab, abab], [ababa, b] }
+/// (caba)          -> [c, aba]
+/// (abc)           -> [ab, c]
+/// (abcaba)        -> { [ab, caba], [abc, aba] }
+/// (abcabab)       -> { [abc, abab], [abcaba, b] }
+/// (abcababa)      -> { [abc, ababa], [abcabab, a] }
+/// (abcababab)     -> { [abc, ababab], [abcababa, b] }
+/// (ababcaba)      -> { [ab, abcaba], [abab, caba] }
+/// (abababcaba)    -> { [ab, ababcaba], [ababab, caba] }
+/// (abcabababcaba) -> { [abc, abababcaba], [abcababab, caba] }
+#[test]
+fn complex_abcabababcaba() {
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    let result = ReadRequest::from_text("abcabababcaba").execute(&mut graph);
+    graph.emit_graph_snapshot();
+
+    expect_atoms!(graph, {a, b, c});
+    assert_indices!(
+        graph,
+        ab, aba, abab, ababa, ababab,
+        caba, abc, abcaba, abcabab, abcababa, abcababab,
+        ababcaba, abababcaba
+    );
+
+    let root = result.expect("should have root");
+    assert_eq!(root.width(), TokenWidth(13));
+
+    assert_patterns!(
+        graph,
+        ab         => [[a, b]],
+        aba        => [[ab, a]],
+        abab       => [[ab, ab], [aba, b]],
+        ababa      => [[ab, aba], [abab, a]],
+        ababab     => [[ab, abab], [ababa, b]],
+        caba       => [[c, aba]],
+        abc        => [[ab, c]],
+        abcaba     => [[ab, caba], [abc, aba]],
+        abcabab    => [[abc, abab], [abcaba, b]],
+        abcababa   => [[abc, ababa], [abcabab, a]],
+        abcababab  => [[abc, ababab], [abcababa, b]],
+        ababcaba   => [[ab, abcaba], [abab, caba]],
+        abababcaba => [[ab, ababcaba], [ababab, caba]],
+        root       => [[abc, abababcaba], [abcababab, caba]]
+    );
+}
