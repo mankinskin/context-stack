@@ -454,6 +454,18 @@ pub struct LogFileInfo {
     pub modified: String,
     /// The command name that produced this log.
     pub command: String,
+    /// Whether the log contains graph snapshot data.
+    #[serde(default)]
+    pub has_graph_snapshot: bool,
+    /// Whether the log contains search operations.
+    #[serde(default)]
+    pub has_search_ops: bool,
+    /// Whether the log contains insert operations.
+    #[serde(default)]
+    pub has_insert_ops: bool,
+    /// Whether the log contains search path transitions.
+    #[serde(default)]
+    pub has_search_paths: bool,
 }
 
 /// A parsed log entry — the simplified API view of a full `LogEntry`.

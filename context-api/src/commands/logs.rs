@@ -79,11 +79,43 @@ pub fn list_logs(
             .unwrap_or(&filename)
             .to_string();
 
+        // Quick scan for feature-flag markers (check first 64KB for speed)
+        let path = entry.path();
+        let bytes = fs::read(&path).unwrap_or_default();
+        let scan_len = bytes.len().min(64 * 1024);
+        let scan_bytes = &bytes[..scan_len];
+
+        let has_graph_snapshot = scan_bytes
+            .windows(b"graph_snapshot".len())
+            .any(|w| w == b"graph_snapshot");
+
+        let has_search_ops = scan_bytes
+            .windows(br#"\"op_type\":\"search\""#.len())
+            .any(|w| w == br#"\"op_type\":\"search\""#)
+            || scan_bytes
+                .windows(br#""op_type": "search""#.len())
+                .any(|w| w == br#""op_type": "search""#);
+
+        let has_insert_ops = scan_bytes
+            .windows(br#"\"op_type\":\"insert\""#.len())
+            .any(|w| w == br#"\"op_type\":\"insert\""#)
+            || scan_bytes
+                .windows(br#""op_type": "insert""#.len())
+                .any(|w| w == br#""op_type": "insert""#);
+
+        let has_search_paths = scan_bytes
+            .windows(b"path_transition".len())
+            .any(|w| w == b"path_transition");
+
         logs.push(LogFileInfo {
             filename,
             size: metadata.len(),
             modified,
             command,
+            has_graph_snapshot,
+            has_search_ops,
+            has_insert_ops,
+            has_search_paths,
         });
 
         if logs.len() >= limit {
@@ -655,5 +687,93 @@ mod tests {
             search_logs(Path::new("/nonexistent"), ".", 10).unwrap();
         assert!(results.is_empty());
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_list_logs_feature_flags() {
+        let tmp = TempDir::new().unwrap();
+        // Log with graph_snapshot marker
+        write_test_log(
+            tmp.path(),
+            "20260314T000000_snapshot.log",
+            r#"{"timestamp":"2026-03-14T00:00:00Z","level":"INFO","fields":{"message":"graph_snapshot captured"},"target":"test"}
+"#,
+        );
+        // Log with search op marker
+        write_test_log(
+            tmp.path(),
+            "20260314T000001_search.log",
+            r#"{"timestamp":"2026-03-14T00:00:00Z","level":"INFO","fields":{"message":"running op","op_type": "search"},"target":"test"}
+"#,
+        );
+        // Log with insert op marker
+        write_test_log(
+            tmp.path(),
+            "20260314T000002_insert.log",
+            r#"{"timestamp":"2026-03-14T00:00:00Z","level":"INFO","fields":{"message":"running op","op_type": "insert"},"target":"test"}
+"#,
+        );
+        // Log with path_transition marker
+        write_test_log(
+            tmp.path(),
+            "20260314T000003_paths.log",
+            r#"{"timestamp":"2026-03-14T00:00:00Z","level":"INFO","fields":{"message":"path_transition detected"},"target":"test"}
+"#,
+        );
+        // Log with NO markers
+        write_test_log(
+            tmp.path(),
+            "20260314T000004_plain.log",
+            r#"{"timestamp":"2026-03-14T00:00:00Z","level":"INFO","fields":{"message":"nothing special"},"target":"test"}
+"#,
+        );
+
+        let logs = list_logs(tmp.path(), None, 100).unwrap();
+        assert_eq!(logs.len(), 5);
+
+        // Find each log by filename and check flags
+        let snapshot_log = logs
+            .iter()
+            .find(|l| l.filename.contains("snapshot"))
+            .unwrap();
+        assert!(snapshot_log.has_graph_snapshot);
+        assert!(!snapshot_log.has_search_ops);
+
+        let search_log =
+            logs.iter().find(|l| l.filename.contains("search")).unwrap();
+        assert!(search_log.has_search_ops);
+        assert!(!search_log.has_insert_ops);
+
+        let insert_log =
+            logs.iter().find(|l| l.filename.contains("insert")).unwrap();
+        assert!(insert_log.has_insert_ops);
+        assert!(!insert_log.has_search_ops);
+
+        let paths_log =
+            logs.iter().find(|l| l.filename.contains("paths")).unwrap();
+        assert!(paths_log.has_search_paths);
+
+        let plain_log =
+            logs.iter().find(|l| l.filename.contains("plain")).unwrap();
+        assert!(!plain_log.has_graph_snapshot);
+        assert!(!plain_log.has_search_ops);
+        assert!(!plain_log.has_insert_ops);
+        assert!(!plain_log.has_search_paths);
+    }
+
+    #[test]
+    fn test_list_logs_feature_flags_escaped_format() {
+        let tmp = TempDir::new().unwrap();
+        // Log with escaped JSON format markers (double-encoded JSON where
+        // quotes appear as literal backslash-quote sequences on disk)
+        write_test_log(
+            tmp.path(),
+            "20260314T000000_escaped.log",
+            r#"{"timestamp":"2026-03-14T00:00:00Z","level":"INFO","fields":{"message":"{\"op_type\":\"search\"}"},"target":"test"}"#,
+        );
+
+        let logs = list_logs(tmp.path(), None, 100).unwrap();
+        assert_eq!(logs.len(), 1);
+        assert!(logs[0].has_search_ops);
     }
 }
