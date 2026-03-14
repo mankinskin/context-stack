@@ -13,7 +13,7 @@
 //!
 //! ## Known Limitations (marked with TODOs)
 //!
-//! - Pattern creation: `insert_or_get_complete([a,b,a,b])` returns ab (width 2)
+//! - Pattern creation: `insert_next_match([a,b,a,b])` returns ab (width 2)
 //!   instead of creating abab (width 4)
 //! - Optimal matching: Search prefers first match found over best match
 //!   (e.g., returns aaa instead of aaaa for [a,a,a,a])
@@ -135,17 +135,11 @@ fn cursor_single_token_exhausts() {
 
     // Query for [a, b] atoms - should find existing "ab" pattern
     let query = vec![a, b];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    // Should find the existing ab token
-    let IndexWithPath { index, path: _ } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path: _ } = result.unwrap().into_result();
 
     assert_eq!(index, ab, "Should find ab token");
     assert_eq!(index.width(), TokenWidth(2), "ab has width 2");
@@ -163,16 +157,11 @@ fn cursor_two_tokens_first_match() {
 
     // Query for [a, b, a, b] - four atoms
     let query = vec![a, b, a, b];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path: _ } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path: _ } = result.unwrap().into_result();
 
     // With current algorithm, finds 'ab' as prefix match (width 2)
     // TODO: Full implementation would create/find [ab, ab] with width 4
@@ -191,16 +180,11 @@ fn cursor_atoms_finds_pattern() {
 
     // Query for [a, b, a, b] - should find "ab" as largest prefix
     let query = vec![a, b, a, b];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // Should find ab token (width 2)
     assert_eq!(index.width(), TokenWidth(2), "Should find ab with width 2");
@@ -224,16 +208,10 @@ fn cursor_repeated_atoms_aa() {
 
     // Query for [a, a] - should find existing aa
     let query = vec![a, a];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query);
+    let result = ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query);
 
-    assert!(result.is_ok(), "Should find aa pattern");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path: _ } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path: _ } = result.unwrap().into_result();
 
     assert_eq!(index, aa, "Should find aa token");
     assert_eq!(index.width(), TokenWidth(2), "aa should have width 2");
@@ -241,7 +219,7 @@ fn cursor_repeated_atoms_aa() {
 
 /// Test: Find existing 'aaa' pattern via [a, a, a] query
 ///
-/// Input: [a, a, a] where 'aa' and 'aaa' exist  
+/// Input: [a, a, a] where 'aa' and 'aaa' exist
 /// Expected: Finds 'aaa' token with width 3
 #[test]
 fn cursor_repeated_atoms_aaa() {
@@ -250,16 +228,10 @@ fn cursor_repeated_atoms_aaa() {
 
     // Query for [a, a, a] - should find existing aaa
     let query = vec![a, a, a];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query);
+    let result = ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query);
 
-    assert!(result.is_ok(), "Should find aaa pattern");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path: _ } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path: _ } = result.unwrap().into_result();
 
     assert_eq!(index, aaa, "Should find aaa token");
     assert_eq!(index.width(), TokenWidth(3), "aaa should have width 3");
@@ -277,16 +249,10 @@ fn cursor_repeated_atoms_aaaa() {
 
     // Query for [a, a, a, a] - should ideally find aaaa
     let query = vec![a, a, a, a];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query);
+    let result = ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query);
 
-    assert!(result.is_ok(), "Should find pattern");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path: _ } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path: _ } = result.unwrap().into_result();
 
     // Current behavior: finds either aaa or aa depending on search path
     // The search finds aa first, then explores parents to find aaa = [aa, a]
@@ -343,17 +309,13 @@ fn cursor_atoms_uses_existing_pattern() {
 
     // Query for [a, b, c]
     let query = vec![a, b, c];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
+    assert!(result.is_ok(), "insert_next_match should succeed");
 
     // Might find ab (width 2) or create abc (width 3) depending on implementation
-    let IndexWithPath { index, .. } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    let IndexWithPath { index, .. } = result.unwrap().into_result();
 
     // Width should be at least 2 (found ab)
     assert!(*index.width() >= 2, "Should find at least ab");
@@ -470,17 +432,14 @@ fn cursor_insert_advance_flow() {
     // Input: [a, b, a, b] (should find [ab, ab] or create abab)
     let original_query: Pattern = vec![a, b, a, b].into();
 
-    // Step 1: First insert_or_get_complete
-    let result1: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(original_query.to_vec());
+    // Step 1: First insert_next_match
+    let result1 = ToInsertCtx::<IndexWithPath>::insert_next_match(
+        &graph,
+        original_query.to_vec(),
+    );
 
     assert!(result1.is_ok(), "First insert should succeed");
-    let inner1 = result1.unwrap();
-
-    let first_match = match inner1 {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    let first_match = result1.unwrap().into_result();
 
     let first_width = *first_match.index.width();
 
@@ -490,7 +449,7 @@ fn cursor_insert_advance_flow() {
     // This test verifies the basic flow works
     // The actual cursor advancement implementation will need to:
     // 1. Track remaining = original_query[first_width..]
-    // 2. Call insert_or_get_complete on remaining
+    // 2. Call insert_next_match on remaining
     // 3. Repeat until exhausted
 }
 
@@ -506,8 +465,7 @@ fn cursor_empty_query() {
 
     // Empty query
     let query: Vec<Token> = vec![];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query);
+    let result = ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query);
 
     // Should either error or handle gracefully
     // Empty patterns are invalid
@@ -523,8 +481,7 @@ fn cursor_single_atom() {
 
     // Single atom query [a]
     let query = vec![a];
-    let result: Result<Result<IndexWithPath, _>, ErrorReason> =
-        graph.insert_or_get_complete(query);
+    let result = ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query);
 
     // Single-element queries cannot search (no way to advance beyond the single token)
     // This returns an ErrorReason::SingleIndex

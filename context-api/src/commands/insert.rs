@@ -16,7 +16,10 @@
 
 use std::collections::HashSet;
 
-use context_insert::ToInsertCtx;
+use context_insert::{
+    InsertOutcome,
+    ToInsertCtx,
+};
 use context_trace::graph::vertex::{
     atom::Atom,
     token::Token,
@@ -39,7 +42,7 @@ impl WorkspaceManager {
     ///
     /// Each `TokenRef` is resolved to a concrete `Token` in the graph (by
     /// index or label). The resolved tokens are passed directly to
-    /// `context-insert`'s `insert_or_get_complete()` pipeline.
+    /// `context-insert`'s `insert_next_match()` pipeline.
     ///
     /// # Errors
     ///
@@ -72,29 +75,31 @@ impl WorkspaceManager {
             "insert_first_match: resolved tokens"
         );
 
-        // Delegate directly to context-insert's insert_or_get_complete
-        let result = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_or_get_complete(
+        // Delegate directly to context-insert's insert_next_match
+        let outcome = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_next_match(
             &graph_ref,
             tokens,
         )
         .map_err(|e| {
             InsertError::InternalError(format!(
-                "insert_or_get_complete failed: {e:?}"
+                "insert_next_match failed: {e:?}"
             ))
         })?;
 
-        let (token, already_existed) = match result {
-            Ok(iwp) => {
-                // Newly created via split+join
-                debug!(token = ?iwp.index, "insert_first_match: newly inserted");
-                (iwp.index, false)
+        let token = outcome.token();
+        let already_existed = !outcome.is_expanded();
+
+        match &outcome {
+            InsertOutcome::Created { .. } => {
+                debug!(token = ?token, "insert_first_match: newly inserted");
             },
-            Err(iwp) => {
-                // Already existed — full match found
-                debug!(token = ?iwp.index, "insert_first_match: already existed");
-                (iwp.index, true)
+            InsertOutcome::Complete { .. } => {
+                debug!(token = ?token, "insert_first_match: already existed (complete)");
             },
-        };
+            InsertOutcome::NoExpansion { .. } => {
+                debug!(token = ?token, "insert_first_match: already existed (no expansion)");
+            },
+        }
 
         // Mark workspace dirty only if we created something new
         if !already_existed {
@@ -123,7 +128,7 @@ impl WorkspaceManager {
     ///
     /// Each character in the text is ensured to exist as an atom (auto-created
     /// if missing). The atom tokens are then passed directly to
-    /// `context-insert`'s `insert_or_get_complete()` pipeline.
+    /// `context-insert`'s `insert_next_match()` pipeline.
     ///
     /// # Errors
     ///
@@ -160,27 +165,31 @@ impl WorkspaceManager {
             })
             .collect();
 
-        // Delegate directly to context-insert's insert_or_get_complete
-        let result = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_or_get_complete(
+        // Delegate directly to context-insert's insert_next_match
+        let outcome = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_next_match(
             &graph_ref,
             tokens,
         )
         .map_err(|e| {
             InsertError::InternalError(format!(
-                "insert_or_get_complete failed: {e:?}"
+                "insert_next_match failed: {e:?}"
             ))
         })?;
 
-        let (token, already_existed) = match result {
-            Ok(iwp) => {
-                debug!(token = ?iwp.index, "insert_sequence: newly inserted");
-                (iwp.index, false)
+        let token = outcome.token();
+        let already_existed = !outcome.is_expanded();
+
+        match &outcome {
+            InsertOutcome::Created { .. } => {
+                debug!(token = ?token, "insert_sequence: newly inserted");
             },
-            Err(iwp) => {
-                debug!(token = ?iwp.index, "insert_sequence: already existed");
-                (iwp.index, true)
+            InsertOutcome::Complete { .. } => {
+                debug!(token = ?token, "insert_sequence: already existed (complete)");
             },
-        };
+            InsertOutcome::NoExpansion { .. } => {
+                debug!(token = ?token, "insert_sequence: already existed (no expansion)");
+            },
+        }
 
         // Mark workspace dirty only if we created something new
         if !already_existed {

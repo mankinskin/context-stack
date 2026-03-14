@@ -59,16 +59,11 @@ fn insert_postfix_bc_of_abc() {
 
     // Query for [b, c] - this is postfix of abc
     let query = vec![b, c];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // The result should:
     // 1. Find or create a token representing [b, c]
@@ -102,16 +97,11 @@ fn insert_postfix_bcd_extends_abc() {
 
     // Query for [b, c, d] - "bc" is postfix of abc, d extends it
     let query = vec![b, c, d];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // Path root should have 3 tokens
     assert_eq!(path.path_root().len(), 3, "Query had 3 tokens");
@@ -136,16 +126,11 @@ fn insert_single_atom_postfix() {
 
     // Query for [c, d] - c is single-atom postfix of abc
     let query = vec![c, d];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // Should have consumed query of 2 tokens
     assert_eq!(path.path_root().len(), 2, "Query had 2 tokens");
@@ -169,16 +154,11 @@ fn insert_finds_existing_overlap_pattern() {
 
     // Query for [b, c] - bc already exists in graph
     let query = vec![b, c];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // Should find existing bc token
     assert_eq!(index, bc, "Should find existing bc token");
@@ -204,16 +184,11 @@ fn insert_finds_postfix_of_compound_token() {
 
     // Query for [c, d] - cd exists and is postfix of abcd
     let query = vec![c, d];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // Should find existing cd token
     assert_eq!(index, cd, "Should find existing cd token");
@@ -246,16 +221,11 @@ fn cursor_position_after_postfix_match() {
     // Query for [b, c, d, e] - 4 atoms
     // "bc" might be matched as postfix of abc
     let query = vec![b, c, d, e];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // The path root should reflect the original query
     assert_eq!(path.path_root().len(), 4, "Original query had 4 tokens");
@@ -283,16 +253,11 @@ fn cursor_tracks_overlap_consumption() {
     // Query for [b, c, d] - 3 atoms
     // bc exists, so should match that first (width 2)
     let query = vec![b, c, d];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // Path root reflects original query
     assert_eq!(path.path_root().len(), 3, "Query had 3 tokens");
@@ -321,16 +286,11 @@ fn insert_no_overlap_path() {
 
     // Query for [d, e] - neither d nor e appear as postfix of abc
     let query = vec![d, e];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
-    assert!(result.is_ok(), "insert_or_get_complete should succeed");
-    let inner = result.unwrap();
-
-    let IndexWithPath { index, path } = match inner {
-        Ok(found) => found,
-        Err(found) => found,
-    };
+    assert!(result.is_ok(), "insert_next_match should succeed");
+    let IndexWithPath { index, path } = result.unwrap().into_result();
 
     // Should process query of 2 tokens
     assert_eq!(path.path_root().len(), 2, "Query had 2 tokens");
@@ -348,19 +308,16 @@ fn insert_single_atom_is_postfix() {
 
     // Query for single atom [c] - c is postfix of abc
     let query = vec![c];
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query.clone());
+    let result =
+        ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query.clone());
 
     // Single atom query might return error (SingleIndex) or succeed
     // Just verify no panic
     match result {
-        Ok(Ok(IndexWithPath { index, .. })) => {
-            assert_eq!(index, c, "Should return c atom");
+        Ok(outcome) => {
+            assert_eq!(outcome.token(), c, "Should return c atom");
         },
-        Ok(Err(IndexWithPath { index, .. })) => {
-            assert_eq!(index, c, "Should return c atom");
-        },
-        Err(e) => {
+        Err(_) => {
             // SingleIndex error is acceptable for single-atom queries
             // This is expected behavior per the search algorithm
         },

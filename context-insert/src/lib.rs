@@ -12,6 +12,7 @@ pub(crate) mod tests;
 // Auto-generated pub(crate) use statements
 pub use crate::{
     insert::{
+        InsertOutcome,
         ToInsertCtx,
         context::InsertCtx,
         result::InsertResult,

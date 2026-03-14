@@ -6,7 +6,10 @@ use context_search::*;
 use context_trace::*;
 pub mod context;
 pub(crate) mod direction;
+pub mod outcome;
 pub mod result;
+
+pub use outcome::InsertOutcome;
 
 /// Trait for types that can create an InsertCtx for graph insertions.
 ///
@@ -28,11 +31,25 @@ pub trait ToInsertCtx<R: InsertResult = Token>: HasGraph {
     ) -> Result<R, ErrorState> {
         self.insert_context().insert_init(ext, init)
     }
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use `insert_next_match` instead. Returns `Result<InsertOutcome, ErrorReason>` — a flat enum replacing the confusing nested Result."
+    )]
+    #[allow(deprecated)]
     fn insert_or_get_complete(
         &self,
         searchable: impl Searchable<InsertTraversal>,
     ) -> Result<Result<R, R::Error>, ErrorReason> {
         self.insert_context().insert_or_get_complete(searchable)
+    }
+    fn insert_next_match(
+        &self,
+        searchable: impl Searchable<InsertTraversal>,
+    ) -> Result<
+        outcome::InsertOutcome,
+        context_trace::graph::getters::ErrorReason,
+    > {
+        self.insert_context().insert_next_match(searchable)
     }
 }
 

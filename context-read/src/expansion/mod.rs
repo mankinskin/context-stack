@@ -92,16 +92,26 @@ impl ExpansionCtx {
                 cursor: CursorCtx::new(graph, cursor),
             }
         } else {
-            // No root - use insert_or_get_complete to find longest prefix match
-            let result: Result<Result<IndexWithPath, _>, _> =
-                graph.insert_or_get_complete(cursor.clone());
+            // No root - use insert_next_match to find longest prefix match
+            let result = ToInsertCtx::<IndexWithPath>::insert_next_match(
+                &graph,
+                cursor.clone(),
+            );
 
             let IndexWithPath {
                 index: first,
                 path: cursor,
             } = match result {
-                Ok(Ok(found)) => found,
-                Ok(Err(found)) => found,
+                Ok(outcome) => {
+                    debug!(
+                        outcome_variant = if outcome.is_expanded() { "Created" }
+                            else if outcome.is_complete() { "Complete" }
+                            else { "NoExpansion" },
+                        token = ?outcome.token(),
+                        "insert_next_match result"
+                    );
+                    outcome.into_result()
+                },
                 Err(ErrorReason::SingleIndex(c)) => *c,
                 Err(_) => {
                     // No match - use first cursor token
@@ -114,7 +124,7 @@ impl ExpansionCtx {
                 },
             };
 
-            debug!(first_index = ?first, "ExpansionCtx initialized with insert_or_get_complete result");
+            debug!(first_index = ?first, "ExpansionCtx initialized with insert_next_match result");
 
             // Update cursor to the advanced position
 

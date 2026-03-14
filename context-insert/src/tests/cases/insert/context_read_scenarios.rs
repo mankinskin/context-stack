@@ -35,7 +35,7 @@ use context_trace::{
 /// - Graph has "hypergraph" pattern partially built
 /// - Search for pattern [p, h] where p exists but h doesn't match next position
 /// - Search returns checkpoint_position = 0
-/// - insert_or_get_complete should handle this gracefully
+/// - insert_next_match should handle this gracefully
 ///
 /// Expected behavior: Returns appropriate error/result without panicking
 #[test]
@@ -46,19 +46,19 @@ fn integration_partial_match_no_checkpoint() {
     // Search for [p, h] - p will be found in hypergra, but h won't match 'e'
     let query = vec![p, h];
 
-    // This mimics what context-read does: insert_or_get_complete
+    // This mimics what context-read does: insert_next_match
     // Should handle gracefully without panicking
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query);
+    let result = ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query);
 
     // The result should either be:
-    // - Ok(Ok(_)) if insertion succeeded
-    // - Ok(Err(_)) if pattern already exists
+    // - Ok(InsertOutcome::Created { .. }) if insertion succeeded
+    // - Ok(InsertOutcome::Complete { .. }) if pattern already exists
+    // - Ok(InsertOutcome::NoExpansion { .. }) if partial match with no expansion
     // - Err(_) if validation failed
     // It should NOT panic
     assert!(
         result.is_ok() || result.is_err(),
-        "insert_or_get_complete should return a result, not panic"
+        "insert_next_match should return a result, not panic"
     );
 }
 
@@ -105,14 +105,17 @@ fn triple_repeat_pattern_scenario() {
     // This might return a Response where root_token is different from cached entries
     let query = vec![ab];
 
-    // insert_or_get_complete should handle this without panic
-    let result: Result<Result<IndexWithPath, _>, _> =
-        graph.insert_or_get_complete(query);
+    // insert_next_match should handle this without panic
+    let result = ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, query);
 
     // Verify no panic occurred
     match result {
-        Ok(Ok(_)) => { /* Pattern already exists - fine */ },
-        Ok(Err(_)) => { /* Insertion completed - fine */ },
+        Ok(crate::InsertOutcome::Created { .. }) => { /* New token created - fine */
+        },
+        Ok(crate::InsertOutcome::Complete { .. }) => { /* Pattern already exists - fine */
+        },
+        Ok(crate::InsertOutcome::NoExpansion { .. }) => { /* Partial match - fine */
+        },
         Err(_) => { /* Error returned - fine, as long as no panic */ },
     }
 }

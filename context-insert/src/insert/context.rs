@@ -20,7 +20,10 @@ use context_trace::{
     *,
 };
 
-use crate::insert::result::InsertResult;
+use crate::insert::{
+    outcome::InsertOutcome,
+    result::InsertResult,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct InsertTraversal;
@@ -58,12 +61,22 @@ impl<R: InsertResult> InsertCtx<R> {
         self.insert_impl(searchable)
             .and_then(|res| res.map_err(|root| root.into()))
     }
+    #[deprecated(since = "0.2.0", note = "Use `insert_next_match` instead.")]
+    #[allow(deprecated)]
     #[context_trace::instrument_sig(level = "info", skip(self))]
     pub(crate) fn insert_or_get_complete(
         &mut self,
         searchable: impl Searchable<InsertTraversal> + Debug,
     ) -> Result<Result<R, R::Error>, ErrorReason> {
         self.insert_impl(searchable).map_err(|err| err.reason)
+    }
+    #[context_trace::instrument_sig(level = "info", skip(self))]
+    pub fn insert_next_match(
+        &mut self,
+        searchable: impl Searchable<InsertTraversal> + Debug,
+    ) -> Result<InsertOutcome, ErrorReason> {
+        self.insert_next_match_impl(searchable)
+            .map_err(|err| err.reason)
     }
     pub(crate) fn insert_init(
         &mut self,
@@ -213,6 +226,71 @@ impl<R: InsertResult> InsertCtx<R> {
                         InitInterval::from(result),
                     )
                     .map(Ok)
+                }
+            },
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Core implementation for `insert_next_match`.
+    ///
+    /// Unlike `insert_impl`, this method:
+    /// - Always returns `IndexWithPath` (no generics)
+    /// - Distinguishes `Complete` vs `NoExpansion` (no `TryInitWith` encoding)
+    /// - Carries the search `Response` in every variant
+    fn insert_next_match_impl(
+        &mut self,
+        searchable: impl Searchable<InsertTraversal>,
+    ) -> Result<InsertOutcome, ErrorState> {
+        match searchable.search(self.graph.clone()) {
+            Ok(result) => {
+                if result.is_entire_root() && result.query_exhausted() {
+                    // ── Complete ──
+                    // Query fully matched an existing token. No insertion needed.
+                    let query_path = result.query_cursor().path().clone();
+                    let root_token = result.root_token();
+                    let response = result; // MOVE — no clone
+
+                    Ok(InsertOutcome::Complete {
+                        result: IndexWithPath {
+                            index: root_token,
+                            path: query_path,
+                        },
+                        response,
+                    })
+                } else if result.is_entire_root() && !result.query_exhausted() {
+                    // ── NoExpansion ──
+                    // Found a complete token at start, but query extends beyond.
+                    let root_token = result.root_token();
+                    let query_path = result.query_cursor().path().clone();
+                    let response = result; // MOVE — no clone
+
+                    Ok(InsertOutcome::NoExpansion {
+                        result: IndexWithPath {
+                            index: root_token,
+                            path: query_path,
+                        },
+                        response,
+                    })
+                } else {
+                    // ── Created ──
+                    // Partial match — need to insert via split+join.
+                    let response = result.clone(); // CLONE — needed because InitInterval consumes result
+                    let query_path = result.query_cursor().path().clone();
+                    let extract =
+                        <R::Extract as ResultExtraction>::extract_from(&result);
+                    let init = InitInterval::from(result); // MOVE — consumes result
+
+                    let new_token: R = self.insert_init(extract, init)?;
+                    let token: Token = new_token.into();
+
+                    Ok(InsertOutcome::Created {
+                        result: IndexWithPath {
+                            index: token,
+                            path: query_path,
+                        },
+                        response,
+                    })
                 }
             },
             Err(err) => Err(err),
