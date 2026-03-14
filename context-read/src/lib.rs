@@ -16,5 +16,11 @@ pub(crate) mod expansion;
 pub(crate) mod request;
 pub(crate) mod segment;
 
+// Re-export key public types from the context module.
+pub use context::{
+    ReadSequenceIter,
+    SegmentResult,
+};
+
 #[cfg(any(test, feature = "test-api"))]
 pub mod tests;

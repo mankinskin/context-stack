@@ -42,6 +42,17 @@ impl Iterator for ExpansionCtx {
     type Item = BandState;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // Multi-band invariant (D8): if we have an overlap, we must commit
+        // before continuing. The caller (BlockExpansionCtx::process) is
+        // responsible for committing via RootManager::commit_state().
+        debug_assert!(
+            !self.state.has_overlap(),
+            "BandState has uncommitted overlap — commit via \
+             RootManager::commit_state() before calling \
+             ExpansionCtx::next() again. State: {:?}",
+            self.state,
+        );
+
         // If we already have an overlap, signal completion (must commit first)
         if self.state.has_overlap() {
             return None;
