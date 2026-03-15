@@ -13,6 +13,7 @@
 //!    `WorkspaceApi` method and wraps the result in a `CommandResult`.
 
 pub mod atoms;
+pub mod compare;
 pub mod debug;
 pub mod export_import;
 pub mod insert;
@@ -36,6 +37,7 @@ use crate::{
     error::{
         ApiError,
         AtomError,
+        CompareError,
         InsertError,
         PatternError,
         ReadError,
@@ -49,6 +51,8 @@ use crate::{
     },
     types::{
         AtomInfo,
+        CompareMode,
+        GraphDiffResult,
         GraphStatistics,
         InsertResult,
         LogAnalysis,
@@ -252,6 +256,23 @@ pub trait WorkspaceApi {
         ws: &str,
         ascii_dag: bool,
     ) -> Result<String, ApiError>;
+
+    // -- Compare (Phase 3.2) ------------------------------------------------
+
+    fn compare_workspaces(
+        &self,
+        workspace_a: &str,
+        workspace_b: &str,
+        mode: CompareMode,
+    ) -> Result<GraphDiffResult, CompareError>;
+
+    fn compare_vertices(
+        &self,
+        workspace_a: &str,
+        index_a: usize,
+        workspace_b: &str,
+        index_b: usize,
+    ) -> Result<GraphDiffResult, CompareError>;
 
     // -- Export / Import (Phase 5) ------------------------------------------
 
@@ -506,6 +527,36 @@ impl WorkspaceApi for WorkspaceManager {
         WorkspaceManager::render_ascii_graph(self, ws, ascii_dag)
     }
 
+    fn compare_workspaces(
+        &self,
+        workspace_a: &str,
+        workspace_b: &str,
+        mode: CompareMode,
+    ) -> Result<GraphDiffResult, CompareError> {
+        WorkspaceManager::compare_workspaces(
+            self,
+            workspace_a,
+            workspace_b,
+            mode,
+        )
+    }
+
+    fn compare_vertices(
+        &self,
+        workspace_a: &str,
+        index_a: usize,
+        workspace_b: &str,
+        index_b: usize,
+    ) -> Result<GraphDiffResult, CompareError> {
+        WorkspaceManager::compare_vertices(
+            self,
+            workspace_a,
+            index_a,
+            workspace_b,
+            index_b,
+        )
+    }
+
     fn export_workspace(
         &self,
         ws: &str,
@@ -739,6 +790,24 @@ pub enum Command {
         #[serde(default)]
         overwrite: bool,
     },
+
+    // -- Compare (Phase 3.2) -----------------------------------------------
+    /// Compare two workspace graphs and return a structured diff.
+    CompareWorkspaces {
+        workspace_a: String,
+        workspace_b: String,
+        /// Comparison mode: `full` (default) or `subset`.
+        #[serde(default)]
+        mode: CompareMode,
+    },
+
+    /// Compare two individual vertices from (potentially different) workspaces.
+    CompareVertices {
+        workspace_a: String,
+        index_a: usize,
+        workspace_b: String,
+        index_b: usize,
+    },
 }
 
 fn default_log_limit() -> usize {
@@ -815,6 +884,9 @@ pub enum CommandResult {
 
     /// Result of `get_snapshot`.
     Snapshot(#[schemars(with = "serde_json::Value")] GraphSnapshot),
+
+    /// Result of `compare_workspaces` or `compare_vertices`.
+    GraphDiff(#[schemars(with = "serde_json::Value")] GraphDiffResult),
 
     /// Result of `get_statistics`.
     Statistics(GraphStatistics),
@@ -1150,6 +1222,29 @@ pub fn execute(
             )?;
             Ok(CommandResult::WorkspaceInfo(info))
         },
+
+        // -- Compare (Phase 3.2) -------------------------------------------
+        Command::CompareWorkspaces {
+            workspace_a,
+            workspace_b,
+            mode,
+        } => {
+            let result = manager
+                .compare_workspaces(&workspace_a, &workspace_b, mode)
+                .map_err(ApiError::Compare)?;
+            Ok(CommandResult::GraphDiff(result))
+        },
+        Command::CompareVertices {
+            workspace_a,
+            index_a,
+            workspace_b,
+            index_b,
+        } => {
+            let result = manager
+                .compare_vertices(&workspace_a, index_a, &workspace_b, index_b)
+                .map_err(ApiError::Compare)?;
+            Ok(CommandResult::GraphDiff(result))
+        },
     }
 }
 
@@ -1232,6 +1327,8 @@ impl Command {
             Command::DeleteLogs { .. } => "delete_logs",
             Command::ExportWorkspace { .. } => "export_workspace",
             Command::ImportWorkspace { .. } => "import_workspace",
+            Command::CompareWorkspaces { .. } => "compare_workspaces",
+            Command::CompareVertices { .. } => "compare_vertices",
         }
     }
 }

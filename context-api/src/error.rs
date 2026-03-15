@@ -40,6 +40,10 @@ pub enum ApiError {
     /// Log operation errors (Phase 3.1).
     #[error(transparent)]
     Log(#[from] LogError),
+
+    /// Graph comparison errors (Phase 3.2).
+    #[error(transparent)]
+    Compare(#[from] CompareError),
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +235,22 @@ pub enum LogError {
 }
 
 // ---------------------------------------------------------------------------
+// Compare errors (Phase 3.2)
+// ---------------------------------------------------------------------------
+
+/// Errors related to graph comparison operations.
+#[derive(Debug, thiserror::Error)]
+pub enum CompareError {
+    /// One of the named workspaces is not currently open.
+    #[error("workspace '{name}' is not open")]
+    WorkspaceNotOpen { name: String },
+
+    /// A vertex index was not found in its workspace.
+    #[error("vertex index {index} not found in workspace '{workspace}'")]
+    VertexNotFound { workspace: String, index: usize },
+}
+
+// ---------------------------------------------------------------------------
 // Display for ApiError variants in JSON-friendly contexts
 // ---------------------------------------------------------------------------
 
@@ -247,6 +267,7 @@ impl ApiError {
             ApiError::Insert(_) => "insert",
             ApiError::Read(_) => "read",
             ApiError::Log(_) => "log",
+            ApiError::Compare(_) => "compare",
         }
     }
 }
