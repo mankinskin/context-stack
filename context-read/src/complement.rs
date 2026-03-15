@@ -33,7 +33,7 @@ impl ComplementBuilder {
         }
 
         let complement_cache =
-            self.build_complement_trace_cache(root, intersection_start);
+            self.build_trace_cache_stub(root, intersection_start);
 
         let init_interval = InitInterval {
             root,
@@ -47,7 +47,8 @@ impl ComplementBuilder {
         complement
     }
 
-    fn build_complement_trace_cache(
+    // DESIGN SESSION REQUIRED: see agents/designs/20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md
+    fn build_trace_cache_stub(
         &self,
         root: Token,
         _end_bound: usize,

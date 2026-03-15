@@ -311,6 +311,17 @@ pub use crate::{
     },
 };
 
+pub use graph::vertex::traversal::{
+    BandExpandingIterator,
+    BandExpandingPolicy,
+    BandIterator,
+    HasTokenRoleIters,
+    PostfixExpandingPolicy,
+    PostfixIterator,
+    PrefixExpandingPolicy,
+    PrefixIterator,
+};
+
 // Re-export new consolidated accessor traits
 pub use path::accessors::{
     path_accessor::{

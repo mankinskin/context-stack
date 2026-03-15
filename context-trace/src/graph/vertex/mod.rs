@@ -21,6 +21,7 @@ pub mod location;
 pub mod parent;
 pub mod pattern;
 pub mod token;
+pub mod traversal;
 pub mod vertex_index;
 pub mod wide;
 

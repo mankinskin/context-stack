@@ -1,8 +1,6 @@
 pub(crate) mod block;
 pub(crate) mod chain;
-pub(crate) mod cursor;
 pub(crate) mod link;
-pub(crate) mod stack;
 
 use chain::{
     band::Band,
@@ -13,7 +11,6 @@ use context_trace::*;
 use tracing::debug;
 
 use crate::{
-    bands::HasTokenRoleIters,
     complement::ComplementBuilder,
     expansion::{
         chain::link::OverlapLink,
@@ -224,7 +221,6 @@ impl ExpansionCtx {
     ) -> BandState {
         debug!(anchor = ?anchor, t1 = ?t1, postfix = ?postfix, t2 = ?t2, "build_overlap_state");
 
-        use crate::bands::HasTokenRoleIters;
         let root_postfix = {
             let mut iter = anchor.postfix_iter(self.graph.clone());
             let entry = iter.next().map(|(loc, _)| loc);
