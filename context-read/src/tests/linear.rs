@@ -16,6 +16,11 @@
 #[cfg(test)]
 use crate::request::ReadRequest;
 #[cfg(test)]
+use context_search::{
+    assert_indices,
+    Find,
+};
+#[cfg(test)]
 use context_trace::*;
 
 /// Test reading a simple 3-character string with no repeats.

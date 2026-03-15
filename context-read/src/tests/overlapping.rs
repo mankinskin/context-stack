@@ -15,6 +15,16 @@
 ///
 /// With overlap: "abcabcabc" = "abc" + "abcabc" where "abc" overlaps
 /// Structure: [abc, abcabc] or [abcabc, abc]
+#[cfg(test)]
+use crate::request::ReadRequest;
+#[cfg(test)]
+use context_search::{
+    assert_indices,
+    Find,
+};
+#[cfg(test)]
+use context_trace::*;
+
 #[test]
 fn repetition_abcabcabc() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();

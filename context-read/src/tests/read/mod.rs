@@ -1,5 +1,16 @@
 #[cfg(test)]
-use context_trace::*;
+use crate::context::has_read_context::HasReadCtx;
+#[cfg(test)]
+use context_search::{
+    assert_indices,
+    assert_not_indices,
+    Find,
+};
+#[cfg(test)]
+use context_trace::{
+    graph::vertex::parent::PatternIndex,
+    *,
+};
 #[test]
 fn sync_read_text1() {
     let mut graph: HypergraphRef =

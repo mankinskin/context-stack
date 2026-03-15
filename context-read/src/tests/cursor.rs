@@ -27,6 +27,8 @@
 //! - **Repeated tokens**: Same token appearing multiple times in input
 //! - **Edge cases**: Single token, empty patterns
 
+use context_insert::ToInsertCtx;
+use context_search::ErrorState;
 use context_trace::{
     graph::vertex::atom::Atom,
     *,
