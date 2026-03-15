@@ -2,7 +2,10 @@ pub(crate) mod band;
 pub(crate) mod link;
 
 use band::Band;
-use context_insert::*;
+use context_insert::{
+    OverlapBundleInput,
+    ToInsertCtx,
+};
 use context_trace::*;
 use tracing::debug;
 
@@ -25,7 +28,7 @@ pub(crate) enum BandState {
         primary: Band,
         /// Overlap band: `[complement, expansion]` decomposition.
         overlap: Band,
-        /// Paths needed to build complement tokens during collapse.
+        /// Paths needed to build overlap bundles during collapse.
         link: OverlapLink,
     },
 }
@@ -149,8 +152,9 @@ impl BandState {
     /// Collapse the band state into a single-element pattern.
     ///
     /// - `Single`: returns the band's pattern unchanged.
-    /// - `WithOverlap`: builds complement tokens, inserts both decompositions,
-    ///   and returns a one-element pattern containing the bundled token.
+    /// - `WithOverlap`: delegates structural overlap bundling to
+    ///   `context-insert` and returns a one-element pattern containing the
+    ///   bundled token.
     pub(crate) fn collapse(
         self,
         graph: &mut HypergraphRef,
@@ -169,41 +173,28 @@ impl BandState {
                     primary = ?primary.pattern,
                     overlap = ?overlap.pattern,
                     link = ?link,
-                    "Collapsing WithOverlap bands"
+                    "Collapsing WithOverlap bands via context-insert bundle_overlap"
                 );
 
-                let prefix_complement = build_prefix_complement(&link, graph);
-                let postfix_complement =
-                    build_postfix_complement(&link, &primary, graph);
-
-                let complete_primary: Pattern =
-                    if let Some(prefix) = prefix_complement {
-                        let mut p = vec![prefix];
-                        p.extend(primary.pattern.iter().cloned());
-                        p.into()
-                    } else {
-                        primary.pattern
-                    };
-
-                let complete_overlap: Pattern =
-                    if let Some(postfix) = postfix_complement {
-                        let mut p = overlap.pattern.to_vec();
-                        p.push(postfix);
-                        p.into()
-                    } else {
-                        overlap.pattern
-                    };
-
-                debug!(
-                    complete_primary = ?complete_primary,
-                    complete_overlap = ?complete_overlap,
-                    "Collapsed decompositions"
+                let t1 = *primary.pattern.last().expect(
+                    "primary pattern must contain the sequential token",
                 );
+                let t2 = *overlap
+                    .pattern
+                    .last()
+                    .expect("overlap pattern must contain the expanded token");
 
-                let bundled = graph.insert_patterns(vec![
-                    complete_primary.to_vec(),
-                    complete_overlap.to_vec(),
-                ]);
+                let bundled =
+                    <HypergraphRef as ToInsertCtx<Token>>::bundle_overlap(
+                        graph,
+                        OverlapBundleInput::new(
+                            link.child_path,
+                            link.search_path,
+                            t1,
+                            t2,
+                        ),
+                    )
+                    .expect("bundle_overlap should succeed for WithOverlap collapse");
 
                 debug!(bundled = ?bundled, "Created bundled token");
                 Pattern::from(vec![bundled])
@@ -219,14 +210,14 @@ impl BandState {
 /// A chain of overlapping expansion bands, ready for collapse.
 ///
 /// `OverlapChain` captures a sequence of consecutive overlaps found during
-/// block expansion.  The `head` token is the leftmost anchor; each
+/// block expansion. The `head` token is the leftmost anchor; each
 /// `OverlapLink` records one overlap step; and `tail` is the rightmost
 /// expanded token.
 ///
 /// # Usage
 /// Chains are constructed via `BandState::into_chain` and grown with
-/// `push`/`cap`.  Full collapse is wired in Pass C3 once the complement
-/// design session is complete.
+/// `push`/`cap`. Full collapse is wired in Pass C3 once the semantic overlap
+/// bundling path is stable.
 #[derive(Clone, Debug)]
 pub(crate) struct OverlapChain {
     /// The leftmost anchor token at the start of the chain.
@@ -263,7 +254,7 @@ impl OverlapChain {
         &mut self,
         _link: BandCapLink,
     ) {
-        // TODO(Pass C3): implement chain termination and complement collapse.
+        // TODO(Pass C3): implement chain termination and overlap collapse.
         unimplemented!("OverlapChain::cap — deferred to Pass C3");
     }
 }
@@ -300,104 +291,4 @@ impl BandState {
             BandState::Single { .. } => None,
         }
     }
-}
-
-fn build_prefix_complement(
-    link: &OverlapLink,
-    graph: &HypergraphRef,
-) -> Option<Token> {
-    use context_trace::{
-        GraphRootChild,
-        HasRootChildIndex,
-    };
-
-    let expansion_root = link.search_path.graph_root_child(graph);
-    let overlap_start_in_expansion = link.search_path.root_child_index();
-
-    debug!(
-        expansion_root = ?expansion_root,
-        overlap_start = overlap_start_in_expansion,
-        "build_prefix_complement"
-    );
-
-    if overlap_start_in_expansion == 0 {
-        debug!("No prefix complement needed (overlap at start)");
-        return None;
-    }
-
-    let cache = TraceCache::new(expansion_root);
-    let init_interval = InitInterval {
-        root: expansion_root,
-        cache,
-        end_bound: overlap_start_in_expansion.into(),
-    };
-
-    let prefix = graph
-        .insert_init((), init_interval)
-        .expect("prefix complement insert_init should succeed");
-
-    debug!(prefix = ?prefix, "Built prefix complement");
-    Some(prefix)
-}
-
-fn build_postfix_complement(
-    link: &OverlapLink,
-    primary: &Band,
-    graph: &HypergraphRef,
-) -> Option<Token> {
-    use context_trace::{
-        GraphRootChild,
-        HasRootChildIndex,
-    };
-
-    let primary_root = link.child_path.graph_root_child(graph);
-    let overlap_start_in_primary = link.child_path.root_child_index();
-
-    let overlap_width = link
-        .search_path
-        .role_leaf_token::<Start, _>(graph)
-        .map(|t| *t.width())
-        .unwrap_or(0);
-
-    let overlap_end_in_primary = overlap_start_in_primary + overlap_width;
-    let primary_end = *primary.end_bound;
-
-    debug!(
-        primary_root = ?primary_root,
-        overlap_start = overlap_start_in_primary,
-        overlap_end = overlap_end_in_primary,
-        primary_end = primary_end,
-        "build_postfix_complement"
-    );
-
-    if overlap_end_in_primary >= primary_end {
-        debug!("No postfix complement needed (overlap at end)");
-        return None;
-    }
-
-    let mut acc = 0usize;
-    let mut postfix_tokens = Vec::new();
-    for token in primary.pattern.iter() {
-        let token_end = acc + *token.width();
-        if acc >= overlap_end_in_primary {
-            postfix_tokens.push(*token);
-        } else if token_end > overlap_end_in_primary {
-            // Partial token overlap — skipped for now.
-        }
-        acc = token_end;
-    }
-
-    if postfix_tokens.is_empty() {
-        debug!("No postfix tokens found");
-        return None;
-    }
-
-    let postfix = if postfix_tokens.len() == 1 {
-        postfix_tokens[0]
-    } else {
-        graph.insert_pattern(postfix_tokens)
-    };
-
-    debug!(postfix = ?postfix, "Built postfix complement");
-    Some(postfix)
 }
