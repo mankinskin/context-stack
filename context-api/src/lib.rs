@@ -88,6 +88,49 @@ pub mod workspace;
 pub const TS_EXPORT_DIR: &str =
     "../../../packages/context-types/src/generated/";
 
+/// Stamps out the two `cfg_attr` lines required to derive and export a
+/// TypeScript type via ts-rs, keeping the `export_to` path in a single place.
+///
+/// Wrap any `struct` or `enum` item (including all its other `#[derive(...)]`
+/// and `#[serde(...)]` attributes) in this macro invocation:
+///
+/// ```ignore
+/// ts_export! {
+///     #[derive(Debug, Clone, Serialize, Deserialize)]
+///     pub struct MyType {
+///         pub field: String,
+///     }
+/// }
+/// ```
+///
+/// expands to:
+///
+/// ```ignore
+/// #[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+/// #[cfg_attr(feature = "ts-gen", ts(export, export_to = "../../../packages/context-types/src/generated/"))]
+/// #[derive(Debug, Clone, Serialize, Deserialize)]
+/// pub struct MyType {
+///     pub field: String,
+/// }
+/// ```
+///
+/// The literal path matches [`TS_EXPORT_DIR`] and must stay in sync with it.
+///
+/// **Grep anchor:** search for `ts_export!` to find every usage site.
+#[macro_export]
+macro_rules! ts_export {
+    ($($item:item)*) => {
+        $(
+            #[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
+            #[cfg_attr(
+                feature = "ts-gen",
+                ts(export, export_to = "../../../packages/context-types/src/generated/")
+            )]
+            $item
+        )*
+    };
+}
+
 // Tests (integration-level, in addition to per-module unit tests)
 #[cfg(test)]
 mod tests;

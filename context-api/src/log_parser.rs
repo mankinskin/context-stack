@@ -5,6 +5,7 @@
 //! indentation. This is the canonical log parser — `viewer-api` and
 //! `log-viewer` re-export from here.
 
+use crate::ts_export;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{
@@ -42,22 +43,16 @@ fn parse_panic_location(message: &str) -> Option<(String, u32, u32)> {
     })
 }
 
-/// Parsed assertion diff data.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct AssertionDiff {
-    pub title: String,
-    pub left_label: String,
-    pub right_label: String,
-    pub left_value: String,
-    pub right_value: String,
+ts_export! {
+    /// Parsed assertion diff data.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct AssertionDiff {
+        pub title: String,
+        pub left_label: String,
+        pub right_label: String,
+        pub left_value: String,
+        pub right_value: String,
+    }
 }
 
 /// Parse assertion diff from message.
@@ -87,52 +82,46 @@ fn parse_assertion_diff(message: &str) -> Option<AssertionDiff> {
     })
 }
 
-/// A parsed log entry — the full representation with all fields.
-///
-/// This is the canonical log entry type. The `LogEntryInfo` type in
-/// `crate::types` is a simplified view for API responses.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct LogEntry {
-    /// Entry index (1-based).
-    pub line_number: usize,
-    /// Log level (TRACE, DEBUG, INFO, WARN, ERROR).
-    pub level: String,
-    /// Timestamp string.
-    pub timestamp: Option<String>,
-    /// The log message.
-    pub message: String,
-    /// Event type (event, span_enter, span_exit, span_new, span_close).
-    pub event_type: String,
-    /// Span name (if this is a span event).
-    pub span_name: Option<String>,
-    /// Indentation depth (number of parent spans).
-    pub depth: usize,
-    /// Additional fields (preserves structured JSON values).
-    #[schemars(with = "std::collections::HashMap<String, serde_json::Value>")]
-    #[cfg_attr(feature = "ts-gen", ts(type = "Record<string, unknown>"))]
-    pub fields: HashMap<String, serde_json::Value>,
-    /// Source file location (from tracing macro).
-    pub file: Option<String>,
-    /// Source line number (from tracing macro).
-    pub source_line: Option<u32>,
-    /// Panic file location (from panic info, points to actual assertion).
-    pub panic_file: Option<String>,
-    /// Panic line number.
-    pub panic_line: Option<u32>,
-    /// Parsed assertion diff (for failed assertions).
-    pub assertion_diff: Option<AssertionDiff>,
-    /// Stack trace (for panics).
-    pub backtrace: Option<String>,
-    /// Raw summary string.
-    pub raw: String,
+ts_export! {
+    /// A parsed log entry — the full representation with all fields.
+    ///
+    /// This is the canonical log entry type. The `LogEntryInfo` type in
+    /// `crate::types` is a simplified view for API responses.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct LogEntry {
+        /// Entry index (1-based).
+        pub line_number: usize,
+        /// Log level (TRACE, DEBUG, INFO, WARN, ERROR).
+        pub level: String,
+        /// Timestamp string.
+        pub timestamp: Option<String>,
+        /// The log message.
+        pub message: String,
+        /// Event type (event, span_enter, span_exit, span_new, span_close).
+        pub event_type: String,
+        /// Span name (if this is a span event).
+        pub span_name: Option<String>,
+        /// Indentation depth (number of parent spans).
+        pub depth: usize,
+        /// Additional fields (preserves structured JSON values).
+        #[schemars(with = "std::collections::HashMap<String, serde_json::Value>")]
+        #[cfg_attr(feature = "ts-gen", ts(type = "Record<string, unknown>"))]
+        pub fields: HashMap<String, serde_json::Value>,
+        /// Source file location (from tracing macro).
+        pub file: Option<String>,
+        /// Source line number (from tracing macro).
+        pub source_line: Option<u32>,
+        /// Panic file location (from panic info, points to actual assertion).
+        pub panic_file: Option<String>,
+        /// Panic line number.
+        pub panic_line: Option<u32>,
+        /// Parsed assertion diff (for failed assertions).
+        pub assertion_diff: Option<AssertionDiff>,
+        /// Stack trace (for panics).
+        pub backtrace: Option<String>,
+        /// Raw summary string.
+        pub raw: String,
+    }
 }
 
 /// Conversion from full `LogEntry` to the simplified `LogEntryInfo` API type.

@@ -22,6 +22,7 @@ pub mod patterns;
 pub mod read;
 pub mod search;
 
+use crate::ts_export;
 use std::collections::HashSet;
 
 use serde::{
@@ -580,234 +581,231 @@ impl WorkspaceApi for WorkspaceManager {
 // Command enum (serializable)
 // ---------------------------------------------------------------------------
 
-/// A serializable command that can be dispatched to a `WorkspaceManager`.
-///
-/// Adapters (CLI, MCP, HTTP) deserialize incoming requests into this enum
-/// and call [`execute`] to run the command and obtain a [`CommandResult`].
-///
-/// The enum is tagged with `#[serde(tag = "command", rename_all = "snake_case")]`
-/// so that the JSON representation includes a `"command"` field identifying the
-/// variant.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(export, export_to = "../../../packages/context-types/src/generated/")
-)]
-#[serde(tag = "command", rename_all = "snake_case")]
-pub enum Command {
-    // -- Workspace lifecycle ------------------------------------------------
-    CreateWorkspace {
-        name: String,
-    },
-    CreateWorkspaceFromNgrams {
-        name: String,
-        text: String,
-        #[serde(default = "default_ngrams_timeout_secs")]
-        timeout_secs: u64,
-    },
-    OpenWorkspace {
-        name: String,
-    },
-    CloseWorkspace {
-        name: String,
-    },
-    SaveWorkspace {
-        name: String,
-    },
-    ListWorkspaces,
-    DeleteWorkspace {
-        name: String,
-    },
-
-    // -- Atoms --------------------------------------------------------------
-    AddAtom {
-        workspace: String,
-        ch: char,
-    },
-    AddAtoms {
-        workspace: String,
-        chars: Vec<char>,
-    },
-    GetAtom {
-        workspace: String,
-        ch: char,
-    },
-    ListAtoms {
-        workspace: String,
-    },
-
-    // -- Patterns -----------------------------------------------------------
-    AddSimplePattern {
-        workspace: String,
-        atoms: Vec<char>,
-    },
-    GetVertex {
-        workspace: String,
-        index: usize,
-    },
-    ListVertices {
-        workspace: String,
-    },
-
-    // -- Search (Phase 2) ---------------------------------------------------
-    SearchPattern {
-        workspace: String,
-        query: Vec<TokenRef>,
-    },
-    SearchSequence {
-        workspace: String,
-        text: String,
-    },
-
-    // -- Insert (Phase 2) ---------------------------------------------------
-    InsertFirstMatch {
-        workspace: String,
-        query: Vec<TokenRef>,
-    },
-    InsertSequence {
-        workspace: String,
-        text: String,
-    },
-    InsertSequences {
-        workspace: String,
-        texts: HashSet<String>,
-    },
-
-    // -- Read (Phase 2) -----------------------------------------------------
-    ReadPattern {
-        workspace: String,
-        index: usize,
-    },
-    ReadAsText {
-        workspace: String,
-        index: usize,
-    },
-    /// Read a text sequence through the graph (auto-creates atoms, builds decomposition).
-    ReadSequence {
-        workspace: String,
-        text: String,
-    },
-    /// Read a file's contents through the graph.
-    ReadFile {
-        workspace: String,
-        path: String,
-    },
-
-    // -- Debug / Introspection ----------------------------------------------
-    GetSnapshot {
-        workspace: String,
-    },
-    GetStatistics {
-        workspace: String,
-    },
-    ValidateGraph {
-        workspace: String,
-    },
-    ShowGraph {
-        workspace: String,
-    },
-    ShowVertex {
-        workspace: String,
-        index: usize,
-    },
-    RenderAsciiGraph {
-        workspace: String,
-        #[serde(default)]
-        ascii_dag: bool,
-    },
-
-    // -- Logs (Phase 3.1) ---------------------------------------------------
-    /// List trace log files for a workspace.
-    ListLogs {
-        workspace: String,
-        #[serde(default)]
-        pattern: Option<String>,
-        #[serde(default = "default_log_limit")]
-        limit: usize,
-    },
-    /// Read a trace log file with optional level filter and pagination.
-    GetLog {
-        workspace: String,
-        filename: String,
-        #[serde(default)]
-        filter: Option<String>,
-        #[serde(default = "default_log_limit")]
-        limit: usize,
-        #[serde(default)]
-        offset: usize,
-    },
-    /// Run a JQ query against a trace log file.
-    QueryLog {
-        workspace: String,
-        filename: String,
-        query: String,
-        #[serde(default = "default_query_limit")]
-        limit: usize,
-    },
-    /// Analyze a trace log file (statistics by level, event type, spans).
-    AnalyzeLog {
-        workspace: String,
-        filename: String,
-    },
-    /// Search across all trace logs in a workspace with a JQ query.
-    SearchLogs {
-        workspace: String,
-        query: String,
-        #[serde(default = "default_search_limit_per_file")]
-        limit_per_file: usize,
-    },
-    /// Delete a specific trace log file.
-    DeleteLog {
-        workspace: String,
-        filename: String,
-    },
-    /// Delete trace log files, optionally only those older than N days.
-    DeleteLogs {
-        workspace: String,
-        #[serde(default)]
-        older_than_days: Option<u32>,
-    },
-
-    // -- Export / Import (Phase 5) ------------------------------------------
-    /// Export a workspace to JSON or bincode format.
+ts_export! {
+    /// A serializable command that can be dispatched to a `WorkspaceManager`.
     ///
-    /// If `path` is `Some`, writes to the given file and returns `Ok`.
-    /// If `path` is `None`, returns the export data inline as `ExportData`.
-    ExportWorkspace {
-        workspace: String,
-        format: ExportFormat,
-        #[serde(default)]
-        path: Option<String>,
-    },
-    /// Import a workspace from a previously exported file.
+    /// Adapters (CLI, MCP, HTTP) deserialize incoming requests into this enum
+    /// and call [`execute`] to run the command and obtain a [`CommandResult`].
     ///
-    /// If `overwrite` is true, an existing workspace with the same name
-    /// will be replaced. Otherwise, `AlreadyExists` is returned.
-    ImportWorkspace {
-        name: String,
-        path: String,
-        #[serde(default)]
-        overwrite: bool,
-    },
+    /// The enum is tagged with `#[serde(tag = "command", rename_all = "snake_case")]`
+    /// so that the JSON representation includes a `"command"` field identifying the
+    /// variant.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    #[serde(tag = "command", rename_all = "snake_case")]
+    pub enum Command {
+        // -- Workspace lifecycle ------------------------------------------------
+        CreateWorkspace {
+            name: String,
+        },
+        CreateWorkspaceFromNgrams {
+            name: String,
+            text: String,
+            #[serde(default = "default_ngrams_timeout_secs")]
+            timeout_secs: u64,
+        },
+        OpenWorkspace {
+            name: String,
+        },
+        CloseWorkspace {
+            name: String,
+        },
+        SaveWorkspace {
+            name: String,
+        },
+        ListWorkspaces,
+        DeleteWorkspace {
+            name: String,
+        },
 
-    // -- Compare (Phase 3.2) -----------------------------------------------
-    /// Compare two workspace graphs and return a structured diff.
-    CompareWorkspaces {
-        workspace_a: String,
-        workspace_b: String,
-        /// Comparison mode: `full` (default) or `subset`.
-        #[serde(default)]
-        mode: CompareMode,
-    },
+        // -- Atoms --------------------------------------------------------------
+        AddAtom {
+            workspace: String,
+            ch: char,
+        },
+        AddAtoms {
+            workspace: String,
+            chars: Vec<char>,
+        },
+        GetAtom {
+            workspace: String,
+            ch: char,
+        },
+        ListAtoms {
+            workspace: String,
+        },
 
-    /// Compare two individual vertices from (potentially different) workspaces.
-    CompareVertices {
-        workspace_a: String,
-        index_a: usize,
-        workspace_b: String,
-        index_b: usize,
-    },
+        // -- Patterns -----------------------------------------------------------
+        AddSimplePattern {
+            workspace: String,
+            atoms: Vec<char>,
+        },
+        GetVertex {
+            workspace: String,
+            index: usize,
+        },
+        ListVertices {
+            workspace: String,
+        },
+
+        // -- Search (Phase 2) ---------------------------------------------------
+        SearchPattern {
+            workspace: String,
+            query: Vec<TokenRef>,
+        },
+        SearchSequence {
+            workspace: String,
+            text: String,
+        },
+
+        // -- Insert (Phase 2) ---------------------------------------------------
+        InsertFirstMatch {
+            workspace: String,
+            query: Vec<TokenRef>,
+        },
+        InsertSequence {
+            workspace: String,
+            text: String,
+        },
+        InsertSequences {
+            workspace: String,
+            texts: HashSet<String>,
+        },
+
+        // -- Read (Phase 2) -----------------------------------------------------
+        ReadPattern {
+            workspace: String,
+            index: usize,
+        },
+        ReadAsText {
+            workspace: String,
+            index: usize,
+        },
+        /// Read a text sequence through the graph (auto-creates atoms, builds decomposition).
+        ReadSequence {
+            workspace: String,
+            text: String,
+        },
+        /// Read a file's contents through the graph.
+        ReadFile {
+            workspace: String,
+            path: String,
+        },
+
+        // -- Debug / Introspection ----------------------------------------------
+        GetSnapshot {
+            workspace: String,
+        },
+        GetStatistics {
+            workspace: String,
+        },
+        ValidateGraph {
+            workspace: String,
+        },
+        ShowGraph {
+            workspace: String,
+        },
+        ShowVertex {
+            workspace: String,
+            index: usize,
+        },
+        RenderAsciiGraph {
+            workspace: String,
+            #[serde(default)]
+            ascii_dag: bool,
+        },
+
+        // -- Logs (Phase 3.1) ---------------------------------------------------
+        /// List trace log files for a workspace.
+        ListLogs {
+            workspace: String,
+            #[serde(default)]
+            pattern: Option<String>,
+            #[serde(default = "default_log_limit")]
+            limit: usize,
+        },
+        /// Read a trace log file with optional level filter and pagination.
+        GetLog {
+            workspace: String,
+            filename: String,
+            #[serde(default)]
+            filter: Option<String>,
+            #[serde(default = "default_log_limit")]
+            limit: usize,
+            #[serde(default)]
+            offset: usize,
+        },
+        /// Run a JQ query against a trace log file.
+        QueryLog {
+            workspace: String,
+            filename: String,
+            query: String,
+            #[serde(default = "default_query_limit")]
+            limit: usize,
+        },
+        /// Analyze a trace log file (statistics by level, event type, spans).
+        AnalyzeLog {
+            workspace: String,
+            filename: String,
+        },
+        /// Search across all trace logs in a workspace with a JQ query.
+        SearchLogs {
+            workspace: String,
+            query: String,
+            #[serde(default = "default_search_limit_per_file")]
+            limit_per_file: usize,
+        },
+        /// Delete a specific trace log file.
+        DeleteLog {
+            workspace: String,
+            filename: String,
+        },
+        /// Delete trace log files, optionally only those older than N days.
+        DeleteLogs {
+            workspace: String,
+            #[serde(default)]
+            older_than_days: Option<u32>,
+        },
+
+        // -- Export / Import (Phase 5) ------------------------------------------
+        /// Export a workspace to JSON or bincode format.
+        ///
+        /// If `path` is `Some`, writes to the given file and returns `Ok`.
+        /// If `path` is `None`, returns the export data inline as `ExportData`.
+        ExportWorkspace {
+            workspace: String,
+            format: ExportFormat,
+            #[serde(default)]
+            path: Option<String>,
+        },
+        /// Import a workspace from a previously exported file.
+        ///
+        /// If `overwrite` is true, an existing workspace with the same name
+        /// will be replaced. Otherwise, `AlreadyExists` is returned.
+        ImportWorkspace {
+            name: String,
+            path: String,
+            #[serde(default)]
+            overwrite: bool,
+        },
+
+        // -- Compare (Phase 3.2) -----------------------------------------------
+        /// Compare two workspace graphs and return a structured diff.
+        CompareWorkspaces {
+            workspace_a: String,
+            workspace_b: String,
+            /// Comparison mode: `full` (default) or `subset`.
+            #[serde(default)]
+            mode: CompareMode,
+        },
+
+        /// Compare two individual vertices from (potentially different) workspaces.
+        CompareVertices {
+            workspace_a: String,
+            index_a: usize,
+            workspace_b: String,
+            index_b: usize,
+        },
+    }
 }
 
 fn default_log_limit() -> usize {
@@ -830,118 +828,115 @@ fn default_ngrams_timeout_secs() -> u64 {
 // CommandResult enum (serializable)
 // ---------------------------------------------------------------------------
 
-/// The result of executing a [`Command`].
-///
-/// Each variant wraps the return type of the corresponding `WorkspaceApi`
-/// method. Adapters serialize this to JSON (or another format) for their
-/// response.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(export, export_to = "../../../packages/context-types/src/generated/")
-)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum CommandResult {
-    /// Result of `create_workspace` or `open_workspace`.
-    WorkspaceInfo(WorkspaceInfo),
-
-    /// Result of `list_workspaces`.
-    WorkspaceInfoList { workspaces: Vec<WorkspaceInfo> },
-
-    /// Result of `add_atom`.
-    AtomInfo(AtomInfo),
-
-    /// Result of `add_atoms` or `list_atoms`.
-    AtomInfoList { atoms: Vec<AtomInfo> },
-
-    /// Result of `get_atom`.
-    OptionalAtomInfo { atom: Option<AtomInfo> },
-
-    /// Result of `add_simple_pattern`.
-    PatternInfo(PatternInfo),
-
-    /// Result of `get_vertex`.
-    OptionalVertexInfo { vertex: Option<VertexInfo> },
-
-    /// Result of `list_vertices`.
-    TokenInfoList { tokens: Vec<TokenInfo> },
-
-    /// Result of `search_pattern` or `search_sequence`.
-    SearchResult(SearchResult),
-
-    /// Result of `insert_first_match` or `insert_sequence`.
-    InsertResult(InsertResult),
-
-    /// Result of `insert_sequences`.
-    InsertResultList { results: Vec<InsertResult> },
-
-    /// Result of `read_pattern`.
-    ReadResult(PatternReadResult),
-
-    /// Result of `read_as_text`.
-    Text { text: String },
-
-    /// Result of `get_snapshot`.
-    Snapshot(#[schemars(with = "serde_json::Value")] GraphSnapshot),
-
-    /// Result of `compare_workspaces` or `compare_vertices`.
-    GraphDiff(#[schemars(with = "serde_json::Value")] GraphDiffResult),
-
-    /// Result of `get_statistics`.
-    Statistics(GraphStatistics),
-
-    /// Result of `validate_graph`.
-    ValidationReport(ValidationReport),
-
-    /// Result of `show_graph` or `show_vertex`.
-    GraphDisplay { display: String },
-
-    /// Result of commands that return `()` (close, save, delete).
-    Ok,
-
-    // -- Log results (Phase 3.1) --------------------------------------------
-    /// Result of `list_logs`.
-    LogList { logs: Vec<LogFileInfo> },
-    /// Result of `get_log`.
-    LogEntries {
-        filename: String,
-        total: usize,
-        offset: usize,
-        limit: usize,
-        returned: usize,
-        entries: Vec<LogEntryInfo>,
-    },
-    /// Result of `query_log`.
-    LogQueryResult {
-        query: String,
-        matches: usize,
-        entries: Vec<LogEntryInfo>,
-    },
-    /// Result of `analyze_log`.
-    LogAnalysis(LogAnalysis),
-    /// Result of `search_logs`.
-    LogSearchResult {
-        query: String,
-        files_with_matches: usize,
-        results: Vec<LogFileSearchResult>,
-    },
-    /// Result of `delete_logs`.
-    LogDeleteResult(LogDeleteResult),
-
-    // -- Export / Import (Phase 5) ------------------------------------------
-    /// Result of `export_workspace` when no output path is specified.
+ts_export! {
+    /// The result of executing a [`Command`].
     ///
-    /// Contains the raw serialized bytes of the export. Adapters can
-    /// base64-encode or stream this to the caller.
-    ExportData {
-        /// The raw export bytes (JSON or bincode depending on the requested format).
-        #[schemars(with = "String")]
-        #[cfg_attr(feature = "ts-gen", ts(type = "number[]"))]
-        data: Vec<u8>,
-        /// The format used for the export.
-        format: ExportFormat,
-    },
+    /// Each variant wraps the return type of the corresponding `WorkspaceApi`
+    /// method. Adapters serialize this to JSON (or another format) for their
+    /// response.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    #[serde(tag = "type", rename_all = "snake_case")]
+    pub enum CommandResult {
+        /// Result of `create_workspace` or `open_workspace`.
+        WorkspaceInfo(WorkspaceInfo),
+
+        /// Result of `list_workspaces`.
+        WorkspaceInfoList { workspaces: Vec<WorkspaceInfo> },
+
+        /// Result of `add_atom`.
+        AtomInfo(AtomInfo),
+
+        /// Result of `add_atoms` or `list_atoms`.
+        AtomInfoList { atoms: Vec<AtomInfo> },
+
+        /// Result of `get_atom`.
+        OptionalAtomInfo { atom: Option<AtomInfo> },
+
+        /// Result of `add_simple_pattern`.
+        PatternInfo(PatternInfo),
+
+        /// Result of `get_vertex`.
+        OptionalVertexInfo { vertex: Option<VertexInfo> },
+
+        /// Result of `list_vertices`.
+        TokenInfoList { tokens: Vec<TokenInfo> },
+
+        /// Result of `search_pattern` or `search_sequence`.
+        SearchResult(SearchResult),
+
+        /// Result of `insert_first_match` or `insert_sequence`.
+        InsertResult(InsertResult),
+
+        /// Result of `insert_sequences`.
+        InsertResultList { results: Vec<InsertResult> },
+
+        /// Result of `read_pattern`.
+        ReadResult(PatternReadResult),
+
+        /// Result of `read_as_text`.
+        Text { text: String },
+
+        /// Result of `get_snapshot`.
+        Snapshot(#[schemars(with = "serde_json::Value")] GraphSnapshot),
+
+        /// Result of `compare_workspaces` or `compare_vertices`.
+        GraphDiff(#[schemars(with = "serde_json::Value")] GraphDiffResult),
+
+        /// Result of `get_statistics`.
+        Statistics(GraphStatistics),
+
+        /// Result of `validate_graph`.
+        ValidationReport(ValidationReport),
+
+        /// Result of `show_graph` or `show_vertex`.
+        GraphDisplay { display: String },
+
+        /// Result of commands that return `()` (close, save, delete).
+        Ok,
+
+        // -- Log results (Phase 3.1) --------------------------------------------
+        /// Result of `list_logs`.
+        LogList { logs: Vec<LogFileInfo> },
+        /// Result of `get_log`.
+        LogEntries {
+            filename: String,
+            total: usize,
+            offset: usize,
+            limit: usize,
+            returned: usize,
+            entries: Vec<LogEntryInfo>,
+        },
+        /// Result of `query_log`.
+        LogQueryResult {
+            query: String,
+            matches: usize,
+            entries: Vec<LogEntryInfo>,
+        },
+        /// Result of `analyze_log`.
+        LogAnalysis(LogAnalysis),
+        /// Result of `search_logs`.
+        LogSearchResult {
+            query: String,
+            files_with_matches: usize,
+            results: Vec<LogFileSearchResult>,
+        },
+        /// Result of `delete_logs`.
+        LogDeleteResult(LogDeleteResult),
+
+        // -- Export / Import (Phase 5) ------------------------------------------
+        /// Result of `export_workspace` when no output path is specified.
+        ///
+        /// Contains the raw serialized bytes of the export. Adapters can
+        /// base64-encode or stream this to the caller.
+        ExportData {
+            /// The raw export bytes (JSON or bincode depending on the requested format).
+            #[schemars(with = "String")]
+            #[cfg_attr(feature = "ts-gen", ts(type = "number[]"))]
+            data: Vec<u8>,
+            /// The format used for the export.
+            format: ExportFormat,
+        },
+    }
 }
 
 // ---------------------------------------------------------------------------

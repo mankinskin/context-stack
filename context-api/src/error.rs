@@ -5,6 +5,7 @@
 //! error type with specific variants. Phase 2 error types (Search, Insert, Read)
 //! are defined as placeholders.
 
+use crate::ts_export;
 use std::fmt;
 
 /// Top-level error type for any API command.
@@ -272,18 +273,15 @@ impl ApiError {
     }
 }
 
-/// Serializable error response for adapter layers.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(export, export_to = "../../../packages/context-types/src/generated/")
-)]
-pub struct ErrorResponse {
-    /// Error category tag (e.g. "workspace", "atom", "pattern").
-    pub kind: String,
-    /// Human-readable error message.
-    pub message: String,
+ts_export! {
+    /// Serializable error response for adapter layers.
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    pub struct ErrorResponse {
+        /// Error category tag (e.g. "workspace", "atom", "pattern").
+        pub kind: String,
+        /// Human-readable error message.
+        pub message: String,
+    }
 }
 
 impl From<&ApiError> for ErrorResponse {

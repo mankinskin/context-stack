@@ -20,6 +20,7 @@
 //! This avoids issues with bincode trying to deserialize serde-tagged enums
 //! inside `WorkspaceMetadata`.
 
+use crate::ts_export;
 use std::{
     fs,
     path::Path,
@@ -49,28 +50,25 @@ use crate::{
 // ExportFormat
 // ---------------------------------------------------------------------------
 
-/// Format for workspace export/import.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(export, export_to = "../../../packages/context-types/src/generated/")
-)]
-#[serde(rename_all = "snake_case")]
-pub enum ExportFormat {
-    /// Human-readable JSON (larger, useful for debugging).
-    Json,
-    /// Compact binary via bincode (smaller, useful for backup/transfer).
-    Bincode,
+ts_export! {
+    /// Format for workspace export/import.
+    #[derive(
+        Debug,
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        Serialize,
+        Deserialize,
+        schemars::JsonSchema,
+    )]
+    #[serde(rename_all = "snake_case")]
+    pub enum ExportFormat {
+        /// Human-readable JSON (larger, useful for debugging).
+        Json,
+        /// Compact binary via bincode (smaller, useful for backup/transfer).
+        Bincode,
+    }
 }
 
 // ---------------------------------------------------------------------------

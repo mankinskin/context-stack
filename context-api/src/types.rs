@@ -17,12 +17,12 @@
 //! Types annotated with `#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]`
 //! export TypeScript definitions when `cargo test --features ts-gen` runs.
 //!
-//! All `export_to` paths use the value of [`crate::TS_EXPORT_DIR`]:
-//! `"../../../packages/context-types/src/generated/"`.  ts-rs resolves this
-//! relative to `<CARGO_MANIFEST_DIR>/bindings/`, so three `../` segments
-//! reach the workspace root.  Search for **`TS_EXPORT_DIR`** to locate every
-//! usage site across the codebase.
+//! All types use the [`ts_export!`] macro which stamps out the two
+//! `cfg_attr` lines and hard-codes the `export_to` path in exactly one
+//! place (`lib.rs`).  The path value matches [`crate::TS_EXPORT_DIR`].
+//! Search for **`ts_export!`** to find every usage site.
 
+use crate::ts_export;
 use std::collections::HashMap;
 
 use serde::{
@@ -54,34 +54,28 @@ pub use context_trace::graph::snapshot::{
 // TokenRef — how callers identify tokens across the API boundary
 // ---------------------------------------------------------------------------
 
-/// Reference to a token in the graph by numeric index or string label.
-///
-/// Adapters (CLI, MCP, HTTP) serialize this as part of command payloads.
-/// Resolution into an actual vertex happens inside the API layer.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-#[serde(untagged)]
-pub enum TokenRef {
-    /// Direct vertex index (numeric).
-    Index(usize),
-    /// Label string — single char resolves as atom, multi-char as sequence.
-    Label(String),
+ts_export! {
+    /// Reference to a token in the graph by numeric index or string label.
+    ///
+    /// Adapters (CLI, MCP, HTTP) serialize this as part of command payloads.
+    /// Resolution into an actual vertex happens inside the API layer.
+    #[derive(
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        Hash,
+        Serialize,
+        Deserialize,
+        schemars::JsonSchema,
+    )]
+    #[serde(untagged)]
+    pub enum TokenRef {
+        /// Direct vertex index (numeric).
+        Index(usize),
+        /// Label string — single char resolves as atom, multi-char as sequence.
+        Label(String),
+    }
 }
 
 impl std::fmt::Display for TokenRef {
@@ -100,23 +94,17 @@ impl std::fmt::Display for TokenRef {
 // AtomInfo
 // ---------------------------------------------------------------------------
 
-/// Information about a single atom (character) vertex.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct AtomInfo {
-    /// Vertex index in the hypergraph.
-    pub index: usize,
-    /// The character value of this atom.
-    pub ch: char,
+ts_export! {
+    /// Information about a single atom (character) vertex.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct AtomInfo {
+        /// Vertex index in the hypergraph.
+        pub index: usize,
+        /// The character value of this atom.
+        pub ch: char,
+    }
 }
 
 impl AtomInfo {
@@ -136,25 +124,19 @@ impl AtomInfo {
 // TokenInfo
 // ---------------------------------------------------------------------------
 
-/// Lightweight information about any vertex (atom or pattern).
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct TokenInfo {
-    /// Vertex index in the hypergraph.
-    pub index: usize,
-    /// Human-readable label (e.g. `"a"` for an atom, `"abc"` for a merged token).
-    pub label: String,
-    /// Token width (1 for atoms, >1 for patterns).
-    pub width: usize,
+ts_export! {
+    /// Lightweight information about any vertex (atom or pattern).
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct TokenInfo {
+        /// Vertex index in the hypergraph.
+        pub index: usize,
+        /// Human-readable label (e.g. `"a"` for an atom, `"abc"` for a merged token).
+        pub label: String,
+        /// Token width (1 for atoms, >1 for patterns).
+        pub width: usize,
+    }
 }
 
 impl TokenInfo {
@@ -194,58 +176,46 @@ impl TokenInfo {
 // PatternInfo
 // ---------------------------------------------------------------------------
 
-/// Information about a newly created pattern vertex.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct PatternInfo {
-    /// Vertex index of the new pattern.
-    pub index: usize,
-    /// Human-readable label (concatenation of child atom chars).
-    pub label: String,
-    /// Token width (number of atoms spanned).
-    pub width: usize,
-    /// The direct children of this pattern.
-    pub children: Vec<TokenInfo>,
+ts_export! {
+    /// Information about a newly created pattern vertex.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct PatternInfo {
+        /// Vertex index of the new pattern.
+        pub index: usize,
+        /// Human-readable label (concatenation of child atom chars).
+        pub label: String,
+        /// Token width (number of atoms spanned).
+        pub width: usize,
+        /// The direct children of this pattern.
+        pub children: Vec<TokenInfo>,
+    }
 }
 
 // ---------------------------------------------------------------------------
 // VertexInfo
 // ---------------------------------------------------------------------------
 
-/// Detailed information about a single vertex (atom or pattern).
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct VertexInfo {
-    /// Vertex index in the hypergraph.
-    pub index: usize,
-    /// Human-readable label.
-    pub label: String,
-    /// Token width.
-    pub width: usize,
-    /// Whether this vertex is an atom (width == 1 and has no children).
-    pub is_atom: bool,
-    /// Child patterns — one `Vec<TokenInfo>` per child pattern of this vertex.
-    pub children: Vec<Vec<TokenInfo>>,
-    /// Number of parent vertices.
-    pub parent_count: usize,
+ts_export! {
+    /// Detailed information about a single vertex (atom or pattern).
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct VertexInfo {
+        /// Vertex index in the hypergraph.
+        pub index: usize,
+        /// Human-readable label.
+        pub label: String,
+        /// Token width.
+        pub width: usize,
+        /// Whether this vertex is an atom (width == 1 and has no children).
+        pub is_atom: bool,
+        /// Child patterns — one `Vec<TokenInfo>` per child pattern of this vertex.
+        pub children: Vec<Vec<TokenInfo>>,
+        /// Number of parent vertices.
+        pub parent_count: usize,
+    }
 }
 
 impl VertexInfo {
@@ -296,60 +266,48 @@ impl VertexInfo {
 // WorkspaceInfo
 // ---------------------------------------------------------------------------
 
-/// Summary information about a workspace.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct WorkspaceInfo {
-    /// Workspace name (also the directory name under `.context-engine/`).
-    pub name: String,
-    /// Number of vertices in the graph (0 if workspace is not open).
-    pub vertex_count: usize,
-    /// Number of atom vertices (0 if not open).
-    pub atom_count: usize,
-    /// Number of non-atom pattern vertices (0 if not open).
-    pub pattern_count: usize,
-    /// ISO-8601 timestamp when the workspace was created.
-    pub created_at: String,
-    /// ISO-8601 timestamp when the workspace was last modified.
-    pub modified_at: String,
+ts_export! {
+    /// Summary information about a workspace.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct WorkspaceInfo {
+        /// Workspace name (also the directory name under `.context-engine/`).
+        pub name: String,
+        /// Number of vertices in the graph (0 if workspace is not open).
+        pub vertex_count: usize,
+        /// Number of atom vertices (0 if not open).
+        pub atom_count: usize,
+        /// Number of non-atom pattern vertices (0 if not open).
+        pub pattern_count: usize,
+        /// ISO-8601 timestamp when the workspace was created.
+        pub created_at: String,
+        /// ISO-8601 timestamp when the workspace was last modified.
+        pub modified_at: String,
+    }
 }
 
 // ---------------------------------------------------------------------------
 // GraphStatistics
 // ---------------------------------------------------------------------------
 
-/// Aggregate statistics about the graph inside a workspace.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct GraphStatistics {
-    /// Total number of vertices.
-    pub vertex_count: usize,
-    /// Number of atom (leaf) vertices.
-    pub atom_count: usize,
-    /// Number of non-atom (pattern) vertices.
-    pub pattern_count: usize,
-    /// Maximum token width among all vertices.
-    pub max_width: usize,
-    /// Total number of parent→child edges across all patterns.
-    pub edge_count: usize,
+ts_export! {
+    /// Aggregate statistics about the graph inside a workspace.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct GraphStatistics {
+        /// Total number of vertices.
+        pub vertex_count: usize,
+        /// Number of atom (leaf) vertices.
+        pub atom_count: usize,
+        /// Number of non-atom (pattern) vertices.
+        pub pattern_count: usize,
+        /// Maximum token width among all vertices.
+        pub max_width: usize,
+        /// Total number of parent→child edges across all patterns.
+        pub edge_count: usize,
+    }
 }
 
 impl GraphStatistics {
@@ -396,336 +354,252 @@ impl GraphStatistics {
 // Phase 2 — Algorithm result types
 // ---------------------------------------------------------------------------
 
-/// Result of a search operation.
-///
-/// Indicates whether the query was found as a complete vertex, partially
-/// matched, or not found at all.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct SearchResult {
-    /// Whether the full query was found as a single existing vertex.
-    pub complete: bool,
-    /// The matched token (if complete).
-    pub token: Option<TokenInfo>,
-    /// Whether the entire query was consumed during search.
-    pub query_exhausted: bool,
-    /// Partial match information (if incomplete).
-    pub partial: Option<PartialMatchInfo>,
+ts_export! {
+    /// Result of a search operation.
+    ///
+    /// Indicates whether the query was found as a complete vertex, partially
+    /// matched, or not found at all.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct SearchResult {
+        /// Whether the full query was found as a single existing vertex.
+        pub complete: bool,
+        /// The matched token (if complete).
+        pub token: Option<TokenInfo>,
+        /// Whether the entire query was consumed during search.
+        pub query_exhausted: bool,
+        /// Partial match information (if incomplete).
+        pub partial: Option<PartialMatchInfo>,
+    }
 }
 
-/// Details about a partial match from a search operation.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct PartialMatchInfo {
-    /// How the query was partially matched.
-    pub kind: PartialMatchKind,
-    /// The root token of the partial match path (if available).
-    pub root_token: Option<TokenInfo>,
+ts_export! {
+    /// Details about a partial match from a search operation.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct PartialMatchInfo {
+        /// How the query was partially matched.
+        pub kind: PartialMatchKind,
+        /// The root token of the partial match path (if available).
+        pub root_token: Option<TokenInfo>,
+    }
 }
 
-/// The kind of partial match found during a search.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub enum PartialMatchKind {
-    /// Matched from the start of the query (postfix remaining).
-    Postfix,
-    /// Matched from the end (prefix remaining).
-    Prefix,
-    /// Matched a range in the middle.
-    Range,
-    /// No match at all / unknown partial state.
-    None,
+ts_export! {
+    /// The kind of partial match found during a search.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub enum PartialMatchKind {
+        /// Matched from the start of the query (postfix remaining).
+        Postfix,
+        /// Matched from the end (prefix remaining).
+        Prefix,
+        /// Matched a range in the middle.
+        Range,
+        /// No match at all / unknown partial state.
+        None,
+    }
 }
 
-/// Result of an insert operation.
-///
-/// Contains the token representing the inserted (or already-existing) vertex,
-/// plus a flag indicating whether the vertex was newly created.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct InsertResult {
-    /// The token representing the inserted or existing pattern.
-    pub token: TokenInfo,
-    /// `true` if this vertex already existed in the graph; `false` if newly
-    /// created by this insert.
-    pub already_existed: bool,
+ts_export! {
+    /// Result of an insert operation.
+    ///
+    /// Contains the token representing the inserted (or already-existing) vertex,
+    /// plus a flag indicating whether the vertex was newly created.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct InsertResult {
+        /// The token representing the inserted or existing pattern.
+        pub token: TokenInfo,
+        /// `true` if this vertex already existed in the graph; `false` if newly
+        /// created by this insert.
+        pub already_existed: bool,
+    }
 }
 
-/// Result of a read (decomposition) operation on a vertex.
-///
-/// Contains the root vertex info, its full leaf text, and a recursive
-/// decomposition tree.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct PatternReadResult {
-    /// The root vertex being read.
-    pub root: TokenInfo,
-    /// The full text (concatenated leaf atoms in order).
-    pub text: String,
-    /// Recursive decomposition tree.
-    pub tree: ReadNode,
+ts_export! {
+    /// Result of a read (decomposition) operation on a vertex.
+    ///
+    /// Contains the root vertex info, its full leaf text, and a recursive
+    /// decomposition tree.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct PatternReadResult {
+        /// The root vertex being read.
+        pub root: TokenInfo,
+        /// The full text (concatenated leaf atoms in order).
+        pub text: String,
+        /// Recursive decomposition tree.
+        pub tree: ReadNode,
+    }
 }
 
-/// A node in the recursive decomposition tree.
-///
-/// Atoms are leaf nodes (no children). Pattern vertices have children
-/// representing one decomposition of the pattern.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct ReadNode {
-    /// The token at this node.
-    pub token: TokenInfo,
-    /// Children of this node (empty for atoms / leaf nodes).
-    pub children: Vec<ReadNode>,
+ts_export! {
+    /// A node in the recursive decomposition tree.
+    ///
+    /// Atoms are leaf nodes (no children). Pattern vertices have children
+    /// representing one decomposition of the pattern.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct ReadNode {
+        /// The token at this node.
+        pub token: TokenInfo,
+        /// Children of this node (empty for atoms / leaf nodes).
+        pub children: Vec<ReadNode>,
+    }
 }
 
-/// Report from a graph validation check.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct ValidationReport {
-    /// Whether the graph passed all checks.
-    pub valid: bool,
-    /// Total number of vertices checked.
-    pub vertex_count: usize,
-    /// List of issues found (empty if `valid` is `true`).
-    pub issues: Vec<String>,
+ts_export! {
+    /// Report from a graph validation check.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    pub struct ValidationReport {
+        /// Whether the graph passed all checks.
+        pub valid: bool,
+        /// Total number of vertices checked.
+        pub vertex_count: usize,
+        /// List of issues found (empty if `valid` is `true`).
+        pub issues: Vec<String>,
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Log-related types (Phase 3.1)
 // ---------------------------------------------------------------------------
 
-/// Information about a log file in a workspace.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct LogFileInfo {
-    /// The log filename (not the full path).
-    pub filename: String,
-    /// File size in bytes.
-    pub size: u64,
-    /// Last modified time as RFC 3339 string.
-    pub modified: String,
-    /// The command name that produced this log.
-    pub command: String,
-    /// Whether the log contains graph snapshot data.
-    #[serde(default)]
-    pub has_graph_snapshot: bool,
-    /// Whether the log contains search operations.
-    #[serde(default)]
-    pub has_search_ops: bool,
-    /// Whether the log contains insert operations.
-    #[serde(default)]
-    pub has_insert_ops: bool,
-    /// Whether the log contains search path transitions.
-    #[serde(default)]
-    pub has_search_paths: bool,
+ts_export! {
+    /// Information about a log file in a workspace.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct LogFileInfo {
+        /// The log filename (not the full path).
+        pub filename: String,
+        /// File size in bytes.
+        pub size: u64,
+        /// Last modified time as RFC 3339 string.
+        pub modified: String,
+        /// The command name that produced this log.
+        pub command: String,
+        /// Whether the log contains graph snapshot data.
+        #[serde(default)]
+        pub has_graph_snapshot: bool,
+        /// Whether the log contains search operations.
+        #[serde(default)]
+        pub has_search_ops: bool,
+        /// Whether the log contains insert operations.
+        #[serde(default)]
+        pub has_insert_ops: bool,
+        /// Whether the log contains search path transitions.
+        #[serde(default)]
+        pub has_search_paths: bool,
+    }
 }
 
-/// A parsed log entry — the simplified API view of a full `LogEntry`.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct LogEntryInfo {
-    /// Entry number (1-based).
-    pub entry_number: usize,
-    /// Log level (TRACE, DEBUG, INFO, WARN, ERROR).
-    pub level: String,
-    /// Timestamp string (if present).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<String>,
-    /// The log message.
-    pub message: String,
-    /// Event type (event, span_enter, span_exit, span_new, span_close).
-    pub event_type: String,
-    /// Span name (if this is a span event).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub span_name: Option<String>,
-    /// Indentation depth (number of parent spans).
-    pub depth: usize,
-    /// Additional fields as a JSON value.
-    #[schemars(with = "serde_json::Value")]
-    pub fields: serde_json::Value,
-    /// Source file location.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_file: Option<String>,
-    /// Source line number.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_line: Option<u32>,
+ts_export! {
+    /// A parsed log entry — the simplified API view of a full `LogEntry`.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct LogEntryInfo {
+        /// Entry number (1-based).
+        pub entry_number: usize,
+        /// Log level (TRACE, DEBUG, INFO, WARN, ERROR).
+        pub level: String,
+        /// Timestamp string (if present).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub timestamp: Option<String>,
+        /// The log message.
+        pub message: String,
+        /// Event type (event, span_enter, span_exit, span_new, span_close).
+        pub event_type: String,
+        /// Span name (if this is a span event).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub span_name: Option<String>,
+        /// Indentation depth (number of parent spans).
+        pub depth: usize,
+        /// Additional fields as a JSON value.
+        #[schemars(with = "serde_json::Value")]
+        pub fields: serde_json::Value,
+        /// Source file location.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub source_file: Option<String>,
+        /// Source line number.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub source_line: Option<u32>,
+    }
 }
 
-/// Analysis summary of a log file.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct LogAnalysis {
-    /// Total number of log entries.
-    pub total_entries: usize,
-    /// Entry count by log level.
-    pub by_level: HashMap<String, usize>,
-    /// Entry count by event type.
-    pub by_event_type: HashMap<String, usize>,
-    /// Span summaries.
-    pub spans: Vec<SpanSummary>,
-    /// Error entries (level == ERROR).
-    pub errors: Vec<LogEntryInfo>,
+ts_export! {
+    /// Analysis summary of a log file.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct LogAnalysis {
+        /// Total number of log entries.
+        pub total_entries: usize,
+        /// Entry count by log level.
+        pub by_level: HashMap<String, usize>,
+        /// Entry count by event type.
+        pub by_event_type: HashMap<String, usize>,
+        /// Span summaries.
+        pub spans: Vec<SpanSummary>,
+        /// Error entries (level == ERROR).
+        pub errors: Vec<LogEntryInfo>,
+    }
 }
 
-/// Summary of a tracing span.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct SpanSummary {
-    /// Span name.
-    pub name: String,
-    /// Number of times this span was entered.
-    pub count: usize,
-    /// Whether any error events occurred inside this span.
-    pub has_errors: bool,
+ts_export! {
+    /// Summary of a tracing span.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct SpanSummary {
+        /// Span name.
+        pub name: String,
+        /// Number of times this span was entered.
+        pub count: usize,
+        /// Whether any error events occurred inside this span.
+        pub has_errors: bool,
+    }
 }
 
-/// Brief trace summary for inclusion in execute responses.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct TraceSummary {
-    /// The log filename.
-    pub log_file: String,
-    /// Total number of entries captured.
-    pub entry_count: usize,
-    /// Event counts by category (e.g., "search": 12, "insert": 35).
-    pub event_summary: HashMap<String, usize>,
-    /// Duration of the captured execution in milliseconds.
-    pub duration_ms: u64,
+ts_export! {
+    /// Brief trace summary for inclusion in execute responses.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct TraceSummary {
+        /// The log filename.
+        pub log_file: String,
+        /// Total number of entries captured.
+        pub entry_count: usize,
+        /// Event counts by category (e.g., "search": 12, "insert": 35).
+        pub event_summary: HashMap<String, usize>,
+        /// Duration of the captured execution in milliseconds.
+        pub duration_ms: u64,
+    }
 }
 
-/// Result of deleting log files.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct LogDeleteResult {
-    /// Number of log files deleted.
-    pub deleted_count: usize,
-    /// Total bytes freed.
-    pub freed_bytes: u64,
+ts_export! {
+    /// Result of deleting log files.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct LogDeleteResult {
+        /// Number of log files deleted.
+        pub deleted_count: usize,
+        /// Total bytes freed.
+        pub freed_bytes: u64,
+    }
 }
 
-/// Per-file results from a cross-file log search.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
-#[cfg_attr(
-    feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../../packages/context-types/src/generated/"
-    )
-)]
-pub struct LogFileSearchResult {
-    /// The log filename.
-    pub filename: String,
-    /// Number of matching entries in this file.
-    pub matches: usize,
-    /// The matching entries.
-    pub entries: Vec<LogEntryInfo>,
+ts_export! {
+    /// Per-file results from a cross-file log search.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct LogFileSearchResult {
+        /// The log filename.
+        pub filename: String,
+        /// Number of matching entries in this file.
+        pub matches: usize,
+        /// The matching entries.
+        pub entries: Vec<LogEntryInfo>,
+    }
 }
 
 // ---------------------------------------------------------------------------
