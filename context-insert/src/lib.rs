@@ -3,6 +3,7 @@
 pub mod insert;
 pub mod interval;
 pub(crate) mod join;
+pub mod overlap;
 pub mod split;
 pub(crate) mod visualization;
 
@@ -20,6 +21,11 @@ pub use crate::{
     interval::{
         IntervalGraph,
         init::InitInterval,
+    },
+    overlap::{
+        OverlapBundleInput,
+        PartitionOutcome,
+        bundle_overlap,
     },
     split::{
         TraceBack,

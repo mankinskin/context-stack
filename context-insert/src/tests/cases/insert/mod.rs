@@ -28,3 +28,4 @@ pub(crate) mod validation;
 // Scenario tests
 pub(crate) mod context_read_scenarios;
 pub(crate) mod expanded_overlap;
+pub(crate) mod overlap_bundle;

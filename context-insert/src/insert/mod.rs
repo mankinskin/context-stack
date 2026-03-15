@@ -1,7 +1,13 @@
 use context::*;
 use result::InsertResult;
 
-use crate::interval::init::InitInterval;
+use crate::{
+    interval::init::InitInterval,
+    overlap::{
+        OverlapBundleInput,
+        bundle_overlap,
+    },
+};
 use context_search::*;
 use context_trace::*;
 pub mod context;
@@ -15,7 +21,9 @@ pub use outcome::InsertOutcome;
 ///
 /// With interior mutability, we only need `HasGraph` - mutations happen
 /// through `&self` methods on `Hypergraph` using per-vertex locks.
-pub trait ToInsertCtx<R: InsertResult = Token>: HasGraph {
+pub trait ToInsertCtx<R: InsertResult = Token>:
+    HasGraph<Kind = BaseGraphKind>
+{
     fn insert_context(&self) -> InsertCtx<R>;
 
     fn insert(
@@ -30,6 +38,13 @@ pub trait ToInsertCtx<R: InsertResult = Token>: HasGraph {
         init: InitInterval,
     ) -> Result<R, ErrorState> {
         self.insert_context().insert_init(ext, init)
+    }
+    fn bundle_overlap(
+        &self,
+        input: OverlapBundleInput,
+    ) -> Result<Token, ErrorState> {
+        bundle_overlap(&HypergraphRef::from(self.graph().clone()), input)
+            .map_err(ErrorState::from)
     }
     #[deprecated(
         since = "0.2.0",
