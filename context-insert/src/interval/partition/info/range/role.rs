@@ -77,6 +77,7 @@ impl RangeKind for Inner {}
 
 impl RangeKind for Outer {}
 
+#[allow(dead_code)]
 pub(crate) trait RangeRole: Debug + Clone + Copy {
     type Mode: ModeInfo<Self>; // todo: use to change join/trace
     type Perfect: BorderPerfect;

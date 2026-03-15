@@ -1,8 +1,3 @@
-use crate::{
-    cursor::Checkpointed,
-    state::matched::CheckpointedCursor,
-    tests::search::event_helpers::*,
-};
 #[cfg(test)]
 use {
     crate::{
@@ -113,45 +108,120 @@ fn find_consecutive1() {
     }
 
     // Exact expected event sequence for first search (37 events)
-    assert_events(&fin1.events, &[
-        start(g),                                                                          // 0
-        explore(g, &[gh]),                                                                 // 1
-        up(g, gh),                                                                         // 2
-        down(gh, h, false),                                                                // 3
-        matched(h, 2),                                                                     // 4
-        root_match(gh),                                                                    // 5
-        explore(gh, &[ghi, efgh]),                                                         // 6
-        up(gh, ghi),                                                                       // 7
-        down(ghi, i, false),                                                               // 8
-        matched(i, 3),                                                                     // 9
-        root_match(ghi),                                                                   // 10
-        explore(ghi, &[efghi, abcdefghi]),                                                 // 11
-        up(ghi, efghi),                                                                    // 12
-        explore(efghi, &[abcdefghi, abcdefghi, ababcdefghi, ababababcdefghi]),              // 13
-        up(efghi, abcdefghi),                                                              // 14
-        explore(abcdefghi, &[abcdefghi, ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi]), // 15
-        up(abcdefghi, abcdefghi),                                                          // 16
-        explore(abcdefghi, &[ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi, ababcdefghi, ababababcdefghi]), // 17
-        up(abcdefghi, ababcdefghi),                                                        // 18
-        explore(ababcdefghi, &[ababcdefghi, ababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 19
-        up(ababcdefghi, ababcdefghi),                                                      // 20
-        explore(ababcdefghi, &[ababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 21
-        up(ababcdefghi, ababcdefghi),                                                      // 22
-        explore(ababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 23
-        up(ababcdefghi, ababababcdefghi),                                                  // 24
-        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 25
-        up(ababababcdefghi, ababababcdefghi),                                              // 26
-        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi, ababababcdefghi]), // 27
-        up(ababababcdefghi, ababababcdefghi),                                              // 28
-        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi, ababababcdefghi]),      // 29
-        up(ababababcdefghi, ababababcdefghi),                                              // 30
-        explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi]),                       // 31
-        up(ababababcdefghi, ababababcdefghi),                                              // 32
-        explore(ababababcdefghi, &[ababababcdefghi]),                                       // 33
-        up(ababababcdefghi, ababababcdefghi),                                              // 34
-        explore(ababababcdefghi, &[]),                                                     // 35
-        done_ok(ghi),                                                                      // 36
-    ]);
+    assert_events(
+        &fin1.events,
+        &[
+            start(g),                          // 0
+            explore(g, &[gh]),                 // 1
+            up(g, gh),                         // 2
+            down(gh, h, false),                // 3
+            matched(h, 2),                     // 4
+            root_match(gh),                    // 5
+            explore(gh, &[ghi, efgh]),         // 6
+            up(gh, ghi),                       // 7
+            down(ghi, i, false),               // 8
+            matched(i, 3),                     // 9
+            root_match(ghi),                   // 10
+            explore(ghi, &[efghi, abcdefghi]), // 11
+            up(ghi, efghi),                    // 12
+            explore(
+                efghi,
+                &[abcdefghi, abcdefghi, ababcdefghi, ababababcdefghi],
+            ), // 13
+            up(efghi, abcdefghi),              // 14
+            explore(
+                abcdefghi,
+                &[
+                    abcdefghi,
+                    ababcdefghi,
+                    ababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                ],
+            ), // 15
+            up(abcdefghi, abcdefghi),          // 16
+            explore(
+                abcdefghi,
+                &[
+                    ababcdefghi,
+                    ababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababcdefghi,
+                    ababababcdefghi,
+                ],
+            ), // 17
+            up(abcdefghi, ababcdefghi),        // 18
+            explore(
+                ababcdefghi,
+                &[
+                    ababcdefghi,
+                    ababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                ],
+            ), // 19
+            up(ababcdefghi, ababcdefghi),      // 20
+            explore(
+                ababcdefghi,
+                &[
+                    ababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                ],
+            ), // 21
+            up(ababcdefghi, ababcdefghi),      // 22
+            explore(
+                ababcdefghi,
+                &[
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                ],
+            ), // 23
+            up(ababcdefghi, ababababcdefghi),  // 24
+            explore(
+                ababababcdefghi,
+                &[
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                ],
+            ), // 25
+            up(ababababcdefghi, ababababcdefghi), // 26
+            explore(
+                ababababcdefghi,
+                &[
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                    ababababcdefghi,
+                ],
+            ), // 27
+            up(ababababcdefghi, ababababcdefghi), // 28
+            explore(
+                ababababcdefghi,
+                &[ababababcdefghi, ababababcdefghi, ababababcdefghi],
+            ), // 29
+            up(ababababcdefghi, ababababcdefghi), // 30
+            explore(ababababcdefghi, &[ababababcdefghi, ababababcdefghi]), // 31
+            up(ababababcdefghi, ababababcdefghi), // 32
+            explore(ababababcdefghi, &[ababababcdefghi]), // 33
+            up(ababababcdefghi, ababababcdefghi), // 34
+            explore(ababababcdefghi, &[]),     // 35
+            done_ok(ghi),                      // 36
+        ],
+    );
 
     // Extract the cursor from the response and use it for the next search
     let query = fin1.end.cursor().clone();
@@ -189,22 +259,38 @@ fn find_consecutive1() {
     }
 
     // Exact expected event sequence for second search (16 events)
-    assert_events(&fin2.events, &[
-        start(a),                                                                          // 0
-        explore(a, &[ab, abc, aba, abcd]),                                                 // 1
-        up(a, ab),                                                                         // 2
-        down(ab, b, false),                                                                // 3
-        matched(b, 5),                                                                     // 4
-        root_match(ab),                                                                    // 5
-        explore(ab, &[aba, abc, abab, abab, ababcd, abcdef, ababab, ababab, ababcdefghi]), // 6
-        up(ab, aba),                                                                       // 7
-        down(aba, a, false),                                                               // 8
-        mismatched(a, 6, c, a),                                                            // 9
-        skip(aba, 8, true),                                                                // 10
-        up(ab, abc),                                                                       // 11
-        down(abc, c, false),                                                               // 12
-        matched(c, 6),                                                                     // 13
-        root_match(abc),                                                                   // 14
-        done_ok(abc),                                                                      // 15
-    ]);
+    assert_events(
+        &fin2.events,
+        &[
+            start(a),                          // 0
+            explore(a, &[ab, abc, aba, abcd]), // 1
+            up(a, ab),                         // 2
+            down(ab, b, false),                // 3
+            matched(b, 5),                     // 4
+            root_match(ab),                    // 5
+            explore(
+                ab,
+                &[
+                    aba,
+                    abc,
+                    abab,
+                    abab,
+                    ababcd,
+                    abcdef,
+                    ababab,
+                    ababab,
+                    ababcdefghi,
+                ],
+            ), // 6
+            up(ab, aba),                       // 7
+            down(aba, a, false),               // 8
+            mismatched(a, 6, c, a),            // 9
+            skip(aba, 8, true),                // 10
+            up(ab, abc),                       // 11
+            down(abc, c, false),               // 12
+            matched(c, 6),                     // 13
+            root_match(abc),                   // 14
+            done_ok(abc),                      // 15
+        ],
+    );
 }

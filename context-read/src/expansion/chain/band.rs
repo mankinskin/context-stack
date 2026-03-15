@@ -2,7 +2,6 @@ use std::borrow::Borrow;
 
 use context_trace::*;
 use derivative::Derivative;
-use derive_more::Deref;
 
 pub(crate) struct BandCtx<'a> {
     pub(crate) band: &'a Band,
@@ -26,9 +25,11 @@ impl Borrow<AtomPosition> for Band {
     }
 }
 impl Band {
+    #[allow(dead_code)]
     pub(crate) fn last_token(&self) -> Token {
         *self.pattern.last().unwrap()
     }
+    #[allow(dead_code)]
     pub(crate) fn append(
         &mut self,
         postfix: Token,

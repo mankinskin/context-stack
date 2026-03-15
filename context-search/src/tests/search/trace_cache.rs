@@ -1,4 +1,4 @@
-use crate::search::Find;
+#![allow(dead_code)]
 use context_trace::{
     tests::{
         env::Env2,

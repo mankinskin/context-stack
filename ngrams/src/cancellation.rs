@@ -5,8 +5,11 @@
 //! and in WebAssembly (using Arc<AtomicBool>).
 
 use std::sync::{
+    atomic::{
+        AtomicBool,
+        Ordering,
+    },
     Arc,
-    atomic::{AtomicBool, Ordering},
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -21,7 +24,7 @@ pub(crate) trait Cancellable {
 /// Native cancellation using tokio's CancellationToken
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
-pub(crate) struct NativeCancellation {
+pub struct NativeCancellation {
     token: CancellationToken,
 }
 
@@ -30,7 +33,7 @@ impl NativeCancellation {
     pub(crate) fn new(token: CancellationToken) -> Self {
         Self { token }
     }
-    
+
     pub(crate) fn token(&self) -> &CancellationToken {
         &self.token
     }
@@ -52,7 +55,7 @@ impl From<CancellationToken> for NativeCancellation {
 
 /// Wasm cancellation using Arc<AtomicBool>
 #[derive(Debug, Clone)]
-pub(crate) struct WasmCancellation {
+pub struct WasmCancellation {
     cancelled: Arc<AtomicBool>,
 }
 
@@ -60,7 +63,7 @@ impl WasmCancellation {
     pub(crate) fn new(cancelled: Arc<AtomicBool>) -> Self {
         Self { cancelled }
     }
-    
+
     pub(crate) fn flag(&self) -> &Arc<AtomicBool> {
         &self.cancelled
     }
@@ -100,11 +103,11 @@ impl Cancellation {
     pub(crate) fn native(token: CancellationToken) -> Self {
         Self::Native(NativeCancellation::new(token))
     }
-    
+
     pub(crate) fn wasm(cancelled: Arc<AtomicBool>) -> Self {
         Self::Wasm(WasmCancellation::new(cancelled))
     }
-    
+
     pub(crate) fn none() -> Self {
         Self::None
     }

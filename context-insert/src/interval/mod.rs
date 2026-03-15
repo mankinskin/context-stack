@@ -38,6 +38,7 @@ impl IntervalGraph {
             .get(&key.index.vertex_index())
             .and_then(|ve| ve.positions.get(&key.pos))
     }
+    #[allow(dead_code)]
     pub(crate) fn get_mut(
         &mut self,
         key: &PosKey,
@@ -52,6 +53,7 @@ impl IntervalGraph {
     ) -> &SplitPositionCache {
         self.get(key).unwrap()
     }
+    #[allow(dead_code)]
     pub(crate) fn expect_mut(
         &mut self,
         key: &PosKey,

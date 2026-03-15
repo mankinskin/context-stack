@@ -28,6 +28,7 @@ use tracing::debug;
 #[derive(Debug)]
 pub(crate) struct JoinedPartition<R: RangeRole> {
     pub(crate) index: Token,
+    #[allow(dead_code)]
     pub(crate) perfect: R::Perfect,
     pub(crate) delta: PatternSubDeltas,
 }

@@ -1,11 +1,5 @@
-use crate::context::has_read_context::HasReadCtx;
-use context_search::*;
-use context_trace::{
-    graph::vertex::parent::PatternIndex,
-    init_test_tracing,
-    *,
-};
-use pretty_assertions::assert_eq;
+#[cfg(test)]
+use context_trace::*;
 #[test]
 fn sync_read_text1() {
     let mut graph: HypergraphRef =
@@ -19,7 +13,7 @@ fn sync_read_text1() {
     let g = graph.graph();
     let space = g.expect_atom_child(' ');
     let exclam = g.expect_atom_child('!');
-    drop(g);
+    let _ = g;
 
     assert_indices!(graph, ld);
     assert_patterns!(

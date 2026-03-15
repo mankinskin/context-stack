@@ -22,10 +22,7 @@ use context_trace::{
     *,
 };
 use std::marker::PhantomData;
-use tracing::{
-    debug,
-    trace,
-};
+use tracing::trace;
 
 pub(crate) trait IntoCursor: StartFoldPath {
     fn into_cursor<G: HasGraph>(
@@ -113,8 +110,7 @@ impl<K: SearchKind> StartCtx<K> {
                     start_node: self.start_token.index.0,
                     path_id: format!(
                         "search/context-search/token-{}-{}",
-                        self.start_token.index.0,
-                        timestamp,
+                        self.start_token.index.0, timestamp,
                     ),
                     viz_path: Default::default(),
                     viz_cursor_pos: 0,
@@ -122,8 +118,7 @@ impl<K: SearchKind> StartCtx<K> {
                     collected_events: Vec::new(),
                     query_path_id: format!(
                         "query/context-search/token-{}-{}",
-                        self.start_token.index.0,
-                        timestamp,
+                        self.start_token.index.0, timestamp,
                     ),
                     query_viz_path: Default::default(),
                 })

@@ -46,6 +46,7 @@ impl BoolPerfect for (bool, bool) {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) trait BorderPerfect:
     Default + Debug + Clone + Extend<Self>
 {

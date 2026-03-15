@@ -26,6 +26,7 @@ impl BorderInfo {
     /// inner_offset from the cache no longer applies to the new token at sub_index.
     /// We must use the inner_offset calculated from trace_child_pos to get the
     /// correct position within the current pattern structure.
+    #[allow(dead_code)]
     pub(crate) fn new_from_atom_pos(
         pattern: &Pattern,
         atom_pos: NonZeroUsize,
@@ -63,6 +64,7 @@ impl HasInnerOffset for BorderInfo {
 
 pub(crate) trait PartitionBorder<R: RangeRole>: Sized {
     fn perfect(&self) -> BooleanPerfectOf<R>;
+    #[allow(dead_code)]
     fn offsets(&self) -> OffsetsOf<R>;
 }
 

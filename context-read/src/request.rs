@@ -29,6 +29,7 @@ use crate::{
 /// let request = ReadRequest::new("hello world".chars());
 /// let result = request.execute(&mut graph);
 /// ```
+#[allow(dead_code)]
 #[derive(Debug, Clone, Builder)]
 #[builder(setter(into))]
 pub(crate) struct ReadRequest {
@@ -40,6 +41,7 @@ pub(crate) struct ReadRequest {
 }
 
 /// The input to a read request, representing what should be read.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) enum RequestInput {
     /// A string to be tokenized and read
@@ -49,6 +51,7 @@ pub(crate) enum RequestInput {
 }
 impl RequestInput {
     /// Check if the input is empty (no tokens to read).
+    #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         match self {
             RequestInput::Text(text) => text.is_empty(),
@@ -59,6 +62,7 @@ impl RequestInput {
 
 impl ReadRequest {
     /// Create a new read request from text input.
+    #[allow(dead_code)]
     pub(crate) fn from_text(text: impl Into<String>) -> Self {
         Self {
             input: RequestInput::Text(text.into()),
@@ -66,6 +70,7 @@ impl ReadRequest {
     }
 
     /// Create a new read request from an existing pattern.
+    #[allow(dead_code)]
     pub(crate) fn from_pattern(pattern: impl IntoPattern) -> Self {
         Self {
             input: RequestInput::Pattern(pattern.into_pattern()),
@@ -76,6 +81,7 @@ impl ReadRequest {
     ///
     /// Returns the root token of the inserted/found sequence, or None if the
     /// input was empty.
+    #[allow(dead_code)]
     pub(crate) fn execute(
         self,
         graph: &mut HypergraphRef,
@@ -88,6 +94,7 @@ impl ReadRequest {
     }
 
     /// Get the input type.
+    #[allow(dead_code)]
     pub(crate) fn input(&self) -> &RequestInput {
         &self.input
     }
@@ -95,6 +102,7 @@ impl ReadRequest {
 
 impl ReadRequestBuilder {
     /// Set the input from text.
+    #[allow(dead_code)]
     pub(crate) fn text(
         &mut self,
         text: impl Into<String>,
@@ -104,6 +112,7 @@ impl ReadRequestBuilder {
     }
 
     /// Set the input from a pattern.
+    #[allow(dead_code)]
     pub(crate) fn pattern(
         &mut self,
         pattern: impl IntoPattern,

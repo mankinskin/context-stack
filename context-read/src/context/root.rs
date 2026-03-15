@@ -37,7 +37,7 @@ impl RootManager {
                         && vertex.parents().is_empty()
                     {
                         let (&pid, _) = vertex.expect_any_child_pattern();
-                        self.graph.append_to_pattern(*root, pid, new)
+                        self.graph.append_to_owned_pattern(*root, pid, new)
                     } else {
                         // some old overlaps though
                         let new = new.into_pattern();
@@ -65,7 +65,7 @@ impl RootManager {
                 && vertex.parents().is_empty()
             {
                 let (&pid, _) = vertex.expect_any_child_pattern();
-                self.graph.append_to_pattern(*root, pid, token)
+                self.graph.append_to_owned_pattern(*root, pid, token)
             } else {
                 self.graph.insert_pattern(vec![*root, token])
             };
@@ -220,7 +220,8 @@ impl RootManager {
         self.root = Some(if can_extend {
             debug!("Extending root in place");
             let (&pid, _) = vertex.expect_any_child_pattern();
-            self.graph.append_to_pattern(root, pid, append_pattern)
+            self.graph
+                .append_to_owned_pattern(root, pid, append_pattern)
         } else {
             debug!("Creating new combined root");
             let combined: Vec<Token> = std::iter::once(root)

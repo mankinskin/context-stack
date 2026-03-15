@@ -159,6 +159,7 @@ impl SplitVertexCache {
     ///
     /// Offsets BEFORE from_offset_index (inside or before the merged region)
     /// should not have their sub_indices adjusted.
+    #[allow(dead_code)]
     pub(crate) fn apply_deltas(
         &mut self,
         deltas: &PatternSubDeltas,
@@ -172,6 +173,7 @@ impl SplitVertexCache {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn new(
         pos: NonZeroUsize,
         entry: SplitPositionCache,

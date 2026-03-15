@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Search test cases for EnvAbabab (triple repeat scenario)
 //!
 //! Tests the scenario from context-read's validate_triple_repeat test:

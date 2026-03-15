@@ -13,13 +13,10 @@
 //! These tests validate the basic cursor advancement without the complexity
 //! of overlap detection.
 
-use crate::{
-    context::has_read_context::HasReadCtx,
-    request::ReadRequest,
-};
-use context_search::*;
+#[cfg(test)]
+use crate::request::ReadRequest;
+#[cfg(test)]
 use context_trace::*;
-use pretty_assertions::assert_eq;
 
 /// Test reading a simple 3-character string with no repeats.
 #[test]
@@ -117,7 +114,7 @@ fn linear_read_with_space() {
     expect_atoms!(graph, {a, b, c});
     let g = graph.graph();
     let space = g.expect_atom_child(' ');
-    drop(g);
+    let _ = g;
 
     let root = result.expect("should have root");
     assert_eq!(root.width(), TokenWidth(5));
@@ -191,7 +188,7 @@ fn linear_read_digits() {
     let d3 = g.expect_atom_child('3');
     let d4 = g.expect_atom_child('4');
     let d5 = g.expect_atom_child('5');
-    drop(g);
+    let _ = g;
 
     assert_patterns!(
         graph,
@@ -216,7 +213,7 @@ fn linear_read_special_chars() {
     let c3 = g.expect_atom_child('#');
     let c4 = g.expect_atom_child('$');
     let c5 = g.expect_atom_child('%');
-    drop(g);
+    let _ = g;
 
     assert_patterns!(
         graph,
@@ -230,7 +227,7 @@ fn linear_read_special_chars() {
 fn linear_read_cursor_advancement() {
     use crate::context::ReadCtx;
 
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
 
     let input = "abcd";

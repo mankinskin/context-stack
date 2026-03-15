@@ -44,6 +44,7 @@ pub(crate) struct CompareInfo {
     /// The compared path token (index + width).
     pub token: PathNode,
     /// The query token being compared against.
+    #[allow(dead_code)]
     pub query_token: PathNode,
     /// Query cursor position at comparison time.
     pub cursor_pos: usize,
@@ -132,6 +133,7 @@ impl SearchNode {
 
     /// Returns the root token for this search node.
     /// Alias for `root_parent()` with a clearer name.
+    #[allow(dead_code)]
     pub(crate) fn root_token(&self) -> Token {
         self.root_parent()
     }
@@ -243,7 +245,9 @@ where
                 Err(parent) => {
                     let parent_token = parent.parent_state.path.root_parent();
                     let query_cursor = parent.cursor.candidate();
-                    let query_token = query_cursor.path.role_rooted_leaf_token::<End, _>(&self.1);
+                    let query_token = query_cursor
+                        .path
+                        .role_rooted_leaf_token::<End, _>(&self.1);
                     Some(QueueMore(
                         K::Policy::next_batch(self.1, &parent)
                             .into_iter()

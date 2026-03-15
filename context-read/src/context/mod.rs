@@ -173,6 +173,7 @@ impl ReadCtx {
     }
 
     /// Get the graph reference.
+    #[allow(dead_code)]
     pub(crate) fn graph(&self) -> &HypergraphRef {
         &self.root.as_ref().expect("RootManager taken").graph
     }

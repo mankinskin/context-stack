@@ -28,6 +28,7 @@ pub(crate) struct Partition<R: RangeRole> {
     pub(crate) offsets: R::Splits,
 }
 impl<R: RangeRole> Partition<R> {
+    #[allow(dead_code)]
     pub(crate) fn new(offsets: impl ToPartition<R>) -> Self {
         offsets.to_partition()
     }

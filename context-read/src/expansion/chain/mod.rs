@@ -23,7 +23,7 @@ pub(crate) enum BandState {
     WithOverlap {
         /// Primary band: sequential expansion (appended tokens)
         primary: Band,
-        /// Overlap band: [complement, expansion] decomposition  
+        /// Overlap band: [complement, expansion] decomposition
         overlap: Band,
         /// Link containing paths for complement construction
         link: OverlapLink,
@@ -78,6 +78,7 @@ impl BandState {
     }
 
     /// Get the primary/single band mutably
+    #[allow(dead_code)]
     pub(crate) fn primary_mut(&mut self) -> &mut Band {
         match self {
             BandState::Single { band, .. } => band,
@@ -106,6 +107,7 @@ impl BandState {
     }
 
     /// Check if the band pattern is empty (no cursor tokens consumed)
+    #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.primary().pattern.is_empty()
     }
@@ -313,7 +315,7 @@ fn build_postfix_complement(
 
     // Build the postfix from overlap_end to primary_end
     // We need to extract [overlap_end_in_primary..primary_end] from the primary root
-    let cache = TraceCache::new(primary_root);
+    let _cache = TraceCache::new(primary_root);
 
     // For postfix, we need range [overlap_end..primary_end]
     // This is a suffix extraction - might need different approach

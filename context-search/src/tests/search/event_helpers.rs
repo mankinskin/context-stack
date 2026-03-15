@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Test helpers for exact event-sequence assertions.
 //!
 //! Each search test should call [`assert_events`] with the exact expected
@@ -10,9 +11,15 @@
 //! isn't part of the algorithm's observable behaviour.
 
 use context_trace::graph::{
-    search_path::{EdgeRef, PathNode},
+    search_path::{
+        EdgeRef,
+        PathNode,
+    },
     vertex::token::Token,
-    visualization::{GraphOpEvent, Transition},
+    visualization::{
+        GraphOpEvent,
+        Transition,
+    },
 };
 
 // ── placeholder EdgeRef (stripped during comparison) ──────────────────────
@@ -44,10 +51,7 @@ fn strip_edge(t: &Transition) -> Transition {
             edge: E,
         },
         Transition::VisitChild {
-            from,
-            to,
-            replace,
-            ..
+            from, to, replace, ..
         } => Transition::VisitChild {
             from: *from,
             to: *to,
@@ -55,11 +59,9 @@ fn strip_edge(t: &Transition) -> Transition {
             replace: *replace,
             edge: E,
         },
-        Transition::CandidateMatch { root, .. } => {
-            Transition::CandidateMatch {
-                root: *root,
-                edge: E,
-            }
+        Transition::CandidateMatch { root, .. } => Transition::CandidateMatch {
+            root: *root,
+            edge: E,
         },
         other => other.clone(),
     }
@@ -72,7 +74,10 @@ fn strip_edge(t: &Transition) -> Transition {
 ///
 /// Also validates that step counters are sequential `0..N`.
 /// Note: Query events (op_type == Query) are filtered out for comparison.
-pub fn assert_events(events: &[GraphOpEvent], expected: &[Transition]) {
+pub fn assert_events(
+    events: &[GraphOpEvent],
+    expected: &[Transition],
+) {
     use context_trace::graph::visualization::OperationType;
 
     // Filter out Query events - they're emitted alongside Search events
@@ -90,8 +95,10 @@ pub fn assert_events(events: &[GraphOpEvent], expected: &[Transition]) {
         "Step counters are not sequential",
     );
 
-    let actual: Vec<Transition> =
-        search_events.iter().map(|e| strip_edge(&e.transition)).collect();
+    let actual: Vec<Transition> = search_events
+        .iter()
+        .map(|e| strip_edge(&e.transition))
+        .collect();
     let expected: Vec<Transition> =
         expected.iter().map(|t| strip_edge(t)).collect();
 
@@ -102,24 +109,33 @@ pub fn assert_events(events: &[GraphOpEvent], expected: &[Transition]) {
 
 /// Shorthand: convert Token to PathNode with actual width.
 fn pn(t: &Token) -> PathNode {
-    PathNode { index: t.index.0, width: t.width.0 }
+    PathNode {
+        index: t.index.0,
+        width: t.width.0,
+    }
 }
 
 /// Shorthand: convert Token to PathNode with placeholder width (1).
 /// Used for parent/root nodes where production code uses TODO placeholders.
 fn pn1(t: &Token) -> PathNode {
-    PathNode { index: t.index.0, width: 1 }
+    PathNode {
+        index: t.index.0,
+        width: 1,
+    }
 }
 
 /// `StartNode` — first event of every search.
 pub fn start(token: &Token) -> Transition {
     Transition::StartNode {
-        node: pn(token),  // real width
+        node: pn(token), // real width
     }
 }
 
 /// `ParentExplore` — root boundary reached, candidates queued.
-pub fn explore(root: &Token, candidates: &[&Token]) -> Transition {
+pub fn explore(
+    root: &Token,
+    candidates: &[&Token],
+) -> Transition {
     Transition::ParentExplore {
         current_root: root.index.0,
         parent_candidates: candidates.iter().map(|t| t.index.0).collect(),
@@ -127,20 +143,27 @@ pub fn explore(root: &Token, candidates: &[&Token]) -> Transition {
 }
 
 /// `VisitParent` — ascending from `from` to `to`.
-pub fn up(from: &Token, to: &Token) -> Transition {
+pub fn up(
+    from: &Token,
+    to: &Token,
+) -> Transition {
     Transition::VisitParent {
-        from: pn1(from),  // placeholder width
-        to: pn1(to),      // placeholder width
+        from: pn1(from), // placeholder width
+        to: pn1(to),     // placeholder width
         entry_pos: 0,
         edge: E,
     }
 }
 
 /// `VisitChild` — descending from `from` to `to` (child_index = 0).
-pub fn down(from: &Token, to: &Token, replace: bool) -> Transition {
+pub fn down(
+    from: &Token,
+    to: &Token,
+    replace: bool,
+) -> Transition {
     Transition::VisitChild {
-        from: pn1(from),  // placeholder width (parent)
-        to: pn(to),       // real width (child)
+        from: pn1(from), // placeholder width (parent)
+        to: pn(to),      // real width (child)
         child_index: 0,
         replace,
         edge: E,
@@ -156,8 +179,8 @@ pub fn down_at(
     child_index: usize,
 ) -> Transition {
     Transition::VisitChild {
-        from: pn1(from),  // placeholder width (parent)
-        to: pn(to),       // real width (child)
+        from: pn1(from), // placeholder width (parent)
+        to: pn(to),      // real width (child)
         child_index,
         replace,
         edge: E,
@@ -165,7 +188,10 @@ pub fn down_at(
 }
 
 /// `ChildMatch` — child comparison succeeded.
-pub fn matched(token: &Token, cursor_pos: usize) -> Transition {
+pub fn matched(
+    token: &Token,
+    cursor_pos: usize,
+) -> Transition {
     Transition::ChildMatch {
         node: pn(token),
         cursor_pos,
@@ -190,7 +216,7 @@ pub fn mismatched(
 /// `CandidateMatch` — parent became the new root.
 pub fn root_match(token: &Token) -> Transition {
     Transition::CandidateMatch {
-        root: pn1(token),  // placeholder width
+        root: pn1(token), // placeholder width
         edge: E,
     }
 }
@@ -202,7 +228,7 @@ pub fn skip(
     is_parent: bool,
 ) -> Transition {
     Transition::CandidateMismatch {
-        node: pn1(token),  // placeholder width
+        node: pn1(token), // placeholder width
         queue_remaining,
         is_parent,
     }

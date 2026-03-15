@@ -47,6 +47,7 @@ impl PartitionRange {
     ///
     /// This is used for computing inner partitions: when target and wrapper
     /// overlap, the overlapping portion becomes a required inner partition.
+    #[allow(dead_code)]
     pub(crate) fn overlap(
         &self,
         other: &Self,

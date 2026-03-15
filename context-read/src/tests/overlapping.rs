@@ -11,11 +11,6 @@
 //!
 //! These tests validate the overlap expansion algorithm.
 
-use crate::request::ReadRequest;
-use context_search::*;
-use context_trace::*;
-use pretty_assertions::assert_eq;
-
 /// Test "abcabcabc" - "abc" repeated three times, requires overlap detection.
 ///
 /// With overlap: "abcabcabc" = "abc" + "abcabc" where "abc" overlaps
@@ -92,10 +87,8 @@ fn complex_abcabababcaba() {
 
     expect_atoms!(graph, {a, b, c});
     assert_indices!(
-        graph,
-        ab, aba, abab, ababa, ababab,
-        caba, abc, abcaba, abcabab, abcababa, abcababab,
-        ababcaba, abababcaba
+        graph, ab, aba, abab, ababa, ababab, caba, abc, abcaba, abcabab,
+        abcababa, abcababab, ababcaba, abababcaba
     );
 
     let root = result.expect("should have root");

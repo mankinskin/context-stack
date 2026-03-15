@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Test environment for xyyxy scenario
 //!
 //! Graph structure:

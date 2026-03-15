@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Search test cases for EnvXyyxy
 //!
 //! Tests the scenario from context-read's read_repeating_known1 test:
@@ -59,7 +60,7 @@ impl SearchTestCase for SearchXyExact {
         let xy = env.xy;
         let xy_id = env.xy_id;
         let x = env.x;
-        let y = env.y;
+        let _y = env.y;
 
         Response {
             end: MatchResult {
@@ -173,7 +174,7 @@ mod tests {
         assert!(
             matches!(
                 &result,
-                Err(ErrorReason::SingleIndex(boxed)) 
+                Err(ErrorReason::SingleIndex(boxed))
                     if boxed.index == y
             ),
             "Search for single token 'y' should return SingleIndex error, got {:?}",

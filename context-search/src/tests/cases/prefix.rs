@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Search test cases for EnvInsertPrefix1
 //!
 //! Concrete implementations of SearchTestCase trait with expected Response values.

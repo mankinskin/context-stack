@@ -15,10 +15,7 @@ use context_search::{
     SearchKind,
     Searchable,
 };
-use context_trace::{
-    PatternRoot,
-    *,
-};
+use context_trace::*;
 
 use crate::insert::{
     outcome::InsertOutcome,

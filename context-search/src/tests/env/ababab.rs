@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Test environment for ababab scenario (triple repeat)
 //!
 //! Graph structure:

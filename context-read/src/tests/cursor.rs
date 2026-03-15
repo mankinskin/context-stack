@@ -27,19 +27,17 @@
 //! - **Repeated tokens**: Same token appearing multiple times in input
 //! - **Edge cases**: Single token, empty patterns
 
-use context_insert::*;
-use context_search::*;
 use context_trace::{
     graph::vertex::atom::Atom,
     *,
 };
-use pretty_assertions::assert_eq;
 
 // ============================================================================
 // Test Environment Setup
 // ============================================================================
 
 /// Create a graph with atoms a, b, c and pattern "ab"
+#[allow(dead_code)]
 fn setup_abc_ab() -> (HypergraphRef, Token, Token, Token, Token) {
     let graph = Hypergraph::default();
 
@@ -64,6 +62,7 @@ fn setup_abc_ab() -> (HypergraphRef, Token, Token, Token, Token) {
 }
 
 /// Create a graph with just atom 'a'
+#[allow(dead_code)]
 fn setup_single_atom() -> (HypergraphRef, Token) {
     let graph = Hypergraph::default();
     let [a] = graph.insert_atoms([Atom::Element('a')])[..] else {
@@ -75,6 +74,7 @@ fn setup_single_atom() -> (HypergraphRef, Token) {
 }
 
 /// Create a graph with 'a' and 'aa' pattern already built
+#[allow(dead_code)]
 fn setup_aa_pattern() -> (HypergraphRef, Token, Token) {
     let graph = Hypergraph::default();
     let [a] = graph.insert_atoms([Atom::Element('a')])[..] else {
@@ -90,6 +90,7 @@ fn setup_aa_pattern() -> (HypergraphRef, Token, Token) {
 }
 
 /// Create a graph with 'a', 'aa', and 'aaa' patterns
+#[allow(dead_code)]
 fn setup_aaa_pattern() -> (HypergraphRef, Token, Token, Token) {
     let graph = Hypergraph::default();
     let [a] = graph.insert_atoms([Atom::Element('a')])[..] else {
@@ -105,6 +106,7 @@ fn setup_aaa_pattern() -> (HypergraphRef, Token, Token, Token) {
 }
 
 /// Create graph with 'a', 'aa', 'aaa', 'aaaa' patterns
+#[allow(dead_code)]
 fn setup_aaaa_pattern() -> (HypergraphRef, Token, Token, Token, Token) {
     let graph = Hypergraph::default();
     let [a] = graph.insert_atoms([Atom::Element('a')])[..] else {
@@ -175,7 +177,7 @@ fn cursor_two_tokens_first_match() {
 /// Expected: Finds ab (width 2), cursor advances by 2 atoms
 #[test]
 fn cursor_atoms_finds_pattern() {
-    let (graph, a, b, _c, ab) = setup_abc_ab();
+    let (graph, a, b, _c, _ab) = setup_abc_ab();
     let _tracing = init_test_tracing!(&graph);
 
     // Query for [a, b, a, b] - should find "ab" as largest prefix
@@ -304,7 +306,7 @@ fn cursor_mixed_pattern_abc() {
 /// Expected: Search finds ab as prefix, remaining c
 #[test]
 fn cursor_atoms_uses_existing_pattern() {
-    let (graph, a, b, c, ab) = setup_abc_ab();
+    let (graph, a, b, c, _ab) = setup_abc_ab();
     let _tracing = init_test_tracing!(&graph);
 
     // Query for [a, b, c]

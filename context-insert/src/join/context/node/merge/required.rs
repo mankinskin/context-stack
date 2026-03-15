@@ -57,6 +57,7 @@ impl RequiredPartitions {
     ///
     /// This handles inner partitions: when target `aby` (1..=3) overlaps with
     /// wrapper `abyz` (1..=4), the overlap `ab` (1..=2) becomes required.
+    #[allow(dead_code)]
     pub(crate) fn close_under_overlaps(&mut self) {
         loop {
             let current: Vec<_> = self.required.iter().cloned().collect();
@@ -91,6 +92,7 @@ impl RequiredPartitions {
     /// For example, to build `aby` (1..=3) with pattern `[ab, y]`:
     /// - Need `ab` (1..=2) as left component
     /// - Need `y` (3..=3) as right component
+    #[allow(dead_code)]
     pub(crate) fn close_under_subranges(&mut self) {
         loop {
             let current: Vec<_> = self.required.iter().cloned().collect();
@@ -140,11 +142,13 @@ impl RequiredPartitions {
     }
 
     /// Number of required partitions.
+    #[allow(dead_code)]
     pub(crate) fn len(&self) -> usize {
         self.required.len()
     }
 
     /// Check if empty.
+    #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.required.is_empty()
     }

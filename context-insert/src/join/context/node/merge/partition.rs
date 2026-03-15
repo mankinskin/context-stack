@@ -110,6 +110,7 @@ where
     }
 
     /// Create a JoinedPartition from partition info (allows pattern replacement).
+    #[allow(dead_code)]
     pub(crate) fn join_partition(
         &mut self,
         info: PartitionInfo<R>,
@@ -223,6 +224,7 @@ where
     /// 2. Creates JoinedPartition with delta computation
     /// 3. Adds sub-merge patterns
     /// 4. Returns the token and any pattern deltas
+    #[allow(dead_code)]
     pub(crate) fn merge(self) -> (Token, Option<PatternSubDeltas>) {
         let result = self.merge_internal(false);
         (result.token, result.delta)

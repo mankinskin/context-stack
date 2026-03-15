@@ -606,113 +606,129 @@ ts_export! {
 // Phase 3.2 — Graph Diff Types
 // ---------------------------------------------------------------------------
 
-/// Overall verdict of a graph comparison.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum DiffVerdict {
-    /// Every vertex in both graphs matches by label, width, and all patterns.
-    Equivalent,
-    /// B is a structural subset of A (returned only in `Subset` mode).
-    Subset,
-    /// The graphs differ — see the detailed fields for specifics.
-    Divergent,
+ts_export! {
+    /// Overall verdict of a graph comparison.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    #[serde(rename_all = "snake_case")]
+    pub enum DiffVerdict {
+        /// Every vertex in both graphs matches by label, width, and all patterns.
+        Equivalent,
+        /// B is a structural subset of A (returned only in `Subset` mode).
+        Subset,
+        /// The graphs differ — see the detailed fields for specifics.
+        Divergent,
+    }
 }
 
-/// High-level counts and overall verdict for a graph diff.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct DiffSummary {
-    pub verdict: DiffVerdict,
-    /// Number of labels present in both graphs.
-    pub shared_count: usize,
-    /// Number of labels present only in graph A (reference).
-    pub only_in_a_count: usize,
-    /// Number of labels present only in graph B (candidate).
-    pub only_in_b_count: usize,
-    /// Number of shared labels with at least one pattern mismatch.
-    pub pattern_mismatch_count: usize,
-    /// Number of shared labels with a width mismatch.
-    pub width_mismatch_count: usize,
+ts_export! {
+    /// High-level counts and overall verdict for a graph diff.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct DiffSummary {
+        pub verdict: DiffVerdict,
+        /// Number of labels present in both graphs.
+        pub shared_count: usize,
+        /// Number of labels present only in graph A (reference).
+        pub only_in_a_count: usize,
+        /// Number of labels present only in graph B (candidate).
+        pub only_in_b_count: usize,
+        /// Number of shared labels with at least one pattern mismatch.
+        pub pattern_mismatch_count: usize,
+        /// Number of shared labels with a width mismatch.
+        pub width_mismatch_count: usize,
+    }
 }
 
-/// A vertex present in both graphs, together with how they compare.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct SharedVertex {
-    pub label: String,
-    pub width: usize,
-    pub match_kind: VertexMatchKind,
-    /// Present only when `match_kind` is `PatternMismatch` or `ExtraPatterns`.
-    pub pattern_diff: Option<PatternDiff>,
+ts_export! {
+    /// A vertex present in both graphs, together with how they compare.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct SharedVertex {
+        pub label: String,
+        pub width: usize,
+        pub match_kind: VertexMatchKind,
+        /// Present only when `match_kind` is `PatternMismatch` or `ExtraPatterns`.
+        pub pattern_diff: Option<PatternDiff>,
+    }
 }
 
-/// How a shared vertex's structure compares between A and B.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "snake_case", tag = "kind")]
-pub enum VertexMatchKind {
-    /// Label, width, and all patterns are identical.
-    Identical,
-    /// Label matches but widths differ.
-    WidthMismatch { width_a: usize, width_b: usize },
-    /// Widths match, but B has additional patterns beyond those in A.
-    ExtraPatterns,
-    /// No common pattern between A and B for this label.
-    PatternMismatch,
+ts_export! {
+    /// How a shared vertex's structure compares between A and B.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    #[serde(rename_all = "snake_case", tag = "kind")]
+    pub enum VertexMatchKind {
+        /// Label, width, and all patterns are identical.
+        Identical,
+        /// Label matches but widths differ.
+        WidthMismatch { width_a: usize, width_b: usize },
+        /// Widths match, but B has additional patterns beyond those in A.
+        ExtraPatterns,
+        /// No common pattern between A and B for this label.
+        PatternMismatch,
+    }
 }
 
-/// Pattern-level diff for a vertex present in both graphs.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct PatternDiff {
-    /// Patterns present in A but not B.
-    pub only_in_a: Vec<Vec<String>>,
-    /// Patterns present in B but not A.
-    pub only_in_b: Vec<Vec<String>>,
-    /// Patterns present in both.
-    pub common: Vec<Vec<String>>,
+ts_export! {
+    /// Pattern-level diff for a vertex present in both graphs.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct PatternDiff {
+        /// Patterns present in A but not B.
+        pub only_in_a: Vec<Vec<String>>,
+        /// Patterns present in B but not A.
+        pub only_in_b: Vec<Vec<String>>,
+        /// Patterns present in both.
+        pub common: Vec<Vec<String>>,
+    }
 }
 
-/// A lightweight vertex entry used in the `only_in_a` / `only_in_b` lists.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct DiffVertexEntry {
-    pub label: String,
-    pub width: usize,
-    /// All child patterns for this vertex (empty for atoms).
-    pub patterns: Vec<Vec<String>>,
-    /// True if this is an atom (width == 1, no children).
-    pub is_atom: bool,
+ts_export! {
+    /// A lightweight vertex entry used in the `only_in_a` / `only_in_b` lists.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct DiffVertexEntry {
+        pub label: String,
+        pub width: usize,
+        /// All child patterns for this vertex (empty for atoms).
+        pub patterns: Vec<Vec<String>>,
+        /// True if this is an atom (width == 1, no children).
+        pub is_atom: bool,
+    }
 }
 
-/// Full result of a graph diff operation between two workspaces.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct GraphDiffResult {
-    /// Name of the reference workspace (A).
-    pub workspace_a: String,
-    /// Name of the candidate workspace (B).
-    pub workspace_b: String,
-    /// The comparison mode used.
-    pub mode: CompareMode,
-    /// High-level summary (counts, verdict).
-    pub summary: DiffSummary,
-    /// Vertices present in both graphs, with comparison details.
-    pub shared: Vec<SharedVertex>,
-    /// Vertices present only in A (missing from B).
-    pub only_in_a: Vec<DiffVertexEntry>,
-    /// Vertices present only in B (extra in candidate).
-    pub only_in_b: Vec<DiffVertexEntry>,
+ts_export! {
+    /// Full result of a graph diff operation between two workspaces.
+    #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+    pub struct GraphDiffResult {
+        /// Name of the reference workspace (A).
+        pub workspace_a: String,
+        /// Name of the candidate workspace (B).
+        pub workspace_b: String,
+        /// The comparison mode used.
+        pub mode: CompareMode,
+        /// High-level summary (counts, verdict).
+        pub summary: DiffSummary,
+        /// Vertices present in both graphs, with comparison details.
+        pub shared: Vec<SharedVertex>,
+        /// Vertices present only in A (missing from B).
+        pub only_in_a: Vec<DiffVertexEntry>,
+        /// Vertices present only in B (extra in candidate).
+        pub only_in_b: Vec<DiffVertexEntry>,
+    }
 }
 
-/// The comparison mode for a graph diff.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum CompareMode {
-    /// Compare both graphs fully — all vertices in A and B are examined.
-    Full,
-    /// Check whether B is a structural subset of A.
-    Subset,
+ts_export! {
+    /// The comparison mode for a graph diff.
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
+    #[serde(rename_all = "snake_case")]
+    pub enum CompareMode {
+        /// Compare both graphs fully — all vertices in A and B are examined.
+        Full,
+        /// Check whether B is a structural subset of A.
+        Subset,
+    }
 }
 
 impl Default for CompareMode {

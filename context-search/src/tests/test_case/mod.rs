@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Search test case trait and supporting types
 
 use context_trace::{

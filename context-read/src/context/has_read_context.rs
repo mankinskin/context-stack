@@ -6,6 +6,7 @@ use crate::{
 };
 
 /// Trait for types that can create or provide a ReadCtx for reading sequences.
+#[allow(dead_code)]
 pub(crate) trait HasReadCtx {
     fn read_context(&'_ mut self) -> ReadCtx;
     fn read_sequence(&mut self) -> Option<Token> {

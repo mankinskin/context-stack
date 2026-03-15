@@ -14,11 +14,13 @@ use crate::{
         SplitMap,
         cache::position::PosKey,
     },
-    visualization::{emit_insert_node, emit_insert_node_with_delta},
+    visualization::emit_insert_node_with_delta,
 };
 use context_trace::{
-    graph::{
-        visualization::{DeltaOp, GraphMutation, Transition},
+    graph::visualization::{
+        DeltaOp,
+        GraphMutation,
+        Transition,
     },
     *,
 };
@@ -89,7 +91,10 @@ impl Iterator for FrontierSplitIterator {
                         node_idx,
                         GraphMutation::single(DeltaOp::UpdateNode {
                             index: node_idx,
-                            detail: format!("Processing at pos {}", key.pos.get()),
+                            detail: format!(
+                                "Processing at pos {}",
+                                key.pos.get()
+                            ),
                         }),
                     );
 

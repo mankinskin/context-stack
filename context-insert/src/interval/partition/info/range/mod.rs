@@ -72,6 +72,7 @@ pub(crate) struct InnerRangeInfo<R: RangeRole> {
     pub(crate) offsets: R::Offsets,
 }
 impl<R: RangeRole> InnerRangeInfo<R> {
+    #[allow(dead_code)]
     pub(crate) fn delta(&self) -> usize {
         self.range.clone().into().len().saturating_sub(1)
     }

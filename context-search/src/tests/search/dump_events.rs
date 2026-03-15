@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Diagnostic tests that dump raw event sequences to stderr.
 //!
 //! All tests are `#[ignore]`d — they never run in CI.  Run them on
@@ -11,13 +12,16 @@
 use {
     crate::search::Find,
     context_trace::{
-        *,
         graph::vertex::token::Token,
+        *,
     },
     itertools::Itertools,
 };
 
-fn dump(label: &str, events: &[context_trace::graph::visualization::GraphOpEvent]) {
+fn dump(
+    label: &str,
+    events: &[context_trace::graph::visualization::GraphOpEvent],
+) {
     eprintln!("\n=== {label} ({} events) ===", events.len());
     for e in events {
         eprintln!("  [{:>2}] transition: {:?}", e.step, e.transition);
@@ -31,8 +35,18 @@ fn dump(label: &str, events: &[context_trace::graph::visualization::GraphOpEvent
 #[ignore = "diagnostic: run with --ignored --nocapture"]
 fn dump_long_pattern() {
     let Env1 {
-        graph, a, b, c, d, e, f, g, h, i,
-        ababababcdefghi, ..
+        graph,
+        a,
+        b,
+        c,
+        d,
+        e,
+        f,
+        g,
+        h,
+        i,
+        ababababcdefghi,
+        ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
     graph.emit_graph_snapshot();
@@ -135,13 +149,24 @@ fn dump_parent_ab_c() {
 #[ignore = "diagnostic: run with --ignored --nocapture"]
 fn dump_consecutive1() {
     let Env1 {
-        graph, a, b, c, g, h, i, ..
+        graph,
+        a,
+        b,
+        c,
+        g,
+        h,
+        i,
+        ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
     graph.emit_graph_snapshot();
     let query = vec![
-        Token::new(g, 1), Token::new(h, 1), Token::new(i, 1),
-        Token::new(a, 1), Token::new(b, 1), Token::new(c, 1),
+        Token::new(g, 1),
+        Token::new(h, 1),
+        Token::new(i, 1),
+        Token::new(a, 1),
+        Token::new(b, 1),
+        Token::new(c, 1),
     ];
     let query = PatternPrefixPath::from(Pattern::from(query));
     let fin1 = graph.find_ancestor(&query).unwrap();

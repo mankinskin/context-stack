@@ -26,6 +26,7 @@ pub(crate) struct OverlapLink {
     pub(crate) search_path: IndexStartPath,
 
     /// Position where the overlap starts in the input sequence.
+    #[allow(dead_code)]
     pub(crate) start_bound: usize,
 }
 
@@ -52,9 +53,11 @@ pub(crate) struct BandCap {
     pub(crate) start_bound: AtomPosition,
 }
 
+#[allow(dead_code)]
 pub(crate) trait StartBound: Sized {
     fn start_bound(&self) -> AtomPosition;
 }
+#[allow(dead_code)]
 pub(crate) trait EndBound: Sized {
     fn end_bound(&self) -> AtomPosition;
 }
