@@ -1,5 +1,4 @@
 pub(crate) mod band;
-pub(crate) mod expand;
 pub(crate) mod link;
 
 use band::Band;
@@ -110,6 +109,16 @@ impl BandState {
     #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.primary().pattern.is_empty()
+    }
+
+    /// If this is a `Single` state with exactly one token in the band pattern,
+    /// return that token.  Returns `None` for `WithOverlap` or multi-token bands.
+    pub(crate) fn single_token(&self) -> Option<Token> {
+        match self {
+            BandState::Single { band } if band.pattern.len() == 1 =>
+                band.pattern.first().copied(),
+            _ => None,
+        }
     }
 
     /// Append a token to the single band.

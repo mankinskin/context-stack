@@ -1,27 +1,26 @@
-//! Insert commands — thin wrappers that forward directly to `context-insert`.
+//! Insert commands — thin wrappers that forward to the read/insert pipelines.
 //!
 //! Provides three entry points for inserting data into the graph:
 //!
 //! - `insert_first_match` — insert by a list of `TokenRef` values (resolved to
 //!   concrete tokens first).
-//! - `insert_sequence` — insert a text string (auto-creates atoms as needed).
+//! - `insert_sequence` — insert a text string via `ReadCtx::read_sequence`,
+//!   which drives the full expansion-loop pipeline (auto-creates atoms as
+//!   needed, detects overlaps, builds tightest decompositions).
 //! - `insert_sequences` — bulk insert a set of text strings.
 //!
 //! ## Insertion strategy
 //!
-//! All insertion is delegated directly to `context-insert`'s `insert()` pipeline
-//! (search → split → join). No short-circuits, no `ReadCtx`, no `insert_pattern`
-//! fallbacks. The API layer is intentionally thin — it exposes the exact
-//! semantics of the `context-insert` crate.
+//! `insert_sequence` delegates to `context-read`'s `ReadCtx::read_sequence`
+//! (the full expansion-loop pipeline).  Single-character inputs are accepted
+//! and return the atom token directly.
 
 use std::collections::HashSet;
 
-use context_insert::{
-    InsertOutcome,
-    ToInsertCtx,
-};
+use context_read::context::ReadCtx;
 use context_trace::graph::vertex::{
     atom::Atom,
+    pattern::Pattern,
     token::Token,
 };
 use tracing::debug;
@@ -75,33 +74,34 @@ impl WorkspaceManager {
             "insert_first_match: resolved tokens"
         );
 
-        // Delegate directly to context-insert's insert_next_match
-        let outcome = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_next_match(
-            &graph_ref,
-            tokens,
-        )
-        .map_err(|e| {
-            InsertError::InternalError(format!(
-                "insert_next_match failed: {e:?}"
-            ))
-        })?;
+        // Capture a snapshot of all known vertex indices before the read so
+        // we can determine whether anything new was created.
+        let pre_vertex_count = graph_ref.vertex_count();
 
-        let token = outcome.token();
-        let already_existed = !outcome.is_expanded();
+        // Delegate to the full ReadCtx pipeline via a Pattern of resolved tokens.
+        // This correctly handles the case where no composite exists yet (e.g.
+        // atoms [a, b] → creates new ab token) as well as idempotent re-insertion
+        // (returns the existing token when already present).
+        let pattern = Pattern::from(tokens);
+        let token = ReadCtx::new(graph_ref.clone(), pattern)
+            .read_sequence()
+            .ok_or_else(|| {
+                InsertError::InternalError(
+                    "read_sequence returned no token for non-empty input"
+                        .to_string(),
+                )
+            })?;
 
-        match &outcome {
-            InsertOutcome::Created { .. } => {
-                debug!(token = ?token, "insert_first_match: newly inserted");
-            },
-            InsertOutcome::Complete { .. } => {
-                debug!(token = ?token, "insert_first_match: already existed (complete)");
-            },
-            InsertOutcome::NoExpansion { .. } => {
-                debug!(token = ?token, "insert_first_match: already existed (no expansion)");
-            },
-        }
+        let post_vertex_count = graph_ref.vertex_count();
+        let already_existed = post_vertex_count == pre_vertex_count;
 
-        // Mark workspace dirty only if we created something new
+        debug!(
+            token = ?token,
+            already_existed,
+            "insert_first_match: read_sequence complete"
+        );
+
+        // Mark workspace dirty if new vertices were created.
         if !already_existed {
             let ws = self.get_workspace_mut(ws_name).map_err(|_| {
                 InsertError::WorkspaceNotOpen {
@@ -124,23 +124,26 @@ impl WorkspaceManager {
         })
     }
 
-    /// Insert a text sequence into the graph.
+    /// Insert a text sequence into the graph via the full read pipeline.
     ///
-    /// Each character in the text is ensured to exist as an atom (auto-created
-    /// if missing). The atom tokens are then passed directly to
-    /// `context-insert`'s `insert_next_match()` pipeline.
+    /// Delegates to `ReadCtx::read_sequence` which drives the expansion-loop
+    /// pipeline: atom auto-creation, segmentation, overlap detection, and
+    /// tightest-decomposition building.
+    ///
+    /// Single-character inputs are accepted (they return the atom token
+    /// directly).  Empty strings return `InsertError::QueryTooShort`.
     ///
     /// # Errors
     ///
     /// - `InsertError::WorkspaceNotOpen` if the workspace is not currently open.
-    /// - `InsertError::QueryTooShort` if the text is shorter than 2 characters.
-    /// - `InsertError::InternalError` on unexpected insert failures.
+    /// - `InsertError::QueryTooShort` if the text is empty.
+    /// - `InsertError::InternalError` if `read_sequence` returns no token.
     pub fn insert_sequence(
         &mut self,
         ws_name: &str,
         text: &str,
     ) -> Result<InsertResult, InsertError> {
-        if text.chars().count() < 2 {
+        if text.is_empty() {
             return Err(InsertError::QueryTooShort);
         }
 
@@ -151,47 +154,36 @@ impl WorkspaceManager {
         })?;
         let graph_ref = ws.graph_ref();
 
-        debug!(text, "insert_sequence: starting");
+        debug!(
+            text,
+            "insert_sequence: delegating to ReadCtx::read_sequence"
+        );
 
-        // Ensure all atoms exist (auto-create missing ones)
-        let tokens: Vec<Token> = text
-            .chars()
-            .map(|ch| {
-                let atom = Atom::Element(ch);
-                match graph_ref.get_atom_index(atom) {
-                    Ok(idx) => Token::new(idx, 1),
-                    Err(_) => graph_ref.insert_atom(atom),
-                }
-            })
-            .collect();
+        // Capture a snapshot of all known vertex indices before the read so
+        // we can determine whether anything new was created.
+        let pre_vertex_count = graph_ref.vertex_count();
 
-        // Delegate directly to context-insert's insert_next_match
-        let outcome = <_ as ToInsertCtx<context_trace::IndexWithPath>>::insert_next_match(
-            &graph_ref,
-            tokens,
-        )
-        .map_err(|e| {
-            InsertError::InternalError(format!(
-                "insert_next_match failed: {e:?}"
-            ))
-        })?;
+        // Delegate to the full read pipeline via ReadCtx.
+        // Collect chars to avoid lifetime issues with the &str borrow.
+        let token = ReadCtx::new(graph_ref.clone(), text.chars())
+            .read_sequence()
+            .ok_or_else(|| {
+                InsertError::InternalError(
+                    "read_sequence returned no token for non-empty input"
+                        .to_string(),
+                )
+            })?;
 
-        let token = outcome.token();
-        let already_existed = !outcome.is_expanded();
+        let post_vertex_count = graph_ref.vertex_count();
+        let already_existed = post_vertex_count == pre_vertex_count;
 
-        match &outcome {
-            InsertOutcome::Created { .. } => {
-                debug!(token = ?token, "insert_sequence: newly inserted");
-            },
-            InsertOutcome::Complete { .. } => {
-                debug!(token = ?token, "insert_sequence: already existed (complete)");
-            },
-            InsertOutcome::NoExpansion { .. } => {
-                debug!(token = ?token, "insert_sequence: already existed (no expansion)");
-            },
-        }
+        debug!(
+            token = ?token,
+            already_existed,
+            "insert_sequence: read_sequence complete"
+        );
 
-        // Mark workspace dirty only if we created something new
+        // Mark workspace dirty if new vertices were created.
         if !already_existed {
             let ws = self.get_workspace_mut(ws_name).map_err(|_| {
                 InsertError::WorkspaceNotOpen {
@@ -310,10 +302,18 @@ mod tests {
     #[test]
     fn insert_sequence_too_short() {
         let (_tmp, mut mgr) = setup("ws");
-        let err = mgr.insert_sequence("ws", "a").unwrap_err();
+        // Single-character sequences are valid — they return the atom token
+        // directly. Only empty strings are rejected with QueryTooShort.
+        let result = mgr.insert_sequence("ws", "a").unwrap();
+        assert_eq!(result.token.label, "a");
+        assert_eq!(result.token.width, 1);
+
+        // Empty string is still too short
+        let err = mgr.insert_sequence("ws", "").unwrap_err();
         match err {
             crate::error::InsertError::QueryTooShort => {},
-            other => panic!("expected QueryTooShort, got: {other}"),
+            other =>
+                panic!("expected QueryTooShort for empty string, got: {other}"),
         }
     }
 

@@ -7,10 +7,7 @@
 
 use crate::{
     context::root::RootManager,
-    expansion::{
-        chain::BandState,
-        ExpansionCtx,
-    },
+    expansion::ExpansionCtx,
 };
 use context_trace::*;
 use tracing::debug;
@@ -26,7 +23,7 @@ pub(crate) struct BlockExpansionCtx {
     ctx: ExpansionCtx,
 }
 
-impl<'a> BlockExpansionCtx {
+impl BlockExpansionCtx {
     /// Create a new block expansion context.
     /// Takes ownership of RootManager to manage block commits.
     pub(crate) fn new(
@@ -35,24 +32,22 @@ impl<'a> BlockExpansionCtx {
     ) -> Self {
         debug!(known_len = known.len(), known = ?known, "BlockExpansionCtx::new");
 
-        // Set up cursor for the known pattern
-        let path = PatternEndPath::new(known.clone(), Default::default());
-        let cursor = path.into_range(0);
-
-        // Get the last token from the existing root (if any) to use as overlap anchor
-        let root_last_token = root.last_child_token();
+        // Read the anchor from the RootManager — the last committed token used
+        // as the left-side context for overlap detection.
+        let anchor = root.anchor();
         debug!(
             has_root = root.root.is_some(),
-            root_last_token = ?root_last_token,
+            anchor = ?anchor,
             "Starting block expansion"
         );
 
-        // Create expansion context with root's last token for overlap detection
-        let expansion_ctx = ExpansionCtx::new(
-            root.graph.clone(),
-            cursor,
-            root_last_token.map(BandState::new),
-        );
+        // Convert the known pattern into a plain Vec<Token> for the new
+        // ExpansionCtx cursor loop.
+        let atoms: Vec<Token> = known.iter().copied().collect();
+
+        let expansion_ctx =
+            ExpansionCtx::new(root.graph.clone(), atoms, anchor);
+
         Self {
             root,
             ctx: expansion_ctx,
@@ -60,17 +55,34 @@ impl<'a> BlockExpansionCtx {
     }
 
     /// Process the known pattern and commit the result to the root.
-    /// Uses overlap expansion and commits when an overlap is found.
+    ///
+    /// Iterates `ExpansionCtx`, committing each yielded `BandState` to the
+    /// `RootManager` immediately (PI-5: commit-before-next invariant).
+    /// After each commit, the anchor is refreshed from `RootManager` so that
+    /// the next `next()` call sees the up-to-date anchor.
     pub(crate) fn process(&mut self) {
-        let first = self.ctx.state.anchor_token();
-        debug!(state = ?self.ctx.state, ?first, "expansion state before processing");
-
-        // Process expansions - when overlap found, commit and continue
-        while let Some(state) = self.ctx.next() {
-            self.root.commit_state(state);
-        }
         debug!(
-            final_state = ?self.ctx.state,
+            anchor = ?self.ctx.anchor,
+            "BlockExpansionCtx::process start"
+        );
+
+        while let Some(state) = self.ctx.next() {
+            // Commit the state — this updates root.anchor inside commit_state.
+            self.root.commit_state(state);
+
+            // Refresh the anchor in ExpansionCtx from RootManager so the next
+            // step sees the newly committed anchor (PI-5 / OQ-5).
+            self.ctx.anchor = self.root.anchor();
+
+            debug!(
+                new_anchor = ?self.ctx.anchor,
+                cursor = self.ctx.cursor,
+                "BlockExpansionCtx::process: committed, anchor refreshed"
+            );
+        }
+
+        debug!(
+            cursor = self.ctx.cursor,
             "BlockExpansionCtx::process complete"
         );
     }

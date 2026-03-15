@@ -2,10 +2,17 @@
 use {
     crate::{
         search::Find,
-        state::end::PathCoverage,
+        state::{
+            end::PathCoverage,
+            matched::CheckpointedCursor,
+        },
+        tests::search::event_helpers::*,
     },
-    context_trace::*,
-    pretty_assertions::assert_matches,
+    context_trace::{
+        graph::visualization::Transition,
+        *,
+    },
+    pretty_assertions::assert_eq,
 };
 
 #[test]
