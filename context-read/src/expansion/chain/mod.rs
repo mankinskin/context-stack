@@ -10,28 +10,25 @@ use crate::expansion::chain::link::OverlapLink;
 
 /// Represents the state of band expansion.
 ///
-/// Constrains the state to only valid configurations:
-/// - Single: one band, no overlap found yet (or after commit)
-/// - WithOverlap: two bands with overlap link, ready for commit
+/// - `Single`: one band, no overlap found (or after commit).
+/// - `WithOverlap`: two bands with an overlap link, ready for collapse and commit.
 #[derive(Clone, Debug)]
 pub(crate) enum BandState {
-    /// Single band, no overlap found (or after commit)
-    /// Optional external_anchor for overlap detection with existing root
-    Single { band: Band },
-    /// Two bands with overlap link, ready for commit
+    Single {
+        band: Band,
+    },
     WithOverlap {
-        /// Primary band: sequential expansion (appended tokens)
+        /// Primary band: sequential expansion (appended tokens).
         primary: Band,
-        /// Overlap band: [complement, expansion] decomposition
+        /// Overlap band: `[complement, expansion]` decomposition.
         overlap: Band,
-        /// Link containing paths for complement construction
+        /// Paths needed to build complement tokens during collapse.
         link: OverlapLink,
     },
 }
 
 impl Default for BandState {
     fn default() -> Self {
-        // Default is a single empty band - should not normally be used
         BandState::Single {
             band: Band {
                 pattern: Pattern::default(),
@@ -43,8 +40,7 @@ impl Default for BandState {
 }
 
 impl BandState {
-    /// Create a new BandState with a single token from the cursor.
-    /// The token's width is tracked as consumed atoms.
+    /// Create a `Single` state for a single token.
     pub(crate) fn new(index: Token) -> Self {
         let band = Band {
             pattern: Pattern::from(vec![index]),
@@ -55,20 +51,6 @@ impl BandState {
         BandState::Single { band }
     }
 
-    ///// Create a BandState with an external anchor token (e.g., from existing root).
-    ///// The anchor is used for overlap detection but doesn't consume cursor atoms.
-    ///// The band starts empty (no cursor atoms consumed yet).
-    //pub(crate) fn with_external_anchor(anchor: Token) -> Self {
-    //    let band = Band {
-    //        pattern: Pattern::default(),
-    //        start_bound: 0.into(),
-    //        end_bound: 0.into(),
-    //    };
-    //    debug!(anchor = ?anchor, initial_band = ?band, "New BandState with external anchor");
-    //    BandState::Single { band, external_anchor: Some(anchor) }
-    //}
-
-    /// Get the primary/single band reference
     pub(crate) fn primary(&self) -> &Band {
         match self {
             BandState::Single { band, .. } => band,
@@ -76,7 +58,6 @@ impl BandState {
         }
     }
 
-    /// Get the primary/single band mutably
     #[allow(dead_code)]
     pub(crate) fn primary_mut(&mut self) -> &mut Band {
         match self {
@@ -85,8 +66,6 @@ impl BandState {
         }
     }
 
-    /// Get the token to use for postfix iteration (overlap detection).
-    /// Returns the external anchor if present, otherwise the last token of the band.
     pub(crate) fn anchor_token(&self) -> Option<Token> {
         match self {
             BandState::Single { band } => band.pattern.last().copied(),
@@ -95,24 +74,20 @@ impl BandState {
         }
     }
 
-    /// Get the end bound of the primary band
     pub(crate) fn end_bound(&self) -> AtomPosition {
         self.primary().end_bound
     }
 
-    /// Check if this state has an overlap
     pub(crate) fn has_overlap(&self) -> bool {
         matches!(self, BandState::WithOverlap { .. })
     }
 
-    /// Check if the band pattern is empty (no cursor tokens consumed)
     #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.primary().pattern.is_empty()
     }
 
-    /// If this is a `Single` state with exactly one token in the band pattern,
-    /// return that token.  Returns `None` for `WithOverlap` or multi-token bands.
+    /// If this is a `Single` state with exactly one token, return that token.
     pub(crate) fn single_token(&self) -> Option<Token> {
         match self {
             BandState::Single { band } if band.pattern.len() == 1 =>
@@ -122,7 +97,8 @@ impl BandState {
     }
 
     /// Append a token to the single band.
-    /// Panics if called on WithOverlap state.
+    ///
+    /// Panics when called on a `WithOverlap` state.
     pub(crate) fn append(
         &mut self,
         token: Token,
@@ -133,12 +109,16 @@ impl BandState {
                 band.end_bound += token.width().0;
             },
             BandState::WithOverlap { .. } => {
-                panic!("Cannot append to BandState::WithOverlap - must commit first");
+                panic!(
+                    "Cannot append to BandState::WithOverlap — commit first"
+                );
             },
         }
     }
 
-    /// Transition from Single to WithOverlap state
+    /// Transition from `Single` to `WithOverlap`.
+    ///
+    /// Panics when already in `WithOverlap` state.
     pub(crate) fn set_overlap(
         self,
         overlap_band: Band,
@@ -158,15 +138,16 @@ impl BandState {
                 }
             },
             BandState::WithOverlap { .. } => {
-                panic!("Already in WithOverlap state - must commit first");
+                panic!("Already in WithOverlap state — commit first");
             },
         }
     }
 
-    /// Collapse the band state into a single pattern.
+    /// Collapse the band state into a single-element pattern.
     ///
-    /// For Single: returns the band's pattern directly (no bundling)
-    /// For WithOverlap: builds complements, creates bundled token with both decompositions
+    /// - `Single`: returns the band's pattern unchanged.
+    /// - `WithOverlap`: builds complement tokens, inserts both decompositions,
+    ///   and returns a one-element pattern containing the bundled token.
     pub(crate) fn collapse(
         self,
         graph: &mut HypergraphRef,
@@ -188,16 +169,10 @@ impl BandState {
                     "Collapsing WithOverlap bands"
                 );
 
-                // Build prefix complement for primary band
-                // (the part before overlap, from expansion's context)
                 let prefix_complement = build_prefix_complement(&link, graph);
-
-                // Build postfix complement for overlap band
-                // (the part after overlap, from primary's context)
                 let postfix_complement =
                     build_postfix_complement(&link, &primary, graph);
 
-                // Complete primary: [prefix_complement, ...original_pattern]
                 let complete_primary: Pattern =
                     if let Some(prefix) = prefix_complement {
                         let mut p = vec![prefix];
@@ -207,7 +182,6 @@ impl BandState {
                         primary.pattern
                     };
 
-                // Complete overlap: [...overlap.pattern, postfix_complement]
                 let complete_overlap: Pattern =
                     if let Some(postfix) = postfix_complement {
                         let mut p = overlap.pattern.to_vec();
@@ -223,7 +197,6 @@ impl BandState {
                     "Collapsed decompositions"
                 );
 
-                // Insert both decompositions as patterns of bundled token
                 let bundled = graph.insert_patterns(vec![
                     complete_primary.to_vec(),
                     complete_overlap.to_vec(),
@@ -236,8 +209,6 @@ impl BandState {
     }
 }
 
-/// Build the prefix complement for the primary band.
-/// Returns None if the overlap starts at position 0 (no prefix needed).
 fn build_prefix_complement(
     link: &OverlapLink,
     graph: &HypergraphRef,
@@ -247,8 +218,6 @@ fn build_prefix_complement(
         HasRootChildIndex,
     };
 
-    // The prefix complement comes from the expansion's perspective (search_path)
-    // It's the part of the expansion before the overlap region
     let expansion_root = link.search_path.graph_root_child(graph);
     let overlap_start_in_expansion = link.search_path.root_child_index();
 
@@ -263,9 +232,7 @@ fn build_prefix_complement(
         return None;
     }
 
-    // Build trace cache for the prefix range
     let cache = TraceCache::new(expansion_root);
-
     let init_interval = InitInterval {
         root: expansion_root,
         cache,
@@ -280,8 +247,6 @@ fn build_prefix_complement(
     Some(prefix)
 }
 
-/// Build the postfix complement for the overlap band.
-/// Returns None if the overlap ends at the primary's end (no postfix needed).
 fn build_postfix_complement(
     link: &OverlapLink,
     primary: &Band,
@@ -292,14 +257,9 @@ fn build_postfix_complement(
         HasRootChildIndex,
     };
 
-    // The postfix complement comes from the primary's perspective (child_path)
-    // It's the part of the primary after the overlap region
     let primary_root = link.child_path.graph_root_child(graph);
     let overlap_start_in_primary = link.child_path.root_child_index();
 
-    // The overlap ends at: overlap_start + overlap_width
-    // We need to figure out where in the primary the overlap ends
-    // The overlap width can be computed from the search_path's leaf
     let overlap_width = link
         .search_path
         .role_leaf_token::<Start, _>(graph)
@@ -322,26 +282,14 @@ fn build_postfix_complement(
         return None;
     }
 
-    // Build the postfix from overlap_end to primary_end
-    // We need to extract [overlap_end_in_primary..primary_end] from the primary root
-    let _cache = TraceCache::new(primary_root);
-
-    // For postfix, we need range [overlap_end..primary_end]
-    // This is a suffix extraction - might need different approach
-    // For now, use the pattern directly from primary band's remaining tokens
-
-    // Calculate which tokens in primary.pattern are after the overlap
     let mut acc = 0usize;
     let mut postfix_tokens = Vec::new();
     for token in primary.pattern.iter() {
         let token_end = acc + *token.width();
         if acc >= overlap_end_in_primary {
-            // This token is entirely after the overlap
             postfix_tokens.push(*token);
         } else if token_end > overlap_end_in_primary {
-            // This token partially overlaps - need to extract suffix
-            // For simplicity, skip partial tokens for now
-            // TODO: Handle partial token extraction
+            // Partial token overlap — skipped for now.
         }
         acc = token_end;
     }
@@ -351,7 +299,6 @@ fn build_postfix_complement(
         return None;
     }
 
-    // Bundle postfix tokens if multiple
     let postfix = if postfix_tokens.len() == 1 {
         postfix_tokens[0]
     } else {
