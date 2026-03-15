@@ -7,6 +7,7 @@ Plans for context-read crate refactorings, algorithm work, and feature additions
 | Date | File | Status | Summary |
 |------|------|--------|---------|
 | 2026-03-15 | [20260315_PLAN_CONTEXT_READ_RESTRUCTURE](20260315_PLAN_CONTEXT_READ_RESTRUCTURE.md) | 📋 ready | Three-pass restructuring: migrate `bands/` to `context-trace`, delete dead code, rename `context/` → `pipeline/`, introduce `IntoReadInput` trait, expose `pub fn read`, consolidate overlap chain types, seed `benches/`. |
+| 2026-03-15 | [20260315_PLAN_COMPLEMENT_AND_C3](20260315_PLAN_COMPLEMENT_AND_C3.md) | 📋 ready | Fix structural overlap complements via path→TraceCache→split/join in `context-insert`, add durable overlap bundling API, migrate `context-read` collapse to that API, then wire Pass C3 after semantic collapse is green. |
 
 ## Templates
 

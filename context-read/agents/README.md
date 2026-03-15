@@ -42,8 +42,10 @@ Examples:
 
 | Priority | Document | Status |
 |----------|----------|--------|
-| High | [plans/20260315_PLAN_CONTEXT_READ_RESTRUCTURE.md](plans/20260315_PLAN_CONTEXT_READ_RESTRUCTURE.md) | 📋 ready |
-| Blocking | [designs/20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md](designs/20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md) | 📋 design-session-pending |
+| Done | [plans/20260315_PLAN_CONTEXT_READ_RESTRUCTURE.md](plans/20260315_PLAN_CONTEXT_READ_RESTRUCTURE.md) | ✅ passes A, B, C1, C2 complete |
+| Done | [interviews/20260315_INTERVIEW_COMPLEMENT_AND_C3.md](interviews/20260315_INTERVIEW_COMPLEMENT_AND_C3.md) | ✅ complete — structural path-driven overlap complement design and C3 sequencing decisions recorded |
+| Done | [designs/20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md](designs/20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md) | ✅ complete — chosen direction is path → `TraceCache` → recursive split/join in `context-insert` |
+| Next | [plans/20260315_PLAN_COMPLEMENT_AND_C3.md](plans/20260315_PLAN_COMPLEMENT_AND_C3.md) | 📋 ready — execute semantic overlap collapse fix first, then wire C3 |
 
 ## Crate Summary
 
@@ -75,11 +77,16 @@ pub struct ReadSequenceIter { ... }
 pub enum SegmentResult { Unknown { .. }, Known { .. }, Mixed { .. } }
 ```
 
-### Test baseline (2026-03-15)
+### Test baseline (2026-03-15, after passes A + B + C1 + C2)
 
 - `context-read` unit tests: **70 pass / 10 fail / 0 ignored**
-- The 10 failing tests all involve overlap collapse, blocked by the complement
-  trace-cache stub (`build_trace_cache_stub` in `complement.rs`).
+- The 10 failing tests all involve overlap collapse.
+- The complement design session is now complete:
+  - interview: `interviews/20260315_INTERVIEW_COMPLEMENT_AND_C3.md`
+  - design: `designs/20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md`
+  - execution plan: `plans/20260315_PLAN_COMPLEMENT_AND_C3.md`
+- Passes A, B, C1, C2 are complete with no regressions.
+- Next work is the semantic overlap collapse fix in `context-insert`, followed by Pass C3 wiring.
 
 ## Cross-References
 

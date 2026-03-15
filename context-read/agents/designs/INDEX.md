@@ -6,4 +6,4 @@ the problem space, candidate approaches, constraints, and the chosen direction.
 
 | Date | File | Status | Summary |
 |------|------|--------|---------|
-| 2026-03-15 | [20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md](20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md) | 📋 design-session-pending | How to build the complement token from the downward path into the anchor vertex. Blocking all 10 failing overlap-collapse tests. Candidate approaches: clean-split via `insert_pattern`, manual `TraceCache` walk, search/checkpoint API. |
+| 2026-03-15 | [20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md](20260315_DESIGN_COMPLEMENT_PATH_BUILDING.md) | ✅ complete | Structural overlap complement construction around a shared overlap token. Chosen direction: path → `TraceCache` → recursive split/join in `context-insert`, with `context-read` remaining orchestration-only and Pass C3 deferred until semantic collapse is green. |
