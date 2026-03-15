@@ -6,7 +6,10 @@ use context_insert::*;
 use context_trace::*;
 use tracing::debug;
 
-use crate::expansion::chain::link::OverlapLink;
+use crate::expansion::chain::link::{
+    BandCapLink,
+    OverlapLink,
+};
 
 /// Represents the state of band expansion.
 ///
@@ -205,6 +208,96 @@ impl BandState {
                 debug!(bundled = ?bundled, "Created bundled token");
                 Pattern::from(vec![bundled])
             },
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OverlapChain — ordered sequence of overlapping bands
+// ---------------------------------------------------------------------------
+
+/// A chain of overlapping expansion bands, ready for collapse.
+///
+/// `OverlapChain` captures a sequence of consecutive overlaps found during
+/// block expansion.  The `head` token is the leftmost anchor; each
+/// `OverlapLink` records one overlap step; and `tail` is the rightmost
+/// expanded token.
+///
+/// # Usage
+/// Chains are constructed via `BandState::into_chain` and grown with
+/// `push`/`cap`.  Full collapse is wired in Pass C3 once the complement
+/// design session is complete.
+#[derive(Clone, Debug)]
+pub(crate) struct OverlapChain {
+    /// The leftmost anchor token at the start of the chain.
+    pub(crate) head: Token,
+    /// Ordered overlap steps from head toward tail.
+    pub(crate) links: Vec<OverlapLink>,
+    /// The rightmost expanded token at the end of the chain.
+    pub(crate) tail: Token,
+}
+
+impl OverlapChain {
+    /// Append another overlap link to the chain.
+    ///
+    /// # Panics
+    /// Panics in debug builds if the chain has already been capped.
+    /// (Full validation is deferred to Pass C3.)
+    pub(crate) fn push(
+        &mut self,
+        link: OverlapLink,
+    ) {
+        // TODO(Pass C3): validate that `link.start_bound` is consistent with
+        // the previous link's end position.
+        self.links.push(link);
+    }
+
+    /// Terminate the chain with a cap link.
+    ///
+    /// After calling `cap`, no more `push` calls should be made.
+    ///
+    /// # Panics
+    /// This is a stub — full implementation is deferred to Pass C3.
+    #[allow(dead_code)]
+    pub(crate) fn cap(
+        &mut self,
+        _link: BandCapLink,
+    ) {
+        // TODO(Pass C3): implement chain termination and complement collapse.
+        unimplemented!("OverlapChain::cap — deferred to Pass C3");
+    }
+}
+
+impl BandState {
+    /// Lift a `WithOverlap` state into an `OverlapChain`.
+    ///
+    /// - `Single` states return `None` (there is no chain to build).
+    /// - `WithOverlap` states return a chain whose `head` and `tail` are the
+    ///   primary and overlap tokens respectively, with the single overlap link.
+    ///
+    /// Pass C3 will replace direct `collapse` calls with chain-based collapse.
+    pub(crate) fn into_chain(self) -> Option<OverlapChain> {
+        match self {
+            BandState::WithOverlap {
+                ref primary,
+                ref overlap,
+                ref link,
+            } => {
+                let head = *primary
+                    .pattern
+                    .last()
+                    .expect("primary pattern must be non-empty");
+                let tail = *overlap
+                    .pattern
+                    .last()
+                    .expect("overlap pattern must be non-empty");
+                Some(OverlapChain {
+                    head,
+                    links: vec![link.clone()],
+                    tail,
+                })
+            },
+            BandState::Single { .. } => None,
         }
     }
 }

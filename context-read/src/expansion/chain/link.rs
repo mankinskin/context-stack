@@ -1,7 +1,10 @@
-use context_trace::*;
-use derive_more::From;
+//! Overlap link types used to represent one step in a resolved overlap chain.
+//!
+//! An [`OverlapLink`] captures the dual-path view of a single overlap region
+//! between two consecutive tokens during band expansion.  A [`BandCapLink`]
+//! records the terminal node of a fully-resolved chain.
 
-use crate::expansion::chain::band::Band;
+use context_trace::*;
 
 /// Represents the overlap between two tokens in a decomposition.
 ///
@@ -30,44 +33,18 @@ pub(crate) struct OverlapLink {
     pub(crate) start_bound: usize,
 }
 
-#[derive(Debug, From)]
-pub(crate) enum ChainOp {
-    Expansion(BandExpansion),
-    Cap(BandCap),
-}
-#[derive(Debug)]
-pub(crate) struct BandExpansion {
-    pub(crate) expansion: IndexWithPath,
-    pub(crate) start_bound: AtomPosition,
-    pub(crate) postfix_path: IndexEndPath,
-}
-impl StartBound for BandExpansion {
-    fn start_bound(&self) -> AtomPosition {
-        self.start_bound
-    }
-}
-#[derive(Debug)]
-pub(crate) struct BandCap {
-    pub(crate) postfix_path: IndexEndPath,
-    pub(crate) expansion: Token,
-    pub(crate) start_bound: AtomPosition,
-}
-
-#[allow(dead_code)]
-pub(crate) trait StartBound: Sized {
-    fn start_bound(&self) -> AtomPosition;
-}
-#[allow(dead_code)]
-pub(crate) trait EndBound: Sized {
-    fn end_bound(&self) -> AtomPosition;
-}
-impl StartBound for (AtomPosition, Band) {
-    fn start_bound(&self) -> AtomPosition {
-        self.0
-    }
-}
-impl EndBound for (Band, AtomPosition) {
-    fn end_bound(&self) -> AtomPosition {
-        self.1
-    }
+/// Terminal node of a resolved overlap chain.
+///
+/// A `BandCapLink` records the final postfix path of a fully-resolved chain.
+/// Unlike `OverlapLink`, it has no `search_path` because the chain has been
+/// terminated — there is no further expansion to anchor.
+///
+/// Invariant: a `BandCapLink` appears only as the last element of an
+/// `OverlapChain::links` list, after all intermediate `OverlapLink`s.
+#[derive(Clone, Debug)]
+pub(crate) struct BandCapLink {
+    /// Top-down child path from the root to the terminal postfix.
+    pub(crate) child_path: IndexEndPath,
+    /// Position where the terminal overlap starts in the input sequence.
+    pub(crate) start_bound: usize,
 }

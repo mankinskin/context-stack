@@ -1,6 +1,6 @@
 use crate::{
-    context::root::RootManager,
     expansion::ExpansionCtx,
+    pipeline::root::RootManager,
 };
 use context_trace::*;
 use tracing::debug;

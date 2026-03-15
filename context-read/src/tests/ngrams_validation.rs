@@ -6,7 +6,7 @@
 //!
 //! Note: These tests may fail if context-read has bugs. The ngrams algorithm is the reference.
 
-use crate::context::has_read_context::HasReadCtx;
+use crate::input::HasReadCtx;
 use context_search::Find;
 use context_trace::{
     graph::{

@@ -14,7 +14,7 @@ use context_trace::{
 use derive_builder::Builder;
 
 use crate::{
-    context::ReadCtx,
+    pipeline::ReadCtx,
     segment::ToNewAtomIndices,
 };
 

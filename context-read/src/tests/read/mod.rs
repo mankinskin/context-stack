@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::context::has_read_context::HasReadCtx;
+use crate::input::HasReadCtx;
 #[cfg(test)]
 use context_search::{
     assert_indices,

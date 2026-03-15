@@ -169,7 +169,7 @@ impl WorkspaceManager {
             let graph_ref = ws.graph_ref();
 
             let mut read_ctx =
-                context_read::context::ReadCtx::new(graph_ref, text.chars());
+                context_read::pipeline::ReadCtx::new(graph_ref, text.chars());
 
             let root_token = read_ctx.read_sequence();
 

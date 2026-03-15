@@ -17,7 +17,7 @@
 
 use std::collections::HashSet;
 
-use context_read::context::ReadCtx;
+use context_read::pipeline::ReadCtx;
 use context_trace::graph::vertex::{
     atom::Atom,
     pattern::Pattern,

@@ -230,7 +230,7 @@ fn linear_read_special_chars() {
 /// After reading, the cursor should have advanced past all tokens.
 #[test]
 fn linear_read_cursor_advancement() {
-    use crate::context::ReadCtx;
+    use crate::pipeline::ReadCtx;
 
     let graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
