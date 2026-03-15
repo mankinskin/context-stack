@@ -1,27 +1,48 @@
-//! Overlap bundling scaffolding for path-driven structural collapse.
+//! Overlap bundling for path-driven structural collapse.
 //!
-//! This module is the first landing zone for the overlap-complement redesign.
-//! The long-term goal is:
+//! This module provides the first working implementation of structural overlap
+//! bundling for `context-read`.
 //!
-//! 1. Accept structural path witnesses from `context-read`
-//! 2. Convert those paths into the trace-cache representation required by
-//!    `insert_init`
-//! 3. Use recursive split/join to construct the structural partitions around
-//!    the shared overlap token
-//! 4. Bundle the resulting decompositions into a single token
+//! ## Design
 //!
-//! This file intentionally starts as a scaffold so the API surface can be
-//! introduced in `context-insert` before the full path-to-cache conversion is
-//! implemented.
+//! Given:
+//! - an old-anchor postfix path to the shared overlap token `P`
+//! - an overlap-side prefix path to the same token `P` inside `t2`
+//! - the participating tokens `t1` and `t2`
+//!
+//! we construct:
+//! - the structural left partition of the anchor around `P`
+//! - the structural right partition of `t2` around `P`
+//!
+//! by collecting hierarchical siblings along the supplied paths.
+//!
+//! This is intentionally implemented as a direct hierarchical sibling
+//! collection first. It establishes the semantics needed by the overlap
+//! collapse path while keeping the API in `context-insert`, where the
+//! longer-term path→trace-cache→split/join implementation belongs.
+//!
+//! ## Important note
+//!
+//! The design documents describe a future implementation based on converting
+//! paths into `TraceCache` and routing through recursive split/join. This file
+//! implements the same *structural semantics* but does so directly by walking
+//! the path hierarchy and inserting the collected sibling patterns.
+//!
+//! That gives `context-read` a durable overlap-bundling entry point now, while
+//! leaving room to swap the internals to trace-cache-based split/join later
+//! without changing the call site.
 
-use context_trace::*;
+use context_trace::{
+    path::accessors::has_path::HasRolePath,
+    *,
+};
 
 /// Result of extracting one structural partition around a shared overlap token.
 ///
 /// In the `context-read` overlap pipeline, the expected case is `Token(_)`,
 /// because only true overlap paths with a non-empty complement should be used.
 /// `Empty` exists as a graceful recovery outcome for more general callers and
-/// for defensive handling while the API is still being integrated.
+/// for defensive handling.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PartitionOutcome {
     /// A non-empty structural partition was successfully constructed.
@@ -96,15 +117,54 @@ impl OverlapBundleInput {
     }
 }
 
-/// Private side marker used internally while the path-based partition helpers
-/// are still side-specific in the design.
-///
-/// This stays module-private for now to avoid freezing the wrong abstraction
-/// publicly before the path→trace-cache conversion is proven in tests.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PartitionSide {
     Left,
     Right,
+}
+
+/// Bundle an overlap into a single token.
+///
+/// This is the durable API entry point intended for `context-read`.
+///
+/// Semantics:
+/// - find the structural left partition of the old anchor around the shared
+///   overlap token
+/// - find the structural right partition of `t2` around the same token
+/// - build the two bundled decompositions
+/// - insert and return the resulting bundled token
+///
+/// The current implementation is based on hierarchical sibling collection from
+/// the supplied paths.
+pub fn bundle_overlap(
+    graph: &HypergraphRef,
+    input: OverlapBundleInput,
+) -> Result<Token, ErrorReason> {
+    let shared = shared_overlap_token(graph, &input.overlap_prefix_path);
+
+    let left =
+        left_partition_from_postfix_path(graph, &input.anchor_postfix_path)?;
+    let right =
+        right_partition_from_prefix_path(graph, &input.overlap_prefix_path)?;
+
+    let primary = join_non_empty(
+        graph,
+        [
+            left.as_token(),
+            Some(shared),
+            right.as_token(),
+            Some(input.t1),
+        ],
+    )
+    .ok_or(ErrorReason::NotFound)?;
+
+    let overlap = join_non_empty(
+        graph,
+        [left.as_token(), Some(input.t2), right.as_token()],
+    )
+    .ok_or(ErrorReason::NotFound)?;
+
+    Ok(graph.insert_patterns(vec![vec![primary], vec![overlap]]))
 }
 
 /// Build the structural left partition of the shared overlap token inside the
@@ -112,21 +172,11 @@ enum PartitionSide {
 ///
 /// This is the token represented by all siblings to the **left** of the leaf
 /// reached by `path`, preserving the hierarchy described by the path.
-///
-/// # Current status
-///
-/// This is a scaffold. The final implementation will:
-///
-/// 1. Convert `path` into a trace-cache representation
-/// 2. Use recursive split/join through `insert_init`
-/// 3. Return the resulting partition token or `Empty`
-///
-/// For now this function exists to establish the API and call sites.
 pub(crate) fn left_partition_from_postfix_path(
-    _graph: &HypergraphRef,
-    _path: &IndexEndPath,
+    graph: &HypergraphRef,
+    path: &IndexEndPath,
 ) -> Result<PartitionOutcome, ErrorReason> {
-    Err(ErrorReason::NotFound)
+    partition_from_path(graph, path, PartitionSide::Left)
 }
 
 /// Build the structural right partition of the shared overlap token inside the
@@ -134,73 +184,105 @@ pub(crate) fn left_partition_from_postfix_path(
 ///
 /// This is the token represented by all siblings to the **right** of the leaf
 /// reached by `path`, preserving the hierarchy described by the path.
-///
-/// # Current status
-///
-/// This is a scaffold. The final implementation will:
-///
-/// 1. Convert `path` into a trace-cache representation
-/// 2. Use recursive split/join through `insert_init`
-/// 3. Return the resulting partition token or `Empty`
-///
-/// The overlap-side path conversion may need small semantic adjustments to
-/// ensure the partition is taken relative to the leaf overlap token inside
-/// `t2`.
 pub(crate) fn right_partition_from_prefix_path(
-    _graph: &HypergraphRef,
-    _path: &IndexStartPath,
-) -> Result<PartitionOutcome, ErrorReason> {
-    Err(ErrorReason::NotFound)
-}
-
-/// Internal helper that will eventually own the path→trace-cache conversion for
-/// one requested side of a structural overlap path.
-///
-/// This remains private while the semantics are still being validated.
-/// Callers should use the higher-level partition helpers or `bundle_overlap`.
-fn partition_from_path<P>(
-    _graph: &HypergraphRef,
-    _path: &P,
-    _side: PartitionSide,
-) -> Result<PartitionOutcome, ErrorReason> {
-    Err(ErrorReason::NotFound)
-}
-
-/// Bundle an overlap into a single token.
-///
-/// This is the intended durable API entry point for `context-read`.
-/// Once fully implemented, `context-read` should be able to delegate overlap
-/// collapse to this function instead of manually constructing left/right
-/// complements.
-///
-/// The final implementation will:
-///
-/// 1. Derive the left partition from `anchor_postfix_path`
-/// 2. Derive the right partition from `overlap_prefix_path`
-/// 3. Construct the required decompositions around the shared overlap token
-/// 4. Insert those decompositions and return the bundled token
-///
-/// # Current status
-///
-/// This is an API scaffold and currently returns `ErrorReason::NotFound`.
-pub fn bundle_overlap(
     graph: &HypergraphRef,
-    input: OverlapBundleInput,
-) -> Result<Token, ErrorReason> {
-    let _ =
-        left_partition_from_postfix_path(graph, &input.anchor_postfix_path)?;
-    let _ =
-        right_partition_from_prefix_path(graph, &input.overlap_prefix_path)?;
-    let _ = partition_from_path(
-        graph,
-        &input.anchor_postfix_path,
-        PartitionSide::Left,
-    )?;
-    let _ = partition_from_path(
-        graph,
-        &input.overlap_prefix_path,
-        PartitionSide::Right,
-    )?;
+    path: &IndexStartPath,
+) -> Result<PartitionOutcome, ErrorReason> {
+    partition_from_path(graph, path, PartitionSide::Right)
+}
 
-    Err(ErrorReason::NotFound)
+fn partition_from_path<R: PathRole>(
+    graph: &HypergraphRef,
+    path: &RootedRolePath<R, IndexRoot>,
+    side: PartitionSide,
+) -> Result<PartitionOutcome, ErrorReason> {
+    let steps = flatten_path_steps(path);
+    if steps.is_empty() {
+        return Ok(PartitionOutcome::Empty);
+    }
+
+    let mut acc: Option<Token> = None;
+
+    for step in steps.iter().rev() {
+        let pattern = graph.expect_pattern_at(step.pattern_location);
+        let sibling_slice: &[Token] = match side {
+            PartitionSide::Left => &pattern[..step.sub_index],
+            PartitionSide::Right => &pattern[step.sub_index + 1..],
+        };
+
+        let siblings = sibling_slice.iter().copied();
+
+        let parts: Vec<Token> = match side {
+            PartitionSide::Left => siblings.chain(acc.into_iter()).collect(),
+            PartitionSide::Right => acc.into_iter().chain(siblings).collect(),
+        };
+
+        acc = join_non_empty_vec(graph, parts);
+    }
+
+    Ok(match acc {
+        Some(token) => PartitionOutcome::Token(token),
+        None => PartitionOutcome::Empty,
+    })
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PathStep {
+    pattern_location: PatternLocation,
+    sub_index: usize,
+}
+
+fn flatten_path_steps<R: PathRole>(
+    path: &RootedRolePath<R, IndexRoot>
+) -> Vec<PathStep> {
+    use context_trace::{
+        HasChildPath,
+        RootedPath,
+    };
+
+    let child_path = path.child_path();
+    let mut steps = Vec::with_capacity(child_path.len() + 1);
+
+    steps.push(PathStep {
+        pattern_location: path.root_pattern_location(),
+        sub_index: path.role_path().root_child_index(),
+    });
+
+    for loc in child_path.iter().copied() {
+        steps.push(PathStep {
+            pattern_location: loc.into_pattern_location(),
+            sub_index: loc.sub_index,
+        });
+    }
+
+    steps
+}
+
+fn shared_overlap_token(
+    graph: &HypergraphRef,
+    path: &IndexStartPath,
+) -> Token {
+    path.role_leaf_token::<Start, _>(graph)
+        .or_else(|| path.leaf_token(graph))
+        .or_else(|| Some(path.graph_root_child(graph)))
+        .expect("overlap path should always identify a shared overlap token")
+}
+
+fn join_non_empty<const N: usize>(
+    graph: &HypergraphRef,
+    parts: [Option<Token>; N],
+) -> Option<Token> {
+    let collected: Vec<Token> = parts.into_iter().flatten().collect();
+    join_non_empty_vec(graph, collected)
+}
+
+fn join_non_empty_vec(
+    graph: &HypergraphRef,
+    parts: Vec<Token>,
+) -> Option<Token> {
+    match parts.len() {
+        0 => None,
+        1 => Some(parts[0]),
+        _ => Some(graph.insert_pattern(parts)),
+    }
 }
