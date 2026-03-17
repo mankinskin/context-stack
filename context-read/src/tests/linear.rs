@@ -338,6 +338,27 @@ fn repetition_abab() {
     );
 }
 
+#[test]
+fn repetition_aaa_both_decompositions() {
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    let result = ReadRequest::from_text("aaa").execute(&mut graph);
+    graph.emit_graph_snapshot();
+
+    expect_atoms!(graph, { a });
+    assert_indices!(graph, aa, aaa);
+
+    let root = result.expect("should have root");
+    assert_eq!(root, aaa, "root token should be aaa");
+    assert_eq!(root.width(), TokenWidth(3));
+
+    assert_patterns!(
+        graph,
+        aa => [[a, a]],
+        aaa => [[a, aa], [aa, a]]
+    );
+}
+
 /// Test "abcxyzabc" - "abc" repeated with different content in between.
 #[test]
 fn repetition_abcxyzabc() {
