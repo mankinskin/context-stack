@@ -239,6 +239,22 @@ impl RootManager {
     /// Example: root = `[[aa, b]]`, token = `b` (atom)
     ///   last_child = `b` (atom), combined = `bb = [[b, b]]`
     ///   new root = `[[aa, bb]]`
+    ///
+    /// Symmetric-pattern rule (`aaa` family):
+    ///   When `old_root`'s own child pattern equals `[last_child, token]`, the
+    ///   two-atom span IS the old root.  In that case we reuse `old_root` as the
+    ///   `combined` token (no new vertex allocated) and record both valid adjacent
+    ///   binary decompositions:
+    ///     - `[..prefix.., old_root]`   (primary, always created)
+    ///     - `[old_root, token]`        (symmetric, added as a second pattern)
+    ///
+    ///   Example: old_root = `aa = [[a, a]]`, last_child = `a`, token = `a`
+    ///     old_root pattern == [last_child, token] → reuse old_root as combined
+    ///     primary pattern  : `[a, aa]`
+    ///     symmetric pattern: `[aa, a]`  ← added here
+    ///
+    ///   This avoids creating a duplicate `aa` vertex (which `insert_pattern`
+    ///   would do because it always allocates a fresh vertex).
     fn try_extend_tail_with(
         &mut self,
         token: Token,
@@ -251,7 +267,31 @@ impl RootManager {
             _ => return false,
         };
 
-        let combined = self.graph.insert_pattern(vec![last_child, token]);
+        // Capture old_root before any mutation.
+        let old_root = self.root;
+
+        // Check whether old_root IS already the two-atom span [last_child, token].
+        // When true we reuse the existing vertex as `combined` instead of calling
+        // insert_pattern, which would allocate a duplicate vertex.
+        //
+        // Example (aaa): old_root = aa = [[a, a]], last_child = a, token = a
+        //   → old_root_is_span = true  → combined = aa (reused, no new vertex)
+        let old_root_is_span = old_root.is_some_and(|or| {
+            or.vertex(&self.graph).child_patterns().values().any(|pat| {
+                pat.len() == 2
+                    && pat[0].vertex_index() == last_child.vertex_index()
+                    && pat[1].vertex_index() == token.vertex_index()
+            })
+        });
+
+        // Resolve the combined token: reuse old_root when it already represents
+        // [last_child, token]; otherwise create it via insert_pattern.
+        let combined = if old_root_is_span {
+            old_root.expect("old_root_is_span implies old_root is Some")
+        } else {
+            self.graph.insert_pattern(vec![last_child, token])
+        };
+
         if *combined.width() <= *last_child.width() {
             return false;
         }
@@ -259,7 +299,7 @@ impl RootManager {
         // Rebuild the root pattern with `last_child` replaced by `combined`.
         // We rebuild via insert_pattern rather than replace_in_pattern to avoid
         // a vertex-width mismatch when the replacement is wider than the original.
-        let new_root = if let Some(root) = self.root {
+        let new_root = if let Some(root) = old_root {
             let vertex = root.vertex(&self.graph);
             let (_pid, pattern) = vertex.expect_any_child_pattern();
             let mut new_pat: Vec<Token> = pattern.iter().copied().collect();
@@ -274,9 +314,35 @@ impl RootManager {
             last_child = ?last_child,
             token = ?token,
             combined = ?combined,
+            old_root_is_span,
             new_root = ?new_root,
             "commit_state: tail extension — rebuilt root"
         );
+
+        // Symmetric-pattern insertion (`aaa` family):
+        //
+        // When old_root IS the two-atom span (detected above), the new root has
+        // two equally-valid adjacent binary decompositions:
+        //   - `[..prefix.., combined]`  (primary, already built above)
+        //   - `[old_root, token]`       (symmetric — added here)
+        //
+        // Because combined == old_root in this branch, the symmetric pattern is
+        // exactly [combined, token] = [old_root, token].
+        if old_root_is_span {
+            if let Some(or) = old_root {
+                let symmetric_pat =
+                    context_trace::graph::vertex::pattern::Pattern::from(vec![
+                        or, token,
+                    ]);
+                debug!(
+                    old_root = ?or,
+                    token = ?token,
+                    new_root = ?new_root,
+                    "commit_state: adding symmetric pattern [old_root, token]"
+                );
+                self.graph.add_pattern_with_update(new_root, symmetric_pat);
+            }
+        }
 
         self.root = Some(new_root);
         self.flat_root = false;
