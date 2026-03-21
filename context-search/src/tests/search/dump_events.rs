@@ -45,7 +45,6 @@ fn dump_long_pattern() {
         g,
         h,
         i,
-        ababababcdefghi,
         ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
@@ -75,8 +74,8 @@ fn dump_ancestor2() {
         xab => [[x, ab],[xa, b]],
     );
     insert_patterns!(graph,
-        (xaby, _xaby_ids) => [[xa, by],[xab,y]],
-        (xabyz, _xabyz_ids) => [[xaby, z],[xab,yz]],
+        xaby => [[xa, by],[xab,y]],
+        _xabyz => [[xaby, z],[xab,yz]],
     );
     let _tracing = init_test_tracing!(&graph);
     graph.emit_graph_snapshot();

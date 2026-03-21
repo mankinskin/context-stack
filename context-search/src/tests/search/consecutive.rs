@@ -9,7 +9,6 @@ use {
         tests::search::event_helpers::*,
     },
     context_trace::{
-        graph::visualization::Transition,
         *,
     },
     pretty_assertions::assert_eq,

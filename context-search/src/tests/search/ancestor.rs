@@ -21,7 +21,6 @@ use {
     },
     context_trace::{
         *,
-        graph::visualization::Transition,
     },
     itertools::*,
     pretty_assertions::{
@@ -257,7 +256,7 @@ fn find_ancestor1_a_b_c_c() {
         graph,
         a, b, c, d,
         ab, abc, abcd, aba,
-        abab, ababcd, abcdef, abcdefghi, ababab, ababcdefghi,
+        abab, ababcd, abcdef, ababab, ababcdefghi,
         ..
     } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);

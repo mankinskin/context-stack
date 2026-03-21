@@ -10,7 +10,6 @@ use {
                 IndexWithPath,
             },
             vertex::token::Token,
-            visualization::Transition,
         },
         init_test_tracing,
         tests::{
