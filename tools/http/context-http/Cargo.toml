@@ -1,0 +1,36 @@
+[package]
+name = "context-http"
+version = "0.1.0"
+edition = "2021"
+description = "HTTP + GraphQL adapter for context-engine API"
+
+[lib]
+name = "context_http"
+path = "src/lib.rs"
+
+[[bin]]
+name = "context-http"
+path = "src/main.rs"
+
+[features]
+default = []
+graphql = ["dep:async-graphql", "dep:async-graphql-axum"]
+
+[dependencies]
+context-api = { path = "../../../crates/context-api" }
+viewer-api = { path = "../../viewer/viewer-api" }
+
+axum = { version = "0.8", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tower-http = { version = "0.6", features = ["cors"] }
+
+# Optional GraphQL support
+async-graphql = { version = "7", optional = true }
+async-graphql-axum = { version = "7", optional = true }
+
+[dev-dependencies]
+axum-test = "19"
+tempfile = "3"
