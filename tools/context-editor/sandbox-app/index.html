@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Context Editor — Sandbox</title>
+    <!-- Trunk will inline the compiled WASM binary here -->
+    <link data-trunk rel="rust" data-wasm-opt="z" />
+    <!-- Tailwind CDN for utility classes used by the glass UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #0a0a12;
+        color: #e2e8f0;
+        font-family: 'Inter', sans-serif;
+      }
+      #gpu-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body></body>
+</html>

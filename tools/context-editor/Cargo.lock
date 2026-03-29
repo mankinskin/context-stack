@@ -4568,6 +4568,7 @@ version = "0.1.0"
 dependencies = [
  "context-editor-kernel",
  "dioxus",
+ "log",
  "serde",
 ]
 
