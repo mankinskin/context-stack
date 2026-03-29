@@ -178,17 +178,17 @@ impl SvoDoubleBuffer {
 // SplatBuffers
 // ---------------------------------------------------------------------------
 
-/// Pre-allocated per-frame GPU buffers for the Gaussian splatting pipeline.
+/// Pre-allocated per-frame GPU buffers for the voxel splatting pipeline.
 ///
-/// All buffers are sized at startup to `max_gaussians` and `tile_count` so no
+/// All buffers are sized at startup to `max_splats` and `tile_count` so no
 /// allocation occurs on the render-critical path.
 #[derive(Resource)]
 pub struct SplatBuffers {
-    /// Gaussian generator output — one `GaussianData` per occupied voxel.
-    pub gaussians: Buffer,
+    /// Voxel splat kernel output — one `VoxelSplat` per occupied leaf voxel.
+    pub splats: Buffer,
     /// EWA-projected screen-space ellipses (`ProjectedGaussian[]`).
     pub projected: Buffer,
-    /// Radix sort keys: `tile_id (20 bit) | depth (12 bit)` per Gaussian.
+    /// Radix sort keys: `tile_id (20 bit) | depth (12 bit)` per splat.
     pub sort_keys: Buffer,
     /// Radix sort values: indices into `projected[]`.
     pub sort_values: Buffer,
@@ -201,24 +201,24 @@ pub struct SplatBuffers {
     pub histograms: Buffer,
     /// Per-tile `TileData { offset: u32, count: u32 }`.
     pub tile_data: Buffer,
-    /// Atomic u32 counter: number of Gaussians emitted by the generator.
-    pub gaussian_count: Buffer,
-    /// Maximum Gaussians this allocation supports.
-    pub max_gaussians: u32,
+    /// Atomic u32 counter: number of splats emitted by the kernel.
+    pub splat_count: Buffer,
+    /// Maximum splats this allocation supports.
+    pub max_splats: u32,
     /// Tile grid dimensions at the configured viewport size.
     pub tiles_x: u32,
     pub tiles_y: u32,
 }
 
 impl SplatBuffers {
-    /// Allocate all buffers for up to `max_gaussians` and the given viewport.
+    /// Allocate all buffers for up to `max_splats` and the given viewport.
     pub fn new(
         device: &RenderDevice,
-        max_gaussians: u32,
+        max_splats: u32,
         viewport_width: u32,
         viewport_height: u32,
     ) -> Self {
-        let n = max_gaussians as u64;
+        let n = max_splats as u64;
         let tiles_x = (viewport_width + TILE_SIZE - 1) / TILE_SIZE;
         let tiles_y = (viewport_height + TILE_SIZE - 1) / TILE_SIZE;
         let tile_count = (tiles_x * tiles_y) as u64;
@@ -241,7 +241,7 @@ impl SplatBuffers {
         }
 
         Self {
-            gaussians: buf!("gaussians", n * GAUSSIAN_DATA_STRIDE, rw),
+            splats: buf!("splats", n * crate::splat::VOXEL_SPLAT_STRIDE, rw),
             projected: buf!("projected", n * PROJECTED_GAUSSIAN_STRIDE, rw),
             sort_keys: buf!("sort_keys", n * 4, rw),
             sort_values: buf!("sort_values", n * 4, rw),
@@ -249,8 +249,8 @@ impl SplatBuffers {
             sort_scratch_values: buf!("sort_scratch_values", n * 4, rw),
             histograms: buf!("radix_histograms", histogram_size, rw),
             tile_data: buf!("tile_data", tile_count * TILE_DATA_STRIDE, rw),
-            gaussian_count: buf!("gaussian_count", 4, atomic),
-            max_gaussians,
+            splat_count: buf!("splat_count", 4, atomic),
+            max_splats,
             tiles_x,
             tiles_y,
         }

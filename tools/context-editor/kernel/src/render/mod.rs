@@ -1,26 +1,28 @@
-//! Custom render-graph pipeline — 7-node Gaussian splat renderer.
+//! Custom render-graph pipeline — 7-node voxel splat renderer.
 //!
-//! Implements T2b: Render Graph + Pipeline Skeleton.
+//! Implements T2b (skeleton) + T6a (voxel splat kernel).
 //!
 //! # Pipeline
 //!
 //! ```text
-//! BufferSwap → ParticleCompute → GaussianGen → EwaProject
+//! BufferSwap → ParticleCompute → VoxelSplatKernel → SortKeyBuild
 //!           → RadixSort → TileBin → TiledRaster
 //! ```
 //!
 //! | Stage | Purpose |
 //! |---|---|
 //! | `BufferSwap` | Flip the SVO double-buffer pointer |
-//! | `ParticleCompute` | Simulate Gaussian particle dynamics |
-//! | `GaussianGen` | Generate 3-D Gaussian primitives from SVO |
-//! | `EwaProject` | Project Gaussians to 2-D EWA ellipses |
+//! | `ParticleCompute` | Simulate voxel particle dynamics |
+//! | `VoxelSplatKernel` | Generate voxel splats from SVO leaves (T6a) |
+//! | `SortKeyBuild` | Build tile+depth sort keys (T6b) |
 //! | `RadixSort` | Sort splats by depth (front-to-back) |
 //! | `TileBin` | Bin splat bounding rects into screen tiles |
 //! | `TiledRaster` | Per-tile rasterise & alpha-composite into framebuffer |
 //!
-//! Each node is currently a *stub* that returns `Ok(())`. The WGSL compute
-//! shaders will be loaded and compiled in subsequent tickets.
+//! `VoxelSplatKernelNode` dispatches the compute shader; remaining nodes are
+//! stubs pending T6b–T6d.
+
+pub mod voxel_splat_kernel;
 
 use bevy::{
     prelude::*,
@@ -30,6 +32,8 @@ use bevy::{
         RenderApp,
     },
 };
+
+use voxel_splat_kernel::VoxelSplatKernelNode;
 
 // ---------------------------------------------------------------------------
 // Node labels
@@ -41,13 +45,12 @@ pub enum ContextEditorLabel {
     /// Flip the SVO double-buffer pointer so the GPU can read the newly
     /// uploaded octree data without stalling.
     BufferSwap,
-    /// Compute Gaussian particle dynamics (spawn / destroy / move splats).
+    /// Compute voxel particle dynamics (spawn / destroy / move splats).
     ParticleCompute,
-    /// Convert SVO leaf-voxel occupancy to 3-D Gaussian parameters
-    /// (mean, Σ covariance, SH colour bands, opacity).
-    GaussianGen,
-    /// Project 3-D Gaussians to 2-D EWA ellipses in screen space.
-    EwaProject,
+    /// Generate voxel splats from SVO leaf nodes (T6a compute shader).
+    VoxelSplatKernel,
+    /// Build tile+depth sort keys from projected splats (T6b).
+    SortKeyBuild,
     /// Sort splats by linear depth for correct alpha compositing.
     RadixSort,
     /// Bin splat bounding rects into a screen-tile grid.
@@ -82,8 +85,8 @@ macro_rules! stub_node {
 
 stub_node!(BufferSwapNode);
 stub_node!(ParticleComputeNode);
-stub_node!(GaussianGenNode);
-stub_node!(EwaProjectNode);
+// VoxelSplatKernelNode lives in render::voxel_splat_kernel (T6a)
+stub_node!(SortKeyBuildNode);
 stub_node!(RadixSortNode);
 stub_node!(TileBinNode);
 stub_node!(TiledRasterNode);
@@ -163,8 +166,8 @@ impl Plugin for ContextEditorRenderPlugin {
             ContextEditorLabel::ParticleCompute,
             ParticleComputeNode::default(),
         );
-        graph.add_node(ContextEditorLabel::GaussianGen, GaussianGenNode::default());
-        graph.add_node(ContextEditorLabel::EwaProject, EwaProjectNode::default());
+        graph.add_node(ContextEditorLabel::VoxelSplatKernel, VoxelSplatKernelNode::default());
+        graph.add_node(ContextEditorLabel::SortKeyBuild, SortKeyBuildNode::default());
         graph.add_node(ContextEditorLabel::RadixSort, RadixSortNode::default());
         graph.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
         graph.add_node(ContextEditorLabel::TiledRaster, TiledRasterNode::default());
@@ -173,10 +176,10 @@ impl Plugin for ContextEditorRenderPlugin {
         graph.add_node_edge(ContextEditorLabel::BufferSwap, ContextEditorLabel::ParticleCompute);
         graph.add_node_edge(
             ContextEditorLabel::ParticleCompute,
-            ContextEditorLabel::GaussianGen,
+            ContextEditorLabel::VoxelSplatKernel,
         );
-        graph.add_node_edge(ContextEditorLabel::GaussianGen, ContextEditorLabel::EwaProject);
-        graph.add_node_edge(ContextEditorLabel::EwaProject, ContextEditorLabel::RadixSort);
+        graph.add_node_edge(ContextEditorLabel::VoxelSplatKernel, ContextEditorLabel::SortKeyBuild);
+        graph.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
         graph.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
         graph.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::TiledRaster);
     }

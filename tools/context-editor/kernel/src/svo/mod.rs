@@ -30,7 +30,7 @@ pub mod upload;
 /// ```wgsl
 /// struct OctreeNode {
 ///     child_pointer: u32,  // lower 8 bits = child bitmask; upper 24 = first-child slot index
-///     color_data:    u32,  // packed: R8 G8 B8 A8  | or: R5G5B5 + roughness5 + metallic5 + ...
+///     color_data:    u32,  // R8 G8 B8 + roughness5 + metallic1 + reserved2
 /// }
 /// ```
 #[repr(C)]
@@ -66,35 +66,56 @@ impl OctreeNode {
 // ---------------------------------------------------------------------------
 
 /// Material packed into an `OctreeNode::color_data` u32.
+///
+/// Bit layout:
+/// ```text
+///   Bits  0–7:  R (8 bits)
+///   Bits  8–15: G (8 bits)
+///   Bits 16–23: B (8 bits)
+///   Bits 24–28: Roughness (5 bits, 0–31 → 0.0–1.0)
+///   Bit  29:    Metallic  (1 bit, 0 = dielectric, 1 = metallic)
+///   Bits 30–31: Reserved
+/// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct VoxelMaterial {
     pub r: u8,
     pub g: u8,
     pub b: u8,
-    /// Perceptual roughness [0, 255] → [0.0, 1.0].
+    /// Perceptual roughness quantised to 5 bits (0–31).
+    /// Values above 31 are clamped.
     pub roughness: u8,
+    /// Metallic flag (binary: dielectric or metal).
+    pub metallic: bool,
 }
 
 impl VoxelMaterial {
     pub const fn new(r: u8, g: u8, b: u8, roughness: u8) -> Self {
-        Self { r, g, b, roughness }
+        Self { r, g, b, roughness, metallic: false }
     }
 
-    /// Pack into a u32: `[roughness | b | g | r]` (little-endian bytes).
+    pub const fn new_metallic(r: u8, g: u8, b: u8, roughness: u8, metallic: bool) -> Self {
+        Self { r, g, b, roughness, metallic }
+    }
+
+    /// Pack into a u32 matching the WGSL `unpack_material()` bit layout.
     pub fn pack(self) -> u32 {
-        (self.roughness as u32) << 24
-            | (self.b as u32) << 16
+        let rough_5 = (self.roughness.min(31)) as u32;
+        let metal_bit = if self.metallic { 1u32 } else { 0u32 };
+        (self.r as u32)
             | (self.g as u32) << 8
-            | self.r as u32
+            | (self.b as u32) << 16
+            | rough_5 << 24
+            | metal_bit << 29
     }
 
-    /// Unpack from a u32.
+    /// Unpack from a u32 (inverse of [`pack`]).
     pub fn unpack(v: u32) -> Self {
         Self {
             r: v as u8,
             g: (v >> 8) as u8,
             b: (v >> 16) as u8,
-            roughness: (v >> 24) as u8,
+            roughness: ((v >> 24) & 0x1F) as u8,
+            metallic: ((v >> 29) & 1) != 0,
         }
     }
 }
@@ -378,15 +399,36 @@ fn merge_ranges(sorted: &[(usize, usize)]) -> Vec<(usize, usize)> {
 mod tests {
     use super::*;
 
-    fn red() -> VoxelMaterial { VoxelMaterial::new(255, 0, 0, 128) }
+    fn red() -> VoxelMaterial { VoxelMaterial::new(255, 0, 0, 16) }
 
     #[test]
     fn material_pack_roundtrip() {
-        let m = VoxelMaterial::new(10, 20, 30, 200);
-        assert_eq!(VoxelMaterial::unpack(m.pack()).r, m.r);
-        assert_eq!(VoxelMaterial::unpack(m.pack()).g, m.g);
-        assert_eq!(VoxelMaterial::unpack(m.pack()).b, m.b);
-        assert_eq!(VoxelMaterial::unpack(m.pack()).roughness, m.roughness);
+        let m = VoxelMaterial::new(10, 20, 30, 25);
+        let u = VoxelMaterial::unpack(m.pack());
+        assert_eq!(u.r, m.r);
+        assert_eq!(u.g, m.g);
+        assert_eq!(u.b, m.b);
+        assert_eq!(u.roughness, m.roughness);
+        assert_eq!(u.metallic, false);
+    }
+
+    #[test]
+    fn material_pack_roundtrip_metallic() {
+        let m = VoxelMaterial::new_metallic(200, 150, 100, 31, true);
+        let u = VoxelMaterial::unpack(m.pack());
+        assert_eq!(u.r, 200);
+        assert_eq!(u.g, 150);
+        assert_eq!(u.b, 100);
+        assert_eq!(u.roughness, 31);
+        assert!(u.metallic);
+    }
+
+    #[test]
+    fn material_roughness_clamped_to_5_bits() {
+        // Values > 31 should be clamped to 31 on pack
+        let m = VoxelMaterial::new(0, 0, 0, 255);
+        let u = VoxelMaterial::unpack(m.pack());
+        assert_eq!(u.roughness, 31);
     }
 
     #[test]
