@@ -77,15 +77,27 @@
         color: #e2e8f0;
         font-family: 'Inter', sans-serif;
       }
-      #gpu-canvas {
+      #bevy-canvas {
         position: absolute;
         inset: 0;
         width: 100%;
         height: 100%;
+        z-index: 0;
+      }
+      #main {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+        pointer-events: none;
       }
     </style>
   </head>
   <body>
+    <!-- Bevy attaches to this canvas directly -->
+    <canvas id="bevy-canvas"></canvas>
+    
     <!-- Dioxus mounts the virtual DOM here. Must match the id passed to launch(). -->
     <div id="main"></div>
   </body>

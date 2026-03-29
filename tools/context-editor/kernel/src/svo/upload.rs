@@ -36,18 +36,33 @@ impl Plugin for SvoUploadPlugin {
         app.add_systems(
             PostUpdate,
             (
-                svo_resize_system,
-                svo_upload_system,
-                double_buffer_swap_system,
+                init_svo_buffer_system,
+                (
+                    svo_resize_system,
+                    svo_upload_system,
+                    double_buffer_swap_system,
+                ).chain().run_if(|svo: Option<Res<crate::gpu::SvoDoubleBuffer>>| svo.is_some()),
             )
-                .chain(),
         );
     }
 }
 
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------  
 // Systems
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------  
+
+/// Initialise the `SvoDoubleBuffer` once `RenderDevice` becomes available.
+pub fn init_svo_buffer_system(
+    mut commands: Commands,
+    device: Option<Res<RenderDevice>>,
+    svo_buffer: Option<Res<SvoDoubleBuffer>>,
+) {
+    if svo_buffer.is_none() {
+        if let Some(device) = device {
+            commands.insert_resource(SvoDoubleBuffer::new(&device, crate::gpu::SVO_CAPACITY_NODES));
+        }
+    }
+}
 
 /// Grow both GPU buffers when the octree overflows current capacity.
 ///

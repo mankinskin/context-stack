@@ -9,6 +9,7 @@ edition = "2021"
 multiplayer = ["dep:spacetimedb-sdk"]
 
 [dependencies]
+wgpu = { version = "27.0.1", default-features = false, features = ["webgpu", "webgl"] }
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_render",
     "bevy_core_pipeline",

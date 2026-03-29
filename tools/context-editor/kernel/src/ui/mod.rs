@@ -7,10 +7,7 @@ use crate::world;
 #[component]
 pub fn root_app() -> Element {
     rsx! {
-        div { class: "kernel-root",
-            // WebGPU canvas — GPU rendering layer (z-0)
-            canvas { id: "gpu-canvas", class: "absolute inset-0 z-0" }
-
+        div { class: "kernel-root pointer-events-none relative h-screen w-screen",
             // Dioxus UI overlay (z-10)
             div { class: "relative z-10 flex h-screen w-screen p-4 pointer-events-none",
                 // Left: world-injected status / inspection panel

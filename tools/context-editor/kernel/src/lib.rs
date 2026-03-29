@@ -42,5 +42,42 @@ pub fn launch<W: SandboxWorld + Default>() {
         .set(Arc::new(W::default()))
         .map_err(|_| "launch() called twice")
         .expect("context_editor_kernel::launch() must only be called once");
-    dioxus::launch(ui::root_app);
+
+dioxus::launch(ui::root_app);
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        // Start Bevy (this will "unwind" using an exception in Winit's run, so it 
+        // won't return, which means we must call Dioxus launch first).
+        run_bevy_wasm();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn run_bevy_wasm() {
+    use bevy::prelude::*;
+
+    let mut app = App::new();
+
+    // Standard Bevy plugins (injecting the canvas config)
+    app.add_plugins(DefaultPlugins.set(render::canvas_window_plugin()));
+
+    // Custom kernel plugins
+    app.add_plugins(crate::render::ContextEditorRenderPlugin);
+    app.add_plugins(crate::physics::PhysicsPlugin);
+    app.add_plugins(crate::svo::upload::SvoUploadPlugin);
+
+    // Initialise empty World Resource
+    app.insert_resource(crate::svo::VoxelWorld::new(8));
+
+    // Basic scene setup
+    app.add_systems(Startup, |mut commands: Commands| {
+        commands.spawn((
+            Camera3d::default(),
+            bevy::core_pipeline::tonemapping::Tonemapping::None,
+            Transform::from_xyz(0.0, 5.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ));
+    });
+
+    app.run();
 }
