@@ -23,7 +23,7 @@ struct RasterUniforms {
     light_dir:     vec3f,
     _pad1:         f32,
     light_color:   vec3f,
-    _pad2:         f32,
+    glass_count:   u32,
 }
 
 struct ProjectedSplat {
@@ -47,6 +47,18 @@ struct VertexOutput {
     @location(0)       uv:       vec2f,
 }
 
+struct GlassPanelData {
+    center:           vec3f,
+    corner_radius:    f32,
+    half_size:        vec3f,
+    ior:              f32,
+    tint:             vec4f,
+    blur_roughness:   f32,
+    caustic_strength: f32,
+    chromatic_spread: f32,
+    _pad:             f32,
+}
+
 // ---------------------------------------------------------------------------
 // Bindings
 // ---------------------------------------------------------------------------
@@ -55,6 +67,7 @@ struct VertexOutput {
 @group(0) @binding(1) var<storage, read> projected:     array<ProjectedSplat>;
 @group(0) @binding(2) var<storage, read> tile_data:     array<u32>; // [off, cnt, off, cnt, …]
 @group(0) @binding(3) var<uniform>       uniforms:      RasterUniforms;
+@group(0) @binding(4) var<storage, read> glass_panels:  array<GlassPanelData>;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -172,25 +185,96 @@ fn box_normal(p: vec3f, half_ext: vec3f) -> vec3f {
 }
 
 // ---------------------------------------------------------------------------
+// Glass SDF helpers
+// ---------------------------------------------------------------------------
+
+/// Rounded-box SDF for a glass panel (in panel-local space).
+fn sdf_rounded_box_glass(world_p: vec3f, panel: GlassPanelData) -> f32 {
+    let p = world_p - panel.center;
+    let q = abs(p) - panel.half_size + vec3f(panel.corner_radius);
+    return length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0)
+           - panel.corner_radius;
+}
+
+/// Numerical normal from SDF gradient (central differences).
+fn glass_sdf_normal(p: vec3f, panel: GlassPanelData) -> vec3f {
+    let e = 0.001;
+    let dx = sdf_rounded_box_glass(p + vec3f(e, 0.0, 0.0), panel)
+           - sdf_rounded_box_glass(p - vec3f(e, 0.0, 0.0), panel);
+    let dy = sdf_rounded_box_glass(p + vec3f(0.0, e, 0.0), panel)
+           - sdf_rounded_box_glass(p - vec3f(0.0, e, 0.0), panel);
+    let dz = sdf_rounded_box_glass(p + vec3f(0.0, 0.0, e), panel)
+           - sdf_rounded_box_glass(p - vec3f(0.0, 0.0, e), panel);
+    return normalize(vec3f(dx, dy, dz));
+}
+
+/// Snell's law refraction with total-internal-reflection fallback.
+fn refract_ray(incident: vec3f, normal: vec3f, eta: f32) -> vec3f {
+    let cos_i  = -dot(incident, normal);
+    let sin2_t = eta * eta * (1.0 - cos_i * cos_i);
+    // Total internal reflection
+    if sin2_t > 1.0 {
+        return reflect(incident, normal);
+    }
+    let cos_t = sqrt(1.0 - sin2_t);
+    return eta * incident + (eta * cos_i - cos_t) * normal;
+}
+
+/// Ray-AABB intersection for a glass panel; returns hit distance or -1.
+fn ray_glass_hit(ro: vec3f, rd: vec3f, panel: GlassPanelData) -> f32 {
+    let he     = panel.half_size;
+    let inv_rd = 1.0 / rd;
+    let t1     = (panel.center - he - ro) * inv_rd;
+    let t2     = (panel.center + he - ro) * inv_rd;
+    let t_min  = max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z));
+    let t_max  = min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z));
+    if t_max < 0.0 || t_min > t_max { return -1.0; }
+    return select(t_min, 0.0, t_min < 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Glass VFX helpers
+// ---------------------------------------------------------------------------
+
+/// Chromatic aberration — per-channel tint shift from refraction dispersion.
+/// Diverges R/G/B slightly based on chromatic_spread and distortion magnitude.
+fn apply_chromatic_aberration(
+    tint: vec4f,
+    distortion: vec2f,
+    chromatic_spread: f32,
+) -> vec4f {
+    let chroma = length(distortion) * chromatic_spread;
+    return vec4f(
+        tint.r * (1.0 + chroma * 0.3),
+        tint.g,
+        tint.b * (1.0 - chroma * 0.3),
+        tint.a,
+    );
+}
+
+/// Pseudo-caustic brightness from refraction divergence.
+fn compute_caustic(distortion: vec2f, caustic_strength: f32) -> f32 {
+    return fwidth(distortion.x + distortion.y) * caustic_strength;
+}
+
+/// Curvature-adaptive roughness — glass edges appear more diffuse than
+/// the flat center. Adds SDF normal curvature to the base roughness.
+fn curvature_adaptive_roughness(
+    hit: vec3f,
+    panel: GlassPanelData,
+    base_roughness: f32,
+) -> f32 {
+    let normal = glass_sdf_normal(hit, panel);
+    let curvature = length(fwidth(normal));
+    return clamp(base_roughness + curvature * 2.0, 0.0, 1.0);
+}
+
+// ---------------------------------------------------------------------------
 // Fragment shader
 // ---------------------------------------------------------------------------
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let px = in.uv * uniforms.resolution;
-
-    let tile_x   = u32(px.x) / TILE_SIZE;
-    let tile_y   = u32(px.y) / TILE_SIZE;
-    let tile_idx = tile_y * uniforms.grid_width + tile_x;
-
-    let tile_offset = tile_data[tile_idx * 2u];
-    let tile_count  = tile_data[tile_idx * 2u + 1u];
-
-    // Empty tile → background
-    if tile_count == 0u {
-        return vec4f(0.1, 0.1, 0.12, 1.0);
-    }
-
     // Reconstruct world-space ray through this pixel
     let ndc       = in.uv * 2.0 - 1.0;
     let clip_near = vec4f(ndc.x, -ndc.y, 0.0, 1.0);
@@ -198,7 +282,61 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let world_near = uniforms.inv_view_proj * clip_near;
     let world_far  = uniforms.inv_view_proj * clip_far;
     let ray_origin = world_near.xyz / world_near.w;
-    let ray_dir    = normalize(world_far.xyz / world_far.w - ray_origin);
+    var ray_dir    = normalize(world_far.xyz / world_far.w - ray_origin);
+
+    // ---- Glass refraction pre-pass ----
+    var glass_tint  = vec4f(1.0);
+    var adjusted_uv = in.uv;
+    for (var g = 0u; g < uniforms.glass_count; g++) {
+        let panel = glass_panels[g];
+        let t = ray_glass_hit(ray_origin, ray_dir, panel);
+        if t >= 0.0 {
+            let hit = ray_origin + ray_dir * t;
+            let d   = sdf_rounded_box_glass(hit, panel);
+            if d <= 0.0 {
+                let normal    = glass_sdf_normal(hit, panel);
+                let eta       = 1.0 / panel.ior;
+                let refracted = refract_ray(ray_dir, normal, eta);
+                let distortion = (refracted.xy - ray_dir.xy) * 0.05;
+                adjusted_uv = adjusted_uv + distortion;
+                ray_dir     = refracted;
+
+                // Curvature-adaptive roughness
+                let eff_roughness = curvature_adaptive_roughness(
+                    hit, panel, panel.blur_roughness);
+
+                // Chromatic aberration (clear glass) vs frosted tint
+                if eff_roughness < 0.01 {
+                    glass_tint = apply_chromatic_aberration(
+                        glass_tint * panel.tint, distortion, panel.chromatic_spread);
+                } else {
+                    // Frosted glass — attenuate more, simulate scatter
+                    let frost_atten = 1.0 - eff_roughness * 0.3;
+                    glass_tint *= panel.tint * vec4f(vec3f(frost_atten), 1.0);
+                }
+
+                // Pseudo-caustics
+                let caustic = compute_caustic(distortion, panel.caustic_strength);
+                glass_tint = vec4f(
+                    glass_tint.rgb + caustic * uniforms.light_color, glass_tint.a);
+            }
+        }
+    }
+
+    // ---- Tile lookup (from possibly refracted UV) ----
+    let px = adjusted_uv * uniforms.resolution;
+
+    let tile_x   = u32(clamp(px.x, 0.0, uniforms.resolution.x - 1.0)) / TILE_SIZE;
+    let tile_y   = u32(clamp(px.y, 0.0, uniforms.resolution.y - 1.0)) / TILE_SIZE;
+    let tile_idx = tile_y * uniforms.grid_width + tile_x;
+
+    let tile_offset = tile_data[tile_idx * 2u];
+    let tile_count  = tile_data[tile_idx * 2u + 1u];
+
+    // Empty tile → background (tinted by glass if applicable)
+    if tile_count == 0u {
+        return vec4f(vec3f(0.1, 0.1, 0.12) * glass_tint.rgb, 1.0);
+    }
 
     var color           = vec3f(0.0);
     var remaining_alpha = 1.0;
@@ -242,6 +380,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 
     // Fill remaining alpha with background
     color += vec3f(0.1, 0.1, 0.12) * remaining_alpha;
+
+    // Apply glass tint to the composited result
+    color *= glass_tint.rgb;
 
     return vec4f(color, 1.0);
 }

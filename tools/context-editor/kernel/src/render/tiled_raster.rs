@@ -12,6 +12,7 @@
 //! | 1 | `storage<read>` | `projected: array<ProjectedSplat>` |
 //! | 2 | `storage<read>` | `tile_data: array<u32>` (flat, stride 2) |
 //! | 3 | `uniform` | `uniforms: RasterUniforms` |
+//! | 4 | `storage<read>` | `glass_panels: array<GlassPanelData>` |
 
 use bevy::{
     prelude::*,
@@ -29,6 +30,7 @@ use bevy::{
 };
 
 use crate::gpu::SplatBuffers;
+use super::glass::GlassPanelBuffer;
 
 // ---------------------------------------------------------------------------
 // Uniform data (matches WGSL `RasterUniforms`)
@@ -51,7 +53,7 @@ pub struct RasterUniforms {
     pub light_dir: [f32; 3],
     pub _pad1: f32,
     pub light_color: [f32; 3],
-    pub _pad2: f32,
+    pub glass_count: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +103,7 @@ pub fn update_raster_uniforms(
     splat_buffers: Option<Res<SplatBuffers>>,
     uniform: Option<Res<RasterUniformBuffer>>,
     render_queue: Option<Res<RenderQueue>>,
+    glass_buffer: Option<Res<GlassPanelBuffer>>,
 ) {
     let Some(uniform) = uniform else { return };
     let Some(render_queue) = render_queue else { return };
@@ -124,7 +127,7 @@ pub fn update_raster_uniforms(
         light_dir: [0.267, 0.802, 0.534], // normalize(0.3, 0.9, 0.6)
         _pad1: 0.0,
         light_color: [1.0, 0.98, 0.95],
-        _pad2: 0.0,
+        glass_count: glass_buffer.as_ref().map_or(0, |b| b.count),
     };
     render_queue.write_buffer(&uniform.0, 0, bytemuck::bytes_of(&u));
 }
@@ -177,6 +180,17 @@ pub fn raster_bind_group_layout_descriptor() -> BindGroupLayoutDescriptor {
                 visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            // binding 4 — glass_panels
+            BindGroupLayoutEntry {
+                binding: 4,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
                     min_binding_size: None,
                 },
@@ -243,9 +257,11 @@ pub fn rebuild_raster_bind_group(
     pipeline_cache: Res<PipelineCache>,
     splat_buffers: Option<Res<SplatBuffers>>,
     uniform: Option<Res<RasterUniformBuffer>>,
+    glass_buffer: Option<Res<GlassPanelBuffer>>,
 ) {
     let Some(splat_buffers) = splat_buffers else { return };
     let Some(uniform) = uniform else { return };
+    let Some(glass_buffer) = glass_buffer else { return };
 
     let descriptor = raster_bind_group_layout_descriptor();
     let layout = pipeline_cache.get_bind_group_layout(&descriptor);
@@ -269,6 +285,10 @@ pub fn rebuild_raster_bind_group(
             BindGroupEntry {
                 binding: 3,
                 resource: uniform.0.as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 4,
+                resource: glass_buffer.buffer.as_entire_binding(),
             },
         ],
     );

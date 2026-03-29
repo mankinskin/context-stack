@@ -5,6 +5,7 @@ pub mod net;
 pub mod gpu;
 pub mod physics;
 pub mod render;
+pub mod theme;
 #[cfg(target_arch = "wasm32")]
 pub mod bootstrap;
 

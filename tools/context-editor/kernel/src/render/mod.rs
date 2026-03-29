@@ -31,6 +31,7 @@ pub mod sort_key_build;
 pub mod radix_sort;
 pub mod tile_binning;
 pub mod tiled_raster;
+pub mod glass;
 
 use bevy::{
     prelude::*,
@@ -195,6 +196,14 @@ impl Plugin for ContextEditorRenderPlugin {
             (
                 tiled_raster::init_raster_resources,
                 tiled_raster::update_raster_uniforms,
+            )
+                .chain(),
+        );
+        app.add_systems(
+            PostUpdate,
+            (
+                glass::init_glass_resources,
+                glass::update_glass_panel_buffer,
             )
                 .chain(),
         );

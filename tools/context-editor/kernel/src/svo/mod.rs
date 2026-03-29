@@ -228,7 +228,7 @@ impl VoxelWorld {
     // Dirty-range tracking
     // -----------------------------------------------------------------------
 
-    fn mark_dirty(&mut self, node_idx: usize) {
+    pub fn mark_dirty(&mut self, node_idx: usize) {
         const STRIDE: usize = 8; // size_of::<OctreeNode>()
         let byte_start = node_idx * STRIDE;
         self.dirty_ranges.push((byte_start, byte_start + STRIDE));
