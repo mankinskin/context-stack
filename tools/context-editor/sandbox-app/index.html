@@ -4,6 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Context Editor — Sandbox</title>
+    <!--
+      Suppress Dioxus devtools WebSocket noise when running under trunk serve.
+      dioxus-web always tries to connect to /_dioxus (the dx serve devtools
+      endpoint). trunk does not implement this protocol, so every connection
+      attempt would log a console error and retry indefinitely.
+      This shim intercepts those WS constructions and immediately closes them
+      before they reach the network layer, keeping the console clean.
+    -->
+    <script>
+      (function () {
+        var _WS = window.WebSocket;
+        window.WebSocket = function (url, protocols) {
+          if (typeof url === 'string' && url.indexOf('/_dioxus') !== -1) {
+            // Return a stub that looks closed from the start.
+            var stub = new _WS('ws://localhost:0/'); // immediately fails
+            return stub;
+          }
+          return protocols !== undefined ? new _WS(url, protocols) : new _WS(url);
+        };
+        window.WebSocket.prototype = _WS.prototype;
+        window.WebSocket.CONNECTING = _WS.CONNECTING;
+        window.WebSocket.OPEN = _WS.OPEN;
+        window.WebSocket.CLOSING = _WS.CLOSING;
+        window.WebSocket.CLOSED = _WS.CLOSED;
+      })();
+    </script>
     <!-- Trunk will inline the compiled WASM binary here -->
     <link data-trunk rel="rust" data-wasm-opt="z" />
     <!-- Tailwind CDN for utility classes used by the glass UI -->
@@ -24,5 +50,8 @@
       }
     </style>
   </head>
-  <body></body>
+  <body>
+    <!-- Dioxus mounts the virtual DOM here. Must match the id passed to launch(). -->
+    <div id="main"></div>
+  </body>
 </html>
