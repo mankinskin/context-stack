@@ -15,7 +15,10 @@ pub fn root_app() -> Element {
 
                 // Centre: minimal HUD crosshair
                 div { class: "flex-1 flex justify-center items-center pointer-events-none",
-                    div { class: "w-4 h-4 rounded-full border-2 border-white/50" }
+                    div {
+                        id: "bevy-loading-spinner",
+                        class: "w-4 h-4 rounded-full border-2 border-white/50 transition-all duration-300"
+                    }
                 }
 
                 // Right: world-injected inventory + generative terminal

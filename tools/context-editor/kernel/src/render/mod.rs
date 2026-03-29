@@ -1,6 +1,7 @@
 //! Custom render-graph pipeline — 7-node voxel splat renderer.
 //!
-//! Implements T2b (skeleton) + T6a (voxel splat kernel).
+//! Implements T2b (skeleton) + T6a (voxel splat kernel) + T6b (sort key build)
+//! + T6c (radix sort).
 //!
 //! # Pipeline
 //!
@@ -15,14 +16,21 @@
 //! | `ParticleCompute` | Simulate voxel particle dynamics |
 //! | `VoxelSplatKernel` | Generate voxel splats from SVO leaves (T6a) |
 //! | `SortKeyBuild` | Build tile+depth sort keys (T6b) |
-//! | `RadixSort` | Sort splats by depth (front-to-back) |
+//! | `RadixSort` | 8-pass 4-bit GPU radix sort (T6c) |
 //! | `TileBin` | Bin splat bounding rects into screen tiles |
 //! | `TiledRaster` | Per-tile rasterise & alpha-composite into framebuffer |
 //!
-//! `VoxelSplatKernelNode` dispatches the compute shader; remaining nodes are
-//! stubs pending T6b–T6d.
+//! `VoxelSplatKernelNode` dispatches the splat generation compute shader.
+//! `SortKeyBuildNode` dispatches AABB projection + sort key construction.
+//! `RadixSortNode` dispatches 24 compute passes (3 × 8 passes) for sorting.
+//! `TileBinNode` bins sorted splats into screen tiles (T6d Phase 1).
+//! `TiledRasterNode` renders per-pixel SDF + PBR (T6d Phase 2).
 
 pub mod voxel_splat_kernel;
+pub mod sort_key_build;
+pub mod radix_sort;
+pub mod tile_binning;
+pub mod tiled_raster;
 
 use bevy::{
     prelude::*,
@@ -34,6 +42,10 @@ use bevy::{
 };
 
 use voxel_splat_kernel::VoxelSplatKernelNode;
+use sort_key_build::SortKeyBuildNode;
+use radix_sort::RadixSortNode;
+use tile_binning::TileBinNode;
+use tiled_raster::TiledRasterNode;
 
 // ---------------------------------------------------------------------------
 // Node labels
@@ -86,10 +98,10 @@ macro_rules! stub_node {
 stub_node!(BufferSwapNode);
 stub_node!(ParticleComputeNode);
 // VoxelSplatKernelNode lives in render::voxel_splat_kernel (T6a)
-stub_node!(SortKeyBuildNode);
-stub_node!(RadixSortNode);
-stub_node!(TileBinNode);
-stub_node!(TiledRasterNode);
+// SortKeyBuildNode lives in render::sort_key_build (T6b)
+// RadixSortNode lives in render::radix_sort (T6c)
+// TileBinNode lives in render::tile_binning (T6d)
+// TiledRasterNode lives in render::tiled_raster (T6d)
 
 // ---------------------------------------------------------------------------
 // Mipmap helper (stub)
@@ -147,12 +159,46 @@ pub fn canvas_window_plugin() -> WindowPlugin {
 
 /// Registers the 7-node context-editor render graph.
 ///
-/// Adds stub nodes to Bevy's top-level [`RenderGraph`] in the correct
-/// execution order. Shader pipelines are attached in subsequent tickets.
+/// Adds nodes to Bevy's top-level [`RenderGraph`] in the correct execution
+/// order. Also registers init and per-frame systems for pipeline setup.
 pub struct ContextEditorRenderPlugin;
 
 impl Plugin for ContextEditorRenderPlugin {
     fn build(&self, app: &mut App) {
+        // Main world: resource init + per-frame uniform updates.
+        // Only systems that use main-world resources (RenderDevice, RenderQueue,
+        // AssetServer) belong here.  Pipeline and bind-group systems need
+        // PipelineCache which lives in the render sub-app — they are NOT
+        // registered here (the render nodes bail silently when missing).
+        app.add_systems(
+            PostUpdate,
+            (
+                sort_key_build::init_sort_key_resources,
+                sort_key_build::update_camera_uniforms,
+            )
+                .chain(),
+        );
+        app.add_systems(
+            PostUpdate,
+            radix_sort::init_radix_sort_resources,
+        );
+        app.add_systems(
+            PostUpdate,
+            (
+                tile_binning::init_tile_bin_resources,
+                tile_binning::update_tile_bin_uniforms,
+            )
+                .chain(),
+        );
+        app.add_systems(
+            PostUpdate,
+            (
+                tiled_raster::init_raster_resources,
+                tiled_raster::update_raster_uniforms,
+            )
+                .chain(),
+        );
+
         // Guard: RenderApp is absent in headless / test contexts.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;

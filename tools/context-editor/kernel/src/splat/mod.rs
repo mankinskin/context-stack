@@ -84,6 +84,87 @@ pub struct SplatParams {
 pub const SPLAT_PARAMS_SIZE: u64 = std::mem::size_of::<SplatParams>() as u64;
 
 // ---------------------------------------------------------------------------
+// ProjectedSplat — screen-space representation after AABB projection (T6b)
+// ---------------------------------------------------------------------------
+
+/// GPU-side projected splat produced by the sort key build shader.
+///
+/// Contains screen-space bounding box for tile assignment and world-space
+/// data for ray-box SDF evaluation in the tiled rasteriser (T6d).
+///
+/// WGSL layout:
+/// ```wgsl
+/// struct ProjectedSplat {
+///     screen_min:       vec2f,
+///     screen_max:       vec2f,
+///     center_ws:        vec3f,
+///     half_extent:      f32,
+///     depth:            f32,
+///     material_packed:  u32,
+///     _pad:             vec2u,
+/// }
+/// ```
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, Pod, Zeroable)]
+pub struct ProjectedSplat {
+    /// Screen-space AABB minimum (pixels).
+    pub screen_min: [f32; 2],
+    /// Screen-space AABB maximum (pixels).
+    pub screen_max: [f32; 2],
+    /// World-space center (passthrough for ray-box SDF in T6d).
+    pub center_ws: [f32; 3],
+    /// World-space half-extent of the axis-aligned voxel box.
+    pub half_extent: f32,
+    /// View-space depth (for sorting).
+    pub depth: f32,
+    /// Packed material from `OctreeNode::color_data`.
+    pub material_packed: u32,
+    /// Alignment padding to reach 48 bytes (vec2u in WGSL).
+    pub _pad: [u32; 2],
+}
+
+/// Byte stride of a single [`ProjectedSplat`] in the GPU buffer.
+pub const PROJECTED_SPLAT_STRIDE: u64 = std::mem::size_of::<ProjectedSplat>() as u64; // 48
+
+// ---------------------------------------------------------------------------
+// CameraUniforms — per-frame camera data for sort key build (T6b)
+// ---------------------------------------------------------------------------
+
+/// Camera uniform buffer data for the sort key build compute shader.
+///
+/// WGSL layout:
+/// ```wgsl
+/// struct CameraUniforms {
+///     view_proj:   mat4x4f,
+///     view_mat:    mat4x4f,
+///     camera_pos:  vec3f,
+///     _pad0:       f32,
+///     resolution:  vec2f,
+///     max_depth:   f32,
+///     _pad1:       f32,
+/// }
+/// ```
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, Pod, Zeroable)]
+pub struct CameraUniforms {
+    /// View-projection matrix.
+    pub view_proj: [f32; 16],
+    /// View (world-to-camera) matrix.
+    pub view_mat: [f32; 16],
+    /// World-space camera position.
+    pub camera_pos: [f32; 3],
+    pub _pad0: f32,
+    /// Viewport resolution in pixels.
+    pub resolution: [f32; 2],
+    /// Maximum view depth for depth quantisation.
+    pub max_depth: f32,
+    pub _pad1: f32,
+}
+
+/// Byte size of [`CameraUniforms`] (160 bytes).
+pub const CAMERA_UNIFORMS_SIZE: u64 = std::mem::size_of::<CameraUniforms>() as u64;
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -116,6 +197,32 @@ mod tests {
     fn splat_params_is_pod() {
         let bytes = [0u8; 32];
         let _: &SplatParams = bytemuck::from_bytes(&bytes);
+    }
+
+    #[test]
+    fn projected_splat_size_matches_wgsl() {
+        // vec2f + vec2f + vec3f + f32 + f32 + u32 + vec2u = 48 bytes
+        assert_eq!(std::mem::size_of::<ProjectedSplat>(), 48);
+        assert_eq!(PROJECTED_SPLAT_STRIDE, 48);
+    }
+
+    #[test]
+    fn projected_splat_is_pod() {
+        let bytes = [0u8; 48];
+        let _: &ProjectedSplat = bytemuck::from_bytes(&bytes);
+    }
+
+    #[test]
+    fn camera_uniforms_size_matches_wgsl() {
+        // mat4x4f(64) + mat4x4f(64) + vec3f(12) + f32(4) + vec2f(8) + f32(4) + f32(4) = 160
+        assert_eq!(std::mem::size_of::<CameraUniforms>(), 160);
+        assert_eq!(CAMERA_UNIFORMS_SIZE, 160);
+    }
+
+    #[test]
+    fn camera_uniforms_is_pod() {
+        let bytes = [0u8; 160];
+        let _: &CameraUniforms = bytemuck::from_bytes(&bytes);
     }
 
     /// CPU-side verification of the shader's leaf-counting logic:

@@ -242,7 +242,7 @@ impl SplatBuffers {
 
         Self {
             splats: buf!("splats", n * crate::splat::VOXEL_SPLAT_STRIDE, rw),
-            projected: buf!("projected", n * PROJECTED_GAUSSIAN_STRIDE, rw),
+            projected: buf!("projected", n * crate::splat::PROJECTED_SPLAT_STRIDE, rw),
             sort_keys: buf!("sort_keys", n * 4, rw),
             sort_values: buf!("sort_values", n * 4, rw),
             sort_scratch_keys: buf!("sort_scratch_keys", n * 4, rw),

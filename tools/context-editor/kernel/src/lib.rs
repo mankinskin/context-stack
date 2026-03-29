@@ -5,6 +5,8 @@ pub mod net;
 pub mod gpu;
 pub mod physics;
 pub mod render;
+#[cfg(target_arch = "wasm32")]
+pub mod bootstrap;
 
 use std::sync::{Arc, OnceLock};
 
@@ -43,7 +45,7 @@ pub fn launch<W: SandboxWorld + Default>() {
         .map_err(|_| "launch() called twice")
         .expect("context_editor_kernel::launch() must only be called once");
 
-dioxus::launch(ui::root_app);
+    dioxus::launch(ui::root_app);
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -69,15 +71,7 @@ fn run_bevy_wasm() {
 
     // Initialise empty World Resource
     app.insert_resource(crate::svo::VoxelWorld::new(8));
-
-    // Basic scene setup
-    app.add_systems(Startup, |mut commands: Commands| {
-        commands.spawn((
-            Camera3d::default(),
-            bevy::core_pipeline::tonemapping::Tonemapping::None,
-            Transform::from_xyz(0.0, 5.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ));
-    });
+    app.add_plugins(crate::bootstrap::BootstrapPlugin);
 
     app.run();
 }

@@ -64,6 +64,21 @@
         window.WebSocket.CLOSING    = _WS.CLOSING;
         window.WebSocket.CLOSED     = _WS.CLOSED;
       })();
+
+      // Ensure keyboard controls reach the Bevy canvas after any scene click.
+      (function () {
+        function focusCanvas() {
+          var canvas = document.getElementById("bevy-canvas");
+          if (!canvas) return;
+          if (canvas.tabIndex !== 0) canvas.tabIndex = 0;
+          if (typeof canvas.focus === "function") canvas.focus();
+        }
+
+        window.addEventListener("load", focusCanvas);
+        window.addEventListener("pointerdown", function () {
+          focusCanvas();
+        });
+      })();
     </script>
     <!-- Trunk will inline the compiled WASM binary here -->
     <link data-trunk rel="rust" data-wasm-opt="z" />
@@ -83,6 +98,7 @@
         width: 100%;
         height: 100%;
         z-index: 0;
+        outline: none;
       }
       #main {
         position: absolute;
@@ -91,6 +107,10 @@
         height: 100%;
         z-index: 10;
         pointer-events: none;
+      }
+      body[data-bevy-ready="true"] #bevy-loading-spinner {
+        opacity: 0;
+        transform: scale(0.6);
       }
     </style>
   </head>
