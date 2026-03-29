@@ -1,0 +1,8 @@
+# Cargo configuration for the context-editor workspace.
+#
+# getrandom 0.3.x requires an explicit backend selection for wasm32-unknown-unknown.
+# "wasm_js" wires getrandom to the Web Crypto API (window.crypto.getRandomValues),
+# which is the correct source of entropy in a browser context.
+# See: https://docs.rs/getrandom/latest/getrandom/#webassembly-support
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]

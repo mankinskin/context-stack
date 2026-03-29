@@ -3,6 +3,11 @@ name = "context-editor-kernel"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+# Enable SpacetimeDB multiplayer support. Disabled by default because it pulls
+# in native-tls/openssl-sys which cannot compile to wasm32-unknown-unknown.
+multiplayer = ["dep:spacetimedb-sdk"]
+
 [dependencies]
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_render",
@@ -14,4 +19,4 @@ bevy = { version = "0.18", default-features = false, features = [
 bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
 bytemuck = { version = "1", features = ["derive"] }
 dioxus = { version = "0.7", features = ["web"] }
-spacetimedb-sdk = "1.12"
+spacetimedb-sdk = { version = "1.12", optional = true }

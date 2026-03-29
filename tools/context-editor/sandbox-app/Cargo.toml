@@ -8,3 +8,8 @@ context-editor-kernel = { path = "../kernel" }
 dioxus = { version = "0.7", features = ["web"] }
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
+
+# getrandom 0.3.x requires both the Cargo feature and a --cfg rustflag
+# (set in ../.cargo/config.toml) to use Web Crypto on wasm32-unknown-unknown.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
