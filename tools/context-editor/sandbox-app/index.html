@@ -4,30 +4,65 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Context Editor — Sandbox</title>
-    <!--
-      Suppress Dioxus devtools WebSocket noise when running under trunk serve.
-      dioxus-web always tries to connect to /_dioxus (the dx serve devtools
-      endpoint). trunk does not implement this protocol, so every connection
-      attempt would log a console error and retry indefinitely.
-      This shim intercepts those WS constructions and immediately closes them
-      before they reach the network layer, keeping the console clean.
-    -->
     <script>
+      // Silence dioxus devtools WebSocket noise when running under trunk serve.
+      //
+      // dioxus-web always tries to connect to ws://host/_dioxus (the `dx serve`
+      // hot-reload endpoint). When built with trunk there is no such server, so
+      // every attempt would log a console error then retry forever.
+      //
+      // Strategy: intercept the constructor for /_dioxus URLs and return a mock
+      // that uses Object.create(_WS.prototype) so it passes `instanceof
+      // WebSocket` checks required by wasm-bindgen, but never fires onopen /
+      // onclose / onerror. Dioxus's devtools future just parks on await()
+      // indefinitely — zero console noise, zero retries.
       (function () {
         var _WS = window.WebSocket;
+        var noop = function () {};
         window.WebSocket = function (url, protocols) {
-          if (typeof url === 'string' && url.indexOf('/_dioxus') !== -1) {
-            // Return a stub that looks closed from the start.
-            var stub = new _WS('ws://localhost:0/'); // immediately fails
-            return stub;
+          if (typeof url === "string" && url.indexOf("/_dioxus") !== -1) {
+            // Use Object.create(_WS.prototype) so the mock passes
+            // `instanceof WebSocket` checks inside wasm-bindgen.
+            //
+            // IMPORTANT: WebSocket.prototype defines onopen/onclose/onerror/
+            // onmessage as native accessor properties whose setters perform an
+            // internal-slot check ("is this a real WebSocket?"). Assigning to
+            // them via `mock.onopen = null` invokes those setters, which throw
+            // TypeError — causing WebSocket::new() in Rust to return Err and
+            // .unwrap() to panic. Fix: pre-define ALL of them as own *data*
+            // properties via Object.defineProperties so the prototype accessor
+            // is shadowed and never invoked.
+            var mock = Object.create(_WS.prototype);
+            Object.defineProperties(mock, {
+              readyState:          { value: 0,      writable: true, configurable: true },
+              bufferedAmount:      { value: 0,      writable: true, configurable: true },
+              url:                 { value: url,    writable: true, configurable: true },
+              protocol:            { value: "",     writable: true, configurable: true },
+              extensions:          { value: "",     writable: true, configurable: true },
+              binaryType:          { value: "blob", writable: true, configurable: true },
+              // Event handlers — must be own data props to shadow prototype setters.
+              onopen:              { value: null,   writable: true, configurable: true },
+              onclose:             { value: null,   writable: true, configurable: true },
+              onerror:             { value: null,   writable: true, configurable: true },
+              onmessage:           { value: null,   writable: true, configurable: true },
+              // Methods — shadow prototype methods with safe no-ops.
+              send:                { value: noop,   writable: true, configurable: true },
+              close:               { value: function () { mock.readyState = 3; }, writable: true, configurable: true },
+              addEventListener:    { value: noop,   writable: true, configurable: true },
+              removeEventListener: { value: noop,   writable: true, configurable: true },
+              dispatchEvent:       { value: function () { return true; }, writable: true, configurable: true },
+            });
+            return mock;
           }
-          return protocols !== undefined ? new _WS(url, protocols) : new _WS(url);
+          return protocols !== undefined
+            ? new _WS(url, protocols)
+            : new _WS(url);
         };
-        window.WebSocket.prototype = _WS.prototype;
+        window.WebSocket.prototype  = _WS.prototype;
         window.WebSocket.CONNECTING = _WS.CONNECTING;
-        window.WebSocket.OPEN = _WS.OPEN;
-        window.WebSocket.CLOSING = _WS.CLOSING;
-        window.WebSocket.CLOSED = _WS.CLOSED;
+        window.WebSocket.OPEN       = _WS.OPEN;
+        window.WebSocket.CLOSING    = _WS.CLOSING;
+        window.WebSocket.CLOSED     = _WS.CLOSED;
       })();
     </script>
     <!-- Trunk will inline the compiled WASM binary here -->
