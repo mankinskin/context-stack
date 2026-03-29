@@ -22,9 +22,9 @@ impl SandboxWorld for CyberpunkWorld {
         // Prefix with Cyberpunk context and send to LLM integration
     }
 
-    fn sidebar_content<'a>(&'a self, cx: Scope<'a>) -> Element<'a> {
-        render! {
-            GlassPanel { title: "Implants & Vitals",
+    fn sidebar_content(&self) -> Element {
+        rsx! {
+            GlassPanel { title: "Implants & Vitals".to_string(),
                 div { class: "flex flex-col gap-2",
                     div { class: "flex justify-between text-sm",
                         span { "Neural Load" },
@@ -39,9 +39,9 @@ impl SandboxWorld for CyberpunkWorld {
         }
     }
 
-    fn inventory_content<'a>(&'a self, cx: Scope<'a>) -> Element<'a> {
-        render! {
-            GlassPanel { title: "Black Market Cache",
+    fn inventory_content(&self) -> Element {
+        rsx! {
+            GlassPanel { title: "Black Market Cache".to_string(),
                 div { class: "grid grid-cols-4 gap-2",
                     // Pseudo inventory slots
                     div { class: "w-12 h-12 bg-white/10 border border-white/20 rounded flex items-center justify-center text-xs", "Gun" }

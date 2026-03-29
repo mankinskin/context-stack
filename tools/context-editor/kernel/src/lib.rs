@@ -11,8 +11,8 @@ pub trait SandboxWorld: 'static + Send + Sync {
     fn trigger_generation(&self, prompt: String);
     
     // UI Providers
-    fn sidebar_content<'a>(&'a self, cx: dioxus::core::Scope<'a>) -> dioxus::core::Element<'a>;
-    fn inventory_content<'a>(&'a self, cx: dioxus::core::Scope<'a>) -> dioxus::core::Element<'a>;
+    fn sidebar_content(&self) -> dioxus::core::Element;
+    fn inventory_content(&self) -> dioxus::core::Element;
 }
 
 // Pseudo launch stub to prove the entrypoint interface
