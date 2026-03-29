@@ -2,3 +2,7 @@
 # Run from this directory:
 #   trunk serve          — dev server with hot reload
 #   trunk build --release — optimised production WASM bundle
+
+[serve]
+port = 8090
+open = false
