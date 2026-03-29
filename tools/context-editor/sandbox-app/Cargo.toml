@@ -1,0 +1,9 @@
+[package]
+name = "sandbox-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+context-editor-kernel = { path = "../kernel" }
+dioxus = { version = "0.5", features = ["web"] }
+serde = { version = "1.0", features = ["derive"] }

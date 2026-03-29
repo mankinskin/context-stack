@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "kernel",
+    "sandbox-app"
+]
+resolver = "2"

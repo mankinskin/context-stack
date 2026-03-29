@@ -1,0 +1,9 @@
+[package]
+name = "context-editor-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.14", default-features = false, features = ["bevy_render", "bevy_core_pipeline"] }
+dioxus = { version = "0.5", features = ["web"] }
+spacetimedb-sdk = "0.10"
