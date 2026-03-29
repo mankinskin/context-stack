@@ -13,6 +13,9 @@
 //! Gaussians are **ephemeral** — regenerated from the SVO every frame.
 
 use bevy::prelude::*;
+use bytemuck::{Pod, Zeroable};
+
+pub mod upload;
 
 // ---------------------------------------------------------------------------
 // OctreeNode
@@ -31,7 +34,7 @@ use bevy::prelude::*;
 /// }
 /// ```
 #[repr(C)]
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Pod, Zeroable)]
 pub struct OctreeNode {
     /// Lower 8 bits: bitmask of which of the 8 children exist.
     /// Upper 24 bits: index (into `VoxelWorld::nodes`) of the first child slot.

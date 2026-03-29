@@ -3,6 +3,8 @@ pub mod svo;
 pub mod splat;
 pub mod net;
 pub mod gpu;
+pub mod physics;
+pub mod render;
 
 use std::sync::{Arc, OnceLock};
 

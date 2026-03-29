@@ -4,6 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = ["bevy_render", "bevy_core_pipeline"] }
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_asset",
+    "bevy_winit",
+    "bevy_window",
+] }
+bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
+bytemuck = { version = "1", features = ["derive"] }
 dioxus = { version = "0.7", features = ["web"] }
 spacetimedb-sdk = "1.12"
