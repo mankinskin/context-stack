@@ -98,6 +98,10 @@ pub struct OverlapBundleInput {
     pub t1: Token,
     /// Overlap expansion token containing the shared overlap token.
     pub t2: Token,
+    /// True when the overlap token IS the anchor (repetition pattern).
+    /// In this case the standard partition formula double-counts and a
+    /// specialized decomposition is used instead.
+    pub self_overlap: bool,
 }
 
 impl OverlapBundleInput {
@@ -113,6 +117,7 @@ impl OverlapBundleInput {
             overlap_prefix_path,
             t1,
             t2,
+            self_overlap: false,
         }
     }
 }
@@ -140,6 +145,53 @@ pub fn bundle_overlap(
     graph: &HypergraphRef,
     input: OverlapBundleInput,
 ) -> Result<Token, ErrorReason> {
+    let anchor = input.anchor_postfix_path.root_parent();
+
+    // Self-overlap: the overlap token IS the anchor (repetition pattern).
+    // The standard formula double-counts because left/right partitions
+    // are extracted from what is effectively the same token.
+    //
+    // Instead, build:
+    //   primary     = [anchor, t1]
+    //   alternative = [left_partition, join(shared, t1)]
+    //
+    // Example: anchor=[abc,abc]=abcabc, postfix=abc, t1=abc
+    //   left = abc, join(abc, abc) = abcabc
+    //   primary = [abcabc, abc], alternative = [abc, abcabc]
+    if input.self_overlap {
+        // In the self-overlap case, the shared token is the postfix
+        // of the anchor — the token at the root of the anchor postfix path.
+        let shared: Token = GraphRootChild::<End>::graph_root_child(&input.anchor_postfix_path, graph);
+        let left = left_partition_from_postfix_path(
+            graph,
+            &input.anchor_postfix_path,
+        )?;
+
+        // Find or create the right extension token [shared, t1].
+        // In the common repetition case (t1 == postfix), this is the
+        // anchor itself, which already exists in the graph.
+        use crate::insert::{ToInsertCtx, outcome::InsertOutcome};
+        let right_ext: Token =
+            match <HypergraphRef as ToInsertCtx<IndexWithPath>>::insert_next_match(
+                graph,
+                vec![shared, input.t1],
+            ) {
+                Ok(o) => {
+                    let outcome: InsertOutcome = o;
+                    outcome.token()
+                },
+                Err(_) => graph.insert_pattern(vec![shared, input.t1]),
+            };
+
+        let primary_pat = vec![anchor, input.t1];
+        let overlap_pat = match left.token() {
+            Some(l) => vec![l, right_ext],
+            None => vec![right_ext],
+        };
+
+        return Ok(graph.insert_patterns(vec![primary_pat, overlap_pat]));
+    }
+
     let shared = shared_overlap_token(graph, &input.overlap_prefix_path);
 
     let left =

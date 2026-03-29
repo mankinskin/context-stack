@@ -187,12 +187,16 @@ impl BandState {
                 let bundled =
                     <HypergraphRef as ToInsertCtx<Token>>::bundle_overlap(
                         graph,
-                        OverlapBundleInput::new(
-                            link.child_path,
-                            link.search_path,
-                            t1,
-                            t2,
-                        ),
+                        {
+                            let mut input = OverlapBundleInput::new(
+                                link.child_path,
+                                link.search_path,
+                                t1,
+                                t2,
+                            );
+                            input.self_overlap = link.self_overlap;
+                            input
+                        },
                     )
                     .expect("bundle_overlap should succeed for WithOverlap collapse");
 

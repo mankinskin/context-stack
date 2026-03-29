@@ -31,6 +31,10 @@ pub(crate) struct OverlapLink {
     /// Position where the overlap starts in the input sequence.
     #[allow(dead_code)]
     pub(crate) start_bound: usize,
+
+    /// True when the overlap expansion returned the anchor token itself
+    /// (repetition pattern like "abcabcabc").
+    pub(crate) self_overlap: bool,
 }
 
 /// Terminal node of a resolved overlap chain.

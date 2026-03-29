@@ -10,13 +10,7 @@ use context_insert::*;
 use context_trace::*;
 use tracing::debug;
 
-use crate::{
-    complement::ComplementBuilder,
-    expansion::{
-        chain::link::OverlapLink,
-        link::ExpansionLink,
-    },
-};
+use crate::expansion::chain::link::OverlapLink;
 
 /// Iterator over a known-atom block.  Yields one `BandState` per step.
 ///
@@ -176,10 +170,12 @@ impl ExpansionCtx {
             }
             let overlap_start = t1_cursor + t1_width - postfix_width;
 
-            let query = self.atoms[overlap_start..].to_vec();
-            if query.is_empty() {
-                continue;
-            }
+            // Build query as [postfix_token, remaining_atoms...].  Using the
+            // postfix *token* (not its atoms) lets the search walk its parents
+            // to find wider tokens that start with the postfix and extend into
+            // the remaining atoms.
+            let mut query: Vec<Token> = vec![postfix];
+            query.extend_from_slice(&self.atoms[overlap_start..]);
 
             let result = match ToInsertCtx::<IndexWithPath>::insert_next_match(
                 &self.graph,
@@ -223,18 +219,17 @@ impl ExpansionCtx {
 
         let root_postfix = {
             let mut iter = anchor.postfix_iter(self.graph.clone());
-            let entry = iter.next().map(|(loc, _)| loc);
-            let mut path = entry.map(IndexEndPath::from).unwrap_or_else(|| {
-                IndexEndPath::from(ChildLocation::new(
-                    anchor,
-                    Default::default(),
-                    0,
-                ))
-            });
-            for (loc, tok) in iter {
-                path.path_append(loc);
-                if tok == postfix {
-                    break;
+            let (entry_loc, entry_tok) = iter.next().unwrap();
+            let mut path = IndexEndPath::from(entry_loc);
+            // Only descend further if the initial entry isn't already the
+            // postfix token (compound postfixes are yielded at the first
+            // level by the postfix iterator).
+            if entry_tok != postfix {
+                for (loc, tok) in iter {
+                    path.path_append(loc);
+                    if tok == postfix {
+                        break;
+                    }
                 }
             }
             path
@@ -244,24 +239,18 @@ impl ExpansionCtx {
 
         let start_bound = anchor.width().0 - postfix.width().0;
 
-        let expansion_link = ExpansionLink {
-            start_bound,
-            root_postfix: root_postfix.clone(),
-            expansion_prefix,
-        };
-
-        let complement =
-            ComplementBuilder::new(expansion_link.clone()).build(&self.graph);
-
-        let primary =
-            Band::from((0.into(), Pattern::from(vec![complement, t1])));
-        let overlap =
-            Band::from((0.into(), Pattern::from(vec![complement, t2])));
+        // Build Band patterns that carry t1/t2 as their last element.
+        // The collapse() method extracts only the last token from each
+        // pattern before delegating to bundle_overlap, so the prefix
+        // elements here are purely informational.
+        let primary = Band::from((0.into(), Pattern::from(vec![t1])));
+        let overlap = Band::from((0.into(), Pattern::from(vec![t2])));
 
         let overlap_link = OverlapLink {
             child_path: root_postfix,
-            search_path: expansion_link.expansion_prefix,
+            search_path: expansion_prefix,
             start_bound,
+            self_overlap: t2.vertex_index() == anchor.vertex_index(),
         };
 
         BandState::WithOverlap {

@@ -72,6 +72,12 @@ impl<R: InsertResult> ToInsertCtx<R> for HypergraphRef {
     fn insert_context(&self) -> InsertCtx<R> {
         InsertCtx::<R>::from(self.clone())
     }
+    fn bundle_overlap(
+        &self,
+        input: OverlapBundleInput,
+    ) -> Result<Token, ErrorState> {
+        bundle_overlap(self, input).map_err(ErrorState::from)
+    }
 }
 
 // Implement for references - with interior mutability, we don't need &mut
