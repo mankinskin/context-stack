@@ -14,7 +14,7 @@ use bytemuck::{Pod, Zeroable};
 /// Sparse Voxel Octree structural parameters.
 #[derive(Resource, Clone, Debug)]
 pub struct SvoParams {
-    /// Maximum octree depth (default: 8 → 256³).
+    /// Maximum octree depth (default: 10 → 1024³).
     pub max_depth: u32,
     /// Voxels per chunk for collider generation (default: 16).
     pub chunk_size: u32,
@@ -23,7 +23,7 @@ pub struct SvoParams {
 impl Default for SvoParams {
     fn default() -> Self {
         Self {
-            max_depth: 8,
+            max_depth: 10,
             chunk_size: 16,
         }
     }

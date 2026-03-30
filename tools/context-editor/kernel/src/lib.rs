@@ -124,7 +124,7 @@ fn run_bevy_wasm() {
     app.add_plugins(crate::debug_overlay::DebugOverlayPlugin);
 
     // Initialise empty World Resource
-    app.insert_resource(crate::svo::VoxelWorld::new(8));
+    app.insert_resource(crate::svo::VoxelWorld::new(10));
     app.add_plugins(crate::bootstrap::BootstrapPlugin);
 
     app.run();

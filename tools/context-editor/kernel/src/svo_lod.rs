@@ -63,8 +63,8 @@ impl Default for LodParams {
         Self {
             min_depth: 3,
             max_depth: 10,
-            near_distance: 5.0,
-            far_distance: 500.0,
+            near_distance: 20.0,
+            far_distance: 2000.0,
             detail_factor: 0.25,
             glass_occlusion_enabled: true,
             glass_lod_reduction: 4,

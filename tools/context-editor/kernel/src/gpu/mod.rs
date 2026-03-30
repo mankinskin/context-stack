@@ -33,8 +33,8 @@ use bevy::render::{
 // Constants
 // ---------------------------------------------------------------------------
 
-/// Default SVO octree capacity (nodes). At 8 bytes/node ≈ 8 MB total.
-pub const SVO_CAPACITY_NODES: usize = 1_048_576; // 2^20
+/// Default SVO octree capacity (nodes). At 8 bytes/node ≈ 32 MB total.
+pub const SVO_CAPACITY_NODES: usize = 4_194_304; // 2^22
 
 /// Default maximum Gaussians generated per frame.
 pub const MAX_GAUSSIANS: u32 = 1_048_576; // 1 M

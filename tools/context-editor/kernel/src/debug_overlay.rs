@@ -60,7 +60,7 @@ impl Default for DebugOverlayState {
         Self {
             enabled: false,
             display_depth: 4,
-            draw_radius: 60.0,
+            draw_radius: 240.0,
             wire_color: Color::srgb(0.0, 1.0, 0.0),
             occupied_only: true,
         }
