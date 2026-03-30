@@ -1,13 +1,13 @@
-//! Custom render-graph pipeline — 7-node voxel splat renderer.
+//! Custom render-graph pipeline — 8-node voxel splat renderer.
 //!
 //! Implements T2b (skeleton) + T6a (voxel splat kernel) + T6b (sort key build)
-//! + T6c (radix sort).
+//! + T6c (radix sort) + UI composite.
 //!
 //! # Pipeline
 //!
 //! ```text
 //! BufferSwap → ParticleCompute → VoxelSplatKernel → SortKeyBuild
-//!           → RadixSort → TileBin → TiledRaster
+//!           → RadixSort → TileBin → TiledRaster → UiComposite
 //! ```
 //!
 //! | Stage | Purpose |
@@ -19,6 +19,7 @@
 //! | `RadixSort` | 8-pass 4-bit GPU radix sort (T6c) |
 //! | `TileBin` | Bin splat bounding rects into screen tiles |
 //! | `TiledRaster` | Per-tile rasterise & alpha-composite into framebuffer |
+//! | `UiComposite` | Composite 2D UI panels over scene colour |
 //!
 //! `VoxelSplatKernelNode` dispatches the splat generation compute shader.
 //! `SortKeyBuildNode` dispatches AABB projection + sort key construction.
@@ -32,6 +33,7 @@ pub mod radix_sort;
 pub mod tile_binning;
 pub mod tiled_raster;
 pub mod glass;
+pub mod ui_composite;
 
 use bevy::{
     prelude::*,
@@ -47,6 +49,7 @@ use sort_key_build::SortKeyBuildNode;
 use radix_sort::RadixSortNode;
 use tile_binning::TileBinNode;
 use tiled_raster::TiledRasterNode;
+use ui_composite::UiCompositeNode;
 
 // ---------------------------------------------------------------------------
 // Node labels
@@ -70,6 +73,8 @@ pub enum ContextEditorLabel {
     TileBin,
     /// Per-tile forward rasterise with alpha-composite into the output target.
     TiledRaster,
+    /// Composite 2D UI panels over the scene colour output.
+    UiComposite,
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +212,14 @@ impl Plugin for ContextEditorRenderPlugin {
             )
                 .chain(),
         );
+        app.add_systems(
+            PostUpdate,
+            (
+                ui_composite::init_ui_composite_resources,
+                ui_composite::update_ui_composite_uniforms,
+            )
+                .chain(),
+        );
 
         // Guard: RenderApp is absent in headless / test contexts.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -226,6 +239,7 @@ impl Plugin for ContextEditorRenderPlugin {
         graph.add_node(ContextEditorLabel::RadixSort, RadixSortNode::default());
         graph.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
         graph.add_node(ContextEditorLabel::TiledRaster, TiledRasterNode::default());
+        graph.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
 
         // Wire the sequential edge chain
         graph.add_node_edge(ContextEditorLabel::BufferSwap, ContextEditorLabel::ParticleCompute);
@@ -237,5 +251,6 @@ impl Plugin for ContextEditorRenderPlugin {
         graph.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
         graph.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
         graph.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::TiledRaster);
+        graph.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::UiComposite);
     }
 }

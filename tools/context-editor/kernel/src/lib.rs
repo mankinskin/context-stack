@@ -1,4 +1,5 @@
 pub mod ui;
+pub mod ui_bridge;
 pub mod svo;
 pub mod splat;
 pub mod net;
@@ -6,6 +7,14 @@ pub mod gpu;
 pub mod physics;
 pub mod render;
 pub mod theme;
+pub mod character;
+pub mod editor;
+pub mod force_compute;
+pub mod world_panel;
+pub mod particle_splat;
+pub mod panel_interaction;
+pub mod advanced_tools;
+pub mod interaction;
 #[cfg(target_arch = "wasm32")]
 pub mod bootstrap;
 
@@ -69,6 +78,14 @@ fn run_bevy_wasm() {
     app.add_plugins(crate::render::ContextEditorRenderPlugin);
     app.add_plugins(crate::physics::PhysicsPlugin);
     app.add_plugins(crate::svo::upload::SvoUploadPlugin);
+    app.add_plugins(crate::ui_bridge::UiBridgePlugin);
+    app.add_plugins(crate::editor::EditorPlugin);
+    app.add_plugins(crate::force_compute::ForceComputePlugin);
+    app.add_plugins(crate::world_panel::WorldPanelPlugin);
+    app.add_plugins(crate::particle_splat::ParticleSplatPlugin);
+    app.add_plugins(crate::panel_interaction::PanelInteractionPlugin);
+    app.add_plugins(crate::advanced_tools::AdvancedToolsPlugin);
+    app.add_plugins(crate::interaction::InteractionBridgePlugin);
 
     // Initialise empty World Resource
     app.insert_resource(crate::svo::VoxelWorld::new(8));

@@ -1,5 +1,5 @@
-use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 use crate::svo::VoxelWorld;
 use crate::theme::{
@@ -7,16 +7,9 @@ use crate::theme::{
     theme_update_svo,
 };
 use crate::render::glass::GlassPanel;
+use crate::character::{CharacterController, CharacterPlugin};
 
 pub struct BootstrapPlugin;
-
-#[derive(Component)]
-struct FlyCamera {
-    yaw: f32,
-    pitch: f32,
-    move_speed: f32,
-    look_sensitivity: f32,
-}
 
 /// Tags a mesh whose [`StandardMaterial`] is driven by a palette slot.
 #[derive(Component)]
@@ -37,11 +30,13 @@ impl Plugin for BootstrapPlugin {
         app.insert_resource(palette);
         app.insert_resource(MaterialRefMap::default());
 
+        app.add_plugins(CharacterPlugin);
+
         app.add_systems(
             Startup,
             (setup_baseline_scene, paint_palette_voxels, mark_runtime_ready).chain(),
         );
-        app.add_systems(Update, (fly_camera_look, fly_camera_move, toggle_theme));
+        app.add_systems(Update, toggle_theme);
         app.add_systems(
             PostUpdate,
             (theme_update_svo, sync_palette_materials, sync_clear_color),
@@ -59,20 +54,24 @@ fn setup_baseline_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<ThemePalette>,
 ) {
-    // Floor / terrain
+    // Floor / terrain (with physics collider)
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(14.0, 0.3, 14.0))),
         MeshMaterial3d(materials.add(palette.voxel_terrain.to_standard_material())),
         Transform::from_xyz(0.0, -0.15, 0.0),
         PaletteMesh(MaterialRef::Terrain),
+        RigidBody::Fixed,
+        Collider::cuboid(7.0, 0.15, 7.0),
     ));
 
-    // Primary cube
+    // Primary cube (with physics collider)
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(2.5, 2.5, 2.5))),
         MeshMaterial3d(materials.add(palette.voxel_primary.to_standard_material())),
         Transform::from_xyz(0.0, 1.5, 0.0),
         PaletteMesh(MaterialRef::Primary),
+        RigidBody::Fixed,
+        Collider::cuboid(1.25, 1.25, 1.25),
     ));
 
     // Secondary sphere
@@ -83,12 +82,14 @@ fn setup_baseline_scene(
         PaletteMesh(MaterialRef::Secondary),
     ));
 
-    // Highlight accent (metallic)
+    // Highlight accent (metallic, with physics collider)
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(1.2, 1.2, 1.2))),
         MeshMaterial3d(materials.add(palette.voxel_highlight.to_standard_material())),
         Transform::from_xyz(-4.0, 0.6, 3.0),
         PaletteMesh(MaterialRef::Highlight),
+        RigidBody::Fixed,
+        Collider::cuboid(0.6, 0.6, 0.6),
     ));
 
     // Lights
@@ -110,17 +111,19 @@ fn setup_baseline_scene(
         Transform::from_xyz(-4.0, 10.0, -6.0).looking_at(Vec3::new(0.0, 1.0, 0.0), Vec3::Y),
     ));
 
-    // Camera
+    // Camera — first-person character controller with physics
     commands.spawn((
         Camera3d::default(),
         bevy::core_pipeline::tonemapping::Tonemapping::None,
         Transform::from_xyz(0.0, 5.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
-        FlyCamera {
+        CharacterController {
             yaw: 0.0,
             pitch: -0.3,
-            move_speed: 12.0,
-            look_sensitivity: 0.003,
+            vertical_velocity: 0.0,
         },
+        RigidBody::KinematicPositionBased,
+        Collider::capsule_y(0.4, 0.3),
+        KinematicCharacterController::default(),
     ));
 
     // Glass panel 1 — clear glass in front of the primary cube
@@ -253,63 +256,6 @@ fn sync_clear_color(
         return;
     }
     clear_color.0 = palette.ambient_color;
-}
-
-fn fly_camera_look(
-    mouse_buttons: Res<ButtonInput<MouseButton>>,
-    mouse_motion: Res<AccumulatedMouseMotion>,
-    mut camera: Query<(&mut Transform, &mut FlyCamera)>,
-) {
-    if !mouse_buttons.pressed(MouseButton::Left) {
-        return;
-    }
-
-    let delta = mouse_motion.delta;
-    if delta == Vec2::ZERO {
-        return;
-    }
-
-    for (mut transform, mut fly) in &mut camera {
-        fly.yaw -= delta.x * fly.look_sensitivity;
-        fly.pitch = (fly.pitch - delta.y * fly.look_sensitivity).clamp(-1.54, 1.54);
-        transform.rotation = Quat::from_euler(EulerRot::YXZ, fly.yaw, fly.pitch, 0.0);
-    }
-}
-
-fn fly_camera_move(
-    keys: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut camera: Query<(&mut Transform, &FlyCamera)>,
-) {
-    for (mut transform, fly) in &mut camera {
-        let forward = *transform.forward();
-        let right = *transform.right();
-
-        let mut move_dir = Vec3::ZERO;
-        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-            move_dir += forward;
-        }
-        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-            move_dir -= forward;
-        }
-        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-            move_dir += right;
-        }
-        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-            move_dir -= right;
-        }
-        if keys.pressed(KeyCode::Space) {
-            move_dir += Vec3::Y;
-        }
-        if keys.pressed(KeyCode::ShiftLeft) {
-            move_dir -= Vec3::Y;
-        }
-
-        if move_dir != Vec3::ZERO {
-            let speed_mult = if keys.pressed(KeyCode::ControlLeft) { 3.0 } else { 1.0 };
-            transform.translation += move_dir.normalize() * fly.move_speed * speed_mult * time.delta_secs();
-        }
-    }
 }
 
 fn mark_runtime_ready() {
