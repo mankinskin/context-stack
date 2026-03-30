@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 const GRAVITY: f32 = 20.0;
-const JUMP_IMPULSE: f32 = 8.0;
+const FLY_THRUST: f32 = 25.0;
 const MOVE_SPEED: f32 = 8.0;
 const SPRINT_MULT: f32 = 2.0;
 const MOUSE_SENSITIVITY: f32 = 0.003;
@@ -112,9 +112,9 @@ fn character_movement(
                 1.0
             };
 
-        // Jump
-        if grounded && keys.just_pressed(KeyCode::Space) {
-            ctrl.vertical_velocity = JUMP_IMPULSE;
+        // Fly: hold Space to thrust upward against gravity
+        if keys.pressed(KeyCode::Space) {
+            ctrl.vertical_velocity += FLY_THRUST * time.delta_secs();
         }
         ctrl.vertical_velocity -= GRAVITY * time.delta_secs();
         if grounded && ctrl.vertical_velocity < 0.0 {

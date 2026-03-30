@@ -60,7 +60,7 @@ impl Default for DebugOverlayState {
         Self {
             enabled: false,
             display_depth: 4,
-            draw_radius: 240.0,
+            draw_radius: 800.0,
             wire_color: Color::srgb(0.0, 1.0, 0.0),
             occupied_only: true,
         }
@@ -84,7 +84,7 @@ fn toggle_debug_keys(keys: Res<ButtonInput<BevyKeyCode>>) {
     }
     if keys.just_pressed(BevyKeyCode::F5) {
         let v = WIREFRAME_DEPTH.load(Ordering::Relaxed);
-        WIREFRAME_DEPTH.store(v.min(7) + 1, Ordering::Relaxed);
+        WIREFRAME_DEPTH.store(v.min(11) + 1, Ordering::Relaxed);
     }
     if keys.just_pressed(BevyKeyCode::F6) {
         let v = WIREFRAME_OCCUPIED.load(Ordering::Relaxed);

@@ -142,7 +142,7 @@ pub fn update_splat_params(
     let params = SplatParams {
         camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
         total_nodes: svo.capacity_nodes as u32,
-        lod_scale: 0.001, // nearly no LOD culling for now
+        lod_scale: 0.0002, // cull distance ≈ half_extent/0.0002 = 2500 for depth-10 leaves
         max_depth: voxel_world.max_depth,
         world_size: (1u32 << voxel_world.max_depth) as f32,
         _pad: 0.0,

@@ -304,7 +304,7 @@ pub fn update_camera_uniforms(
         camera_pos: [camera_pos.x, camera_pos.y, camera_pos.z],
         _pad0: 0.0,
         resolution,
-        max_depth: 1000.0,
+        max_depth: 2000.0,
         _pad1: 0.0,
     };
 

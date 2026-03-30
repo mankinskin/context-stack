@@ -25,7 +25,7 @@ use bevy::{
 
 use crate::debug_overlay::DebugOverlayState;
 
-const MAX_WIREFRAME_VERTICES: u64 = 65536;
+const MAX_WIREFRAME_VERTICES: u64 = 262144;
 const WIREFRAME_UNIFORM_SIZE: u64 = 80; // mat4x4f (64) + vec4f (16)
 
 // ---------------------------------------------------------------------------
