@@ -21,7 +21,8 @@ use bevy::{
         render_graph::{Node, NodeRunError, RenderGraphContext},
         render_resource::{
             BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-            BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
+            BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState,
+            Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
             CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
             MultisampleState, PipelineCache, PrimitiveState, RenderPassDescriptor,
             RenderPipelineDescriptor, ShaderStages, TextureFormat, VertexState,
@@ -243,7 +244,18 @@ pub fn queue_raster_pipeline(
             entry_point: Some("fs_main".into()),
             targets: vec![Some(ColorTargetState {
                 format: TextureFormat::bevy_default(),
-                blend: None,
+                blend: Some(BlendState {
+                    color: BlendComponent {
+                        src_factor: BlendFactor::One,
+                        dst_factor: BlendFactor::OneMinusSrcAlpha,
+                        operation: BlendOperation::Add,
+                    },
+                    alpha: BlendComponent {
+                        src_factor: BlendFactor::One,
+                        dst_factor: BlendFactor::OneMinusSrcAlpha,
+                        operation: BlendOperation::Add,
+                    },
+                }),
                 write_mask: ColorWrites::ALL,
             })],
         }),

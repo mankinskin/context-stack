@@ -8,7 +8,6 @@
 //! atomics: the UI writes settings, and the Bevy system reads them each frame.
 
 use bevy::prelude::*;
-use bevy::asset::RenderAssetUsages;
 use dioxus::prelude::*;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
@@ -31,10 +30,6 @@ static WIREFRAME_OCCUPIED: AtomicBool = AtomicBool::new(true);
 // ---------------------------------------------------------------------------
 
 pub struct DebugOverlayPlugin;
-
-/// Tag for wireframe line-mesh entities so we can despawn/respawn them.
-#[derive(Component)]
-struct SvoWireframeLine;
 
 impl Plugin for DebugOverlayPlugin {
     fn build(&self, app: &mut App) {
@@ -104,23 +99,20 @@ fn sync_debug_from_shared(mut state: ResMut<DebugOverlayState>) {
     state.occupied_only = WIREFRAME_OCCUPIED.load(Ordering::Relaxed);
 }
 
-/// Walk the SVO and draw wireframe boxes via spawned line-mesh entities.
+/// Walk the SVO and populate the wireframe overlay vertex buffer.
 ///
-/// Each frame we despawn old wireframe entities and respawn fresh ones.
-/// Using line-mesh entities instead of Gizmos because the WebGPU/WASM backend
-/// does not reliably render Bevy gizmos.
+/// Each frame we recompute the line positions and write them to the
+/// [`WireframeVertices`] resource, which the GPU overlay node uploads and draws
+/// on top of the voxel splats.
 fn draw_svo_wireframe(
-    mut commands: Commands,
     state: Res<DebugOverlayState>,
     voxel_world: Res<VoxelWorld>,
-    existing: Query<Entity, With<SvoWireframeLine>>,
     camera_q: Query<&Transform, With<Camera3d>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut wire_verts: Option<ResMut<crate::render::wireframe_overlay::WireframeVertices>>,
 ) {
-    // Despawn previous frame's wireframe entities.
-    for ent in &existing {
-        commands.entity(ent).despawn();
+    // Clear previous frame's data.
+    if let Some(ref mut verts) = wire_verts {
+        verts.positions.clear();
     }
 
     if !state.enabled || voxel_world.nodes.is_empty() {
@@ -143,8 +135,7 @@ fn draw_svo_wireframe(
         return;
     }
 
-    // Build a single line-list mesh for all wireframe edges.
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(cubes.len() * 24);
+    let Some(ref mut wire_verts) = wire_verts else { return };
 
     let edges: [(usize, usize); 12] = [
         (0,1),(1,2),(2,3),(3,0), // front face
@@ -152,6 +143,7 @@ fn draw_svo_wireframe(
         (0,4),(1,5),(2,6),(3,7), // connectors
     ];
 
+    wire_verts.positions.reserve(cubes.len() * 24);
     for &(center, extent) in &cubes {
         let h = extent * 0.5;
         let c = [
@@ -165,29 +157,10 @@ fn draw_svo_wireframe(
             center + Vec3::new(-h,  h,  h),
         ];
         for &(a, b) in &edges {
-            positions.push(c[a].to_array());
-            positions.push(c[b].to_array());
+            wire_verts.positions.push(c[a].to_array());
+            wire_verts.positions.push(c[b].to_array());
         }
     }
-
-    let mut mesh = Mesh::new(
-        wgpu::PrimitiveTopology::LineList,
-        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
-    );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-
-    let wire_mat = materials.add(StandardMaterial {
-        base_color: state.wire_color,
-        unlit: true,
-        ..default()
-    });
-
-    commands.spawn((
-        Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(wire_mat),
-        Transform::IDENTITY,
-        SvoWireframeLine,
-    ));
 }
 
 // ---------------------------------------------------------------------------

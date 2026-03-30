@@ -337,9 +337,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let tile_count  = packed & 0xFFFu;
     let tile_offset = packed >> 12u;
 
-    // Empty tile → background (tinted by glass if applicable)
+    // Empty tile → transparent (let underlying wireframe / MainPass show through)
     if tile_count == 0u {
-        return vec4f(vec3f(0.1, 0.1, 0.12) * glass_tint.rgb, 1.0);
+        return vec4f(0.0);
     }
 
     var color           = vec3f(0.0);
@@ -387,11 +387,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
         if remaining_alpha < 0.01 { break; }
     }
 
-    // Fill remaining alpha with background
-    color += vec3f(0.1, 0.1, 0.12) * remaining_alpha;
-
-    // Apply glass tint to the composited result
+    // Apply glass tint to the composited result (premultiplied alpha)
     color *= glass_tint.rgb;
 
-    return vec4f(color, 1.0);
+    // Output premultiplied-alpha: (color already weighted by coverage, alpha = total opacity)
+    let opacity = 1.0 - remaining_alpha;
+    return vec4f(color, opacity);
 }

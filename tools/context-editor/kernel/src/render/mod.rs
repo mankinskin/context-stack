@@ -34,6 +34,7 @@ pub mod tile_binning;
 pub mod tiled_raster;
 pub mod glass;
 pub mod ui_composite;
+pub mod wireframe_overlay;
 
 use bevy::{
     prelude::*,
@@ -52,6 +53,7 @@ use radix_sort::RadixSortNode;
 use tile_binning::TileBinNode;
 use tiled_raster::TiledRasterNode;
 use ui_composite::UiCompositeNode;
+use wireframe_overlay::WireframeOverlayNode;
 
 // ---------------------------------------------------------------------------
 // Node labels
@@ -77,6 +79,8 @@ pub enum ContextEditorLabel {
     TiledRaster,
     /// Composite 2D UI panels over the scene colour output.
     UiComposite,
+    /// Draw SVO wireframe lines on top of voxel splats.
+    WireframeOverlay,
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +184,7 @@ impl Plugin for ContextEditorRenderPlugin {
         bevy::asset::embedded_asset!(app, "radix_sort.wgsl");
         bevy::asset::embedded_asset!(app, "tile_binning.wgsl");
         bevy::asset::embedded_asset!(app, "tiled_raster.wgsl");
+        bevy::asset::embedded_asset!(app, "wireframe_overlay.wgsl");
 
         // Main world: resource init + per-frame uniform updates.
         // Only systems that use main-world resources (RenderDevice, RenderQueue,
@@ -244,6 +249,14 @@ impl Plugin for ContextEditorRenderPlugin {
             )
                 .chain(),
         );
+        app.add_systems(
+            PostUpdate,
+            (
+                wireframe_overlay::init_wireframe_overlay,
+                wireframe_overlay::upload_wireframe_data,
+            )
+                .chain(),
+        );
 
         // Extract main-world resources into the render sub-app each frame.
         // ExtractResourcePlugin must be added to the MAIN app (not render_app)
@@ -257,7 +270,8 @@ impl Plugin for ContextEditorRenderPlugin {
             .add_plugins(ExtractResourcePlugin::<radix_sort::RadixSortStagingBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<tiled_raster::RasterUniformBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<tile_binning::TileBinUniformBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<glass::GlassPanelBuffer>::default());
+            .add_plugins(ExtractResourcePlugin::<glass::GlassPanelBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<wireframe_overlay::WireframeOverlayBuffers>::default());
 
         // Guard: RenderApp is absent in headless / test contexts.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -313,8 +327,19 @@ impl Plugin for ContextEditorRenderPlugin {
                 .in_set(RenderSystems::Queue),
         );
 
+        render_app.add_systems(
+            Render,
+            (
+                wireframe_overlay::queue_wireframe_pipeline,
+                wireframe_overlay::rebuild_wireframe_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+
         // Construct nodes that need FromWorld before borrowing the graph.
         let tiled_raster_node = TiledRasterNode::from_world(render_app.world_mut());
+        let wireframe_node = WireframeOverlayNode::from_world(render_app.world_mut());
 
         let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
 
@@ -335,6 +360,7 @@ impl Plugin for ContextEditorRenderPlugin {
         core3d.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
         core3d.add_node(ContextEditorLabel::TiledRaster, tiled_raster_node);
         core3d.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
+        core3d.add_node(ContextEditorLabel::WireframeOverlay, wireframe_node);
 
         // Wire the sequential edge chain (internal ordering)
         core3d.add_node_edge(ContextEditorLabel::BufferSwap, ContextEditorLabel::ParticleCompute);
@@ -346,7 +372,8 @@ impl Plugin for ContextEditorRenderPlugin {
         core3d.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
         core3d.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
         core3d.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::TiledRaster);
-        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::UiComposite);
+        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::WireframeOverlay);
+        core3d.add_node_edge(ContextEditorLabel::WireframeOverlay, ContextEditorLabel::UiComposite);
 
         // Anchor into the existing Core3d sub-graph:
         //   ... → EndMainPass → [our chain] → Tonemapping → Upscaling → ...
