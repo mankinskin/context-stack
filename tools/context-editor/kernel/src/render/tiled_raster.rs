@@ -17,15 +17,17 @@
 use bevy::{
     prelude::*,
     render::{
+        extract_resource::ExtractResource,
         render_graph::{Node, NodeRunError, RenderGraphContext},
         render_resource::{
             BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
             BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
             CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState,
-            MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor,
-            ShaderStages, TextureFormat, VertexState,
+            MultisampleState, PipelineCache, PrimitiveState, RenderPassDescriptor,
+            RenderPipelineDescriptor, ShaderStages, TextureFormat, VertexState,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
+        view::ViewTarget,
     },
 };
 
@@ -61,8 +63,15 @@ pub struct RasterUniforms {
 // ---------------------------------------------------------------------------
 
 /// GPU uniform buffer for the rasteriser's per-frame data.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct RasterUniformBuffer(pub Buffer);
+
+impl ExtractResource for RasterUniformBuffer {
+    type Source = RasterUniformBuffer;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
+}
 
 /// Cached render pipeline for the fullscreen-triangle rasteriser.
 #[derive(Resource)]
@@ -304,28 +313,66 @@ pub fn rebuild_raster_bind_group(
 /// Draws 3 vertices (no VBO) with the `tiled_raster.wgsl` shader.  Each pixel
 /// loops over the splats in its tile, evaluates a ray-box SDF, and composites
 /// with PBR lighting.
-///
-/// **Note:** This node currently bails silently because it needs a render
-/// target texture (e.g. swapchain `TextureView`) which requires integration
-/// with Bevy's camera rendering.  The shaders and pipeline are complete;
-/// the framebuffer hookup will be added when the full pipeline is connected.
-#[derive(Default)]
-pub struct TiledRasterNode;
+pub struct TiledRasterNode {
+    view_query: QueryState<&'static ViewTarget>,
+}
+
+impl FromWorld for TiledRasterNode {
+    fn from_world(world: &mut World) -> Self {
+        Self {
+            view_query: QueryState::new(world),
+        }
+    }
+}
 
 impl Node for TiledRasterNode {
+    fn update(&mut self, world: &mut World) {
+        self.view_query.update_archetypes(world);
+    }
+
     fn run(
         &self,
         _graph: &mut RenderGraphContext,
-        _render_context: &mut RenderContext,
-        _world: &World,
+        render_context: &mut RenderContext,
+        world: &World,
     ) -> Result<(), NodeRunError> {
-        // TODO: Once the render target (swapchain TextureView) is available:
-        //   1. Begin a render pass targeting the output texture
-        //   2. Set the raster pipeline + bind group
-        //   3. Draw 3 vertices (fullscreen triangle)
-        //
-        // The WGSL shaders and pipeline descriptor are ready — this node only
-        // needs the target texture to produce output.
+        let Some(pipeline_res) = world.get_resource::<RasterPipeline>() else {
+            return Ok(());
+        };
+        let Some(bind_group) = world.get_resource::<TiledRasterBindGroup>() else {
+            return Ok(());
+        };
+        let Some(pipeline_cache) = world.get_resource::<PipelineCache>() else {
+            return Ok(());
+        };
+        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0) else {
+            return Ok(());
+        };
+
+        let binding = self.view_query.query_manual(world);
+        let Ok(view_target) = binding.single() else {
+            return Ok(());
+        };
+
+        let color_attachment = view_target.get_color_attachment();
+
+        {
+            let mut render_pass =
+                render_context
+                    .command_encoder()
+                    .begin_render_pass(&RenderPassDescriptor {
+                        label: Some("tiled_raster_pass"),
+                        color_attachments: &[Some(color_attachment)],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+
+            render_pass.set_pipeline(pipeline);
+            render_pass.set_bind_group(0, &bind_group.0, &[]);
+            render_pass.draw(0..3, 0..1);
+        }
+
         Ok(())
     }
 }

@@ -11,6 +11,7 @@
 
 use bevy::prelude::*;
 use bevy::render::{
+    extract_resource::ExtractResource,
     render_resource::{Buffer, BufferDescriptor, BufferUsages},
     renderer::{RenderDevice, RenderQueue},
 };
@@ -93,11 +94,18 @@ pub struct GlassPanelGpu {
 ///
 /// Updated each frame by [`update_glass_panel_buffer`] and bound at
 /// `@group(0) @binding(4)` in `tiled_raster.wgsl`.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct GlassPanelBuffer {
     pub buffer: Buffer,
     /// Number of active panels this frame (written into `RasterUniforms.glass_count`).
     pub count: u32,
+}
+
+impl ExtractResource for GlassPanelBuffer {
+    type Source = GlassPanelBuffer;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
 }
 
 // ---------------------------------------------------------------------------

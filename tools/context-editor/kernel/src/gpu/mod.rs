@@ -18,8 +18,9 @@
 //!                          active_svo_group(current_is_front) selects the right one.
 //! ```
 
-use bevy::prelude::Resource;
+use bevy::prelude::{Commands, Query, Res, Resource, Window};
 use bevy::render::{
+    extract_resource::ExtractResource,
     render_resource::{
         BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry,
         BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
@@ -182,7 +183,7 @@ impl SvoDoubleBuffer {
 ///
 /// All buffers are sized at startup to `max_splats` and `tile_count` so no
 /// allocation occurs on the render-critical path.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct SplatBuffers {
     /// Voxel splat kernel output — one `VoxelSplat` per occupied leaf voxel.
     pub splats: Buffer,
@@ -254,6 +255,35 @@ impl SplatBuffers {
             tiles_x,
             tiles_y,
         }
+    }
+}
+
+/// Create the [`SplatBuffers`] resource from the primary window dimensions.
+///
+/// Runs once (guards against double-init) and requires `RenderDevice` to
+/// be available in the main world.
+pub fn init_splat_buffers(
+    mut commands: Commands,
+    device: Option<Res<RenderDevice>>,
+    existing: Option<Res<SplatBuffers>>,
+    windows: Query<&Window>,
+) {
+    if existing.is_some() {
+        return;
+    }
+    let Some(device) = device else { return };
+    let Ok(window) = windows.single() else { return };
+
+    let w = window.physical_width().max(1);
+    let h = window.physical_height().max(1);
+
+    commands.insert_resource(SplatBuffers::new(&device, MAX_GAUSSIANS, w, h));
+}
+
+impl ExtractResource for SplatBuffers {
+    type Source = SplatBuffers;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
     }
 }
 

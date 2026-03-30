@@ -38,9 +38,10 @@ pub mod ui_composite;
 use bevy::{
     prelude::*,
     render::{
+        extract_resource::ExtractResourcePlugin,
         render_graph::{Node, NodeRunError, RenderGraph, RenderGraphContext, RenderLabel},
         renderer::RenderContext,
-        RenderApp,
+        Render, RenderApp, RenderSystems,
     },
 };
 
@@ -174,8 +175,12 @@ impl Plugin for ContextEditorRenderPlugin {
         // Main world: resource init + per-frame uniform updates.
         // Only systems that use main-world resources (RenderDevice, RenderQueue,
         // AssetServer) belong here.  Pipeline and bind-group systems need
-        // PipelineCache which lives in the render sub-app — they are NOT
-        // registered here (the render nodes bail silently when missing).
+        // PipelineCache which lives in the render sub-app — they are registered
+        // below on the render sub-app.
+        app.add_systems(
+            PostUpdate,
+            crate::gpu::init_splat_buffers,
+        );
         app.add_systems(
             PostUpdate,
             (
@@ -226,6 +231,29 @@ impl Plugin for ContextEditorRenderPlugin {
             return;
         };
 
+        // Extract main-world resources into the render sub-app each frame.
+        // Buffer (wgpu) is Arc-based so Clone is a cheap ref-count bump.
+        render_app
+            .add_plugins(ExtractResourcePlugin::<crate::gpu::SplatBuffers>::default())
+            .add_plugins(ExtractResourcePlugin::<tiled_raster::RasterUniformBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<glass::GlassPanelBuffer>::default());
+
+        // Render-world systems: pipeline queueing and bind group rebuild.
+        // These need PipelineCache / AssetServer which live in the render
+        // sub-app, so they must run here.
+        render_app.add_systems(
+            Render,
+            (
+                tiled_raster::queue_raster_pipeline,
+                tiled_raster::rebuild_raster_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+
+        // Construct nodes that need FromWorld before borrowing the graph.
+        let tiled_raster_node = TiledRasterNode::from_world(render_app.world_mut());
+
         let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
 
         // Register nodes
@@ -238,7 +266,7 @@ impl Plugin for ContextEditorRenderPlugin {
         graph.add_node(ContextEditorLabel::SortKeyBuild, SortKeyBuildNode::default());
         graph.add_node(ContextEditorLabel::RadixSort, RadixSortNode::default());
         graph.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
-        graph.add_node(ContextEditorLabel::TiledRaster, TiledRasterNode::default());
+        graph.add_node(ContextEditorLabel::TiledRaster, tiled_raster_node);
         graph.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
 
         // Wire the sequential edge chain
