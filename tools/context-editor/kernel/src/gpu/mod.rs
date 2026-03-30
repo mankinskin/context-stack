@@ -44,9 +44,9 @@ pub const TILE_SIZE: u32 = 16;
 
 /// Maximum active-list entries (splat-tile overlaps).
 ///
-/// Each sorted splat can appear in multiple tiles via AABB overlap.  This
-/// limit must fit into the 20-bit offset field of packed `TileData`.
-pub const MAX_ACTIVE_ENTRIES: u32 = MAX_GAUSSIANS;
+/// Each sorted splat can appear in multiple tiles via AABB overlap.
+/// With separate offset/count u32s in `tile_data`, this can exceed 1M.
+pub const MAX_ACTIVE_ENTRIES: u32 = 4_194_304; // 4 M
 
 /// Byte stride of `GaussianData` in the GPU buffer.
 ///
@@ -67,11 +67,11 @@ pub const GAUSSIAN_DATA_STRIDE: u64 = 232;
 /// - `opacity:       f32`    →  4 bytes
 pub const PROJECTED_GAUSSIAN_STRIDE: u64 = 40;
 
-/// Byte stride of packed `TileData` — single `u32`: `(offset << 12) | count`.
+/// Byte stride of `TileData` — two `u32`s per tile: `[offset, count]`.
 ///
-/// - Bits 12–31 (20 bits): offset into sorted array (max 1,048,576 = `MAX_GAUSSIANS`)
-/// - Bits  0–11 (12 bits): splat count per tile (max 4,095 with overflow guard)
-pub const TILE_DATA_STRIDE: u64 = 4;
+/// - `tile_data[tile_idx * 2 + 0]` = offset into active_list
+/// - `tile_data[tile_idx * 2 + 1]` = splat count for this tile
+pub const TILE_DATA_STRIDE: u64 = 8;
 
 /// Byte size of a single `OctreeNode` (2 × u32 = child_pointer + color_data).
 pub const OCTREE_NODE_SIZE: u64 = 8;
@@ -283,24 +283,32 @@ impl SplatBuffers {
     }
 }
 
-/// Create the [`SplatBuffers`] resource from the primary window dimensions.
+/// Create (or re-create on resize) the [`SplatBuffers`] resource from the
+/// primary window dimensions.
 ///
-/// Runs once (guards against double-init) and requires `RenderDevice` to
-/// be available in the main world.
+/// On first call it creates the resource; on subsequent calls it checks
+/// whether the window size changed and re-allocates if needed so that
+/// the tile grid always matches the actual viewport.
 pub fn init_splat_buffers(
     mut commands: Commands,
     device: Option<Res<RenderDevice>>,
     existing: Option<Res<SplatBuffers>>,
     windows: Query<&Window>,
 ) {
-    if existing.is_some() {
-        return;
-    }
     let Some(device) = device else { return };
     let Ok(window) = windows.single() else { return };
 
     let w = window.physical_width().max(1);
     let h = window.physical_height().max(1);
+
+    let tiles_x = (w + TILE_SIZE - 1) / TILE_SIZE;
+    let tiles_y = (h + TILE_SIZE - 1) / TILE_SIZE;
+
+    if let Some(buf) = &existing {
+        if buf.tiles_x == tiles_x && buf.tiles_y == tiles_y {
+            return;
+        }
+    }
 
     commands.insert_resource(SplatBuffers::new(&device, MAX_GAUSSIANS, w, h));
 }

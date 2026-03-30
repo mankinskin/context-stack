@@ -22,7 +22,7 @@ struct TileBinUniforms {
     num_elements: u32,  // max_splats — dispatch bound
     num_tiles:    u32,  // tiles_x * tiles_y
     grid_width:   u32,  // tiles_x
-    max_active:   u32,  // active_list capacity (offset limit for 20-bit packing)
+    max_active:   u32,  // active_list capacity
 }
 
 @group(0) @binding(0) var<storage, read>        sorted_values:    array<u32>;
@@ -58,11 +58,7 @@ fn count_tile_overlaps(@builtin(global_invocation_id) gid: vec3u) {
         for (var tx = tx0; tx <= tx1; tx++) {
             let tile_idx = ty * uniforms.grid_width + tx;
             if tile_idx < uniforms.num_tiles {
-                // Overflow guard: 12-bit count max 4095
-                let current = atomicLoad(&tile_counts[tile_idx]);
-                if current < 4095u {
-                    atomicAdd(&tile_counts[tile_idx], 1u);
-                }
+                atomicAdd(&tile_counts[tile_idx], 1u);
             }
         }
     }
@@ -80,21 +76,22 @@ fn prefix_sum_and_pack() {
     var running_offset = 0u;
     for (var i = 0u; i < uniforms.num_tiles; i++) {
         let count = atomicLoad(&tile_counts[i]);
-        let clamped = min(count, 4095u);
 
         // Initialize write head to this tile's start offset
         atomicStore(&tile_write_heads[i], running_offset);
 
-        // Pack tile_data: (offset << 12) | count
-        tile_data[i] = (running_offset << 12u) | clamped;
+        // Store offset and count as two separate u32s
+        tile_data[i * 2u]      = running_offset;
+        tile_data[i * 2u + 1u] = count;
 
-        running_offset += clamped;
+        running_offset += count;
 
-        // Prevent offset overflow (20-bit packed limit)
+        // Prevent offset overflow
         if running_offset >= uniforms.max_active {
             // Remaining tiles get zero count
             for (var j = i + 1u; j < uniforms.num_tiles; j++) {
-                tile_data[j] = 0u;
+                tile_data[j * 2u]      = running_offset;
+                tile_data[j * 2u + 1u] = 0u;
                 atomicStore(&tile_write_heads[j], running_offset);
             }
             break;

@@ -64,7 +64,7 @@ struct GlassPanelData {
 
 @group(0) @binding(0) var<storage, read> active_list: array<u32>;
 @group(0) @binding(1) var<storage, read> projected:     array<ProjectedSplat>;
-@group(0) @binding(2) var<storage, read> tile_data:     array<u32>; // packed: (offset << 12) | count
+@group(0) @binding(2) var<storage, read> tile_data:     array<u32>; // [offset, count] per tile (2 u32s each)
 @group(0) @binding(3) var<uniform>       uniforms:      RasterUniforms;
 @group(0) @binding(4) var<storage, read> glass_panels:  array<GlassPanelData>;
 
@@ -333,9 +333,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let tile_y   = u32(clamp(px.y, 0.0, uniforms.resolution.y - 1.0)) / TILE_SIZE;
     let tile_idx = tile_y * uniforms.grid_width + tile_x;
 
-    let packed     = tile_data[tile_idx];
-    let tile_count  = packed & 0xFFFu;
-    let tile_offset = packed >> 12u;
+    let tile_offset = tile_data[tile_idx * 2u];
+    let tile_count  = tile_data[tile_idx * 2u + 1u];
 
     // Empty tile → transparent (let underlying wireframe / MainPass show through)
     if tile_count == 0u {

@@ -16,8 +16,11 @@ use crate::world_gen::{
 /// Scene center in voxel/world coordinates (middle of 1024³ SVO).
 const SCENE_X: f32 = 512.0;
 const SCENE_Z: f32 = 512.0;
-/// Floor surface Y level (matches WorldGenerator base height).
+/// Floor surface Y level — physics collider sits here.
 const FLOOR_Y: f32 = 256.0;
+/// SVO ground reference — a few voxels below the physics floor so
+/// the visual ground surface sits beneath the character's feet.
+const SVO_GROUND_Y: f32 = 253.0;
 
 pub struct BootstrapPlugin;
 
@@ -108,7 +111,7 @@ fn setup_baseline_scene(
             vertical_velocity: 0.0,
         },
         RigidBody::KinematicPositionBased,
-        Collider::capsule_y(0.4, 0.3),
+        Collider::capsule_y(0.8, 0.3),
         KinematicCharacterController::default(),
     ));
 
@@ -121,7 +124,7 @@ fn setup_baseline_scene(
             alpha_mode: AlphaMode::Blend,
             ..default()
         })),
-        Transform::from_xyz(SCENE_X, FLOOR_Y + 8.0, SCENE_Z + 16.0),
+        Transform::from_xyz(SCENE_X, SVO_GROUND_Y + 8.0, SCENE_Z + 16.0),
         GlassPanel {
             ior: 1.5,
             tint: glass_tint,
@@ -143,7 +146,7 @@ fn setup_baseline_scene(
             perceptual_roughness: 0.8,
             ..default()
         })),
-        Transform::from_xyz(SCENE_X + 20.0, FLOOR_Y + 6.0, SCENE_Z + 10.0),
+        Transform::from_xyz(SCENE_X + 20.0, SVO_GROUND_Y + 6.0, SCENE_Z + 10.0),
         GlassPanel {
             ior: 1.33,
             tint: frosted_tint,
@@ -167,7 +170,7 @@ fn paint_palette_voxels(
 ) {
     let cx = SCENE_X as i32; // 512
     let cz = SCENE_Z as i32; // 512
-    let fy = FLOOR_Y as i32; // 256
+    let fy = SVO_GROUND_Y as i32; // 253 — visual ground below physics floor
 
     // --- Ground slab: 240×12×240 centered at (cx, fy, cz) --------------------
     let grass = VoxelMaterial::unpack(MATERIAL_GRASS);
@@ -301,17 +304,17 @@ fn paint_palette_voxels(
 
     // --- Palette demo spheres (original) --------------------------------------
     voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X, FLOOR_Y + 32.0, SCENE_Z),
+        Vec3::new(SCENE_X, SVO_GROUND_Y + 32.0, SCENE_Z),
         16.0,
         palette.voxel_primary.to_voxel_material(),
     );
     voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X + 48.0, FLOOR_Y + 32.0, SCENE_Z),
+        Vec3::new(SCENE_X + 48.0, SVO_GROUND_Y + 32.0, SCENE_Z),
         12.0,
         palette.voxel_secondary.to_voxel_material(),
     );
     voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X - 48.0, FLOOR_Y + 32.0, SCENE_Z),
+        Vec3::new(SCENE_X - 48.0, SVO_GROUND_Y + 32.0, SCENE_Z),
         8.0,
         palette.voxel_highlight.to_voxel_material(),
     );

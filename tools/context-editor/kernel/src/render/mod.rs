@@ -166,6 +166,32 @@ pub fn canvas_window_plugin() -> WindowPlugin {
     }
 }
 
+/// On WASM, force-sync the Bevy [`Window`] resolution from the actual canvas
+/// element dimensions each frame. This works around Bevy's `fit_canvas_to_parent`
+/// ResizeObserver not firing when the parent is already the correct size at
+/// creation time.
+#[cfg(target_arch = "wasm32")]
+pub fn sync_canvas_resolution(mut windows: Query<&mut Window>) {
+    let Some(canvas) = web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.get_element_by_id("bevy-canvas"))
+    else {
+        return;
+    };
+    let w = canvas.client_width().max(1) as f32;
+    let h = canvas.client_height().max(1) as f32;
+
+    for mut window in &mut windows {
+        let cur_w = window.resolution.physical_width() as f32;
+        let cur_h = window.resolution.physical_height() as f32;
+        if (cur_w - w).abs() > 1.0 || (cur_h - h).abs() > 1.0 {
+            window
+                .resolution
+                .set_physical_resolution(w as u32, h as u32);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
@@ -186,6 +212,11 @@ impl Plugin for ContextEditorRenderPlugin {
         bevy::asset::embedded_asset!(app, "tile_binning.wgsl");
         bevy::asset::embedded_asset!(app, "tiled_raster.wgsl");
         bevy::asset::embedded_asset!(app, "wireframe_overlay.wgsl");
+
+        // On WASM, force-sync the Window resolution from the actual canvas
+        // size before any render-related systems read it.
+        #[cfg(target_arch = "wasm32")]
+        app.add_systems(PreUpdate, sync_canvas_resolution);
 
         // Main world: resource init + per-frame uniform updates.
         // Only systems that use main-world resources (RenderDevice, RenderQueue,

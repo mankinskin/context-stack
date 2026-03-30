@@ -25,4 +25,4 @@ dioxus = { version = "0.7", features = ["web"] }
 spacetimedb-sdk = { version = "1.12", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { version = "0.3.92", features = ["Window", "Document", "Element", "HtmlElement"] }
+web-sys = { version = "0.3.92", features = ["Window", "Document", "Element", "HtmlElement", "console"] }
