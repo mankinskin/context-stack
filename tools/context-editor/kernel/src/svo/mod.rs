@@ -98,8 +98,9 @@ impl VoxelMaterial {
     }
 
     /// Pack into a u32 matching the WGSL `unpack_material()` bit layout.
-    pub fn pack(self) -> u32 {
-        let rough_5 = (self.roughness.min(31)) as u32;
+    pub const fn pack(self) -> u32 {
+        let r = self.roughness;
+        let rough_5 = (if r < 31 { r } else { 31 }) as u32;
         let metal_bit = if self.metallic { 1u32 } else { 0u32 };
         (self.r as u32)
             | (self.g as u32) << 8

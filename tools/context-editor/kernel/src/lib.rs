@@ -15,6 +15,23 @@ pub mod particle_splat;
 pub mod panel_interaction;
 pub mod advanced_tools;
 pub mod interaction;
+pub mod runtime_params;
+pub mod sdf_cutting;
+pub mod latency_comp;
+pub mod editor_ux;
+pub mod svo_lod;
+pub mod multiplayer_backend;
+pub mod multiplayer_net;
+pub mod multiplayer_chars;
+pub mod world_gen;
+pub mod combat;
+pub mod inventory;
+pub mod skill;
+pub mod context_graph;
+pub mod llm_integration;
+pub mod ticket_editor;
+pub mod doc_editor;
+pub mod code_viewer;
 #[cfg(target_arch = "wasm32")]
 pub mod bootstrap;
 
@@ -86,6 +103,23 @@ fn run_bevy_wasm() {
     app.add_plugins(crate::panel_interaction::PanelInteractionPlugin);
     app.add_plugins(crate::advanced_tools::AdvancedToolsPlugin);
     app.add_plugins(crate::interaction::InteractionBridgePlugin);
+    app.add_plugins(crate::runtime_params::RuntimeParamsPlugin);
+    app.add_plugins(crate::sdf_cutting::SdfCuttingPlugin);
+    app.add_plugins(crate::latency_comp::LatencyCompPlugin);
+    app.add_plugins(crate::editor_ux::EditorUxPlugin);
+    app.add_plugins(crate::svo_lod::SvoLodPlugin);
+    app.add_plugins(crate::multiplayer_backend::MultiplayerBackendPlugin);
+    app.add_plugins(crate::multiplayer_net::MultiplayerNetPlugin);
+    app.add_plugins(crate::multiplayer_chars::MultiplayerCharactersPlugin);
+    app.add_plugins(crate::world_gen::WorldGenPlugin);
+    app.add_plugins(crate::combat::CombatPlugin);
+    app.add_plugins(crate::inventory::InventoryPlugin);
+    app.add_plugins(crate::skill::SkillPlugin);
+    app.add_plugins(crate::context_graph::ContextGraph3DPlugin);
+    app.add_plugins(crate::llm_integration::LlmIntegrationPlugin);
+    app.add_plugins(crate::ticket_editor::TicketEditorPlugin);
+    app.add_plugins(crate::doc_editor::DocEditorPlugin);
+    app.add_plugins(crate::code_viewer::CodeViewerPlugin);
 
     // Initialise empty World Resource
     app.insert_resource(crate::svo::VoxelWorld::new(8));
