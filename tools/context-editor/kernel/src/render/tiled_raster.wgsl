@@ -27,13 +27,12 @@ struct RasterUniforms {
 }
 
 struct ProjectedSplat {
-    screen_min:       vec2f,
-    screen_max:       vec2f,
-    center_ws:        vec3f,
-    half_extent:      f32,
-    depth:            f32,
-    material_packed:  u32,
-    _pad:             vec2u,
+    screen_min:         vec2f,
+    screen_max:         vec2f,
+    center_and_extent:  vec4f,   // xyz = world center, w = half_extent
+    depth:              f32,
+    material_packed:    u32,
+    _pad:               vec2u,
 }
 
 struct Material {
@@ -63,9 +62,9 @@ struct GlassPanelData {
 // Bindings
 // ---------------------------------------------------------------------------
 
-@group(0) @binding(0) var<storage, read> sorted_values: array<u32>;
+@group(0) @binding(0) var<storage, read> active_list: array<u32>;
 @group(0) @binding(1) var<storage, read> projected:     array<ProjectedSplat>;
-@group(0) @binding(2) var<storage, read> tile_data:     array<u32>; // [off, cnt, off, cnt, …]
+@group(0) @binding(2) var<storage, read> tile_data:     array<u32>; // packed: (offset << 12) | count
 @group(0) @binding(3) var<uniform>       uniforms:      RasterUniforms;
 @group(0) @binding(4) var<storage, read> glass_panels:  array<GlassPanelData>;
 
@@ -254,19 +253,23 @@ fn apply_chromatic_aberration(
 
 /// Pseudo-caustic brightness from refraction divergence.
 fn compute_caustic(distortion: vec2f, caustic_strength: f32) -> f32 {
-    return fwidth(distortion.x + distortion.y) * caustic_strength;
+    // Analytical approximation — avoids fwidth() which requires uniform control flow.
+    return length(distortion) * caustic_strength * 20.0;
 }
 
 /// Curvature-adaptive roughness — glass edges appear more diffuse than
-/// the flat center. Adds SDF normal curvature to the base roughness.
+/// the flat center. Estimates curvature from SDF gradient instead of
+/// using fwidth() which requires uniform control flow.
 fn curvature_adaptive_roughness(
     hit: vec3f,
     panel: GlassPanelData,
     base_roughness: f32,
 ) -> f32 {
-    let normal = glass_sdf_normal(hit, panel);
-    let curvature = length(fwidth(normal));
-    return clamp(base_roughness + curvature * 2.0, 0.0, 1.0);
+    // Estimate curvature via the SDF value near the surface — closer to
+    // the rounded edges means higher curvature.
+    let d = abs(sdf_rounded_box_glass(hit, panel));
+    let curvature = clamp(1.0 - d / max(panel.corner_radius, 0.001), 0.0, 1.0);
+    return clamp(base_roughness + curvature * 0.3, 0.0, 1.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -275,14 +278,17 @@ fn curvature_adaptive_roughness(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    // Reconstruct world-space ray through this pixel
-    let ndc       = in.uv * 2.0 - 1.0;
-    let clip_near = vec4f(ndc.x, -ndc.y, 0.0, 1.0);
-    let clip_far  = vec4f(ndc.x, -ndc.y, 1.0, 1.0);
-    let world_near = uniforms.inv_view_proj * clip_near;
-    let world_far  = uniforms.inv_view_proj * clip_far;
-    let ray_origin = world_near.xyz / world_near.w;
-    var ray_dir    = normalize(world_far.xyz / world_far.w - ray_origin);
+    // Ray reconstruction — Bevy uses infinite reverse-Z projection.
+    // Use camera_pos as origin; unproject two finite clip-z values for direction.
+    let ndc = in.uv * 2.0 - 1.0;
+    let clip_0 = vec4f(ndc.x, -ndc.y, 1.0, 1.0);   // near plane (depth = 1.0)
+    let clip_1 = vec4f(ndc.x, -ndc.y, 0.5, 1.0);   // finite midpoint
+    let world_0 = uniforms.inv_view_proj * clip_0;
+    let world_1 = uniforms.inv_view_proj * clip_1;
+    let p0 = world_0.xyz / world_0.w;
+    let p1 = world_1.xyz / world_1.w;
+    let ray_origin = uniforms.camera_pos;
+    var ray_dir    = normalize(p1 - p0);
 
     // ---- Glass refraction pre-pass ----
     var glass_tint  = vec4f(1.0);
@@ -305,17 +311,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
                 let eff_roughness = curvature_adaptive_roughness(
                     hit, panel, panel.blur_roughness);
 
-                // Chromatic aberration (clear glass) vs frosted tint
                 if eff_roughness < 0.01 {
                     glass_tint = apply_chromatic_aberration(
                         glass_tint * panel.tint, distortion, panel.chromatic_spread);
                 } else {
-                    // Frosted glass — attenuate more, simulate scatter
                     let frost_atten = 1.0 - eff_roughness * 0.3;
                     glass_tint *= panel.tint * vec4f(vec3f(frost_atten), 1.0);
                 }
 
-                // Pseudo-caustics
                 let caustic = compute_caustic(distortion, panel.caustic_strength);
                 glass_tint = vec4f(
                     glass_tint.rgb + caustic * uniforms.light_color, glass_tint.a);
@@ -330,8 +333,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let tile_y   = u32(clamp(px.y, 0.0, uniforms.resolution.y - 1.0)) / TILE_SIZE;
     let tile_idx = tile_y * uniforms.grid_width + tile_x;
 
-    let tile_offset = tile_data[tile_idx * 2u];
-    let tile_count  = tile_data[tile_idx * 2u + 1u];
+    let packed     = tile_data[tile_idx];
+    let tile_count  = packed & 0xFFFu;
+    let tile_offset = packed >> 12u;
 
     // Empty tile → background (tinted by glass if applicable)
     if tile_count == 0u {
@@ -342,7 +346,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     var remaining_alpha = 1.0;
 
     for (var i = 0u; i < tile_count; i++) {
-        let splat_idx = sorted_values[tile_offset + i];
+        let splat_idx = active_list[tile_offset + i];
         let s         = projected[splat_idx];
 
         // Skip if pixel outside splat's screen AABB
@@ -351,20 +355,25 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
             continue;
         }
 
+        let center_ws  = s.center_and_extent.xyz;
+        let half_ext_f = s.center_and_extent.w;
+
         // Ray-box SDF evaluation
         let local_pos = ray_box_closest_point(
-            ray_origin, ray_dir, s.center_ws, s.half_extent,
+            ray_origin, ray_dir, center_ws, half_ext_f,
         );
-        let d = sd_box(local_pos - s.center_ws, vec3f(s.half_extent));
+        let d = sd_box(local_pos - center_ws, vec3f(half_ext_f));
 
-        // Anti-aliased coverage via screen-space derivative
-        let fw    = fwidth(d);
+        // Anti-aliased coverage — analytical pixel footprint (avoids fwidth
+        // in non-uniform control flow)
+        let hit_dist = length(local_pos - ray_origin);
+        let fw = hit_dist / max(uniforms.resolution.y, 1.0);
         let alpha = (1.0 - smoothstep(-fw, fw, d)) * remaining_alpha;
         if alpha < 1.0 / 255.0 { continue; }
 
         // Lighting
         let mat      = unpack_material(s.material_packed);
-        let normal   = box_normal(local_pos - s.center_ws, vec3f(s.half_extent));
+        let normal   = box_normal(local_pos - center_ws, vec3f(half_ext_f));
         let view_dir = normalize(uniforms.camera_pos - local_pos);
         let pbr      = evaluate_pbr(mat, normal, view_dir,
                                     uniforms.light_dir, uniforms.light_color);

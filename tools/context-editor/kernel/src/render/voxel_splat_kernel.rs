@@ -7,6 +7,7 @@
 use bevy::{
     prelude::*,
     render::{
+        extract_resource::ExtractResource,
         render_graph::{Node, NodeRunError, RenderGraphContext},
         render_resource::{
             BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
@@ -18,8 +19,66 @@ use bevy::{
     },
 };
 
-use crate::gpu::{SvoDoubleBuffer, SplatBuffers};
-use crate::splat::SPLAT_PARAMS_SIZE;
+use crate::gpu::{SvoDoubleBuffer, SplatBuffers, SVO_CAPACITY_NODES};
+use crate::splat::{SplatParams, SPLAT_PARAMS_SIZE};
+
+// ---------------------------------------------------------------------------
+// NodePositionBuffer — precomputed world-space positions for each SVO node
+// ---------------------------------------------------------------------------
+
+/// GPU storage buffer holding `vec4<f32>` per node (xyz = center, w = half_extent).
+///
+/// Positions are computed on the CPU by [`crate::svo::VoxelWorld::compute_node_positions`]
+/// because WGSL does not support the recursive tree traversal needed to derive
+/// them on the GPU.
+#[derive(Resource, Clone)]
+pub struct NodePositionBuffer(pub Buffer);
+
+impl ExtractResource for NodePositionBuffer {
+    type Source = NodePositionBuffer;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
+}
+
+impl NodePositionBuffer {
+    pub fn new(device: &RenderDevice, capacity_nodes: usize) -> Self {
+        Self(device.create_buffer(&BufferDescriptor {
+            label: Some("node_positions"),
+            size: (capacity_nodes as u64) * 16, // vec4<f32> = 16 bytes
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        }))
+    }
+}
+
+/// One-shot system: create [`NodePositionBuffer`] once `RenderDevice` is ready.
+pub fn init_node_positions(
+    mut commands: Commands,
+    device: Option<Res<RenderDevice>>,
+    existing: Option<Res<NodePositionBuffer>>,
+) {
+    if existing.is_some() {
+        return;
+    }
+    let Some(device) = device else { return };
+    commands.insert_resource(NodePositionBuffer::new(&device, SVO_CAPACITY_NODES));
+}
+
+/// Per-frame system: recompute positions from VoxelWorld and upload to GPU.
+pub fn update_node_positions(
+    render_queue: Option<Res<RenderQueue>>,
+    pos_buf: Option<Res<NodePositionBuffer>>,
+    voxel_world: Option<Res<crate::svo::VoxelWorld>>,
+) {
+    let Some(render_queue) = render_queue else { return };
+    let Some(pos_buf) = pos_buf else { return };
+    let Some(voxel_world) = voxel_world else { return };
+
+    let positions = voxel_world.compute_node_positions();
+    let bytes: &[u8] = bytemuck::cast_slice(&positions);
+    render_queue.write_buffer(&pos_buf.0, 0, bytes);
+}
 
 // ---------------------------------------------------------------------------
 // SplatParamsUniform — Bevy resource holding the GPU uniform buffer
@@ -27,8 +86,15 @@ use crate::splat::SPLAT_PARAMS_SIZE;
 
 /// GPU uniform buffer for [`SplatParams`], updated each frame from camera +
 /// SVO state by [`update_splat_params_system`].
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct SplatParamsUniform(pub Buffer);
+
+impl ExtractResource for SplatParamsUniform {
+    type Source = SplatParamsUniform;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
+}
 
 impl SplatParamsUniform {
     pub fn new(device: &RenderDevice) -> Self {
@@ -39,6 +105,49 @@ impl SplatParamsUniform {
             mapped_at_creation: false,
         }))
     }
+}
+
+// ---------------------------------------------------------------------------
+// Init / update systems for SplatParamsUniform
+// ---------------------------------------------------------------------------
+
+/// One-shot system: create `SplatParamsUniform` once `RenderDevice` is ready.
+pub fn init_splat_params(
+    mut commands: Commands,
+    device: Option<Res<RenderDevice>>,
+    existing: Option<Res<SplatParamsUniform>>,
+) {
+    if existing.is_some() {
+        return;
+    }
+    let Some(device) = device else { return };
+    commands.insert_resource(SplatParamsUniform::new(&device));
+}
+
+/// Per-frame system: write camera + SVO state into the uniform buffer.
+pub fn update_splat_params(
+    camera_query: Query<&GlobalTransform, With<Camera3d>>,
+    render_queue: Option<Res<RenderQueue>>,
+    params_buf: Option<Res<SplatParamsUniform>>,
+    svo: Option<Res<SvoDoubleBuffer>>,
+    voxel_world: Option<Res<crate::svo::VoxelWorld>>,
+) {
+    let Some(render_queue) = render_queue else { return };
+    let Some(params_buf) = params_buf else { return };
+    let Some(svo) = svo else { return };
+    let Some(voxel_world) = voxel_world else { return };
+    let Ok(cam_tf) = camera_query.single() else { return };
+
+    let cam_pos = cam_tf.translation();
+    let params = SplatParams {
+        camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
+        total_nodes: svo.capacity_nodes as u32,
+        lod_scale: 0.001, // nearly no LOD culling for now
+        max_depth: voxel_world.max_depth,
+        world_size: (1u32 << voxel_world.max_depth) as f32,
+        _pad: 0.0,
+    };
+    render_queue.write_buffer(&params_buf.0, 0, bytemuck::bytes_of(&params));
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +210,17 @@ pub fn splat_kernel_bind_group_layout_descriptor() -> BindGroupLayoutDescriptor 
                 },
                 count: None,
             },
+            // binding 4: node_positions (read-only storage, vec4<f32> per node)
+            BindGroupLayoutEntry {
+                binding: 4,
+                visibility: ShaderStages::COMPUTE,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
         ],
     )
 }
@@ -116,6 +236,7 @@ impl VoxelSplatBindGroup {
         svo: &SvoDoubleBuffer,
         splat_buffers: &SplatBuffers,
         params: &SplatParamsUniform,
+        positions: &NodePositionBuffer,
     ) -> Self {
         Self(device.create_bind_group(
             "bg_voxel_splat_kernel",
@@ -137,6 +258,10 @@ impl VoxelSplatBindGroup {
                     binding: 3,
                     resource: params.0.as_entire_binding(),
                 },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: positions.0.as_entire_binding(),
+                },
             ],
         ))
     }
@@ -155,8 +280,12 @@ pub fn queue_voxel_splat_pipeline(
     mut commands: Commands,
     pipeline_cache: Res<PipelineCache>,
     asset_server: Res<AssetServer>,
+    existing: Option<Res<VoxelSplatPipeline>>,
 ) {
-    let shader = asset_server.load("render/voxel_splat_kernel.wgsl");
+    if existing.is_some() {
+        return;
+    }
+    let shader = asset_server.load("embedded://context_editor_kernel/render/voxel_splat_kernel.wgsl");
     let id = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
         label: Some("voxel_splat_kernel_pipeline".into()),
         layout: vec![splat_kernel_bind_group_layout_descriptor()],
@@ -179,10 +308,16 @@ pub fn rebuild_splat_bind_group(
     mut commands: Commands,
     device: Res<RenderDevice>,
     pipeline_cache: Res<PipelineCache>,
-    svo: Res<SvoDoubleBuffer>,
-    splat_buffers: Res<SplatBuffers>,
-    params: Res<SplatParamsUniform>,
+    svo: Option<Res<SvoDoubleBuffer>>,
+    splat_buffers: Option<Res<SplatBuffers>>,
+    params: Option<Res<SplatParamsUniform>>,
+    positions: Option<Res<NodePositionBuffer>>,
 ) {
+    let Some(svo) = svo else { return };
+    let Some(splat_buffers) = splat_buffers else { return };
+    let Some(params) = params else { return };
+    let Some(positions) = positions else { return };
+
     let descriptor = splat_kernel_bind_group_layout_descriptor();
     let layout = pipeline_cache.get_bind_group_layout(&descriptor);
     commands.insert_resource(VoxelSplatBindGroup::new(
@@ -191,6 +326,7 @@ pub fn rebuild_splat_bind_group(
         &svo,
         &splat_buffers,
         &params,
+        &positions,
     ));
 }
 

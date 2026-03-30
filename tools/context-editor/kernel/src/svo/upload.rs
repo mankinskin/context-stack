@@ -25,6 +25,15 @@ use bytemuck::cast_slice;
 use crate::{gpu::SvoDoubleBuffer, svo::VoxelWorld};
 
 // ---------------------------------------------------------------------------
+// Flag: tracks whether svo_upload_system wrote data this frame
+// ---------------------------------------------------------------------------
+
+/// When `true`, `double_buffer_swap_system` performs the FRONT ↔ BACK swap.
+/// Reset to `false` after each swap.
+#[derive(Resource, Default)]
+pub struct SvoUploadedThisFrame(pub bool);
+
+// ---------------------------------------------------------------------------
 // Bevy Plugin
 // ---------------------------------------------------------------------------
 
@@ -33,6 +42,7 @@ pub struct SvoUploadPlugin;
 
 impl Plugin for SvoUploadPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<SvoUploadedThisFrame>();
         app.add_systems(
             PostUpdate,
             (
@@ -91,6 +101,7 @@ pub fn svo_upload_system(
     mut voxel_world: ResMut<VoxelWorld>,
     svo_buffer: Res<SvoDoubleBuffer>,
     render_queue: Res<RenderQueue>,
+    mut uploaded_flag: ResMut<SvoUploadedThisFrame>,
 ) {
     let ranges = voxel_world.take_dirty_ranges();
     if ranges.is_empty() {
@@ -108,6 +119,8 @@ pub fn svo_upload_system(
         }
         render_queue.write_buffer(target, start as u64, &node_bytes[start..end]);
     }
+
+    uploaded_flag.0 = true;
 }
 
 /// Swap BACK → FRONT so the Gaussian generator reads fresh data next frame.
@@ -115,8 +128,14 @@ pub fn svo_upload_system(
 /// This is a CPU-side pointer flip (`< 0.01 ms`). No GPU synchronisation is
 /// needed because wgpu's command queue ordering guarantees that the upload
 /// writes complete before the next frame's compute dispatch.
-pub fn double_buffer_swap_system(mut svo_buffer: ResMut<SvoDoubleBuffer>) {
-    svo_buffer.swap();
+pub fn double_buffer_swap_system(
+    mut svo_buffer: ResMut<SvoDoubleBuffer>,
+    mut uploaded_flag: ResMut<SvoUploadedThisFrame>,
+) {
+    if uploaded_flag.0 {
+        svo_buffer.swap();
+        uploaded_flag.0 = false;
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -12,13 +12,12 @@ struct VoxelSplat {
 }
 
 struct ProjectedSplat {
-    screen_min:       vec2f,
-    screen_max:       vec2f,
-    center_ws:        vec3f,
-    half_extent:      f32,
-    depth:            f32,
-    material_packed:  u32,
-    _pad:             vec2u,
+    screen_min:         vec2f,
+    screen_max:         vec2f,
+    center_and_extent:  vec4f,   // xyz = world center, w = half_extent
+    depth:              f32,
+    material_packed:    u32,
+    _pad:               vec2u,
 }
 
 struct CameraUniforms {
@@ -109,12 +108,11 @@ fn build_sort_keys(@builtin(global_invocation_id) id: vec3u) {
     let pos_view = camera.view_mat * vec4f(s.center_ws, 1.0);
     let view_depth = -pos_view.z; // Negate: view-space Z is negative for objects in front
 
-    // Store projected splat
+    // Store projected splat (center + extent packed into vec4f)
     projected[idx] = ProjectedSplat(
         screen_min,
         screen_max,
-        s.center_ws,
-        s.half_extent,
+        vec4f(s.center_ws, s.half_extent),
         view_depth,
         s.material_packed,
         vec2u(0u),

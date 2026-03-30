@@ -95,13 +95,12 @@ pub const SPLAT_PARAMS_SIZE: u64 = std::mem::size_of::<SplatParams>() as u64;
 /// WGSL layout:
 /// ```wgsl
 /// struct ProjectedSplat {
-///     screen_min:       vec2f,
-///     screen_max:       vec2f,
-///     center_ws:        vec3f,
-///     half_extent:      f32,
-///     depth:            f32,
-///     material_packed:  u32,
-///     _pad:             vec2u,
+///     screen_min:         vec2f,
+///     screen_max:         vec2f,
+///     center_and_extent:  vec4f,   // xyz = world center, w = half_extent
+///     depth:              f32,
+///     material_packed:    u32,
+///     _pad:               vec2u,
 /// }
 /// ```
 #[repr(C)]
@@ -111,10 +110,9 @@ pub struct ProjectedSplat {
     pub screen_min: [f32; 2],
     /// Screen-space AABB maximum (pixels).
     pub screen_max: [f32; 2],
-    /// World-space center (passthrough for ray-box SDF in T6d).
-    pub center_ws: [f32; 3],
-    /// World-space half-extent of the axis-aligned voxel box.
-    pub half_extent: f32,
+    /// World-space center (xyz) + half-extent (w), packed as a single vec4f
+    /// for a single 16-byte GPU load.
+    pub center_and_extent: [f32; 4],
     /// View-space depth (for sorting).
     pub depth: f32,
     /// Packed material from `OctreeNode::color_data`.

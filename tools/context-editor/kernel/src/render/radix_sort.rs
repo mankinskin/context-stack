@@ -26,6 +26,7 @@
 use bevy::{
     prelude::*,
     render::{
+        extract_resource::ExtractResource,
         render_graph::{Node, NodeRunError, RenderGraphContext},
         render_resource::{
             BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
@@ -71,13 +72,27 @@ struct RadixSortUniforms {
 
 /// GPU uniform buffer (16 bytes) updated inline via `copy_buffer_to_buffer`
 /// before each histogram dispatch.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct RadixSortUniformBuffer(pub Buffer);
+
+impl ExtractResource for RadixSortUniformBuffer {
+    type Source = RadixSortUniformBuffer;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
+}
 
 /// Pre-filled staging buffer holding all 8 parameter sets (128 bytes).
 /// Copied into [`RadixSortUniformBuffer`] per-pass inside the render node.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct RadixSortStagingBuffer(pub Buffer);
+
+impl ExtractResource for RadixSortStagingBuffer {
+    type Source = RadixSortStagingBuffer;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
+}
 
 /// Cached pipeline IDs for the three compute entry points.
 #[derive(Resource)]
@@ -244,7 +259,7 @@ pub fn queue_radix_sort_pipelines(
         return;
     }
 
-    let shader = asset_server.load("render/radix_sort.wgsl");
+    let shader = asset_server.load("embedded://context_editor_kernel/render/radix_sort.wgsl");
     let layout = vec![radix_sort_bind_group_layout_descriptor()];
 
     let histogram = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {

@@ -65,42 +65,16 @@ fn setup_baseline_scene(
     palette: Res<ThemePalette>,
 ) {
     // Floor / terrain (with physics collider) — centered in SVO world
+    // Keep as invisible physics ground plane; voxel terrain is rendered by the
+    // splat pipeline from the SVO data painted in paint_palette_voxels().
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(80.0, 0.3, 80.0))),
-        MeshMaterial3d(materials.add(palette.voxel_terrain.to_standard_material())),
         Transform::from_xyz(SCENE_X, FLOOR_Y - 0.15, SCENE_Z),
-        PaletteMesh(MaterialRef::Terrain),
         RigidBody::Fixed,
         Collider::cuboid(40.0, 0.15, 40.0),
     ));
 
-    // Primary cube (with physics collider)
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(2.5, 2.5, 2.5))),
-        MeshMaterial3d(materials.add(palette.voxel_primary.to_standard_material())),
-        Transform::from_xyz(SCENE_X, FLOOR_Y + 1.5, SCENE_Z),
-        PaletteMesh(MaterialRef::Primary),
-        RigidBody::Fixed,
-        Collider::cuboid(1.25, 1.25, 1.25),
-    ));
-
-    // Secondary sphere
-    commands.spawn((
-        Mesh3d(meshes.add(Sphere::new(1.5).mesh().ico(4).unwrap())),
-        MeshMaterial3d(materials.add(palette.voxel_secondary.to_standard_material())),
-        Transform::from_xyz(SCENE_X + 5.0, FLOOR_Y + 1.5, SCENE_Z),
-        PaletteMesh(MaterialRef::Secondary),
-    ));
-
-    // Highlight accent (metallic, with physics collider)
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(1.2, 1.2, 1.2))),
-        MeshMaterial3d(materials.add(palette.voxel_highlight.to_standard_material())),
-        Transform::from_xyz(SCENE_X - 4.0, FLOOR_Y + 0.6, SCENE_Z + 3.0),
-        PaletteMesh(MaterialRef::Highlight),
-        RigidBody::Fixed,
-        Collider::cuboid(0.6, 0.6, 0.6),
-    ));
+    // Primary, secondary, highlight objects are now voxelized SDFs
+    // in the SVO (see paint_palette_voxels). No forward-rendered meshes here.
 
     // Lights
     commands.spawn((

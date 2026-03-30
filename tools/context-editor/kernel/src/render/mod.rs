@@ -37,6 +37,7 @@ pub mod ui_composite;
 
 use bevy::{
     prelude::*,
+    core_pipeline::core_3d::graph::{Core3d, Node3d},
     render::{
         extract_resource::ExtractResourcePlugin,
         render_graph::{Node, NodeRunError, RenderGraph, RenderGraphContext, RenderLabel},
@@ -172,6 +173,14 @@ pub struct ContextEditorRenderPlugin;
 
 impl Plugin for ContextEditorRenderPlugin {
     fn build(&self, app: &mut App) {
+        // Embed WGSL shaders into the binary so they are available on WASM
+        // without a filesystem or asset-serving HTTP path.
+        bevy::asset::embedded_asset!(app, "voxel_splat_kernel.wgsl");
+        bevy::asset::embedded_asset!(app, "sort_key_build.wgsl");
+        bevy::asset::embedded_asset!(app, "radix_sort.wgsl");
+        bevy::asset::embedded_asset!(app, "tile_binning.wgsl");
+        bevy::asset::embedded_asset!(app, "tiled_raster.wgsl");
+
         // Main world: resource init + per-frame uniform updates.
         // Only systems that use main-world resources (RenderDevice, RenderQueue,
         // AssetServer) belong here.  Pipeline and bind-group systems need
@@ -180,6 +189,16 @@ impl Plugin for ContextEditorRenderPlugin {
         app.add_systems(
             PostUpdate,
             crate::gpu::init_splat_buffers,
+        );
+        app.add_systems(
+            PostUpdate,
+            (
+                voxel_splat_kernel::init_splat_params,
+                voxel_splat_kernel::update_splat_params,
+                voxel_splat_kernel::init_node_positions,
+                voxel_splat_kernel::update_node_positions,
+            )
+                .chain(),
         );
         app.add_systems(
             PostUpdate,
@@ -226,17 +245,24 @@ impl Plugin for ContextEditorRenderPlugin {
                 .chain(),
         );
 
+        // Extract main-world resources into the render sub-app each frame.
+        // ExtractResourcePlugin must be added to the MAIN app (not render_app)
+        // because its build() internally accesses app.get_sub_app_mut(RenderApp).
+        app.add_plugins(ExtractResourcePlugin::<crate::gpu::SplatBuffers>::default())
+            .add_plugins(ExtractResourcePlugin::<crate::gpu::SvoDoubleBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<voxel_splat_kernel::SplatParamsUniform>::default())
+            .add_plugins(ExtractResourcePlugin::<voxel_splat_kernel::NodePositionBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<sort_key_build::SortKeyCameraUniform>::default())
+            .add_plugins(ExtractResourcePlugin::<radix_sort::RadixSortUniformBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<radix_sort::RadixSortStagingBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<tiled_raster::RasterUniformBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<tile_binning::TileBinUniformBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<glass::GlassPanelBuffer>::default());
+
         // Guard: RenderApp is absent in headless / test contexts.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
-
-        // Extract main-world resources into the render sub-app each frame.
-        // Buffer (wgpu) is Arc-based so Clone is a cheap ref-count bump.
-        render_app
-            .add_plugins(ExtractResourcePlugin::<crate::gpu::SplatBuffers>::default())
-            .add_plugins(ExtractResourcePlugin::<tiled_raster::RasterUniformBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<glass::GlassPanelBuffer>::default());
 
         // Render-world systems: pipeline queueing and bind group rebuild.
         // These need PipelineCache / AssetServer which live in the render
@@ -244,8 +270,44 @@ impl Plugin for ContextEditorRenderPlugin {
         render_app.add_systems(
             Render,
             (
+                voxel_splat_kernel::queue_voxel_splat_pipeline,
+                voxel_splat_kernel::rebuild_splat_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+        render_app.add_systems(
+            Render,
+            (
+                sort_key_build::queue_sort_key_pipeline,
+                sort_key_build::rebuild_sort_key_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+        render_app.add_systems(
+            Render,
+            (
+                radix_sort::queue_radix_sort_pipelines,
+                radix_sort::rebuild_radix_sort_bind_groups,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+        render_app.add_systems(
+            Render,
+            (
                 tiled_raster::queue_raster_pipeline,
                 tiled_raster::rebuild_raster_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+        render_app.add_systems(
+            Render,
+            (
+                tile_binning::queue_tile_bin_pipeline,
+                tile_binning::rebuild_tile_bin_bind_group,
             )
                 .chain()
                 .in_set(RenderSystems::Queue),
@@ -256,29 +318,39 @@ impl Plugin for ContextEditorRenderPlugin {
 
         let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
 
-        // Register nodes
-        graph.add_node(ContextEditorLabel::BufferSwap, BufferSwapNode::default());
-        graph.add_node(
+        // Register nodes in the Core3d camera sub-graph so they execute
+        // WITHIN the camera pipeline — after 3D rendering, before tonemapping
+        // and upscaling. Placing nodes in the main graph caused their output
+        // to be overwritten by Bevy's built-in upscaling pass.
+        let core3d = graph.sub_graph_mut(Core3d);
+
+        core3d.add_node(ContextEditorLabel::BufferSwap, BufferSwapNode::default());
+        core3d.add_node(
             ContextEditorLabel::ParticleCompute,
             ParticleComputeNode::default(),
         );
-        graph.add_node(ContextEditorLabel::VoxelSplatKernel, VoxelSplatKernelNode::default());
-        graph.add_node(ContextEditorLabel::SortKeyBuild, SortKeyBuildNode::default());
-        graph.add_node(ContextEditorLabel::RadixSort, RadixSortNode::default());
-        graph.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
-        graph.add_node(ContextEditorLabel::TiledRaster, tiled_raster_node);
-        graph.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
+        core3d.add_node(ContextEditorLabel::VoxelSplatKernel, VoxelSplatKernelNode::default());
+        core3d.add_node(ContextEditorLabel::SortKeyBuild, SortKeyBuildNode::default());
+        core3d.add_node(ContextEditorLabel::RadixSort, RadixSortNode::default());
+        core3d.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
+        core3d.add_node(ContextEditorLabel::TiledRaster, tiled_raster_node);
+        core3d.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
 
-        // Wire the sequential edge chain
-        graph.add_node_edge(ContextEditorLabel::BufferSwap, ContextEditorLabel::ParticleCompute);
-        graph.add_node_edge(
+        // Wire the sequential edge chain (internal ordering)
+        core3d.add_node_edge(ContextEditorLabel::BufferSwap, ContextEditorLabel::ParticleCompute);
+        core3d.add_node_edge(
             ContextEditorLabel::ParticleCompute,
             ContextEditorLabel::VoxelSplatKernel,
         );
-        graph.add_node_edge(ContextEditorLabel::VoxelSplatKernel, ContextEditorLabel::SortKeyBuild);
-        graph.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
-        graph.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
-        graph.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::TiledRaster);
-        graph.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::UiComposite);
+        core3d.add_node_edge(ContextEditorLabel::VoxelSplatKernel, ContextEditorLabel::SortKeyBuild);
+        core3d.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
+        core3d.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
+        core3d.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::TiledRaster);
+        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::UiComposite);
+
+        // Anchor into the existing Core3d sub-graph:
+        //   ... → EndMainPass → [our chain] → Tonemapping → Upscaling → ...
+        core3d.add_node_edge(Node3d::EndMainPass, ContextEditorLabel::BufferSwap);
+        core3d.add_node_edge(ContextEditorLabel::UiComposite, Node3d::Tonemapping);
     }
 }

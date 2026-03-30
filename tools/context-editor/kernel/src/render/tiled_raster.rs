@@ -10,7 +10,7 @@
 //! |---------|------|---------|
 //! | 0 | `storage<read>` | `sorted_values: array<u32>` |
 //! | 1 | `storage<read>` | `projected: array<ProjectedSplat>` |
-//! | 2 | `storage<read>` | `tile_data: array<u32>` (flat, stride 2) |
+//! | 2 | `storage<read>` | `tile_data: array<u32>` (packed: offset<<12 | count) |
 //! | 3 | `uniform` | `uniforms: RasterUniforms` |
 //! | 4 | `storage<read>` | `glass_panels: array<GlassPanelData>` |
 
@@ -224,7 +224,7 @@ pub fn queue_raster_pipeline(
         return;
     }
 
-    let shader = asset_server.load("render/tiled_raster.wgsl");
+    let shader = asset_server.load("embedded://context_editor_kernel/render/tiled_raster.wgsl");
     let layout = vec![raster_bind_group_layout_descriptor()];
 
     let id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
@@ -242,14 +242,18 @@ pub fn queue_raster_pipeline(
             shader_defs: vec![],
             entry_point: Some("fs_main".into()),
             targets: vec![Some(ColorTargetState {
-                format: TextureFormat::Bgra8UnormSrgb,
+                format: TextureFormat::bevy_default(),
                 blend: None,
                 write_mask: ColorWrites::ALL,
             })],
         }),
         primitive: PrimitiveState::default(),
         depth_stencil: None,
-        multisample: MultisampleState::default(),
+        multisample: MultisampleState {
+            count: 4, // matches Bevy default Msaa::Sample4
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
         zero_initialize_workgroup_memory: false,
     });
     commands.insert_resource(RasterPipeline(id));
@@ -281,7 +285,7 @@ pub fn rebuild_raster_bind_group(
         &[
             BindGroupEntry {
                 binding: 0,
-                resource: splat_buffers.sort_values.as_entire_binding(),
+                resource: splat_buffers.active_list.as_entire_binding(),
             },
             BindGroupEntry {
                 binding: 1,

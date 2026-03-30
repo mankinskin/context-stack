@@ -42,6 +42,12 @@ pub const MAX_GAUSSIANS: u32 = 1_048_576; // 1 M
 /// Tile side length in pixels for the tiled forward+ renderer.
 pub const TILE_SIZE: u32 = 16;
 
+/// Maximum active-list entries (splat-tile overlaps).
+///
+/// Each sorted splat can appear in multiple tiles via AABB overlap.  This
+/// limit must fit into the 20-bit offset field of packed `TileData`.
+pub const MAX_ACTIVE_ENTRIES: u32 = MAX_GAUSSIANS;
+
 /// Byte stride of `GaussianData` in the GPU buffer.
 ///
 /// WGSL layout:
@@ -61,8 +67,11 @@ pub const GAUSSIAN_DATA_STRIDE: u64 = 232;
 /// - `opacity:       f32`    →  4 bytes
 pub const PROJECTED_GAUSSIAN_STRIDE: u64 = 40;
 
-/// Byte stride of `TileData` (offset: u32, count: u32).
-pub const TILE_DATA_STRIDE: u64 = 8;
+/// Byte stride of packed `TileData` — single `u32`: `(offset << 12) | count`.
+///
+/// - Bits 12–31 (20 bits): offset into sorted array (max 1,048,576 = `MAX_GAUSSIANS`)
+/// - Bits  0–11 (12 bits): splat count per tile (max 4,095 with overflow guard)
+pub const TILE_DATA_STRIDE: u64 = 4;
 
 /// Byte size of a single `OctreeNode` (2 × u32 = child_pointer + color_data).
 pub const OCTREE_NODE_SIZE: u64 = 8;
@@ -126,12 +135,19 @@ impl GlobalUniformBuffer {
 /// The GPU reads the **FRONT** buffer; WASM writes dirty octree regions to the
 /// **BACK** buffer. After `svo_upload_system` writes, `swap()` atomically
 /// switches them — zero allocation, < 0.01 ms, 1-frame visual update latency.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct SvoDoubleBuffer {
     pub front: Buffer,
     pub back: Buffer,
     current_is_front: bool,
     pub capacity_nodes: usize,
+}
+
+impl ExtractResource for SvoDoubleBuffer {
+    type Source = SvoDoubleBuffer;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
 }
 
 impl SvoDoubleBuffer {
@@ -200,8 +216,14 @@ pub struct SplatBuffers {
     /// Per-workgroup 16-digit histograms for the 8 radix passes
     /// (size = workgroups × 8 passes × 16 digits × 4 bytes).
     pub histograms: Buffer,
-    /// Per-tile `TileData { offset: u32, count: u32 }`.
+    /// Per-tile packed `TileData`: `(offset << 12) | count`.
     pub tile_data: Buffer,
+    /// Per-tile atomic counters used by the count-tile-overlaps pass.
+    pub tile_counts: Buffer,
+    /// Per-tile atomic write heads used by the scatter-to-tiles pass.
+    pub tile_write_heads: Buffer,
+    /// Active list: splat indices written by scatter, read by rasteriser.
+    pub active_list: Buffer,
     /// Atomic u32 counter: number of splats emitted by the kernel.
     pub splat_count: Buffer,
     /// Maximum splats this allocation supports.
@@ -250,6 +272,9 @@ impl SplatBuffers {
             sort_scratch_values: buf!("sort_scratch_values", n * 4, rw),
             histograms: buf!("radix_histograms", histogram_size, rw),
             tile_data: buf!("tile_data", tile_count * TILE_DATA_STRIDE, rw),
+            tile_counts: buf!("tile_counts", tile_count * 4, rw),
+            tile_write_heads: buf!("tile_write_heads", tile_count * 4, rw),
+            active_list: buf!("active_list", MAX_ACTIVE_ENTRIES as u64 * 4, rw),
             splat_count: buf!("splat_count", 4, atomic),
             max_splats,
             tiles_x,
@@ -568,7 +593,7 @@ mod tests {
     fn constants_are_sane() {
         assert_eq!(GAUSSIAN_DATA_STRIDE, (3 + 1 + 6 + 48) as u64 * 4);
         assert_eq!(PROJECTED_GAUSSIAN_STRIDE, (2 + 3 + 1 + 3 + 1) as u64 * 4);
-        assert_eq!(TILE_DATA_STRIDE, 8);
+        assert_eq!(TILE_DATA_STRIDE, 4); // packed: (offset << 12) | count
         assert_eq!(OCTREE_NODE_SIZE, 8);
     }
 }

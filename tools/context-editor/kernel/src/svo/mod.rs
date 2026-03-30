@@ -249,6 +249,55 @@ impl VoxelWorld {
     }
 
     // -----------------------------------------------------------------------
+    // Position precomputation for GPU
+    // -----------------------------------------------------------------------
+
+    /// Compute world-space positions for every node, returned as `[x, y, z, half_extent]`.
+    ///
+    /// The GPU cannot use recursion, so we precompute positions on the CPU via
+    /// a DFS traversal and upload them as a storage buffer.
+    pub fn compute_node_positions(&self) -> Vec<[f32; 4]> {
+        let world_size = (1u32 << self.max_depth) as f32;
+        let mut positions = vec![[0.0f32; 4]; self.nodes.len()];
+        self.fill_positions(
+            self.root_index as usize,
+            0.0, 0.0, 0.0,
+            world_size,
+            &mut positions,
+        );
+        positions
+    }
+
+    fn fill_positions(
+        &self,
+        idx: usize,
+        ox: f32, oy: f32, oz: f32,
+        size: f32,
+        out: &mut Vec<[f32; 4]>,
+    ) {
+        let half = size * 0.5;
+        // Store center of this cell
+        out[idx] = [ox + half, oy + half, oz + half, half];
+
+        let node = &self.nodes[idx];
+        let mask = node.child_mask();
+        if mask == 0 {
+            return; // leaf
+        }
+        let first_child = node.first_child_index();
+        let child_size = half;
+        for slot in 0..8usize {
+            if mask & (1 << slot) == 0 {
+                continue;
+            }
+            let cx = if slot & 1 != 0 { ox + half } else { ox };
+            let cy = if slot & 2 != 0 { oy + half } else { oy };
+            let cz = if slot & 4 != 0 { oz + half } else { oz };
+            self.fill_positions(first_child + slot, cx, cy, cz, child_size, out);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Traversal
     // -----------------------------------------------------------------------
 
@@ -351,9 +400,15 @@ impl VoxelWorld {
 
         let child_mask = self.nodes[node_idx].child_mask();
         if child_mask & bit == 0 {
-            // Allocate 8 new child slots
-            let first_child = self.nodes.len();
-            self.nodes.extend_from_slice(&[OctreeNode::default(); 8]);
+            // Reuse existing 8-slot block if children already exist,
+            // otherwise allocate a fresh block.
+            let first_child = if child_mask == 0 {
+                let fc = self.nodes.len();
+                self.nodes.extend_from_slice(&[OctreeNode::default(); 8]);
+                fc
+            } else {
+                self.nodes[node_idx].first_child_index()
+            };
             let new_mask = child_mask | bit;
             self.nodes[node_idx].child_pointer =
                 (first_child as u32) << 8 | new_mask as u32;

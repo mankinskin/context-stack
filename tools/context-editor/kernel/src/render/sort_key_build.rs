@@ -18,6 +18,7 @@
 use bevy::{
     prelude::*,
     render::{
+        extract_resource::ExtractResource,
         render_graph::{Node, NodeRunError, RenderGraphContext},
         render_resource::{
             BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
@@ -55,8 +56,15 @@ pub fn init_sort_key_resources(
 // ---------------------------------------------------------------------------
 
 /// GPU uniform buffer holding [`CameraUniforms`] data for the sort key shader.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct SortKeyCameraUniform(pub Buffer);
+
+impl ExtractResource for SortKeyCameraUniform {
+    type Source = SortKeyCameraUniform;
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
+}
 
 impl SortKeyCameraUniform {
     pub fn new(device: &RenderDevice) -> Self {
@@ -218,8 +226,12 @@ pub fn queue_sort_key_pipeline(
     mut commands: Commands,
     pipeline_cache: Res<PipelineCache>,
     asset_server: Res<AssetServer>,
+    existing: Option<Res<SortKeyPipeline>>,
 ) {
-    let shader = asset_server.load("render/sort_key_build.wgsl");
+    if existing.is_some() {
+        return;
+    }
+    let shader = asset_server.load("embedded://context_editor_kernel/render/sort_key_build.wgsl");
     let id = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
         label: Some("sort_key_build_pipeline".into()),
         layout: vec![sort_key_bind_group_layout_descriptor()],
@@ -238,9 +250,12 @@ pub fn rebuild_sort_key_bind_group(
     mut commands: Commands,
     device: Res<RenderDevice>,
     pipeline_cache: Res<PipelineCache>,
-    splat_buffers: Res<SplatBuffers>,
-    camera_uniform: Res<SortKeyCameraUniform>,
+    splat_buffers: Option<Res<SplatBuffers>>,
+    camera_uniform: Option<Res<SortKeyCameraUniform>>,
 ) {
+    let Some(splat_buffers) = splat_buffers else { return };
+    let Some(camera_uniform) = camera_uniform else { return };
+
     let descriptor = sort_key_bind_group_layout_descriptor();
     let layout = pipeline_cache.get_bind_group_layout(&descriptor);
     commands.insert_resource(SortKeyBindGroup::new(
