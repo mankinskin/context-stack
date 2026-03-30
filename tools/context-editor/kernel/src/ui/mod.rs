@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use crate::world;
+use crate::debug_overlay::DebugPanel;
 
 /// Root Dioxus component — passed by function pointer to `dioxus::launch`.
 /// Renders the kernel glass scaffold, injecting world-specific UI via the
@@ -10,8 +11,11 @@ pub fn root_app() -> Element {
         div { class: "kernel-root pointer-events-none relative h-screen w-screen",
             // Dioxus UI overlay (z-10)
             div { class: "relative z-10 flex h-screen w-screen p-4 pointer-events-none",
-                // Left: world-injected status / inspection panel
-                div { class: "w-1/4 pointer-events-auto", {world().sidebar_content()} }
+                // Left: world-injected status / inspection panel + debug settings
+                div { class: "w-1/4 flex flex-col gap-4 pointer-events-auto",
+                    {world().sidebar_content()},
+                    DebugPanel {}
+                }
 
                 // Centre: minimal HUD crosshair
                 div { class: "flex-1 flex justify-center items-center pointer-events-none",

@@ -32,6 +32,7 @@ pub mod llm_integration;
 pub mod ticket_editor;
 pub mod doc_editor;
 pub mod code_viewer;
+pub mod debug_overlay;
 #[cfg(target_arch = "wasm32")]
 pub mod bootstrap;
 
@@ -120,6 +121,7 @@ fn run_bevy_wasm() {
     app.add_plugins(crate::ticket_editor::TicketEditorPlugin);
     app.add_plugins(crate::doc_editor::DocEditorPlugin);
     app.add_plugins(crate::code_viewer::CodeViewerPlugin);
+    app.add_plugins(crate::debug_overlay::DebugOverlayPlugin);
 
     // Initialise empty World Resource
     app.insert_resource(crate::svo::VoxelWorld::new(8));

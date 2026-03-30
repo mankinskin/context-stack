@@ -17,6 +17,7 @@ bevy = { version = "0.18", default-features = false, features = [
     "bevy_pbr",
     "bevy_winit",
     "bevy_window",
+    "bevy_gizmos",
 ] }
 bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
 bytemuck = { version = "1", features = ["derive"] }
