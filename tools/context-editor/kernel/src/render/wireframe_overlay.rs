@@ -203,7 +203,7 @@ pub fn queue_wireframe_pipeline(
         },
         depth_stencil: None,
         multisample: MultisampleState {
-            count: 4,
+            count: 1,
             mask: !0,
             alpha_to_coverage_enabled: false,
         },
@@ -292,7 +292,7 @@ impl Node for WireframeOverlayNode {
             return Ok(());
         };
 
-        let color_attachment = view_target.get_color_attachment();
+        let color_attachment = view_target.get_unsampled_color_attachment();
 
         {
             let mut pass = render_context

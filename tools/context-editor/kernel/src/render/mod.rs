@@ -8,6 +8,7 @@
 //! ```text
 //! BufferSwap → ParticleCompute → VoxelSplatKernel → SortKeyBuild
 //!           → RadixSort → TileBin → TiledRaster → UiComposite
+//!           → WireframeOverlay
 //! ```
 //!
 //! | Stage | Purpose |
@@ -372,12 +373,12 @@ impl Plugin for ContextEditorRenderPlugin {
         core3d.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
         core3d.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
         core3d.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::TiledRaster);
-        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::WireframeOverlay);
-        core3d.add_node_edge(ContextEditorLabel::WireframeOverlay, ContextEditorLabel::UiComposite);
+        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::UiComposite);
+        core3d.add_node_edge(ContextEditorLabel::UiComposite, ContextEditorLabel::WireframeOverlay);
 
         // Anchor into the existing Core3d sub-graph:
         //   ... → EndMainPass → [our chain] → Tonemapping → Upscaling → ...
         core3d.add_node_edge(Node3d::EndMainPass, ContextEditorLabel::BufferSwap);
-        core3d.add_node_edge(ContextEditorLabel::UiComposite, Node3d::Tonemapping);
+        core3d.add_node_edge(ContextEditorLabel::WireframeOverlay, Node3d::Tonemapping);
     }
 }
