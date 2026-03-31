@@ -67,6 +67,7 @@ struct GlassPanelData {
 @group(0) @binding(2) var<storage, read> tile_data:     array<u32>; // [offset, count] per tile (2 u32s each)
 @group(0) @binding(3) var<uniform>       uniforms:      RasterUniforms;
 @group(0) @binding(4) var<storage, read> glass_panels:  array<GlassPanelData>;
+@group(0) @binding(5) var<storage, read> octree:        array<vec2u>; // OctreeNode: (child_pointer, color_data)
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -176,11 +177,95 @@ fn ray_box_closest_point(ro: vec3f, rd: vec3f, center: vec3f, half_ext: f32) -> 
     return ro + rd * max(t, 0.0);
 }
 
-/// Approximate face-normal from point-on-surface.
-fn box_normal(p: vec3f, half_ext: vec3f) -> vec3f {
-    let d   = abs(p) - half_ext;
-    let eps = vec3f(0.001);
-    return normalize(sign(p) * step(d.yzx, d.xyz) * step(d.zxy, d.xyz));
+fn box_normal(p_local: vec3f, half_ext: vec3f) -> vec3f {
+    // Ein sehr kleiner Epsilon-Wert für die Gradienten-Berechnung
+    let e = vec2f(0.001, 0.0);
+    
+    // Wir berechnen den Gradienten der sd_box Funktion an Punkt p
+    // Das entspricht der Richtung des steilsten Anstiegs der Distanz
+    let n = vec3f(
+        sd_box(p_local + e.xyy, half_ext) - sd_box(p_local - e.xyy, half_ext),
+        sd_box(p_local + e.yxy, half_ext) - sd_box(p_local - e.yxy, half_ext),
+        sd_box(p_local + e.yyx, half_ext) - sd_box(p_local - e.yyx, half_ext)
+    );
+    
+    return normalize(n);
+}
+
+// ---------------------------------------------------------------------------
+// SDF type dispatch — bits 30-31 of material_packed
+// 0b00 = Box  (default, fastest)
+// 0b01 = Sphere (inscribed in voxel, 90% radius)
+// 0b10 = SVO-Sampled (box fallback until LOD splats are added)
+// 0b11 = Torus / Procedural
+// ---------------------------------------------------------------------------
+
+fn sdf_type_from_mp(material_packed: u32) -> u32 {
+    return (material_packed >> 30u) & 3u;
+}
+
+fn sd_sphere(p: vec3f, r: f32) -> f32 {
+    return length(p) - r;
+}
+
+fn sd_torus(p: vec3f, major_r: f32, minor_r: f32) -> f32 {
+    let q = vec2f(length(p.xz) - major_r, p.y);
+    return length(q) - minor_r;
+}
+
+/// Dispatch SDF evaluation to the correct shape function.
+fn sdf_eval(p: vec3f, half_ext: f32, sdf_type: u32) -> f32 {
+    if sdf_type == 1u {
+        return sd_sphere(p, half_ext * 0.9);
+    }
+    if sdf_type == 3u {
+        return sd_torus(p, half_ext * 0.6, half_ext * 0.25);
+    }
+    // Box (type 0, 2 = svo-sampled fallback, or unknown)
+    return sd_box(p, vec3f(half_ext));
+}
+
+/// Analytical surface normal for each SDF type.
+fn sdf_normal_type(p_local: vec3f, half_ext: f32, sdf_type: u32) -> vec3f {
+    if sdf_type == 1u {
+        // Sphere: radial direction
+        return normalize(p_local);
+    }
+    if sdf_type == 3u {
+        // Torus analytical gradient (ring in XZ plane)
+        let major_r = half_ext * 0.6;
+        let xz_len  = length(p_local.xz);
+        let xz_hat  = p_local.xz / max(xz_len, 0.0001);
+        let q       = vec2f(xz_len - major_r, p_local.y);
+        let q_hat   = normalize(q);
+        return normalize(vec3f(xz_hat.x * q_hat.x, q_hat.y, xz_hat.y * q_hat.x));
+    }
+    // Box and all fallback types: use gradient-based box normal
+    return box_normal(p_local, vec3f(half_ext));
+}
+
+/// Closest point on the surface along the ray, per SDF type.
+fn ray_surface_closest_point(
+    ro: vec3f, rd: vec3f, center: vec3f, half_ext: f32, sdf_type: u32,
+) -> vec3f {
+    if sdf_type == 1u {
+        // Exact ray-sphere intersection
+        let r    = half_ext * 0.9;
+        let oc   = ro - center;
+        let b    = dot(oc, rd);
+        let c    = dot(oc, oc) - r * r;
+        let disc = b * b - c;
+        if disc >= 0.0 {
+            let sq = sqrt(disc);
+            let t1 = -b - sq;
+            let t2 = -b + sq;
+            // Ray starts inside sphere → t=0 (current position is inside)
+            if t1 < 0.0 && t2 > 0.0 { return ro; }
+            return ro + rd * max(t1, 0.0);
+        }
+        // Miss → fall through to box closest point
+    }
+    return ray_box_closest_point(ro, rd, center, half_ext);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,11 +442,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
         let center_ws  = s.center_and_extent.xyz;
         let half_ext_f = s.center_and_extent.w;
 
-        // Ray-box SDF evaluation
-        let local_pos = ray_box_closest_point(
-            ray_origin, ray_dir, center_ws, half_ext_f,
+        // SDF type dispatch
+        let sdf_tp    = sdf_type_from_mp(s.material_packed);
+        let local_pos = ray_surface_closest_point(
+            ray_origin, ray_dir, center_ws, half_ext_f, sdf_tp,
         );
-        let d = sd_box(local_pos - center_ws, vec3f(half_ext_f));
+        let p_local = local_pos - center_ws;
+        let d = sdf_eval(p_local, half_ext_f, sdf_tp);
 
         // Anti-aliased coverage — analytical pixel footprint (avoids fwidth
         // in non-uniform control flow)
@@ -372,7 +459,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 
         // Lighting
         let mat      = unpack_material(s.material_packed);
-        let normal   = box_normal(local_pos - center_ws, vec3f(half_ext_f));
+        let normal   = sdf_normal_type(p_local, half_ext_f, sdf_tp);
         let view_dir = normalize(uniforms.camera_pos - local_pos);
         let pbr      = evaluate_pbr(mat, normal, view_dir,
                                     uniforms.light_dir, uniforms.light_color);

@@ -63,6 +63,7 @@ impl MaterialDef {
             b: (self.base_color[2] * 255.0).clamp(0.0, 255.0) as u8,
             roughness: (self.roughness * 31.0).clamp(0.0, 31.0) as u8,
             metallic: self.metallic,
+            sdf_type: 0,
         }
     }
 

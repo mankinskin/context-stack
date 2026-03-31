@@ -32,7 +32,7 @@ use bevy::{
     },
 };
 
-use crate::gpu::SplatBuffers;
+use crate::gpu::{SplatBuffers, SvoDoubleBuffer};
 use super::glass::GlassPanelBuffer;
 
 // ---------------------------------------------------------------------------
@@ -206,6 +206,17 @@ pub fn raster_bind_group_layout_descriptor() -> BindGroupLayoutDescriptor {
                 },
                 count: None,
             },
+            // binding 5 — octree (SVO front buffer for SDF type evaluation)
+            BindGroupLayoutEntry {
+                binding: 5,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
         ],
     )
 }
@@ -283,10 +294,12 @@ pub fn rebuild_raster_bind_group(
     splat_buffers: Option<Res<SplatBuffers>>,
     uniform: Option<Res<RasterUniformBuffer>>,
     glass_buffer: Option<Res<GlassPanelBuffer>>,
+    svo: Option<Res<SvoDoubleBuffer>>,
 ) {
     let Some(splat_buffers) = splat_buffers else { return };
     let Some(uniform) = uniform else { return };
     let Some(glass_buffer) = glass_buffer else { return };
+    let Some(svo) = svo else { return };
 
     let descriptor = raster_bind_group_layout_descriptor();
     let layout = pipeline_cache.get_bind_group_layout(&descriptor);
@@ -314,6 +327,10 @@ pub fn rebuild_raster_bind_group(
             BindGroupEntry {
                 binding: 4,
                 resource: glass_buffer.buffer.as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 5,
+                resource: svo.front.as_entire_binding(),
             },
         ],
     );

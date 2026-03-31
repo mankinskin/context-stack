@@ -6,6 +6,7 @@
 //! tiled rasteriser process them identically.
 
 use bevy::prelude::*;
+use bevy::render::extract_resource::ExtractResource;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bytemuck::{Pod, Zeroable};
 
@@ -75,7 +76,7 @@ pub struct ParticleSystem {
 }
 
 /// GPU buffer for particle splats.
-#[derive(Resource)]
+#[derive(Resource, Clone, ExtractResource)]
 pub struct ParticleSplatBuffer {
     pub buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
@@ -107,6 +108,10 @@ impl Plugin for ParticleSplatPlugin {
 fn simulate_particles(time: Res<Time>, mut system: ResMut<ParticleSystem>) {
     let dt = time.delta_secs();
 
+    // Diagnostic: log particle count at milestones so the browser console
+    // confirms the simulation is running and emitters are seeded.
+    let count_before = system.particles.len();
+
     // Emit new particles
     let mut new_particles = Vec::new();
     for emitter in &system.emitters {
@@ -114,8 +119,15 @@ fn simulate_particles(time: Res<Time>, mut system: ResMut<ParticleSystem>) {
             if system.particles.len() + new_particles.len() >= MAX_PARTICLES {
                 break;
             }
+            // Golden-angle sunflower jitter so each spawn goes to a slightly
+            // different XZ position — prevents all particles stacking at
+            // exactly the origin and creates a natural-looking cloud spread.
+            let spawn_idx = (system.particles.len() + new_particles.len()) as f32;
+            let angle = spawn_idx * 2.399_963; // golden angle ≈ 137.5°
+            let radius = spawn_idx.sqrt() * 0.25; // grows slowly, ~3 units at 144 particles
+            let jitter = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
             new_particles.push(Particle {
-                position: emitter.origin,
+                position: emitter.origin + jitter,
                 velocity: emitter.initial_velocity,
                 color: emitter.color,
                 scale: emitter.scale,
@@ -126,6 +138,17 @@ fn simulate_particles(time: Res<Time>, mut system: ResMut<ParticleSystem>) {
         }
     }
     system.particles.extend(new_particles);
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let new_total = system.particles.len();
+        if count_before == 0 && new_total > 0 {
+            web_sys::console::log_1(
+                &format!("[particles] first {} particles spawned, {} emitters",
+                    new_total, system.emitters.len()).into()
+            );
+        }
+    }
 
     // Age and integrate
     for p in &mut system.particles {

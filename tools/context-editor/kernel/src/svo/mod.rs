@@ -44,6 +44,10 @@ pub struct OctreeNode {
 }
 
 impl OctreeNode {
+    /// Bit 31 of `child_pointer`: marks a leaf node as fully surrounded on all 6 faces.
+    /// Interior voxels are skipped by the splat kernel — they can never be seen.
+    pub const INTERIOR_FLAG: u32 = 0x8000_0000;
+
     pub const fn leaf(color_data: u32) -> Self {
         Self { child_pointer: 0, color_data }
     }
@@ -57,7 +61,8 @@ impl OctreeNode {
     }
 
     pub fn first_child_index(&self) -> usize {
-        (self.child_pointer >> 8) as usize
+        // Mask out INTERIOR_FLAG (bit 31) before extracting the 23-bit child index.
+        ((self.child_pointer & 0x7FFF_FF00) >> 8) as usize
     }
 }
 
@@ -74,7 +79,7 @@ impl OctreeNode {
 ///   Bits 16–23: B (8 bits)
 ///   Bits 24–28: Roughness (5 bits, 0–31 → 0.0–1.0)
 ///   Bit  29:    Metallic  (1 bit, 0 = dielectric, 1 = metallic)
-///   Bits 30–31: Reserved
+///   Bits 30–31: SDF type  (0=box, 1=sphere, 2=svo-sampled, 3=torus/procedural)
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct VoxelMaterial {
@@ -86,15 +91,23 @@ pub struct VoxelMaterial {
     pub roughness: u8,
     /// Metallic flag (binary: dielectric or metal).
     pub metallic: bool,
+    /// SDF shape type encoded in bits 30–31:
+    /// 0 = box (default), 1 = sphere, 2 = svo-sampled, 3 = torus.
+    pub sdf_type: u8,
 }
 
 impl VoxelMaterial {
     pub const fn new(r: u8, g: u8, b: u8, roughness: u8) -> Self {
-        Self { r, g, b, roughness, metallic: false }
+        Self { r, g, b, roughness, metallic: false, sdf_type: 0 }
     }
 
     pub const fn new_metallic(r: u8, g: u8, b: u8, roughness: u8, metallic: bool) -> Self {
-        Self { r, g, b, roughness, metallic }
+        Self { r, g, b, roughness, metallic, sdf_type: 0 }
+    }
+
+    /// Create a material with an explicit SDF shape type.
+    pub const fn new_sdf(r: u8, g: u8, b: u8, roughness: u8, sdf_type: u8) -> Self {
+        Self { r, g, b, roughness, metallic: false, sdf_type }
     }
 
     /// Pack into a u32 matching the WGSL `unpack_material()` bit layout.
@@ -102,11 +115,13 @@ impl VoxelMaterial {
         let r = self.roughness;
         let rough_5 = (if r < 31 { r } else { 31 }) as u32;
         let metal_bit = if self.metallic { 1u32 } else { 0u32 };
+        let sdf_bits = (self.sdf_type as u32 & 3u32) << 30;
         (self.r as u32)
             | (self.g as u32) << 8
             | (self.b as u32) << 16
             | rough_5 << 24
             | metal_bit << 29
+            | sdf_bits
     }
 
     /// Unpack from a u32 (inverse of [`pack`]).
@@ -117,6 +132,7 @@ impl VoxelMaterial {
             b: (v >> 16) as u8,
             roughness: ((v >> 24) & 0x1F) as u8,
             metallic: ((v >> 29) & 1) != 0,
+            sdf_type: ((v >> 30) & 3) as u8,
         }
     }
 }
@@ -167,17 +183,47 @@ impl VoxelWorld {
     ///
     /// Subdivides the octree down to `max_depth` as needed and marks the
     /// modified node dirty for GPU upload.
+    ///
+    /// Also updates the INTERIOR_FLAG on this voxel and all 6 face-neighbors:
+    /// a voxel is interior if all 6 axis-aligned neighbors are occupied.
     pub fn set_voxel(&mut self, pos: IVec3, material: VoxelMaterial) {
         let node_idx = self.descend_and_allocate(pos.as_uvec3(), 0, self.root_index as usize, 0);
         self.nodes[node_idx].color_data = material.pack();
+        // Clear any stale interior flag from before (will be recalculated).
+        self.nodes[node_idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
         self.mark_dirty(node_idx);
+        self.reclassify_interior_around(pos);
     }
 
     /// Remove the voxel at `pos` (set to empty/transparent).
+    ///
+    /// Clears the INTERIOR_FLAG from all 6 face-neighbors since they are now
+    /// exposed to empty space.
     pub fn remove_voxel(&mut self, pos: IVec3) {
         if let Some(node_idx) = self.descend_to(pos) {
             self.nodes[node_idx].color_data = 0;
+            self.nodes[node_idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
             self.mark_dirty(node_idx);
+
+            // Neighbors can no longer be interior — clear their flags.
+            let max_c = (1i32 << self.max_depth) - 1;
+            let mut to_clear: Vec<usize> = Vec::new();
+            for &dir in &[IVec3::X, -IVec3::X, IVec3::Y, -IVec3::Y, IVec3::Z, -IVec3::Z] {
+                let np = pos + dir;
+                if np.x < 0 || np.y < 0 || np.z < 0
+                    || np.x > max_c || np.y > max_c || np.z > max_c {
+                    continue;
+                }
+                if let Some(nidx) = self.descend_to(np) {
+                    if self.nodes[nidx].color_data != 0 {
+                        to_clear.push(nidx);
+                    }
+                }
+            }
+            for nidx in to_clear {
+                self.nodes[nidx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
+                self.mark_dirty(nidx);
+            }
         }
     }
 
@@ -223,6 +269,146 @@ impl VoxelWorld {
             }
         }
         count
+    }
+
+    // -----------------------------------------------------------------------
+    // Interior flag helpers (Phase 4)
+    // -----------------------------------------------------------------------
+
+    /// Check whether the voxel at `pos` is occupied (non-zero color_data).
+    /// Out-of-bounds positions are treated as empty.
+    pub fn is_occupied_at(&self, pos: IVec3) -> bool {
+        let max_c = (1i32 << self.max_depth) - 1;
+        if pos.x < 0 || pos.y < 0 || pos.z < 0
+            || pos.x > max_c || pos.y > max_c || pos.z > max_c
+        {
+            return false;
+        }
+        self.descend_to(pos)
+            .map(|i| self.nodes[i].color_data != 0)
+            .unwrap_or(false)
+    }
+
+    /// Returns `true` if all 6 axis-aligned neighbors of `pos` are occupied.
+    fn all_face_neighbors_occupied(&self, pos: IVec3) -> bool {
+        for &dir in &[IVec3::X, -IVec3::X, IVec3::Y, -IVec3::Y, IVec3::Z, -IVec3::Z] {
+            if !self.is_occupied_at(pos + dir) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Recalculate the INTERIOR_FLAG for `pos` and its 6 face-neighbors.
+    ///
+    /// Called after every `set_voxel` so the splat kernel can skip voxels
+    /// that are guaranteed not to be visible.
+    fn reclassify_interior_around(&mut self, pos: IVec3) {
+        let dirs = [
+            IVec3::ZERO,
+            IVec3::X, -IVec3::X,
+            IVec3::Y, -IVec3::Y,
+            IVec3::Z, -IVec3::Z,
+        ];
+        let max_c = (1i32 << self.max_depth) - 1;
+
+        // Collect (node_index, new_interior_flag) without holding a mutable borrow.
+        let updates: Vec<(usize, bool)> = dirs
+            .iter()
+            .filter_map(|&d| {
+                let cp = pos + d;
+                if cp.x < 0 || cp.y < 0 || cp.z < 0
+                    || cp.x > max_c || cp.y > max_c || cp.z > max_c
+                {
+                    return None;
+                }
+                let idx = self.descend_to(cp)?;
+                if self.nodes[idx].color_data == 0 {
+                    return None; // not occupied
+                }
+                let interior = self.all_face_neighbors_occupied(cp);
+                Some((idx, interior))
+            })
+            .collect();
+
+        for (idx, interior) in updates {
+            if interior {
+                self.nodes[idx].child_pointer |= OctreeNode::INTERIOR_FLAG;
+            } else {
+                self.nodes[idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
+            }
+            self.mark_dirty(idx);
+        }
+    }
+
+    /// One-shot pass to classify every leaf node as interior or surface.
+    ///
+    /// Call this once after bulk world generation (e.g. at the end of
+    /// bootstrap) to avoid per-voxel overhead during initial placement.
+    pub fn recompute_all_interior_flags(&mut self) {
+        let node_count = self.nodes.len();
+        let max_c = (1i32 << self.max_depth) - 1;
+
+        // We need world-space positions for every leaf node. Use a DFS.
+        // Collect (node_idx, world_pos) for all occupied leaves.
+        let mut leaves: Vec<(usize, IVec3)> = Vec::new();
+        self.collect_occupied_leaves(
+            self.root_index as usize,
+            IVec3::ZERO,
+            1i32 << self.max_depth,
+            &mut leaves,
+        );
+        let _ = (node_count, max_c);
+
+        let updates: Vec<(usize, bool)> = leaves
+            .iter()
+            .map(|&(idx, pos)| (idx, self.all_face_neighbors_occupied(pos)))
+            .collect();
+
+        for (idx, interior) in updates {
+            if interior {
+                self.nodes[idx].child_pointer |= OctreeNode::INTERIOR_FLAG;
+            } else {
+                self.nodes[idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
+            }
+            self.mark_dirty(idx);
+        }
+    }
+
+    fn collect_occupied_leaves(
+        &self,
+        idx: usize,
+        origin: IVec3,
+        size: i32,
+        out: &mut Vec<(usize, IVec3)>,
+    ) {
+        let node = &self.nodes[idx];
+        if node.is_leaf() {
+            if node.color_data != 0 {
+                let half = size / 2;
+                out.push((idx, origin + IVec3::splat(half)));
+            }
+            return;
+        }
+        let child_mask  = node.child_mask();
+        let first_child = node.first_child_index();
+        let child_half  = size / 2;
+        for slot in 0u8..8 {
+            if child_mask & (1 << slot) == 0 {
+                continue;
+            }
+            let child_offset = (child_mask & ((1 << slot) - 1)).count_ones() as usize;
+            let child_idx    = first_child + child_offset;
+            let dx = if slot & 1 != 0 { child_half } else { 0 };
+            let dy = if slot & 2 != 0 { child_half } else { 0 };
+            let dz = if slot & 4 != 0 { child_half } else { 0 };
+            self.collect_occupied_leaves(
+                child_idx,
+                origin + IVec3::new(dx, dy, dz),
+                child_half,
+                out,
+            );
+        }
     }
 
     // -----------------------------------------------------------------------

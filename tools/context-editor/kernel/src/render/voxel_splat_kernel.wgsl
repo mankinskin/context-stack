@@ -45,6 +45,7 @@ fn generate_splats(@builtin(global_invocation_id) id: vec3u) {
     let node = octree[node_idx];
 
     // Skip internal nodes — only leaves produce splats
+    const INTERIOR_FLAG: u32 = 0x80000000u;
     let child_mask = node.child_pointer & 0xFFu;
     if child_mask != 0u {
         return;
@@ -52,6 +53,11 @@ fn generate_splats(@builtin(global_invocation_id) id: vec3u) {
 
     // Skip empty leaves (color_data == 0 means unoccupied)
     if node.color_data == 0u {
+        return;
+    }
+
+    // Skip interior voxels (fully surrounded — not visible)
+    if (node.child_pointer & INTERIOR_FLAG) != 0u {
         return;
     }
 
@@ -68,5 +74,5 @@ fn generate_splats(@builtin(global_invocation_id) id: vec3u) {
     }
 
     let si = atomicAdd(&splat_count, 1u);
-    splats[si] = VoxelSplat(pos, half, node.color_data, 0u);
+    splats[si] = VoxelSplat(pos, half, node.color_data, node_idx);
 }

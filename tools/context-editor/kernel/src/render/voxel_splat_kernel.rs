@@ -21,6 +21,7 @@ use bevy::{
 
 use crate::gpu::{SvoDoubleBuffer, SplatBuffers, SVO_CAPACITY_NODES};
 use crate::splat::{SplatParams, SPLAT_PARAMS_SIZE};
+use crate::particle_splat::ParticleSplatBuffer;
 
 // ---------------------------------------------------------------------------
 // NodePositionBuffer — precomputed world-space positions for each SVO node
@@ -373,10 +374,16 @@ impl Node for VoxelSplatKernelNode {
 
         let encoder = render_context.command_encoder();
 
-        // Reset splat_count atomic to 0
-        let zero = [0u8; 4];
+        // Seed splat_count = particle_count so the SVO kernel's atomicAdd calls
+        // append voxel splats AFTER the particle region splats[0..particle_count).
+        // When there are no particles this is equivalent to resetting to 0.
+        let particle_count = world
+            .get_resource::<ParticleSplatBuffer>()
+            .map(|p| p.count)
+            .unwrap_or(0);
+        let init_bytes = particle_count.to_le_bytes();
         let render_queue = world.get_resource::<RenderQueue>().unwrap();
-        render_queue.write_buffer(&splat_buffers.splat_count, 0, &zero);
+        render_queue.write_buffer(&splat_buffers.splat_count, 0, &init_bytes);
 
         // Dispatch compute
         let total_nodes = svo.capacity_nodes as u32;

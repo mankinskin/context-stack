@@ -36,6 +36,7 @@ pub mod tiled_raster;
 pub mod glass;
 pub mod ui_composite;
 pub mod wireframe_overlay;
+pub mod particle_inject;
 
 use bevy::{
     prelude::*,
@@ -55,6 +56,7 @@ use tile_binning::TileBinNode;
 use tiled_raster::TiledRasterNode;
 use ui_composite::UiCompositeNode;
 use wireframe_overlay::WireframeOverlayNode;
+use particle_inject::ParticleComputeNode;
 
 // ---------------------------------------------------------------------------
 // Node labels
@@ -109,7 +111,7 @@ macro_rules! stub_node {
 }
 
 stub_node!(BufferSwapNode);
-stub_node!(ParticleComputeNode);
+// ParticleComputeNode lives in render::particle_inject (real implementation)
 // VoxelSplatKernelNode lives in render::voxel_splat_kernel (T6a)
 // SortKeyBuildNode lives in render::sort_key_build (T6b)
 // RadixSortNode lives in render::radix_sort (T6c)
@@ -212,6 +214,7 @@ impl Plugin for ContextEditorRenderPlugin {
         bevy::asset::embedded_asset!(app, "tile_binning.wgsl");
         bevy::asset::embedded_asset!(app, "tiled_raster.wgsl");
         bevy::asset::embedded_asset!(app, "wireframe_overlay.wgsl");
+        bevy::asset::embedded_asset!(app, "particle_inject.wgsl");
 
         // On WASM, force-sync the Window resolution from the actual canvas
         // size before any render-related systems read it.
@@ -295,6 +298,7 @@ impl Plugin for ContextEditorRenderPlugin {
         // because its build() internally accesses app.get_sub_app_mut(RenderApp).
         app.add_plugins(ExtractResourcePlugin::<crate::gpu::SplatBuffers>::default())
             .add_plugins(ExtractResourcePlugin::<crate::gpu::SvoDoubleBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<crate::particle_splat::ParticleSplatBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<voxel_splat_kernel::SplatParamsUniform>::default())
             .add_plugins(ExtractResourcePlugin::<voxel_splat_kernel::NodePositionBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<sort_key_build::SortKeyCameraUniform>::default())
@@ -313,6 +317,15 @@ impl Plugin for ContextEditorRenderPlugin {
         // Render-world systems: pipeline queueing and bind group rebuild.
         // These need PipelineCache / AssetServer which live in the render
         // sub-app, so they must run here.
+        render_app.add_systems(
+            Render,
+            (
+                particle_inject::queue_particle_inject_pipeline,
+                particle_inject::rebuild_particle_inject_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
         render_app.add_systems(
             Render,
             (

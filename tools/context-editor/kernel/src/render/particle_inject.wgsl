@@ -35,13 +35,23 @@ var<storage, read_write> splats: array<VoxelSplat>;
 var<uniform> uniforms: ParticleUniforms;
 
 /// Pack normalised RGB + opacity into a single u32.
-/// Layout: [R:8][G:8][B:8][A:8]
+/// Layout: [0:2 sdf=box][R:6][G:8][B:8][A:8]
+///
+/// Packs color into the compact material format expected by the tiled rasteriser:
+///   bits  0- 7: R (8 bits)
+///   bits  8-15: G (8 bits)
+///   bits 16-23: B (8 bits)
+///   bits 24-28: roughness (5 bits, 0-31)
+///   bit     29: metallic (0 = dielectric)
+///   bits 30-31: sdf_type (0 = box SDF for particle splats)
 fn pack_color(c: vec4<f32>, opacity: f32) -> u32 {
     let r = u32(clamp(c.r, 0.0, 1.0) * 255.0);
     let g = u32(clamp(c.g, 0.0, 1.0) * 255.0);
     let b = u32(clamp(c.b, 0.0, 1.0) * 255.0);
-    let a = u32(clamp(opacity, 0.0, 1.0) * 255.0);
-    return (r << 24u) | (g << 16u) | (b << 8u) | a;
+    // Matte, non-metallic, box SDF (sdf_type=0 keeps bits 30-31 clear).
+    let roughness: u32 = 9u; // ~0.3 roughness (matte)
+    // sdf_type=1 (sphere) in bits 30-31 gives particle-like round appearance.
+    return r | (g << 8u) | (b << 16u) | (roughness << 24u) | (1u << 30u);
 }
 
 /// Compute the motion-blurred AABB half-extent.

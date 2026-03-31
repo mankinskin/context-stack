@@ -6,7 +6,6 @@ use crate::theme::{
     MaterialRef, MaterialRefMap, ThemePalette,
     theme_update_svo,
 };
-use crate::render::glass::GlassPanel;
 use crate::character::{CharacterController, CharacterPlugin};
 use crate::world_gen::{
     tree_template, boulder_template,
@@ -28,13 +27,6 @@ pub struct BootstrapPlugin;
 #[derive(Component)]
 struct PaletteMesh(MaterialRef);
 
-/// Extract sRGBA components from a palette Color (always created via `Color::srgba`).
-fn color_to_rgba(color: &Color) -> [f32; 4] {
-    match color {
-        Color::Srgba(c) => [c.red, c.green, c.blue, c.alpha],
-        _ => [0.5, 0.5, 0.5, 1.0],
-    }
-}
 
 impl Plugin for BootstrapPlugin {
     fn build(&self, app: &mut App) {
@@ -63,9 +55,6 @@ impl Plugin for BootstrapPlugin {
 
 fn setup_baseline_scene(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    palette: Res<ThemePalette>,
 ) {
     // Floor / terrain (with physics collider) — centered in SVO world
     // Keep as invisible physics ground plane; voxel terrain is rendered by the
@@ -115,48 +104,6 @@ fn setup_baseline_scene(
         KinematicCharacterController::default(),
     ));
 
-    // Glass panel 1 — clear glass in front of the primary cube
-    let glass_tint = color_to_rgba(&palette.glass_tint);
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(12.0, 8.0, 0.2))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: palette.glass_tint,
-            alpha_mode: AlphaMode::Blend,
-            ..default()
-        })),
-        Transform::from_xyz(SCENE_X, SVO_GROUND_Y + 8.0, SCENE_Z + 16.0),
-        GlassPanel {
-            ior: 1.5,
-            tint: glass_tint,
-            blur_roughness: 0.0,
-            corner_radius: 0.6,
-            half_size: Vec3::new(6.0, 4.0, 0.1),
-            caustic_strength: 5.0,
-            chromatic_spread: 1.2,
-        },
-    ));
-
-    // Glass panel 2 — frosted glass near the secondary sphere
-    let frosted_tint = color_to_rgba(&palette.glass_frosted_tint);
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(8.0, 10.0, 0.2))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: palette.glass_frosted_tint,
-            alpha_mode: AlphaMode::Blend,
-            perceptual_roughness: 0.8,
-            ..default()
-        })),
-        Transform::from_xyz(SCENE_X + 20.0, SVO_GROUND_Y + 6.0, SCENE_Z + 10.0),
-        GlassPanel {
-            ior: 1.33,
-            tint: frosted_tint,
-            blur_roughness: 0.4,
-            corner_radius: 0.8,
-            half_size: Vec3::new(4.0, 5.0, 0.1),
-            caustic_strength: 3.0,
-            chromatic_spread: 0.0,
-        },
-    ));
 }
 
 // ---------------------------------------------------------------------------

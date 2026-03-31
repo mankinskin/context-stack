@@ -127,5 +127,36 @@ fn run_bevy_wasm() {
     app.insert_resource(crate::svo::VoxelWorld::new(10));
     app.add_plugins(crate::bootstrap::BootstrapPlugin);
 
+    // Seed a persistent ambient particle emitter so the particle pipeline is
+    // exercised immediately. Spawns slow-drifting cyan ember particles above
+    // the scene centre.
+    app.add_systems(Startup, seed_ambient_emitter);
+
     app.run();
+}
+
+#[cfg(target_arch = "wasm32")]
+fn seed_ambient_emitter(mut system: bevy::prelude::ResMut<crate::particle_splat::ParticleSystem>) {
+    use crate::particle_splat::ParticleEmitter;
+    use bevy::prelude::Vec3;
+    // Camera settles at y≈257. Emitters at y=261, z=540 are safely in frustum.
+    // scale=1.0 matches SVO leaf-voxel size; slow upward drift + jitter spreads
+    // particles into a visible cloud rather than a single stacked pile.
+    system.emitters.push(ParticleEmitter {
+        origin: Vec3::new(512.0, 261.0, 540.0),
+        rate: 20,
+        color: [0.1, 0.9, 1.0, 1.0], // bright cyan
+        scale: 1.0,
+        initial_velocity: Vec3::new(0.0, 1.0, 0.0),
+        lifetime: 6.0,
+    });
+    // Magenta cluster slightly right for visual separation.
+    system.emitters.push(ParticleEmitter {
+        origin: Vec3::new(518.0, 261.0, 537.0),
+        rate: 15,
+        color: [1.0, 0.1, 0.8, 1.0], // bright magenta
+        scale: 1.0,
+        initial_velocity: Vec3::new(0.3, 1.2, 0.0),
+        lifetime: 6.0,
+    });
 }

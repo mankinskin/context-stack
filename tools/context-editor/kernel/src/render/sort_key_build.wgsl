@@ -115,7 +115,7 @@ fn build_sort_keys(@builtin(global_invocation_id) id: vec3u) {
         vec4f(s.center_ws, s.half_extent),
         view_depth,
         s.material_packed,
-        vec2u(0u),
+        vec2u(s._pad, 0u),
     );
 
     // Sort key: tile_id of center (20 bits) | depth (12 bits)
