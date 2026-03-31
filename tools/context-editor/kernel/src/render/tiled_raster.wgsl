@@ -68,6 +68,7 @@ struct GlassPanelData {
 @group(0) @binding(3) var<uniform>       uniforms:      RasterUniforms;
 @group(0) @binding(4) var<storage, read> glass_panels:  array<GlassPanelData>;
 @group(0) @binding(5) var<storage, read> octree:        array<vec2u>; // OctreeNode: (child_pointer, color_data)
+@group(0) @binding(6) var<storage, read> depth_prepass: array<f32>; // per-pixel opaque depth from ZPrepassNode
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -429,6 +430,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     var color           = vec3f(0.0);
     var remaining_alpha = 1.0;
 
+    // Depth cull: prepass wrote the nearest opaque hit distance for this pixel.
+    // Any splat further than (prepass_depth + epsilon) is behind solid terrain
+    // and can be skipped, eliminating z-fighting.
+    let px_idx       = u32(px.y) * u32(uniforms.resolution.x) + u32(px.x);
+    let prepass_depth = depth_prepass[px_idx];
+
     for (var i = 0u; i < tile_count; i++) {
         let splat_idx = active_list[tile_offset + i];
         let s         = projected[splat_idx];
@@ -454,8 +461,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
         // in non-uniform control flow)
         let hit_dist = length(local_pos - ray_origin);
         let fw = hit_dist / max(uniforms.resolution.y, 1.0);
-        let alpha = (1.0 - smoothstep(-fw, fw, d)) * remaining_alpha;
+        // Part A opacity fix: box voxels clearly inside the surface are fully
+        // opaque — the smoothstep fringe only applies at the edge boundary.
+        var alpha: f32;
+        if sdf_tp == 0u && d < -fw {
+            alpha = remaining_alpha;
+        } else {
+            alpha = (1.0 - smoothstep(-fw, fw, d)) * remaining_alpha;
+        }
         if alpha < 1.0 / 255.0 { continue; }
+
+        // Depth cull: skip anything behind the prepass opaque surface.
+        // Guard: prepass_depth == 0.0 means the buffer is uninitialized
+        // (first frame(s) before the compute pipeline compiles).
+        // prepass_depth == DEPTH_INFINITY (1e20) means no opaque hit was found in the
+        // prepass — in both cases skip the cull and let alpha compositing run.
+        let has_prepass_hit = prepass_depth > 0.0 && prepass_depth < 1.0e20;
+        if has_prepass_hit && hit_dist > prepass_depth + 0.05 { continue; }
 
         // Lighting
         let mat      = unpack_material(s.material_packed);

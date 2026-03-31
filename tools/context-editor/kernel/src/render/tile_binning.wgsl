@@ -129,3 +129,35 @@ fn scatter_to_tiles(@builtin(global_invocation_id) gid: vec3u) {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Pass 4: Sort each tile's active_list range by depth (front-to-back)
+// ---------------------------------------------------------------------------
+//
+// One thread per tile.  Insertion sort on the tile's active_list entries
+// keyed by projected[].depth.  Tiles typically contain < 100 entries so
+// this is fast and avoids the need for a parallel sort.
+
+@compute @workgroup_size(256)
+fn sort_tile_active_list(@builtin(global_invocation_id) gid: vec3u) {
+    let tile_idx = gid.x;
+    if tile_idx >= uniforms.num_tiles { return; }
+
+    let offset = tile_data[tile_idx * 2u];
+    let count  = tile_data[tile_idx * 2u + 1u];
+    if count <= 1u { return; }
+
+    // Insertion sort — stable, in-place, O(n²) but n is small.
+    for (var i = 1u; i < count; i++) {
+        let key_idx  = active_list[offset + i];
+        let key_depth = projected[key_idx].depth;
+        var j = i;
+        while j > 0u {
+            let prev_idx = active_list[offset + j - 1u];
+            if projected[prev_idx].depth <= key_depth { break; }
+            active_list[offset + j] = prev_idx;
+            j -= 1u;
+        }
+        active_list[offset + j] = key_idx;
+    }
+}

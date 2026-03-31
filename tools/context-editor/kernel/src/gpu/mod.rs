@@ -226,6 +226,10 @@ pub struct SplatBuffers {
     pub active_list: Buffer,
     /// Atomic u32 counter: number of splats emitted by the kernel.
     pub splat_count: Buffer,
+    /// Per-pixel depth from the Z-prepass (one f32 per pixel, tile-aligned).
+    /// Written by `ZPrepassNode`, read by the tiled rasteriser to cull splats
+    /// behind the nearest opaque surface.
+    pub depth_prepass: Buffer,
     /// Maximum splats this allocation supports.
     pub max_splats: u32,
     /// Tile grid dimensions at the configured viewport size.
@@ -276,6 +280,13 @@ impl SplatBuffers {
             tile_write_heads: buf!("tile_write_heads", tile_count * 4, rw),
             active_list: buf!("active_list", MAX_ACTIVE_ENTRIES as u64 * 4, rw),
             splat_count: buf!("splat_count", 4, atomic),
+            // Tile-rounded pixel buffer: one f32 per pixel. Sized to cover the
+            // full tile-aligned dispatch so the compute shader never goes OOB.
+            depth_prepass: buf!(
+                "depth_prepass",
+                (tiles_x as u64) * (TILE_SIZE as u64) * (tiles_y as u64) * (TILE_SIZE as u64) * 4,
+                BufferUsages::STORAGE | BufferUsages::COPY_DST
+            ),
             max_splats,
             tiles_x,
             tiles_y,

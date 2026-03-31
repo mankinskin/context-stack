@@ -72,12 +72,13 @@ impl ExtractResource for TileBinUniformBuffer {
     }
 }
 
-/// Cached pipeline IDs for the three-pass tile binning shader.
+/// Cached pipeline IDs for the four-pass tile binning shader.
 #[derive(Resource)]
 pub struct TileBinPipelines {
     pub count: CachedComputePipelineId,
     pub prefix_sum: CachedComputePipelineId,
     pub scatter: CachedComputePipelineId,
+    pub sort: CachedComputePipelineId,
 }
 
 /// Pre-built bind group for the tile binning dispatch.
@@ -266,14 +267,23 @@ pub fn queue_tile_bin_pipeline(
     });
     let scatter = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
         label: Some("tile_bin_scatter_pipeline".into()),
-        layout,
+        layout: layout.clone(),
         push_constant_ranges: vec![],
-        shader,
+        shader: shader.clone(),
         shader_defs: vec![],
         entry_point: Some("scatter_to_tiles".into()),
         zero_initialize_workgroup_memory: false,
     });
-    commands.insert_resource(TileBinPipelines { count, prefix_sum, scatter });
+    let sort = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+        label: Some("tile_bin_sort_pipeline".into()),
+        layout,
+        push_constant_ranges: vec![],
+        shader,
+        shader_defs: vec![],
+        entry_point: Some("sort_tile_active_list".into()),
+        zero_initialize_workgroup_memory: false,
+    });
+    commands.insert_resource(TileBinPipelines { count, prefix_sum, scatter, sort });
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +392,11 @@ impl Node for TileBinNode {
         else {
             return Ok(());
         };
+        let Some(sort_pipeline) =
+            pipeline_cache.get_compute_pipeline(pipelines.sort)
+        else {
+            return Ok(());
+        };
 
         let encoder = render_context.command_encoder();
 
@@ -421,6 +436,19 @@ impl Node for TileBinNode {
             pass.set_pipeline(scatter_pipeline);
             pass.set_bind_group(0, &bind_group.0, &[]);
             pass.dispatch_workgroups(splat_workgroups, 1, 1);
+        }
+
+        // Pass 4 – sort each tile's active_list entries by depth (front-to-back)
+        let num_tiles = splat_buffers.tiles_x * splat_buffers.tiles_y;
+        let tile_workgroups = (num_tiles + 255) / 256;
+        {
+            let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some("tile_bin_sort"),
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(sort_pipeline);
+            pass.set_bind_group(0, &bind_group.0, &[]);
+            pass.dispatch_workgroups(tile_workgroups, 1, 1);
         }
 
         Ok(())

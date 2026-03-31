@@ -13,6 +13,8 @@
 //! | 2 | `storage<read>` | `tile_data: array<u32>` (packed: offset<<12 | count) |
 //! | 3 | `uniform` | `uniforms: RasterUniforms` |
 //! | 4 | `storage<read>` | `glass_panels: array<GlassPanelData>` |
+//! | 5 | `storage<read>` | `octree: array<vec2u>` (SVO front buffer) |
+//! | 6 | `storage<read>` | `depth_prepass: array<f32>` (from ZPrepassNode) |
 
 use bevy::{
     prelude::*,
@@ -217,6 +219,17 @@ pub fn raster_bind_group_layout_descriptor() -> BindGroupLayoutDescriptor {
                 },
                 count: None,
             },
+            // binding 6 — depth_prepass (written by ZPrepassNode, read here to cull splats)
+            BindGroupLayoutEntry {
+                binding: 6,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
         ],
     )
 }
@@ -331,6 +344,10 @@ pub fn rebuild_raster_bind_group(
             BindGroupEntry {
                 binding: 5,
                 resource: svo.front.as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 6,
+                resource: splat_buffers.depth_prepass.as_entire_binding(),
             },
         ],
     );

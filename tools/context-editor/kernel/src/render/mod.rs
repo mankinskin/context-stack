@@ -33,6 +33,7 @@ pub mod sort_key_build;
 pub mod radix_sort;
 pub mod tile_binning;
 pub mod tiled_raster;
+pub mod z_prepass;
 pub mod glass;
 pub mod ui_composite;
 pub mod wireframe_overlay;
@@ -54,6 +55,7 @@ use sort_key_build::SortKeyBuildNode;
 use radix_sort::RadixSortNode;
 use tile_binning::TileBinNode;
 use tiled_raster::TiledRasterNode;
+use z_prepass::ZPrepassNode;
 use ui_composite::UiCompositeNode;
 use wireframe_overlay::WireframeOverlayNode;
 use particle_inject::ParticleComputeNode;
@@ -80,6 +82,8 @@ pub enum ContextEditorLabel {
     TileBin,
     /// Per-tile forward rasterise with alpha-composite into the output target.
     TiledRaster,
+    /// Z-Prepass: find the nearest opaque depth per pixel before rasterising.
+    ZPrepass,
     /// Composite 2D UI panels over the scene colour output.
     UiComposite,
     /// Draw SVO wireframe lines on top of voxel splats.
@@ -213,6 +217,7 @@ impl Plugin for ContextEditorRenderPlugin {
         bevy::asset::embedded_asset!(app, "radix_sort.wgsl");
         bevy::asset::embedded_asset!(app, "tile_binning.wgsl");
         bevy::asset::embedded_asset!(app, "tiled_raster.wgsl");
+        bevy::asset::embedded_asset!(app, "z_prepass.wgsl");
         bevy::asset::embedded_asset!(app, "wireframe_overlay.wgsl");
         bevy::asset::embedded_asset!(app, "particle_inject.wgsl");
 
@@ -371,6 +376,15 @@ impl Plugin for ContextEditorRenderPlugin {
                 .chain()
                 .in_set(RenderSystems::Queue),
         );
+        render_app.add_systems(
+            Render,
+            (
+                z_prepass::queue_z_prepass_pipelines,
+                z_prepass::rebuild_z_prepass_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
 
         render_app.add_systems(
             Render,
@@ -403,6 +417,7 @@ impl Plugin for ContextEditorRenderPlugin {
         core3d.add_node(ContextEditorLabel::SortKeyBuild, SortKeyBuildNode::default());
         core3d.add_node(ContextEditorLabel::RadixSort, RadixSortNode::default());
         core3d.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
+        core3d.add_node(ContextEditorLabel::ZPrepass, ZPrepassNode::default());
         core3d.add_node(ContextEditorLabel::TiledRaster, tiled_raster_node);
         core3d.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
         core3d.add_node(ContextEditorLabel::WireframeOverlay, wireframe_node);
@@ -416,7 +431,8 @@ impl Plugin for ContextEditorRenderPlugin {
         core3d.add_node_edge(ContextEditorLabel::VoxelSplatKernel, ContextEditorLabel::SortKeyBuild);
         core3d.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
         core3d.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
-        core3d.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::TiledRaster);
+        core3d.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::ZPrepass);
+        core3d.add_node_edge(ContextEditorLabel::ZPrepass, ContextEditorLabel::TiledRaster);
         core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::UiComposite);
         core3d.add_node_edge(ContextEditorLabel::UiComposite, ContextEditorLabel::WireframeOverlay);
 
