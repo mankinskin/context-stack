@@ -187,10 +187,6 @@ impl Node for ParticleComputeNode {
         if particle_count == 0 {
             return Ok(());
         }
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(
-            &format!("[particle_inject] dispatch {} particles", particle_count).into()
-        );
 
         let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_res.0) else {
             return Ok(());

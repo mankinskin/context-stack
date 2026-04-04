@@ -213,8 +213,10 @@ fn sd_sphere(p: vec3f, r: f32) -> f32 {
     return length(p) - r;
 }
 
+// Torus in xy-plane (vertical ring / wheel orientation) — visible as a ring
+// from the default forward-facing camera.
 fn sd_torus(p: vec3f, major_r: f32, minor_r: f32) -> f32 {
-    let q = vec2f(length(p.xz) - major_r, p.y);
+    let q = vec2f(length(p.xy) - major_r, p.z);
     return length(q) - minor_r;
 }
 
@@ -237,13 +239,13 @@ fn sdf_normal_type(p_local: vec3f, half_ext: f32, sdf_type: u32) -> vec3f {
         return normalize(p_local);
     }
     if sdf_type == 3u {
-        // Torus analytical gradient (ring in XZ plane)
+        // Torus analytical gradient (ring in XY plane — matches sd_torus).
         let major_r = half_ext * 0.6;
-        let xz_len  = length(p_local.xz);
-        let xz_hat  = p_local.xz / max(xz_len, 0.0001);
-        let q       = vec2f(xz_len - major_r, p_local.y);
+        let xy_len  = length(p_local.xy);
+        let xy_hat  = p_local.xy / max(xy_len, 0.0001);
+        let q       = vec2f(xy_len - major_r, p_local.z);
         let q_hat   = normalize(q);
-        return normalize(vec3f(xz_hat.x * q_hat.x, q_hat.y, xz_hat.y * q_hat.x));
+        return normalize(vec3f(xy_hat.x * q_hat.x, xy_hat.y * q_hat.x, q_hat.y));
     }
     // Box and all fallback types: use gradient-based box normal
     return box_normal(p_local, vec3f(half_ext));
@@ -269,6 +271,27 @@ fn ray_surface_closest_point(
             return ro + rd * max(t1, 0.0);
         }
         // Miss → fall through to box closest point
+    }
+    if sdf_type == 3u {
+        // Sphere-trace the torus SDF inside the voxel AABB (rd is normalized).
+        // A single box-face sample is always outside the torus tube, so we
+        // march along the ray until we reach the surface or exit the box.
+        let he     = vec3f(half_ext);
+        let inv_rd = 1.0 / rd;
+        let t1v    = (center - he - ro) * inv_rd;
+        let t2v    = (center + he - ro) * inv_rd;
+        let t_enter = max(max(min(t1v.x, t2v.x), min(t1v.y, t2v.y)), min(t1v.z, t2v.z));
+        let t_exit  = min(min(max(t1v.x, t2v.x), max(t1v.y, t2v.y)), max(t1v.z, t2v.z));
+        let major_r = half_ext * 0.6;
+        let minor_r = half_ext * 0.25;
+        var t = max(t_enter, 0.0);
+        for (var i = 0; i < 8; i++) {
+            let d = sd_torus(ro + rd * t - center, major_r, minor_r);
+            if d < half_ext * 1e-3 { break; }
+            t += d;
+            if t >= t_exit { break; }
+        }
+        return ro + rd * clamp(t, max(t_enter, 0.0), t_exit);
     }
     return ray_box_closest_point(ro, rd, center, half_ext);
 }

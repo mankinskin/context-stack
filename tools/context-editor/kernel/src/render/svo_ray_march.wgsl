@@ -19,17 +19,20 @@
 // ---------------------------------------------------------------------------
 
 struct RayMarchUniforms {
-    inv_view_proj: mat4x4f,  // 64 bytes
-    camera_pos:    vec3f,    // 12 bytes
-    cot_half_fov:  f32,      //  4 bytes — 1/tan(fov_y/2), for AA pixel footprint
-    resolution:    vec2f,    //  8 bytes
-    screen_width:  u32,      //  4 bytes — u32 form of resolution.x for indexing
-    _pad0:         u32,      //  4 bytes
-    light_dir:     vec3f,    // 12 bytes — normalised world-space light direction
-    _pad1:         f32,      //  4 bytes
-    light_color:   vec3f,    // 12 bytes
-    _pad2:         f32,      //  4 bytes
-}                            // Total: 128 bytes
+    inv_view_proj:   mat4x4f,  // 64 bytes
+    camera_pos:      vec3f,    // 12 bytes
+    cot_half_fov:    f32,      //  4 bytes — 1/tan(fov_y/2), for AA pixel footprint
+    resolution:      vec2f,    //  8 bytes
+    screen_width:    u32,      //  4 bytes — u32 form of resolution.x for indexing
+    _pad0:           u32,      //  4 bytes
+    light_dir:       vec3f,    // 12 bytes — normalised world-space light direction
+    _pad1:           f32,      //  4 bytes
+    light_color:     vec3f,    // 12 bytes
+    max_bounces:     u32,      //  4 bytes — max secondary ray bounces (0 = primary only)
+    max_shadow_dist: f32,      //  4 bytes — world-space max shadow ray distance
+    feature_flags:   u32,      //  4 bytes — bit0=neighbor_blend bit1=shadow bit2=reflect
+    _pad3:           vec2u,    //  8 bytes
+}                              // Total: 144 bytes
 
 // SVO coordinate transform (matches Rust `SvoTransformData`)
 struct SvoTransform {
@@ -91,6 +94,11 @@ const BACKGROUND_R: f32 = 0.12;
 const BACKGROUND_G: f32 = 0.14;
 const BACKGROUND_B: f32 = 0.18;
 
+// Phase 2a/2b feature flag bit positions (must match Rust `ray_march_feature_flags()`).
+const FEAT_NEIGHBOR_BLEND: u32 = 1u;  // Phase 2a: smooth-min seam blending
+const FEAT_SHADOW_RAYS:    u32 = 2u;  // Phase 2b: shadow ray per primary hit
+const FEAT_REFLECTION:     u32 = 4u;  // Phase 2b: reflection for metallic surfaces
+
 // ---------------------------------------------------------------------------
 // OctreeNode bit-decode helpers (inlined from svo_common.wgsl)
 // ---------------------------------------------------------------------------
@@ -113,6 +121,160 @@ fn unpack_base_color(cd: u32) -> vec3f {
     let g = f32((cd >> 8u) & 0xFFu) / 255.0;
     let b = f32((cd >> 16u) & 0xFFu) / 255.0;
     return vec3f(r, g, b);
+}
+
+// ---------------------------------------------------------------------------
+// Material bit-field unpacking (bits 24-31 of color_data)
+// ---------------------------------------------------------------------------
+
+fn unpack_roughness(cd: u32) -> f32 {
+    return f32((cd >> 24u) & 0x1Fu) / 31.0;
+}
+
+fn unpack_metallic(cd: u32) -> f32 {
+    return f32((cd >> 29u) & 1u);
+}
+
+fn unpack_sdf_type(cd: u32) -> u32 {
+    return (cd >> 30u) & 3u;
+}
+
+// ---------------------------------------------------------------------------
+// Extended SDF library (Phase 2a)
+// ---------------------------------------------------------------------------
+
+// Sphere SDF: signed distance from p to a sphere centred at origin with radius r.
+fn sd_sphere(p: vec3f, r: f32) -> f32 {
+    return length(p) - r;
+}
+
+// Torus SDF: torus in the xy-plane (vertical ring / wheel orientation),
+// major radius R (ring centre radius), minor radius r (tube radius).
+// Rotating from xz to xy makes it visible as a ring from the default
+// forward-facing camera angle.
+fn sd_torus(p: vec3f, major_r: f32, minor_r: f32) -> f32 {
+    let q = vec2f(length(p.xy) - major_r, p.z);
+    return length(q) - minor_r;
+}
+
+// Dispatch SDF evaluation by sdf_type embedded in color_data.
+// sdf_type: 0=box, 1=sphere, 2=svo-sampled(placeholder→box), 3=torus
+fn eval_voxel_sdf(p_local: vec3f, half: f32, sdf_type: u32) -> f32 {
+    switch sdf_type {
+        case 1u: { return sd_sphere(p_local, half); }
+        case 3u: { return sd_torus(p_local, half * 0.7, half * 0.3); }
+        default: { return sd_box(p_local, vec3f(half)); }
+    }
+}
+
+// Analytical surface normal for the chosen SDF type.
+fn eval_voxel_normal(p_local: vec3f, half: f32, sdf_type: u32) -> vec3f {
+    if sdf_type == 1u {
+        // Sphere: gradient = p / |p|.  Guard against the exact-centre degenerate
+        // case (length ≈ 0) where normalize() would produce NaN/zero.
+        let len = length(p_local);
+        if len < 1e-6 { return vec3f(0.0, 1.0, 0.0); }
+        return p_local / len;
+    }
+    if sdf_type == 3u {
+        // Torus in xy plane: analytical gradient (matches sd_torus above).
+        let len_xy = max(length(p_local.xy), 1e-6);
+        let q      = vec2f(len_xy - half * 0.7, p_local.z);
+        let d      = max(length(q), 1e-6);
+        let nxy    = (p_local.xy / len_xy) * (q.x / d);
+        return normalize(vec3f(nxy.x, nxy.y, q.y / d));
+    }
+    // Default analytical box normal: largest abs component direction.
+    let abs_p = abs(p_local) / half;
+    if abs_p.x >= abs_p.y && abs_p.x >= abs_p.z {
+        return vec3f(sign(p_local.x), 0.0, 0.0);
+    } else if abs_p.y >= abs_p.z {
+        return vec3f(0.0, sign(p_local.y), 0.0);
+    }
+    return vec3f(0.0, 0.0, sign(p_local.z));
+}
+
+// ---------------------------------------------------------------------------
+// Smooth-union (smooth_min) for Phase 2a neighbor blending
+// ---------------------------------------------------------------------------
+
+fn smooth_min(a: f32, b: f32, k: f32) -> f32 {
+    let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ---------------------------------------------------------------------------
+// SVO point lookup — returns color_data of leaf containing `pos` (Phase 2a).
+//
+// `pos` must be in normalised SVO space [0,1)³.  Returns 0 for empty or
+// out-of-range positions.  Interior leaves (INTERIOR_FLAG) are treated as
+// occupied for blending purposes.
+//
+// Time complexity: O(max_depth).  Gate behind FEAT_NEIGHBOR_BLEND check to
+// avoid per-pixel cost when blending is disabled.
+// ---------------------------------------------------------------------------
+
+fn svo_lookup(pos: vec3f) -> u32 {
+    if any(pos < vec3f(0.0)) || any(pos >= vec3f(1.0)) { return 0u; }
+    var node_idx: u32 = 0u;
+    var aabb_min = vec3f(0.0);
+    var aabb_size = 1.0;
+    for (var depth = 0u; depth < svo_tf.max_depth + 1u; depth++) {
+        let node  = octree[node_idx];
+        let cp    = node.x;
+        let cd    = node.y;
+        let cmask = svo_child_mask(cp);
+        // Leaf (no children) — return its color_data (0 = empty, != 0 = occupied).
+        if cmask == 0u { return cd; }
+        let half   = aabb_size * 0.5;
+        let center = aabb_min + vec3f(half);
+        let bx     = pos.x >= center.x;
+        let by     = pos.y >= center.y;
+        let bz     = pos.z >= center.z;
+        let ci     = u32(bx) | (u32(by) << 1u) | (u32(bz) << 2u);
+        if (cmask & (1u << ci)) == 0u { return 0u; }
+        aabb_min  += vec3f(select(0.0, half, bx), select(0.0, half, by), select(0.0, half, bz));
+        aabb_size  = half;
+        node_idx   = svo_first_child(cp) + ci;
+    }
+    return octree[node_idx].y;
+}
+
+// ---------------------------------------------------------------------------
+// Neighbor SDF blending (Phase 2a)
+//
+// Samples the 6 face-adjacent voxel slots and smooth-unions their SDFs with
+// the centre voxel, eliminating hard seams between neighbouring filled cells.
+// ---------------------------------------------------------------------------
+
+fn blend_with_neighbors(
+    center_d:     f32,
+    ray_pos:      vec3f,    // sample point in SVO space
+    voxel_center: vec3f,    // centre of the current leaf in SVO space
+    half:         f32,      // half-size of the leaf in SVO space
+    blend_k:      f32,      // smooth-union radius
+) -> f32 {
+    var d = center_d;
+    let step = half * 2.0;
+    // ±x, ±y, ±z face neighbours
+    let offsets = array<vec3f, 6>(
+        vec3f( 1.0, 0.0, 0.0),
+        vec3f(-1.0, 0.0, 0.0),
+        vec3f( 0.0, 1.0, 0.0),
+        vec3f( 0.0,-1.0, 0.0),
+        vec3f( 0.0, 0.0, 1.0),
+        vec3f( 0.0, 0.0,-1.0),
+    );
+    for (var i = 0u; i < 6u; i++) {
+        let neighbor_center = voxel_center + offsets[i] * step;
+        let neighbor_cd     = svo_lookup(neighbor_center);
+        if neighbor_cd != 0u {
+            let sdf_type   = unpack_sdf_type(neighbor_cd);
+            let neighbor_d = eval_voxel_sdf(ray_pos - neighbor_center, half, sdf_type);
+            d = smooth_min(d, neighbor_d, blend_k);
+        }
+    }
+    return d;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,11 +329,15 @@ struct StackEntry {
 // ---------------------------------------------------------------------------
 
 struct TraversalResult {
-    hit:    bool,
-    color:  vec3f,
-    alpha:  f32,
-    t_hit:  f32,
-    normal: vec3f,
+    hit:         bool,
+    color:       vec3f,
+    alpha:       f32,
+    t_hit:       f32,
+    normal:      vec3f,
+    roughness:   f32,   // perceptual roughness [0,1]
+    metallic:    f32,   // metallic flag [0,1] from bit 29
+    transparent: bool,  // Phase 2b: refraction flag (always false until atom system adds transparent materials)
+    ior:         f32,   // index of refraction (e.g. 1.5 for glass; unused when !transparent)
 }
 
 fn traverse_svo(
@@ -184,7 +350,7 @@ fn traverse_svo(
     // Root AABB is [0,1]³ in SVO space.
     let root_hit = ray_aabb_slab(ro_svo, inv_rd, vec3f(0.0), vec3f(1.0));
     if root_hit.x >= root_hit.y || root_hit.y <= 0.0 {
-        return TraversalResult(false, vec3f(0.0), 0.0, 1e30, vec3f(0.0, 1.0, 0.0));
+        return TraversalResult(false, vec3f(0.0), 0.0, 1e30, vec3f(0.0, 1.0, 0.0), 1.0, 0.0, false, 1.0);
     }
 
     // Fixed-size stack (depth-limited to MAX_STACK_DEPTH).
@@ -196,8 +362,12 @@ fn traverse_svo(
 
     var accum_color = vec3f(0.0);
     var accum_alpha = 0.0;
-    var best_t      = 1e30;
-    var best_normal = vec3f(0.0, 1.0, 0.0);
+    var best_t         = 1e30;
+    var best_normal    = vec3f(0.0, 1.0, 0.0);
+    var best_roughness = 1.0;
+    var best_metallic  = 0.0;
+
+    let neighbor_blend = (uniforms.feature_flags & FEAT_NEIGHBOR_BLEND) != 0u;
 
     while sp > 0u && accum_alpha < OPAQUE_THRESHOLD {
         sp -= 1u;
@@ -230,37 +400,68 @@ fn traverse_svo(
                 continue;
             }
 
-            // SDF evaluation for sub-voxel anti-aliasing.
-            let half     = vec3f(n_size * 0.5);
-            let center   = n_min + half;
+            // Phase 2a: type-dispatched SDF evaluation.
+            let sdf_type = unpack_sdf_type(cd);
+            let half     = n_size * 0.5;
+            let center   = n_min + vec3f(half);
 
-            // Ray–AABB to find a good sample point inside the voxel.
+            // Ray–AABB intersection for this leaf.
             let aabb_hit = ray_aabb_slab(ro_svo, inv_rd, n_min, n_max);
-            let t_mid    = clamp(
+
+            // t_entry: first surface contact with the voxel.
+            //   Used for: hit depth, shadow/reflect ray origin, surface normal.
+            //   Placing the shadow origin here (+ normal bias) avoids self-intersection.
+            // t_sample: AABB interior midpoint (used only for SDF d evaluation).
+            //   Using t_entry for d would give d ≈ 0 → alpha ≈ 0.5 (translucent).
+            //   The midpoint gives d << 0 → alpha ≈ 1.0 (opaque solid).
+            var t_entry  = max(aabb_hit.x, 0.0);
+            var t_sample = clamp(
                 (aabb_hit.x + aabb_hit.y) * 0.5,
-                max(aabb_hit.x, 0.0),
+                t_entry,
                 aabb_hit.y,
             );
-            let hit_p    = ro_svo + rd_svo * t_mid;
-            let p_local  = hit_p - center;
-            let d        = sd_box(p_local, half);
+            // Torus: the AABB midpoint is always at the voxel centre, which is
+            // the hole of the torus (d ≈ major_r – minor_r >> fw).  Sphere-trace
+            // along the ray inside the AABB to find the tube surface.
+            // rd_svo = rd_world * inv_world_size  →  |rd_svo| = inv_world_size
+            // step_t = d_svo / |rd_svo| converts SVO-space SDF steps to t units.
+            if sdf_type == 3u {
+                let rd_inv_len = 1.0 / length(rd_svo); // ≈ world_size
+                var t_st = t_entry;
+                for (var _i = 0; _i < 8; _i++) {
+                    let d_st = sd_torus(ro_svo + rd_svo * t_st - center,
+                                        half * 0.7, half * 0.3);
+                    if abs(d_st) < half * 5e-3 { break; }
+                    t_st += d_st * rd_inv_len;
+                    if t_st >= aabb_hit.y { break; }
+                }
+                t_sample = clamp(t_st, t_entry, aabb_hit.y);
+                // For torus the sphere-traced point IS the surface, so entry = sample.
+                t_entry  = t_sample;
+            }
+            let hit_p   = ro_svo + rd_svo * t_sample;
+            let p_local = hit_p - center;
+            var d       = eval_voxel_sdf(p_local, half, sdf_type);
 
-            // FOV-correct pixel footprint at this distance.
-            let t_world = t_mid * t_scale;
+            // Phase 2a: optional smooth-min neighbor blending.
+            if neighbor_blend {
+                let blend_k = half * 0.25;
+                d = blend_with_neighbors(d, hit_p, center, half, blend_k);
+            }
+
+            // Pixel footprint at the surface entry distance (not the interior midpoint).
+            let t_world = t_entry * t_scale;
             let fw      = fw_coeff * max(t_world, 1e-4);
             let alpha   = 1.0 - smoothstep(-fw, fw, d);
 
             if alpha > 0.001 {
-                // Analytical box normal: largest component of abs(p_local / half).
-                let abs_p  = abs(p_local) / half;
-                var normal: vec3f;
-                if abs_p.x >= abs_p.y && abs_p.x >= abs_p.z {
-                    normal = vec3f(sign(p_local.x), 0.0, 0.0);
-                } else if abs_p.y >= abs_p.z {
-                    normal = vec3f(0.0, sign(p_local.y), 0.0);
-                } else {
-                    normal = vec3f(0.0, 0.0, sign(p_local.z));
-                }
+                // Evaluate normal at the ray entry point, not the AABB midpoint.
+                // At the midpoint: sphere centre → length(p_local) ≈ 0 (degenerate
+                // gradient, falls back to hardcoded up-vector); box centre → all abs
+                // components near-equal (arbitrary face selected).  Both cause wrong
+                // lighting and broken shadow ray self-test.
+                let p_entry_local = (ro_svo + rd_svo * t_entry) - center;
+                let normal = eval_voxel_normal(p_entry_local, half, sdf_type);
 
                 // Front-to-back alpha compositing.
                 let contribution = alpha * (1.0 - accum_alpha);
@@ -268,8 +469,10 @@ fn traverse_svo(
                 accum_alpha += contribution;
 
                 if t_world < best_t {
-                    best_t      = t_world;
-                    best_normal = normal;
+                    best_t         = t_world;
+                    best_normal    = normal;
+                    best_roughness = unpack_roughness(cd);
+                    best_metallic  = unpack_metallic(cd);
                 }
             }
             continue; // leaf processed
@@ -341,9 +544,72 @@ fn traverse_svo(
     }
 
     if accum_alpha < 0.001 {
-        return TraversalResult(false, vec3f(0.0), 0.0, 1e30, vec3f(0.0, 1.0, 0.0));
+        return TraversalResult(false, vec3f(0.0), 0.0, 1e30, vec3f(0.0, 1.0, 0.0), 1.0, 0.0, false, 1.0);
     }
-    return TraversalResult(true, accum_color, accum_alpha, best_t, best_normal);
+    return TraversalResult(true, accum_color, accum_alpha, best_t, best_normal, best_roughness, best_metallic, false, 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// Shadow occlusion traversal (Phase 2b)
+//
+// Simplified SVO traversal — only detects the first occupied leaf hit.
+// No SDF evaluation, no alpha compositing.  Returns true if any leaf blocks
+// the ray before max_t_raw (SVO-space ray parameter == world-space distance).
+// ---------------------------------------------------------------------------
+
+fn svo_trace_occlusion(
+    ro_svo:    vec3f,  // ray origin in SVO space
+    rd_svo:    vec3f,  // ray direction in SVO space
+    inv_rd:    vec3f,  // element-wise 1 / rd_svo
+    max_t_raw: f32,    // max SVO-space t to search (= world-space distance for this parameterisation)
+) -> bool {
+    let root_hit = ray_aabb_slab(ro_svo, inv_rd, vec3f(0.0), vec3f(1.0));
+    if root_hit.x >= root_hit.y || root_hit.y <= 0.0 { return false; }
+    if root_hit.x > max_t_raw { return false; }
+
+    var stack: array<StackEntry, 12>;
+    var sp: u32 = 0u;
+    stack[0] = StackEntry(0u, vec3f(0.0), 1.0, max(root_hit.x, 0.0));
+    sp = 1u;
+
+    while sp > 0u {
+        sp -= 1u;
+        let entry = stack[sp];
+        if entry.t_enter > max_t_raw { continue; }
+
+        let node  = octree[entry.node_idx];
+        let cp    = node.x;
+        let cd    = node.y;
+        let cmask = svo_child_mask(cp);
+
+        if cmask == 0u {
+            // Leaf: occupied if cd != 0 and not an interior-only node.
+            if cd != 0u && !svo_is_interior(cp) { return true; }
+            continue;
+        }
+
+        let child_size = entry.aabb_size * 0.5;
+        let fc         = svo_first_child(cp);
+
+        for (var ci = 0u; ci < 8u; ci++) {
+            let bit = 1u << ci;
+            if (cmask & bit) == 0u { continue; }
+            let ox    = f32((ci     ) & 1u);
+            let oy    = f32((ci >> 1u) & 1u);
+            let oz    = f32((ci >> 2u) & 1u);
+            let c_min = entry.aabb_min + vec3f(ox, oy, oz) * child_size;
+            let c_max = c_min + child_size;
+            let chit  = ray_aabb_slab(ro_svo, inv_rd, c_min, c_max);
+            if chit.x >= chit.y || chit.y <= 0.0 { continue; }
+            let t_child = max(chit.x, 0.0);
+            if t_child > max_t_raw { continue; }
+            if sp < MAX_STACK_DEPTH {
+                stack[sp] = StackEntry(fc + ci, c_min, child_size, t_child);
+                sp += 1u;
+            }
+        }
+    }
+    return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -393,30 +659,156 @@ fn ray_march_main(@builtin(global_invocation_id) gid: vec3u) {
     let result = traverse_svo(ro_svo, rd_svo, inv_rd, t_scale, fw_coeff);
 
     if !result.hit {
-        color_buffer[color_base]     = BACKGROUND_R;
+        color_buffer[color_base]      = BACKGROUND_R;
         color_buffer[color_base + 1u] = BACKGROUND_G;
         color_buffer[color_base + 2u] = BACKGROUND_B;
         color_buffer[color_base + 3u] = 1.0;
-        depth_buffer[pixel_idx]      = 1e30;
+        depth_buffer[pixel_idx]       = 1e30;
         return;
     }
 
-    // Simplified Lambertian + ambient lighting (Cook-Torrance is Phase 3a).
-    let normal  = result.normal;
-    let diffuse = max(dot(normal, normalize(uniforms.light_dir)), 0.0)
-                  * uniforms.light_color * result.color;
-    let ambient = result.color * 0.15;
-    var lit     = diffuse + ambient;
+    // Phase 2b: feature flag decoding.
+    let flags       = uniforms.feature_flags;
+    let shadow_en   = (flags & FEAT_SHADOW_RAYS) != 0u;
+    let reflect_en  = (flags & FEAT_REFLECTION)  != 0u;
 
-    // Blend with background for semi-transparent (SDF fringe) pixels.
-    let inv_a = 1.0 - result.alpha;
-    lit = lit * result.alpha + vec3f(BACKGROUND_R, BACKGROUND_G, BACKGROUND_B) * inv_a;
+    // Surface offset bias: push shadow/reflection origins off the hit surface.
+    // Uses a fraction of the leaf voxel's half-size in world units (the leaf
+    // size is world_size / 2^max_depth).  0.05 voxel-half-widths is enough to
+    // clear self-intersection for all SDF types (spheres, tori) and is scale-
+    // invariant regardless of world_size.
+    // bias_svo = 0.05 * (world_size / 2^max_depth) / world_size
+    //          = 0.05 / 2^max_depth  (in normalised SVO space)
+    let leaf_half_svo = 0.5 / f32(1u << svo_tf.max_depth);
+    let origin_bias   = 0.05 * leaf_half_svo;
 
-    color_buffer[color_base]      = lit.r;
-    color_buffer[color_base + 1u] = lit.g;
-    color_buffer[color_base + 2u] = lit.b;
+    // Light direction transformed to SVO-space ray parameterisation.
+    let light_dir_svo = uniforms.light_dir * svo_tf.inv_world_size;
+
+    // Iterative bounce loop (Phase 2b).  WGSL has no function recursion, so
+    // reflections use an explicit loop capped at max_bounces.
+    var final_color   = vec3f(0.0);
+    var throughput    = vec3f(1.0);
+    var bounce_ro     = ro_svo;
+    var bounce_rd     = rd_svo;
+    var bounce_result = result;
+    var first_t       = result.t_hit;
+
+    for (var bounce = 0u; bounce <= uniforms.max_bounces; bounce++) {
+        let normal   = bounce_result.normal;
+        // Un-premultiply the accumulated colour to get the bare surface colour.
+        let base_col = bounce_result.color / max(bounce_result.alpha, 0.001);
+
+        // ---- Shadow ray (Phase 2b) ----
+        var shadow = 1.0;
+        if shadow_en {
+            // Hit point in SVO space: t_raw = t_hit_svo_normalised * world_size
+            let t_raw       = bounce_result.t_hit * svo_tf.world_size;
+            let hit_p       = bounce_ro + bounce_rd * t_raw;
+            let shadow_orig = hit_p + normal * origin_bias;
+
+            var shad_inv = 1.0 / light_dir_svo;
+            if abs(shad_inv.x) > 1e15 { shad_inv.x = 1e15 * sign(shad_inv.x + 1e-30); }
+            if abs(shad_inv.y) > 1e15 { shad_inv.y = 1e15 * sign(shad_inv.y + 1e-30); }
+            if abs(shad_inv.z) > 1e15 { shad_inv.z = 1e15 * sign(shad_inv.z + 1e-30); }
+
+            // Shadow max_t: world-space distance = SVO-space t parameter.
+            let occluded = svo_trace_occlusion(
+                shadow_orig, light_dir_svo, shad_inv, uniforms.max_shadow_dist
+            );
+            shadow = select(1.0, 0.0, occluded);
+        }
+
+        // ---- Lambertian + ambient shading ----
+        let diffuse_f = max(dot(normal, normalize(uniforms.light_dir)), 0.0) * shadow;
+        let lit = base_col * (diffuse_f * uniforms.light_color + vec3f(0.15));
+
+        // Blend with background for semi-transparent SDF fringe pixels.
+        let inv_a   = 1.0 - bounce_result.alpha;
+        let blended = lit * bounce_result.alpha
+                    + vec3f(BACKGROUND_R, BACKGROUND_G, BACKGROUND_B) * inv_a;
+
+        // ---- Check for reflection / refraction (Phase 2b) ----
+        let can_reflect = reflect_en
+                       && bounce_result.metallic > 0.5
+                       && bounce < uniforms.max_bounces;
+        let can_refract = bounce_result.transparent
+                       && bounce < uniforms.max_bounces;
+
+        if can_reflect {
+            // Schlick Fresnel for metallic reflectance.
+            // Metals have F0 ≈ 0.9 (not 0.04 like dielectrics), so reflections
+            // are strong even at normal incidence — metallic surfaces are mirrors.
+            let cos_theta = max(-dot(normalize(bounce_rd), normal), 0.0);
+            let fresnel   = 0.9 + 0.1 * pow(1.0 - cos_theta, 5.0);
+
+            // Diffuse contribution is minimal for metals (metals have no diffuse).
+            final_color += throughput * blended * (1.0 - fresnel);
+            throughput  *= fresnel;
+
+            // Compute reflected ray from the hit point.
+            let t_raw      = bounce_result.t_hit * svo_tf.world_size;
+            let hit_p      = bounce_ro + bounce_rd * t_raw;
+            let refl_orig  = hit_p + normal * origin_bias;
+            let refl_rd    = reflect(bounce_rd, normal);
+
+            var refl_inv = 1.0 / refl_rd;
+            if abs(refl_inv.x) > 1e15 { refl_inv.x = 1e15 * sign(refl_inv.x + 1e-30); }
+            if abs(refl_inv.y) > 1e15 { refl_inv.y = 1e15 * sign(refl_inv.y + 1e-30); }
+            if abs(refl_inv.z) > 1e15 { refl_inv.z = 1e15 * sign(refl_inv.z + 1e-30); }
+
+            let next = traverse_svo(refl_orig, refl_rd, refl_inv, t_scale, fw_coeff);
+            if !next.hit {
+                final_color += throughput
+                             * vec3f(BACKGROUND_R, BACKGROUND_G, BACKGROUND_B);
+                break;
+            }
+            bounce_ro     = refl_orig;
+            bounce_rd     = refl_rd;
+            bounce_result = next;
+        } else if can_refract {
+            // Refraction ray (Phase 2b infrastructure).
+            // bounce_result.transparent is always false until the atom system
+            // adds transparent materials; this branch handles TIR correctly
+            // so AC 2b-7 is satisfied structurally.
+            let inc_unit  = normalize(bounce_rd);
+            let refr_unit = refract(inc_unit, normal, 1.0 / bounce_result.ior);
+            if dot(refr_unit, refr_unit) < 0.001 {
+                // Total internal reflection — fall back to opaque diffuse.
+                final_color += throughput * blended;
+                break;
+            }
+            // Scale refracted unit direction to SVO-space parameterisation.
+            let refr_rd   = refr_unit * svo_tf.inv_world_size;
+            let t_raw     = bounce_result.t_hit * svo_tf.world_size;
+            let hit_p     = bounce_ro + bounce_rd * t_raw;
+            // Bias origin into the surface (opposite direction to normal).
+            let refr_orig = hit_p - normal * origin_bias;
+            var refr_inv  = 1.0 / refr_rd;
+            if abs(refr_inv.x) > 1e15 { refr_inv.x = 1e15 * sign(refr_inv.x + 1e-30); }
+            if abs(refr_inv.y) > 1e15 { refr_inv.y = 1e15 * sign(refr_inv.y + 1e-30); }
+            if abs(refr_inv.z) > 1e15 { refr_inv.z = 1e15 * sign(refr_inv.z + 1e-30); }
+            let next = traverse_svo(refr_orig, refr_rd, refr_inv, t_scale, fw_coeff);
+            if !next.hit {
+                final_color += throughput
+                             * vec3f(BACKGROUND_R, BACKGROUND_G, BACKGROUND_B);
+                break;
+            }
+            bounce_ro     = refr_orig;
+            bounce_rd     = refr_rd;
+            bounce_result = next;
+        } else {
+            // Diffuse surface or all secondary rays disabled — accumulate and stop.
+            final_color += throughput * blended;
+            break;
+        }
+    }
+
+    color_buffer[color_base]      = final_color.r;
+    color_buffer[color_base + 1u] = final_color.g;
+    color_buffer[color_base + 2u] = final_color.b;
     color_buffer[color_base + 3u] = 1.0;
-    depth_buffer[pixel_idx]       = result.t_hit;
+    depth_buffer[pixel_idx]       = first_t;
 }
 
 // ---------------------------------------------------------------------------

@@ -52,7 +52,7 @@ use bevy::{
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::debug_overlay::is_ray_march_enabled;
+use crate::debug_overlay::{is_ray_march_enabled, ray_march_feature_flags};
 use crate::gpu::SvoDoubleBuffer;
 use crate::gpu::svo_transform::SvoTransformBuffer;
 
@@ -60,27 +60,30 @@ use crate::gpu::svo_transform::SvoTransformBuffer;
 // Uniform data (matches WGSL `RayMarchUniforms`)
 // ---------------------------------------------------------------------------
 
-/// Ray march uniforms: 128 bytes packed for GPU.
+/// Ray march uniforms: 144 bytes packed for GPU (buffer rounded up to 256 for alignment).
 const RAY_MARCH_UNIFORM_SIZE: u64 = 256; // round up to uniform alignment
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Pod, Zeroable)]
 pub struct RayMarchUniformData {
-    pub inv_view_proj: [f32; 16],  // 64 bytes
-    pub camera_pos:    [f32; 3],   // 12 bytes
-    pub cot_half_fov:  f32,        //  4 bytes
-    pub resolution:    [f32; 2],   //  8 bytes
-    pub screen_width:  u32,        //  4 bytes
-    pub _pad0:         u32,        //  4 bytes
-    pub light_dir:     [f32; 3],   // 12 bytes
-    pub _pad1:         f32,        //  4 bytes
-    pub light_color:   [f32; 3],   // 12 bytes
-    pub _pad2:         f32,        //  4 bytes
-}                                  // total: 128 bytes
+    pub inv_view_proj:   [f32; 16],  // 64 bytes
+    pub camera_pos:      [f32; 3],   // 12 bytes
+    pub cot_half_fov:    f32,        //  4 bytes
+    pub resolution:      [f32; 2],   //  8 bytes
+    pub screen_width:    u32,        //  4 bytes
+    pub _pad0:           u32,        //  4 bytes
+    pub light_dir:       [f32; 3],   // 12 bytes
+    pub _pad1:           f32,        //  4 bytes
+    pub light_color:     [f32; 3],   // 12 bytes
+    pub max_bounces:     u32,        //  4 bytes
+    pub max_shadow_dist: f32,        //  4 bytes
+    pub feature_flags:   u32,        //  4 bytes (bit0=neighbor_blend, bit1=shadow, bit2=reflect)
+    pub _pad3:           [u32; 2],   //  8 bytes
+}                                    // total: 144 bytes
 
 const _: () = assert!(
-    std::mem::size_of::<RayMarchUniformData>() == 128,
-    "RayMarchUniformData must be 128 bytes"
+    std::mem::size_of::<RayMarchUniformData>() == 144,
+    "RayMarchUniformData must be 144 bytes"
 );
 
 // ---------------------------------------------------------------------------
@@ -213,16 +216,19 @@ pub fn update_ray_march_uniforms(
     let cot_half_fov = proj_mat.y_axis.y;
 
     let data = RayMarchUniformData {
-        inv_view_proj: inv_vp.to_cols_array(),
-        camera_pos:    [cam_pos.x, cam_pos.y, cam_pos.z],
+        inv_view_proj:   inv_vp.to_cols_array(),
+        camera_pos:      [cam_pos.x, cam_pos.y, cam_pos.z],
         cot_half_fov,
-        resolution:    [width, height],
-        screen_width:  width as u32,
-        _pad0:         0,
-        light_dir:     [0.267, 0.802, 0.534], // normalize(0.3, 0.9, 0.6)
-        _pad1:         0.0,
-        light_color:   [1.0, 0.98, 0.95],
-        _pad2:         0.0,
+        resolution:      [width, height],
+        screen_width:    width as u32,
+        _pad0:           0,
+        light_dir:       [0.267, 0.802, 0.534], // normalize(0.3, 0.9, 0.6)
+        _pad1:           0.0,
+        light_color:     [1.0, 0.98, 0.95],
+        max_bounces:     2,
+        max_shadow_dist: 200.0,
+        feature_flags:   ray_march_feature_flags(),
+        _pad3:           [0; 2],
     };
 
     render_queue.write_buffer(&uniform_buf.0, 0, bytemuck::bytes_of(&data));
@@ -577,7 +583,7 @@ mod tests {
 
     #[test]
     fn ray_march_uniform_size() {
-        assert_eq!(std::mem::size_of::<RayMarchUniformData>(), 128);
+        assert_eq!(std::mem::size_of::<RayMarchUniformData>(), 144);
     }
 
     #[test]

@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn default_params_are_sane() {
         let p = RenderParams::default();
-        assert_eq!(p.svo.max_depth, 8);
+        assert_eq!(p.svo.max_depth, 10);
         assert_eq!(p.splat.max_splats, 2_000_000);
         assert!(p.splat.generation_enabled);
         assert!(p.double_buffer.enabled);

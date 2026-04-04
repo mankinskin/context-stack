@@ -249,19 +249,57 @@ fn paint_palette_voxels(
     boulder.stamp(&mut voxel_world, IVec3::new(cx + 48, fy + 1, cz - 12));
     boulder.stamp(&mut voxel_world, IVec3::new(cx - 32, fy + 1, cz - 60));
 
+    // --- SDF-type showcase (Phase 2a/2b visual verification) ------------------
+    // These voxels demonstrate sphere SDF (type 1), torus SDF (type 3), and
+    // metallic reflections.  Placed at ground level, visible from the default
+    // camera position.
+
+    // Sphere-type voxels: a 7×4×3 block of blue-white spheroids to the left.
+    // cx-8 → viewing angle ≈11° from camera centre, well within any FOV.
+    let sphere_mat = VoxelMaterial { r: 80, g: 160, b: 230, roughness: 6, metallic: false, sdf_type: 1 };
+    for dy in 1..=4 {
+        for dx in -3_i32..=3 {
+            for dz in 0..3_i32 {
+                voxel_world.set_voxel(IVec3::new(cx - 8 + dx, fy + dy, cz + 30 + dz), sphere_mat);
+            }
+        }
+    }
+
+    // Torus-type voxels: a 7×4×3 block of amber tori to the right.
+    // cx+8 → same ~11° from centre, symmetric with spheres.
+    let torus_mat = VoxelMaterial { r: 230, g: 130, b: 40, roughness: 6, metallic: false, sdf_type: 3 };
+    for dy in 1..=4 {
+        for dx in -3_i32..=3 {
+            for dz in 0..3_i32 {
+                voxel_world.set_voxel(IVec3::new(cx + 8 + dx, fy + dy, cz + 30 + dz), torus_mat);
+            }
+        }
+    }
+
+    // Metallic-reflective wall: a 17×14×2 silver slab as a backdrop behind
+    // the showcase blocks, close enough to show reflections in ray march mode.
+    let metallic_mat = VoxelMaterial { r: 192, g: 192, b: 200, roughness: 2, metallic: true, sdf_type: 0 };
+    for dy in 1..=14 {
+        for dx in -8_i32..=8 {
+            for dz in 0..2_i32 {
+                voxel_world.set_voxel(IVec3::new(cx + dx, fy + dy, cz + 18 + dz), metallic_mat);
+            }
+        }
+    }
+
     // --- Palette demo spheres (original) --------------------------------------
     voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X, SVO_GROUND_Y + 32.0, SCENE_Z),
+        Vec3::new(SCENE_X, SVO_GROUND_Y, SCENE_Z),
         16.0,
         palette.voxel_primary.to_voxel_material(),
     );
     voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X + 48.0, SVO_GROUND_Y + 32.0, SCENE_Z),
+        Vec3::new(SCENE_X + 48.0, SVO_GROUND_Y, SCENE_Z),
         12.0,
         palette.voxel_secondary.to_voxel_material(),
     );
     voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X - 48.0, SVO_GROUND_Y + 32.0, SCENE_Z),
+        Vec3::new(SCENE_X - 48.0, SVO_GROUND_Y, SCENE_Z),
         8.0,
         palette.voxel_highlight.to_voxel_material(),
     );

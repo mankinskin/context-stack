@@ -27,7 +27,13 @@ static WIREFRAME_OCCUPIED: AtomicBool = AtomicBool::new(true);
 /// Z-prepass toggle — OFF by default to avoid redundant per-pixel SDF work.
 static ZPREPASS_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Ray-march toggle — when ON, `SvoRayMarchNode` renders instead of tiled pipeline.
-static RAY_MARCH_ENABLED: AtomicBool = AtomicBool::new(false);
+static RAY_MARCH_ENABLED: AtomicBool = AtomicBool::new(true);
+/// Smooth-min neighbor blending for SDF seams (Phase 2a).
+static NEIGHBOR_BLEND_ENABLED: AtomicBool = AtomicBool::new(false);
+/// Shadow rays — primary hits cast a shadow ray toward the light (Phase 2b).
+static SHADOW_RAYS_ENABLED: AtomicBool = AtomicBool::new(true);
+/// Reflection rays — metallic surfaces cast a secondary traversal ray (Phase 2b).
+static REFLECTION_RAYS_ENABLED: AtomicBool = AtomicBool::new(true);
 
 /// Frame time in microseconds (written by Bevy system, read by Dioxus UI).
 static FRAME_TIME_US: AtomicU64 = AtomicU64::new(0);
@@ -43,6 +49,20 @@ pub fn is_zprepass_enabled() -> bool {
 /// are no-ops for that frame.
 pub fn is_ray_march_enabled() -> bool {
     RAY_MARCH_ENABLED.load(Ordering::Relaxed)
+}
+
+/// Returns the Phase 2a/2b feature flag bitmask for use in `RayMarchUniforms`.
+///
+/// Bit layout:
+/// - Bit 0 (0x1): neighbor blend (Phase 2a smooth-min seam removal)
+/// - Bit 1 (0x2): shadow rays (Phase 2b)
+/// - Bit 2 (0x4): reflection rays (Phase 2b)
+pub fn ray_march_feature_flags() -> u32 {
+    let mut flags = 0u32;
+    if NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed) { flags |= 0x1; }
+    if SHADOW_RAYS_ENABLED.load(Ordering::Relaxed)    { flags |= 0x2; }
+    if REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed) { flags |= 0x4; }
+    flags
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +282,10 @@ pub fn DebugPanel() -> Element {
     let mut depth = use_signal(|| WIREFRAME_DEPTH.load(Ordering::Relaxed));
     let mut occupied = use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
     let mut zprepass = use_signal(|| ZPREPASS_ENABLED.load(Ordering::Relaxed));
+    let mut ray_march = use_signal(|| RAY_MARCH_ENABLED.load(Ordering::Relaxed));
+    let mut neighbor_blend = use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
+    let mut shadow_rays = use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
+    let mut reflection_rays = use_signal(|| REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed));
 
     // Frame-time readout — re-read atomic on every render and via refresh counter.
     let mut refresh_counter = use_signal(|| 0u32);
@@ -347,6 +371,67 @@ pub fn DebugPanel() -> Element {
                     "Occupied Only"
                 }
 
+                // --- Phase 2a/2b ray-march feature toggles ---
+                div { class: "mt-2 pt-2 border-t border-white/10 text-white/50 text-[10px] uppercase tracking-wide",
+                    "Ray March"
+                }
+
+                // Ray March pipeline enable/disable
+                label { class: "flex items-center gap-2 cursor-pointer text-white hover:text-green-300 font-semibold",
+                    input {
+                        r#type: "checkbox",
+                        checked: *ray_march.read(),
+                        onclick: move |_| {
+                            let v = !*ray_march.read();
+                            ray_march.set(v);
+                            RAY_MARCH_ENABLED.store(v, Ordering::Relaxed);
+                        }
+                    },
+                    "Enable Ray March"
+                }
+
+                // Neighbor Blend (Phase 2a)
+                label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
+                    input {
+                        r#type: "checkbox",
+                        checked: *neighbor_blend.read(),
+                        onclick: move |_| {
+                            let v = !*neighbor_blend.read();
+                            neighbor_blend.set(v);
+                            NEIGHBOR_BLEND_ENABLED.store(v, Ordering::Relaxed);
+                        }
+                    },
+                    "Neighbor Blend"
+                }
+
+                // Shadow Rays (Phase 2b)
+                label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
+                    input {
+                        r#type: "checkbox",
+                        checked: *shadow_rays.read(),
+                        onclick: move |_| {
+                            let v = !*shadow_rays.read();
+                            shadow_rays.set(v);
+                            SHADOW_RAYS_ENABLED.store(v, Ordering::Relaxed);
+                        }
+                    },
+                    "Shadow Rays"
+                }
+
+                // Reflection Rays (Phase 2b)
+                label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
+                    input {
+                        r#type: "checkbox",
+                        checked: *reflection_rays.read(),
+                        onclick: move |_| {
+                            let v = !*reflection_rays.read();
+                            reflection_rays.set(v);
+                            REFLECTION_RAYS_ENABLED.store(v, Ordering::Relaxed);
+                        }
+                    },
+                    "Reflections"
+                }
+
                 // Keybinding hints
                 div { class: "mt-2 pt-2 border-t border-white/10 text-white/30 text-[10px]",
                     "F3 toggle · F4/F5 depth · F6 filter"
@@ -371,7 +456,7 @@ mod tests {
         assert!(!s.enabled);
         assert_eq!(s.display_depth, 4);
         assert!(s.occupied_only);
-        assert_eq!(s.draw_radius, 60.0);
+        assert_eq!(s.draw_radius, 800.0);
     }
 
     #[test]

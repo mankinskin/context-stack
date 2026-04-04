@@ -615,7 +615,7 @@ mod tests {
     fn constants_are_sane() {
         assert_eq!(GAUSSIAN_DATA_STRIDE, (3 + 1 + 6 + 48) as u64 * 4);
         assert_eq!(PROJECTED_GAUSSIAN_STRIDE, (2 + 3 + 1 + 3 + 1) as u64 * 4);
-        assert_eq!(TILE_DATA_STRIDE, 4); // packed: (offset << 12) | count
+        assert_eq!(TILE_DATA_STRIDE, 8); // two separate u32s: [offset, count]
         assert_eq!(OCTREE_NODE_SIZE, 8);
     }
 }
