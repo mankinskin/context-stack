@@ -194,6 +194,34 @@ fn eval_voxel_normal(p_local: vec3f, half: f32, sdf_type: u32) -> vec3f {
     return vec3f(0.0, 0.0, sign(p_local.z));
 }
 
+// Returns the outward face normal for the AABB face that `ro + rd * t` entered.
+//
+// Computed from per-axis slab entry t-values so it is unambiguous even when
+// the ray enters exactly at an edge or corner (two or three axis t-values are
+// equal).  That case causes the position-based `eval_voxel_normal` to pick an
+// arbitrary face, which is the root cause of visible grey gridlines between
+// adjacent box voxels — the "winning" face is always the first branch (X),
+// even when the ray is entering through the top (Y) face.
+//
+// `inv_rd` must be precomputed `1 / rd`.  `box_min / box_max` are the leaf
+// AABB corners in the same space as `ro`.
+fn box_entry_normal(ro: vec3f, inv_rd: vec3f, box_min: vec3f, box_max: vec3f) -> vec3f {
+    // Per-axis slab entry t: how far along the ray until the ray is inside
+    // each axis slab.  The LAST axis to be entered determines the face.
+    let t1 = (box_min - ro) * inv_rd;
+    let t2 = (box_max - ro) * inv_rd;
+    let t_enter = min(t1, t2);   // entry t per axis
+    // Outward normal on the entering face = -sign(rd) on that axis.
+    // WGSL select(false_val, true_val, cond):
+    //   inv_rd.x > 0 → rd.x > 0 → ray entered through min-X face → normal = -X
+    if t_enter.x >= t_enter.y && t_enter.x >= t_enter.z {
+        return vec3f(select(1.0, -1.0, inv_rd.x > 0.0), 0.0, 0.0);
+    } else if t_enter.y >= t_enter.z {
+        return vec3f(0.0, select(1.0, -1.0, inv_rd.y > 0.0), 0.0);
+    }
+    return vec3f(0.0, 0.0, select(1.0, -1.0, inv_rd.z > 0.0));
+}
+
 // ---------------------------------------------------------------------------
 // Smooth-union (smooth_min) for Phase 2a neighbor blending
 // ---------------------------------------------------------------------------
@@ -456,12 +484,48 @@ fn traverse_svo(
 
             if alpha > 0.001 {
                 // Evaluate normal at the ray entry point, not the AABB midpoint.
-                // At the midpoint: sphere centre → length(p_local) ≈ 0 (degenerate
-                // gradient, falls back to hardcoded up-vector); box centre → all abs
-                // components near-equal (arbitrary face selected).  Both cause wrong
-                // lighting and broken shadow ray self-test.
+                // At the midpoint all position components are ≈ 0 → degenerate
+                // gradient for every SDF type (was the root cause of the
+                // "hard centre point" artifact fixed in the previous pass).
                 let p_entry_local = (ro_svo + rd_svo * t_entry) - center;
-                let normal = eval_voxel_normal(p_entry_local, half, sdf_type);
+
+                // Box types: use the slab-derived entry-face normal, which is
+                // unambiguous at edges/corners (see box_entry_normal above).
+                //
+                // Gridline seam suppression (requires FEAT_NEIGHBOR_BLEND):
+                //   At shallow viewing angles, rays enter flat ground voxels
+                //   through SIDE faces (Z or X) instead of the TOP face.  Side
+                //   faces have lower dot(normal, light_dir) → darker pixels →
+                //   visible grid.  When the entry face is INTERIOR (covered by
+                //   an adjacent voxel), the camera can only see the voxel because
+                //   it approached from a grazing angle: the physically correct
+                //   visible surface is the nearest EXPOSED face.  We prefer +Y
+                //   (up) first — it eliminates grass/terrain gridlines — then
+                //   -Y, then fall back to the entry face for fully interior
+                //   voxels (stone cores etc.).  Cost: 1–3 svo_lookup calls,
+                //   same order as the per-leaf SDF blend already under this flag.
+                //
+                // Sphere / torus: use the SDF gradient at the AABB entry point
+                // (directionally correct; exact surface normal requires an
+                // additional ray–sphere solve, deferred to a later phase).
+                var normal: vec3f;
+                if sdf_type == 0u || sdf_type == 2u {
+                    let entry_n = box_entry_normal(ro_svo, inv_rd, n_min, n_max);
+                    if neighbor_blend && svo_lookup(center + entry_n * n_size) != 0u {
+                        // Entry face is interior — find the nearest exposed face.
+                        if svo_lookup(center + vec3f(0.0, n_size, 0.0)) == 0u {
+                            normal = vec3f(0.0, 1.0, 0.0);  // +Y exposed
+                        } else if svo_lookup(center - vec3f(0.0, n_size, 0.0)) == 0u {
+                            normal = vec3f(0.0, -1.0, 0.0); // -Y exposed
+                        } else {
+                            normal = entry_n; // fully interior voxel, no better option
+                        }
+                    } else {
+                        normal = entry_n;
+                    }
+                } else {
+                    normal = eval_voxel_normal(p_entry_local, half, sdf_type);
+                }
 
                 // Front-to-back alpha compositing.
                 let contribution = alpha * (1.0 - accum_alpha);
