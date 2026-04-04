@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 use dioxus::prelude::*;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use crate::svo::VoxelWorld;
 use crate::ui::GlassPanel;
@@ -24,6 +24,16 @@ use bevy::input::keyboard::KeyCode as BevyKeyCode;
 static WIREFRAME_ENABLED: AtomicBool = AtomicBool::new(false);
 static WIREFRAME_DEPTH: AtomicU32 = AtomicU32::new(4);
 static WIREFRAME_OCCUPIED: AtomicBool = AtomicBool::new(true);
+/// Z-prepass toggle — OFF by default to avoid redundant per-pixel SDF work.
+static ZPREPASS_ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// Frame time in microseconds (written by Bevy system, read by Dioxus UI).
+static FRAME_TIME_US: AtomicU64 = AtomicU64::new(0);
+
+/// Returns `true` if the z-prepass is enabled (read by `ZPrepassNode`).
+pub fn is_zprepass_enabled() -> bool {
+    ZPREPASS_ENABLED.load(Ordering::Relaxed)
+}
 
 // ---------------------------------------------------------------------------
 // Plugin
@@ -38,6 +48,7 @@ impl Plugin for DebugOverlayPlugin {
             toggle_debug_keys,
             sync_debug_from_shared,
             draw_svo_wireframe,
+            track_frame_time,
         ).chain());
     }
 }
@@ -97,6 +108,12 @@ fn sync_debug_from_shared(mut state: ResMut<DebugOverlayState>) {
     state.enabled = WIREFRAME_ENABLED.load(Ordering::Relaxed);
     state.display_depth = WIREFRAME_DEPTH.load(Ordering::Relaxed);
     state.occupied_only = WIREFRAME_OCCUPIED.load(Ordering::Relaxed);
+}
+
+/// Write frame dt (microseconds) into the shared atomic for UI display.
+fn track_frame_time(time: Res<Time>) {
+    let dt_us = (time.delta_secs_f64() * 1_000_000.0) as u64;
+    FRAME_TIME_US.store(dt_us, Ordering::Relaxed);
 }
 
 /// Walk the SVO and populate the wireframe overlay vertex buffer.
@@ -230,10 +247,43 @@ pub fn DebugPanel() -> Element {
     let mut enabled = use_signal(|| WIREFRAME_ENABLED.load(Ordering::Relaxed));
     let mut depth = use_signal(|| WIREFRAME_DEPTH.load(Ordering::Relaxed));
     let mut occupied = use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
+    let mut zprepass = use_signal(|| ZPREPASS_ENABLED.load(Ordering::Relaxed));
+
+    // Frame-time readout — re-read atomic on every render and via refresh counter.
+    let mut refresh_counter = use_signal(|| 0u32);
+    let _ = *refresh_counter.read(); // subscribe so set() triggers re-render
+    let frame_us = FRAME_TIME_US.load(Ordering::Relaxed);
+    let fps = if frame_us == 0 { 0.0 } else { 1_000_000.0 / frame_us as f64 };
+    let ms = frame_us as f64 / 1000.0;
 
     rsx! {
         GlassPanel { title: "Debug Settings".to_string(),
             div { class: "space-y-3 text-xs",
+                // FPS / frame time readout
+                div { class: "flex items-center gap-2",
+                    span { class: "font-mono text-green-400 text-sm",
+                        "{fps:.0} FPS  ({ms:.1} ms)"
+                    }
+                    button {
+                        class: "px-1 py-0.5 text-[10px] bg-white/10 hover:bg-white/20 rounded text-white/50",
+                        onclick: move |_| refresh_counter.set(refresh_counter() + 1),
+                        "⟳"
+                    }
+                }
+
+                // Z-prepass toggle
+                label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
+                    input {
+                        r#type: "checkbox",
+                        checked: *zprepass.read(),
+                        onclick: move |_| {
+                            let v = !*zprepass.read();
+                            zprepass.set(v);
+                            ZPREPASS_ENABLED.store(v, Ordering::Relaxed);
+                        }
+                    },
+                    "Z-Prepass"
+                }
                 // Wireframe toggle
                 label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
                     input {

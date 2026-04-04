@@ -242,15 +242,12 @@ impl Node for ZPrepassNode {
         let Some(clear_pipeline) = pipeline_cache.get_compute_pipeline(pipelines.clear) else {
             return Ok(());
         };
-        let Some(prepass_pipeline) = pipeline_cache.get_compute_pipeline(pipelines.prepass) else {
-            return Ok(());
-        };
 
         // Tile-rounded viewport dimensions (the shader bounds-checks internally).
         let width  = splat_buffers.tiles_x * TILE_SIZE;
         let height = splat_buffers.tiles_y * TILE_SIZE;
 
-        // --- Clear pass: fill depth_prepass with f32 +infinity ---
+        // --- Clear pass: always run to keep the buffer valid (all INFINITY) ---
         let total_pixels    = width * height;
         let clear_dispatch  = total_pixels.div_ceil(256);
         {
@@ -264,6 +261,15 @@ impl Node for ZPrepassNode {
             pass.set_bind_group(0, &bind_group.0, &[]);
             pass.dispatch_workgroups(clear_dispatch, 1, 1);
         }
+
+        // --- Prepass: only run when enabled via debug toggle ---
+        if !crate::debug_overlay::is_zprepass_enabled() {
+            return Ok(());
+        }
+
+        let Some(prepass_pipeline) = pipeline_cache.get_compute_pipeline(pipelines.prepass) else {
+            return Ok(());
+        };
 
         // --- Prepass: one thread per pixel, 8×8 workgroup ---
         let wg_x = width.div_ceil(8);

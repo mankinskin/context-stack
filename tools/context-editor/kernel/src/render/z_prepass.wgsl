@@ -62,6 +62,8 @@ const MAX_PREPASS_SPLATS: u32 = 8u;
 /// Sentinel depth meaning "no opaque hit" — much larger than any real scene depth.
 /// Avoids bitcast which is not supported as a naga constant expression.
 const DEPTH_INFINITY: f32     = 1.0e20;
+/// Mask for unpacking the projected index from packed active_list entries.
+const INDEX_MASK: u32         = 0x1FFFFFu;
 
 // ---------------------------------------------------------------------------
 // SDF helpers (duplicated from tiled_raster.wgsl — avoids cross-file import)
@@ -82,6 +84,7 @@ fn ray_box_closest_point(ro: vec3f, rd: vec3f, center: vec3f, half_ext: f32) -> 
     let t      = select(t_min, 0.0, t_min < 0.0);
     return ro + rd * max(t, 0.0);
 }
+
 
 // ---------------------------------------------------------------------------
 // Entry point 1: clear_depth
@@ -135,7 +138,7 @@ fn z_prepass_main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let limit  = min(tile_count, MAX_PREPASS_SPLATS);
 
     for (var i = 0u; i < limit; i++) {
-        let splat_idx = active_list[tile_offset + i];
+        let splat_idx = active_list[tile_offset + i] & INDEX_MASK;
         let s         = projected[splat_idx];
 
         // Skip if pixel is outside this splat's screen AABB.
@@ -147,15 +150,15 @@ fn z_prepass_main(@builtin(global_invocation_id) gid: vec3<u32>) {
         let center_ws = s.center_and_extent.xyz;
         let half_ext  = s.center_and_extent.w;
 
-        // Cheap box SDF regardless of actual sdf_type.
+        // SDF evaluation — same as tiled_raster but box-only for prepass.
         let local_pos = ray_box_closest_point(ray_origin, ray_dir, center_ws, half_ext);
         let p_local   = local_pos - center_ws;
         let d         = sd_box(p_local, vec3f(half_ext));
+        let hit_dist  = length(local_pos - ray_origin);
+        let fw        = hit_dist / max(uniforms.resolution.y, 1.0);
+        let alpha     = 1.0 - smoothstep(0.0, fw, d);
 
-        let hit_dist = length(local_pos - ray_origin);
-        let fw       = hit_dist / max(uniforms.resolution.y, 1.0);
-        let alpha    = 1.0 - smoothstep(-fw, fw, d);
-
+        // Accept as opaque if alpha is near 1.0.
         if alpha > 0.95 {
             depth_prepass[px_idx] = hit_dist;
             return;

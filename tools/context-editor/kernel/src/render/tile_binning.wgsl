@@ -36,6 +36,14 @@ struct TileBinUniforms {
 
 const TILE_SIZE: u32 = 16u;
 
+// Per-tile active_list cap — prevents pathological O(n²) sort on dense tiles.
+const MAX_PER_TILE: u32 = 512u;
+
+// Bit layout of packed active_list entries:
+//   [31:21] = top 11 bits of bitcast<u32>(depth)  (coarse front-to-back key)
+//   [20:0]  = projected buffer index              (up to 2 097 151)
+const INDEX_MASK: u32 = 0x1FFFFFu;
+
 // ---------------------------------------------------------------------------
 // Pass 1: Count tile overlaps
 // ---------------------------------------------------------------------------
@@ -75,7 +83,7 @@ fn count_tile_overlaps(@builtin(global_invocation_id) gid: vec3u) {
 fn prefix_sum_and_pack() {
     var running_offset = 0u;
     for (var i = 0u; i < uniforms.num_tiles; i++) {
-        let count = atomicLoad(&tile_counts[i]);
+        let count = min(atomicLoad(&tile_counts[i]), MAX_PER_TILE);
 
         // Initialize write head to this tile's start offset
         atomicStore(&tile_write_heads[i], running_offset);
@@ -117,13 +125,20 @@ fn scatter_to_tiles(@builtin(global_invocation_id) gid: vec3u) {
     let ty0 = u32(max(s.screen_min.y, 0.0)) / TILE_SIZE;
     let ty1 = u32(max(s.screen_max.y, 0.0)) / TILE_SIZE;
 
+    // Pack depth into the upper 11 bits so the per-tile sort can compare
+    // u32 values directly without random reads into projected[].
+    let depth_key = bitcast<u32>(s.depth) >> 21u;
+    let packed_val = (depth_key << 21u) | proj_idx;
+
     for (var ty = ty0; ty <= ty1; ty++) {
         for (var tx = tx0; tx <= tx1; tx++) {
             let tile_idx = ty * uniforms.grid_width + tx;
             if tile_idx < uniforms.num_tiles {
+                let tile_start = tile_data[tile_idx * 2u];
                 let slot = atomicAdd(&tile_write_heads[tile_idx], 1u);
-                if slot < uniforms.max_active {
-                    active_list[slot] = proj_idx;
+                // Respect per-tile cap from prefix_sum and global buffer limit.
+                if (slot - tile_start) < MAX_PER_TILE && slot < uniforms.max_active {
+                    active_list[slot] = packed_val;
                 }
             }
         }
@@ -147,17 +162,17 @@ fn sort_tile_active_list(@builtin(global_invocation_id) gid: vec3u) {
     let count  = tile_data[tile_idx * 2u + 1u];
     if count <= 1u { return; }
 
-    // Insertion sort — stable, in-place, O(n²) but n is small.
+    // Insertion sort on packed (depth_key|index) values — compare u32s
+    // directly without reading from the projected[] buffer.
     for (var i = 1u; i < count; i++) {
-        let key_idx  = active_list[offset + i];
-        let key_depth = projected[key_idx].depth;
+        let key_val = active_list[offset + i];
         var j = i;
         while j > 0u {
-            let prev_idx = active_list[offset + j - 1u];
-            if projected[prev_idx].depth <= key_depth { break; }
-            active_list[offset + j] = prev_idx;
+            let prev_val = active_list[offset + j - 1u];
+            if prev_val <= key_val { break; }
+            active_list[offset + j] = prev_val;
             j -= 1u;
         }
-        active_list[offset + j] = key_idx;
+        active_list[offset + j] = key_val;
     }
 }

@@ -76,6 +76,8 @@ struct GlassPanelData {
 
 const PI: f32       = 3.14159265359;
 const TILE_SIZE: u32 = 16u;
+/// Mask for unpacking the projected index from packed active_list entries.
+const INDEX_MASK: u32 = 0x1FFFFFu;
 
 // ---------------------------------------------------------------------------
 // Vertex shader — fullscreen triangle (3 vertices, no VBO)
@@ -177,6 +179,8 @@ fn ray_box_closest_point(ro: vec3f, rd: vec3f, center: vec3f, half_ext: f32) -> 
     let t       = select(t_min, 0.0, t_min < 0.0);
     return ro + rd * max(t, 0.0);
 }
+
+
 
 fn box_normal(p_local: vec3f, half_ext: vec3f) -> vec3f {
     // Ein sehr kleiner Epsilon-Wert für die Gradienten-Berechnung
@@ -437,7 +441,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let prepass_depth = depth_prepass[px_idx];
 
     for (var i = 0u; i < tile_count; i++) {
-        let splat_idx = active_list[tile_offset + i];
+        let splat_idx = active_list[tile_offset + i] & INDEX_MASK;
         let s         = projected[splat_idx];
 
         // Skip if pixel outside splat's screen AABB
@@ -449,39 +453,27 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
         let center_ws  = s.center_and_extent.xyz;
         let half_ext_f = s.center_and_extent.w;
 
-        // SDF type dispatch
+        // SDF type dispatch — unified path for all SDF types.
         let sdf_tp    = sdf_type_from_mp(s.material_packed);
         let local_pos = ray_surface_closest_point(
             ray_origin, ray_dir, center_ws, half_ext_f, sdf_tp,
         );
         let p_local = local_pos - center_ws;
-        let d = sdf_eval(p_local, half_ext_f, sdf_tp);
-
-        // Anti-aliased coverage — analytical pixel footprint (avoids fwidth
-        // in non-uniform control flow)
+        let d       = sdf_eval(p_local, half_ext_f, sdf_tp);
         let hit_dist = length(local_pos - ray_origin);
-        let fw = hit_dist / max(uniforms.resolution.y, 1.0);
-        // Part A opacity fix: box voxels clearly inside the surface are fully
-        // opaque — the smoothstep fringe only applies at the edge boundary.
-        var alpha: f32;
-        if sdf_tp == 0u && d < -fw {
-            alpha = remaining_alpha;
-        } else {
-            alpha = (1.0 - smoothstep(-fw, fw, d)) * remaining_alpha;
-        }
+        let fw       = hit_dist / max(uniforms.resolution.y, 1.0);
+        // AA fringe on the OUTSIDE only: d <= 0 (on/inside surface) → full
+        // opacity, 0 < d < fw → smooth silhouette falloff.
+        let alpha = (1.0 - smoothstep(0.0, fw, d)) * remaining_alpha;
         if alpha < 1.0 / 255.0 { continue; }
+        let normal = sdf_normal_type(p_local, half_ext_f, sdf_tp);
 
         // Depth cull: skip anything behind the prepass opaque surface.
-        // Guard: prepass_depth == 0.0 means the buffer is uninitialized
-        // (first frame(s) before the compute pipeline compiles).
-        // prepass_depth == DEPTH_INFINITY (1e20) means no opaque hit was found in the
-        // prepass — in both cases skip the cull and let alpha compositing run.
         let has_prepass_hit = prepass_depth > 0.0 && prepass_depth < 1.0e20;
         if has_prepass_hit && hit_dist > prepass_depth + 0.05 { continue; }
 
         // Lighting
         let mat      = unpack_material(s.material_packed);
-        let normal   = sdf_normal_type(p_local, half_ext_f, sdf_tp);
         let view_dir = normalize(uniforms.camera_pos - local_pos);
         let pbr      = evaluate_pbr(mat, normal, view_dir,
                                     uniforms.light_dir, uniforms.light_color);
