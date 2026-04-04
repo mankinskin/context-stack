@@ -26,6 +26,8 @@ static WIREFRAME_DEPTH: AtomicU32 = AtomicU32::new(4);
 static WIREFRAME_OCCUPIED: AtomicBool = AtomicBool::new(true);
 /// Z-prepass toggle — OFF by default to avoid redundant per-pixel SDF work.
 static ZPREPASS_ENABLED: AtomicBool = AtomicBool::new(false);
+/// Ray-march toggle — when ON, `SvoRayMarchNode` renders instead of tiled pipeline.
+static RAY_MARCH_ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// Frame time in microseconds (written by Bevy system, read by Dioxus UI).
 static FRAME_TIME_US: AtomicU64 = AtomicU64::new(0);
@@ -33,6 +35,14 @@ static FRAME_TIME_US: AtomicU64 = AtomicU64::new(0);
 /// Returns `true` if the z-prepass is enabled (read by `ZPrepassNode`).
 pub fn is_zprepass_enabled() -> bool {
     ZPREPASS_ENABLED.load(Ordering::Relaxed)
+}
+
+/// Returns `true` if the SVO ray march pipeline is active.
+///
+/// When `true`, `SvoRayMarchNode` renders the scene; the tiled forward+ nodes
+/// are no-ops for that frame.
+pub fn is_ray_march_enabled() -> bool {
+    RAY_MARCH_ENABLED.load(Ordering::Relaxed)
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +110,10 @@ fn toggle_debug_keys(keys: Res<ButtonInput<BevyKeyCode>>) {
     if keys.just_pressed(BevyKeyCode::F6) {
         let v = WIREFRAME_OCCUPIED.load(Ordering::Relaxed);
         WIREFRAME_OCCUPIED.store(!v, Ordering::Relaxed);
+    }
+    if keys.just_pressed(BevyKeyCode::F7) {
+        let v = RAY_MARCH_ENABLED.load(Ordering::Relaxed);
+        RAY_MARCH_ENABLED.store(!v, Ordering::Relaxed);
     }
 }
 

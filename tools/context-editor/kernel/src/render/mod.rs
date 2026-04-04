@@ -38,6 +38,7 @@ pub mod glass;
 pub mod ui_composite;
 pub mod wireframe_overlay;
 pub mod particle_inject;
+pub mod svo_ray_march;
 
 use bevy::{
     prelude::*,
@@ -59,6 +60,7 @@ use z_prepass::ZPrepassNode;
 use ui_composite::UiCompositeNode;
 use wireframe_overlay::WireframeOverlayNode;
 use particle_inject::ParticleComputeNode;
+use svo_ray_march::SvoRayMarchNode;
 
 // ---------------------------------------------------------------------------
 // Node labels
@@ -88,6 +90,8 @@ pub enum ContextEditorLabel {
     UiComposite,
     /// Draw SVO wireframe lines on top of voxel splats.
     WireframeOverlay,
+    /// SVO direct ray march (Phase 1b) — replaces tiled pipeline when toggled on.
+    SvoRayMarch,
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +224,8 @@ impl Plugin for ContextEditorRenderPlugin {
         bevy::asset::embedded_asset!(app, "z_prepass.wgsl");
         bevy::asset::embedded_asset!(app, "wireframe_overlay.wgsl");
         bevy::asset::embedded_asset!(app, "particle_inject.wgsl");
+        bevy::asset::embedded_asset!(app, "svo_common.wgsl");
+        bevy::asset::embedded_asset!(app, "svo_ray_march.wgsl");
 
         // On WASM, force-sync the Window resolution from the actual canvas
         // size before any render-related systems read it.
@@ -298,6 +304,27 @@ impl Plugin for ContextEditorRenderPlugin {
                 .chain(),
         );
 
+        // Phase 1a: SVO transform uniform (world-to-SVO coordinate mapping).
+        app.add_systems(
+            PostUpdate,
+            (
+                crate::gpu::svo_transform::init_svo_transform,
+                crate::gpu::svo_transform::update_svo_transform,
+            )
+                .chain(),
+        );
+
+        // Phase 1b: SVO ray march — output buffers and per-frame uniforms.
+        app.add_systems(
+            PostUpdate,
+            (
+                svo_ray_march::init_ray_march_buffers,
+                svo_ray_march::init_ray_march_uniforms,
+                svo_ray_march::update_ray_march_uniforms,
+            )
+                .chain(),
+        );
+
         // Extract main-world resources into the render sub-app each frame.
         // ExtractResourcePlugin must be added to the MAIN app (not render_app)
         // because its build() internally accesses app.get_sub_app_mut(RenderApp).
@@ -312,7 +339,11 @@ impl Plugin for ContextEditorRenderPlugin {
             .add_plugins(ExtractResourcePlugin::<tiled_raster::RasterUniformBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<tile_binning::TileBinUniformBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<glass::GlassPanelBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<wireframe_overlay::WireframeOverlayBuffers>::default());
+            .add_plugins(ExtractResourcePlugin::<wireframe_overlay::WireframeOverlayBuffers>::default())
+            // Phase 1a + 1b extractions
+            .add_plugins(ExtractResourcePlugin::<crate::gpu::SvoTransformBuffer>::default())
+            .add_plugins(ExtractResourcePlugin::<svo_ray_march::SvoRayMarchBuffers>::default())
+            .add_plugins(ExtractResourcePlugin::<svo_ray_march::SvoRayMarchUniformBuffer>::default());
 
         // Guard: RenderApp is absent in headless / test contexts.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -396,9 +427,21 @@ impl Plugin for ContextEditorRenderPlugin {
                 .in_set(RenderSystems::Queue),
         );
 
+        // Phase 1b: SVO ray march pipeline and bind group setup
+        render_app.add_systems(
+            Render,
+            (
+                svo_ray_march::queue_ray_march_pipelines,
+                svo_ray_march::rebuild_ray_march_bind_groups,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+
         // Construct nodes that need FromWorld before borrowing the graph.
         let tiled_raster_node = TiledRasterNode::from_world(render_app.world_mut());
         let wireframe_node = WireframeOverlayNode::from_world(render_app.world_mut());
+        let svo_ray_march_node = SvoRayMarchNode::from_world(render_app.world_mut());
 
         let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
 
@@ -419,6 +462,7 @@ impl Plugin for ContextEditorRenderPlugin {
         core3d.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
         core3d.add_node(ContextEditorLabel::ZPrepass, ZPrepassNode::default());
         core3d.add_node(ContextEditorLabel::TiledRaster, tiled_raster_node);
+        core3d.add_node(ContextEditorLabel::SvoRayMarch, svo_ray_march_node);
         core3d.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
         core3d.add_node(ContextEditorLabel::WireframeOverlay, wireframe_node);
 
@@ -433,7 +477,10 @@ impl Plugin for ContextEditorRenderPlugin {
         core3d.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
         core3d.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::ZPrepass);
         core3d.add_node_edge(ContextEditorLabel::ZPrepass, ContextEditorLabel::TiledRaster);
-        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::UiComposite);
+        // SvoRayMarch runs after TiledRaster.  When the toggle is ON it overwrites
+        // the view target with ray-marched output; when OFF it is a no-op.
+        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::SvoRayMarch);
+        core3d.add_node_edge(ContextEditorLabel::SvoRayMarch, ContextEditorLabel::UiComposite);
         core3d.add_node_edge(ContextEditorLabel::UiComposite, ContextEditorLabel::WireframeOverlay);
 
         // Anchor into the existing Core3d sub-graph:

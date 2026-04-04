@@ -438,6 +438,21 @@ impl VoxelWorld {
     // Position precomputation for GPU
     // -----------------------------------------------------------------------
 
+    /// World-space position of the SVO root's min corner.
+    ///
+    /// Currently always `(0, 0, 0)`. Exposed as a getter so the ray march
+    /// shader can be initialised from the correct origin if the root relocates.
+    pub fn origin(&self) -> Vec3 {
+        Vec3::ZERO
+    }
+
+    /// Total side length of the SVO root cube in world units (`2^max_depth`).
+    ///
+    /// Each leaf node covers exactly 1×1×1 world-unit cell.
+    pub fn world_size(&self) -> f32 {
+        (1u32 << self.max_depth) as f32
+    }
+
     /// Compute world-space positions for every node, returned as `[x, y, z, half_extent]`.
     ///
     /// The GPU cannot use recursion, so we precompute positions on the CPU via
@@ -598,6 +613,10 @@ impl VoxelWorld {
             let new_mask = child_mask | bit;
             self.nodes[node_idx].child_pointer =
                 (first_child as u32) << 8 | new_mask as u32;
+            // Mark the parent dirty so the GPU buffer gets the updated child_pointer.
+            // The ray march shader traverses the tree hierarchically and needs correct
+            // child_mask + first_child data at every internal node, not just leaves.
+            self.mark_dirty(node_idx);
         }
 
         let first_child = self.nodes[node_idx].first_child_index();

@@ -18,6 +18,9 @@
 //!                          active_svo_group(current_is_front) selects the right one.
 //! ```
 
+pub mod svo_transform;
+pub use svo_transform::SvoTransformBuffer;
+
 use bevy::prelude::{Commands, Query, Res, Resource, Window};
 use bevy::render::{
     extract_resource::ExtractResource,
