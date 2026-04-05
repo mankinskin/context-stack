@@ -13,7 +13,7 @@ use bevy::{
     render::{
         render_graph::{Node, NodeRunError, RenderGraphContext},
         render_resource::{
-            BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+            BindGroup, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
             BindingType, BufferBindingType, CachedComputePipelineId, ComputePassDescriptor,
             ComputePipelineDescriptor, PipelineCache, ShaderStages,
         },
@@ -21,7 +21,6 @@ use bevy::{
     },
 };
 
-use crate::gpu::SplatBuffers;
 use crate::particle_splat::ParticleSplatBuffer;
 
 // ---------------------------------------------------------------------------
@@ -119,37 +118,19 @@ pub struct ParticleInjectBindGroup(pub BindGroup);
 ///
 /// Particle and splat buffers don't swap, but rebuilding each frame keeps the
 /// pattern consistent with other render nodes and handles late-init.
+///
+/// # Note
+/// The tiled forward+ splat pipeline has been removed (Phase 3b). This system
+/// is a no-op until particle injection is reworked for the ray-march pipeline.
 pub fn rebuild_particle_inject_bind_group(
-    mut commands: Commands,
-    device: Res<RenderDevice>,
-    pipeline_cache: Res<PipelineCache>,
-    particles: Option<Res<ParticleSplatBuffer>>,
-    splat_buffers: Option<Res<SplatBuffers>>,
+    _commands: Commands,
+    _device: Res<RenderDevice>,
+    _pipeline_cache: Res<PipelineCache>,
+    _particles: Option<Res<ParticleSplatBuffer>>,
 ) {
-    let Some(particles) = particles else { return };
-    let Some(splat_buffers) = splat_buffers else { return };
-
-    let descriptor = particle_inject_bind_group_layout_descriptor();
-    let layout = pipeline_cache.get_bind_group_layout(&descriptor);
-    let bg = device.create_bind_group(
-        "bg_particle_inject",
-        &layout,
-        &[
-            BindGroupEntry {
-                binding: 0,
-                resource: particles.buffer.as_entire_binding(),
-            },
-            BindGroupEntry {
-                binding: 1,
-                resource: splat_buffers.splats.as_entire_binding(),
-            },
-            BindGroupEntry {
-                binding: 2,
-                resource: particles.uniform_buffer.as_entire_binding(),
-            },
-        ],
-    );
-    commands.insert_resource(ParticleInjectBindGroup(bg));
+    // No-op: SplatBuffers (tiled pipeline output) has been removed. The
+    // ParticleComputeNode is kept in the graph but does nothing until
+    // particle injection is re-wired for the ray-march pipeline.
 }
 
 // ---------------------------------------------------------------------------

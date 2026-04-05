@@ -1,39 +1,22 @@
-//! Custom render-graph pipeline — 8-node voxel splat renderer.
-//!
-//! Implements T2b (skeleton) + T6a (voxel splat kernel) + T6b (sort key build)
-//! + T6c (radix sort) + UI composite.
+//! Custom render-graph pipeline — SVO ray-march + depth-bridge renderer.
 //!
 //! # Pipeline
 //!
 //! ```text
-//! BufferSwap → ParticleCompute → VoxelSplatKernel → SortKeyBuild
-//!           → RadixSort → TileBin → TiledRaster → UiComposite
-//!           → WireframeOverlay
+//! BufferSwap → ParticleCompute → SvoRayMarch → DepthBridge
+//!           → UiComposite → WireframeOverlay
 //! ```
 //!
 //! | Stage | Purpose |
 //! |---|---|
 //! | `BufferSwap` | Flip the SVO double-buffer pointer |
 //! | `ParticleCompute` | Simulate voxel particle dynamics |
-//! | `VoxelSplatKernel` | Generate voxel splats from SVO leaves (T6a) |
-//! | `SortKeyBuild` | Build tile+depth sort keys (T6b) |
-//! | `RadixSort` | 8-pass 4-bit GPU radix sort (T6c) |
-//! | `TileBin` | Bin splat bounding rects into screen tiles |
-//! | `TiledRaster` | Per-tile rasterise & alpha-composite into framebuffer |
+//! | `SvoRayMarch` | Direct SVO ray march — per-pixel colour + NDC depth |
+//! | `DepthBridge` | Copy NDC depth from storage buffer to hardware depth attachment |
 //! | `UiComposite` | Composite 2D UI panels over scene colour |
-//!
-//! `VoxelSplatKernelNode` dispatches the splat generation compute shader.
-//! `SortKeyBuildNode` dispatches AABB projection + sort key construction.
-//! `RadixSortNode` dispatches 24 compute passes (3 × 8 passes) for sorting.
-//! `TileBinNode` bins sorted splats into screen tiles (T6d Phase 1).
-//! `TiledRasterNode` renders per-pixel SDF + PBR (T6d Phase 2).
+//! | `WireframeOverlay` | Draw SVO wireframe lines with depth testing |
 
-pub mod voxel_splat_kernel;
-pub mod sort_key_build;
-pub mod radix_sort;
-pub mod tile_binning;
-pub mod tiled_raster;
-pub mod z_prepass;
+pub mod depth_bridge;
 pub mod glass;
 pub mod ui_composite;
 pub mod wireframe_overlay;
@@ -51,12 +34,7 @@ use bevy::{
     },
 };
 
-use voxel_splat_kernel::VoxelSplatKernelNode;
-use sort_key_build::SortKeyBuildNode;
-use radix_sort::RadixSortNode;
-use tile_binning::TileBinNode;
-use tiled_raster::TiledRasterNode;
-use z_prepass::ZPrepassNode;
+use depth_bridge::DepthBridgeNode;
 use ui_composite::UiCompositeNode;
 use wireframe_overlay::WireframeOverlayNode;
 use particle_inject::ParticleComputeNode;
@@ -74,24 +52,14 @@ pub enum ContextEditorLabel {
     BufferSwap,
     /// Compute voxel particle dynamics (spawn / destroy / move splats).
     ParticleCompute,
-    /// Generate voxel splats from SVO leaf nodes (T6a compute shader).
-    VoxelSplatKernel,
-    /// Build tile+depth sort keys from projected splats (T6b).
-    SortKeyBuild,
-    /// Sort splats by linear depth for correct alpha compositing.
-    RadixSort,
-    /// Bin splat bounding rects into a screen-tile grid.
-    TileBin,
-    /// Per-tile forward rasterise with alpha-composite into the output target.
-    TiledRaster,
-    /// Z-Prepass: find the nearest opaque depth per pixel before rasterising.
-    ZPrepass,
+    /// SVO direct ray march — per-pixel colour and NDC depth output.
+    SvoRayMarch,
+    /// Copy NDC depth from storage buffer to hardware Depth32Float attachment.
+    DepthBridge,
     /// Composite 2D UI panels over the scene colour output.
     UiComposite,
-    /// Draw SVO wireframe lines on top of voxel splats.
+    /// Draw SVO wireframe lines on top of scene with depth testing.
     WireframeOverlay,
-    /// SVO direct ray march (Phase 1b) — replaces tiled pipeline when toggled on.
-    SvoRayMarch,
 }
 
 // ---------------------------------------------------------------------------
@@ -120,11 +88,8 @@ macro_rules! stub_node {
 
 stub_node!(BufferSwapNode);
 // ParticleComputeNode lives in render::particle_inject (real implementation)
-// VoxelSplatKernelNode lives in render::voxel_splat_kernel (T6a)
-// SortKeyBuildNode lives in render::sort_key_build (T6b)
-// RadixSortNode lives in render::radix_sort (T6c)
-// TileBinNode lives in render::tile_binning (T6d)
-// TiledRasterNode lives in render::tiled_raster (T6d)
+// SvoRayMarchNode lives in render::svo_ray_march (Phase 1b)
+// DepthBridgeNode lives in render::depth_bridge (Phase 3a)
 
 // ---------------------------------------------------------------------------
 // Mipmap helper (stub)
@@ -216,12 +181,7 @@ impl Plugin for ContextEditorRenderPlugin {
     fn build(&self, app: &mut App) {
         // Embed WGSL shaders into the binary so they are available on WASM
         // without a filesystem or asset-serving HTTP path.
-        bevy::asset::embedded_asset!(app, "voxel_splat_kernel.wgsl");
-        bevy::asset::embedded_asset!(app, "sort_key_build.wgsl");
-        bevy::asset::embedded_asset!(app, "radix_sort.wgsl");
-        bevy::asset::embedded_asset!(app, "tile_binning.wgsl");
-        bevy::asset::embedded_asset!(app, "tiled_raster.wgsl");
-        bevy::asset::embedded_asset!(app, "z_prepass.wgsl");
+        bevy::asset::embedded_asset!(app, "depth_bridge.wgsl");
         bevy::asset::embedded_asset!(app, "wireframe_overlay.wgsl");
         bevy::asset::embedded_asset!(app, "particle_inject.wgsl");
         bevy::asset::embedded_asset!(app, "svo_common.wgsl");
@@ -237,48 +197,6 @@ impl Plugin for ContextEditorRenderPlugin {
         // AssetServer) belong here.  Pipeline and bind-group systems need
         // PipelineCache which lives in the render sub-app — they are registered
         // below on the render sub-app.
-        app.add_systems(
-            PostUpdate,
-            crate::gpu::init_splat_buffers,
-        );
-        app.add_systems(
-            PostUpdate,
-            (
-                voxel_splat_kernel::init_splat_params,
-                voxel_splat_kernel::update_splat_params,
-                voxel_splat_kernel::init_node_positions,
-                voxel_splat_kernel::update_node_positions,
-            )
-                .chain(),
-        );
-        app.add_systems(
-            PostUpdate,
-            (
-                sort_key_build::init_sort_key_resources,
-                sort_key_build::update_camera_uniforms,
-            )
-                .chain(),
-        );
-        app.add_systems(
-            PostUpdate,
-            radix_sort::init_radix_sort_resources,
-        );
-        app.add_systems(
-            PostUpdate,
-            (
-                tile_binning::init_tile_bin_resources,
-                tile_binning::update_tile_bin_uniforms,
-            )
-                .chain(),
-        );
-        app.add_systems(
-            PostUpdate,
-            (
-                tiled_raster::init_raster_resources,
-                tiled_raster::update_raster_uniforms,
-            )
-                .chain(),
-        );
         app.add_systems(
             PostUpdate,
             (
@@ -325,25 +243,31 @@ impl Plugin for ContextEditorRenderPlugin {
                 .chain(),
         );
 
+        // Phase 3a: Depth bridge — depth texture and bridge uniforms.
+        app.add_systems(
+            PostUpdate,
+            (
+                depth_bridge::init_svo_depth_texture,
+                depth_bridge::init_depth_bridge_uniforms,
+                depth_bridge::update_depth_bridge_uniforms,
+            )
+                .chain(),
+        );
+
         // Extract main-world resources into the render sub-app each frame.
         // ExtractResourcePlugin must be added to the MAIN app (not render_app)
         // because its build() internally accesses app.get_sub_app_mut(RenderApp).
-        app.add_plugins(ExtractResourcePlugin::<crate::gpu::SplatBuffers>::default())
-            .add_plugins(ExtractResourcePlugin::<crate::gpu::SvoDoubleBuffer>::default())
+        app.add_plugins(ExtractResourcePlugin::<crate::gpu::SvoDoubleBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<crate::particle_splat::ParticleSplatBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<voxel_splat_kernel::SplatParamsUniform>::default())
-            .add_plugins(ExtractResourcePlugin::<voxel_splat_kernel::NodePositionBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<sort_key_build::SortKeyCameraUniform>::default())
-            .add_plugins(ExtractResourcePlugin::<radix_sort::RadixSortUniformBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<radix_sort::RadixSortStagingBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<tiled_raster::RasterUniformBuffer>::default())
-            .add_plugins(ExtractResourcePlugin::<tile_binning::TileBinUniformBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<glass::GlassPanelBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<wireframe_overlay::WireframeOverlayBuffers>::default())
             // Phase 1a + 1b extractions
             .add_plugins(ExtractResourcePlugin::<crate::gpu::SvoTransformBuffer>::default())
             .add_plugins(ExtractResourcePlugin::<svo_ray_march::SvoRayMarchBuffers>::default())
-            .add_plugins(ExtractResourcePlugin::<svo_ray_march::SvoRayMarchUniformBuffer>::default());
+            .add_plugins(ExtractResourcePlugin::<svo_ray_march::SvoRayMarchUniformBuffer>::default())
+            // Phase 3a: depth bridge extractions
+            .add_plugins(ExtractResourcePlugin::<depth_bridge::SvoDepthTexture>::default())
+            .add_plugins(ExtractResourcePlugin::<depth_bridge::DepthBridgeUniformBuffer>::default());
 
         // Guard: RenderApp is absent in headless / test contexts.
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -358,60 +282,6 @@ impl Plugin for ContextEditorRenderPlugin {
             (
                 particle_inject::queue_particle_inject_pipeline,
                 particle_inject::rebuild_particle_inject_bind_group,
-            )
-                .chain()
-                .in_set(RenderSystems::Queue),
-        );
-        render_app.add_systems(
-            Render,
-            (
-                voxel_splat_kernel::queue_voxel_splat_pipeline,
-                voxel_splat_kernel::rebuild_splat_bind_group,
-            )
-                .chain()
-                .in_set(RenderSystems::Queue),
-        );
-        render_app.add_systems(
-            Render,
-            (
-                sort_key_build::queue_sort_key_pipeline,
-                sort_key_build::rebuild_sort_key_bind_group,
-            )
-                .chain()
-                .in_set(RenderSystems::Queue),
-        );
-        render_app.add_systems(
-            Render,
-            (
-                radix_sort::queue_radix_sort_pipelines,
-                radix_sort::rebuild_radix_sort_bind_groups,
-            )
-                .chain()
-                .in_set(RenderSystems::Queue),
-        );
-        render_app.add_systems(
-            Render,
-            (
-                tiled_raster::queue_raster_pipeline,
-                tiled_raster::rebuild_raster_bind_group,
-            )
-                .chain()
-                .in_set(RenderSystems::Queue),
-        );
-        render_app.add_systems(
-            Render,
-            (
-                tile_binning::queue_tile_bin_pipeline,
-                tile_binning::rebuild_tile_bin_bind_group,
-            )
-                .chain()
-                .in_set(RenderSystems::Queue),
-        );
-        render_app.add_systems(
-            Render,
-            (
-                z_prepass::queue_z_prepass_pipelines,
-                z_prepass::rebuild_z_prepass_bind_group,
             )
                 .chain()
                 .in_set(RenderSystems::Queue),
@@ -438,8 +308,18 @@ impl Plugin for ContextEditorRenderPlugin {
                 .in_set(RenderSystems::Queue),
         );
 
+        // Phase 3a: Depth bridge pipeline and bind group setup
+        render_app.add_systems(
+            Render,
+            (
+                depth_bridge::queue_depth_bridge_pipeline,
+                depth_bridge::rebuild_depth_bridge_bind_group,
+            )
+                .chain()
+                .in_set(RenderSystems::Queue),
+        );
+
         // Construct nodes that need FromWorld before borrowing the graph.
-        let tiled_raster_node = TiledRasterNode::from_world(render_app.world_mut());
         let wireframe_node = WireframeOverlayNode::from_world(render_app.world_mut());
         let svo_ray_march_node = SvoRayMarchNode::from_world(render_app.world_mut());
 
@@ -456,31 +336,17 @@ impl Plugin for ContextEditorRenderPlugin {
             ContextEditorLabel::ParticleCompute,
             ParticleComputeNode::default(),
         );
-        core3d.add_node(ContextEditorLabel::VoxelSplatKernel, VoxelSplatKernelNode::default());
-        core3d.add_node(ContextEditorLabel::SortKeyBuild, SortKeyBuildNode::default());
-        core3d.add_node(ContextEditorLabel::RadixSort, RadixSortNode::default());
-        core3d.add_node(ContextEditorLabel::TileBin, TileBinNode::default());
-        core3d.add_node(ContextEditorLabel::ZPrepass, ZPrepassNode::default());
-        core3d.add_node(ContextEditorLabel::TiledRaster, tiled_raster_node);
         core3d.add_node(ContextEditorLabel::SvoRayMarch, svo_ray_march_node);
+        core3d.add_node(ContextEditorLabel::DepthBridge, DepthBridgeNode::default());
         core3d.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
         core3d.add_node(ContextEditorLabel::WireframeOverlay, wireframe_node);
 
-        // Wire the sequential edge chain (internal ordering)
+        // Wire the sequential edge chain:
+        // BufferSwap → ParticleCompute → SvoRayMarch → DepthBridge → UiComposite → WireframeOverlay
         core3d.add_node_edge(ContextEditorLabel::BufferSwap, ContextEditorLabel::ParticleCompute);
-        core3d.add_node_edge(
-            ContextEditorLabel::ParticleCompute,
-            ContextEditorLabel::VoxelSplatKernel,
-        );
-        core3d.add_node_edge(ContextEditorLabel::VoxelSplatKernel, ContextEditorLabel::SortKeyBuild);
-        core3d.add_node_edge(ContextEditorLabel::SortKeyBuild, ContextEditorLabel::RadixSort);
-        core3d.add_node_edge(ContextEditorLabel::RadixSort, ContextEditorLabel::TileBin);
-        core3d.add_node_edge(ContextEditorLabel::TileBin, ContextEditorLabel::ZPrepass);
-        core3d.add_node_edge(ContextEditorLabel::ZPrepass, ContextEditorLabel::TiledRaster);
-        // SvoRayMarch runs after TiledRaster.  When the toggle is ON it overwrites
-        // the view target with ray-marched output; when OFF it is a no-op.
-        core3d.add_node_edge(ContextEditorLabel::TiledRaster, ContextEditorLabel::SvoRayMarch);
-        core3d.add_node_edge(ContextEditorLabel::SvoRayMarch, ContextEditorLabel::UiComposite);
+        core3d.add_node_edge(ContextEditorLabel::ParticleCompute, ContextEditorLabel::SvoRayMarch);
+        core3d.add_node_edge(ContextEditorLabel::SvoRayMarch, ContextEditorLabel::DepthBridge);
+        core3d.add_node_edge(ContextEditorLabel::DepthBridge, ContextEditorLabel::UiComposite);
         core3d.add_node_edge(ContextEditorLabel::UiComposite, ContextEditorLabel::WireframeOverlay);
 
         // Anchor into the existing Core3d sub-graph:

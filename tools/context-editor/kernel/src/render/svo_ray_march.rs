@@ -52,7 +52,7 @@ use bevy::{
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::debug_overlay::{is_ray_march_enabled, ray_march_feature_flags};
+use crate::debug_overlay::ray_march_feature_flags;
 use crate::gpu::SvoDoubleBuffer;
 use crate::gpu::svo_transform::SvoTransformBuffer;
 
@@ -67,6 +67,7 @@ const RAY_MARCH_UNIFORM_SIZE: u64 = 256; // round up to uniform alignment
 #[derive(Copy, Clone, Debug, Default, Pod, Zeroable)]
 pub struct RayMarchUniformData {
     pub inv_view_proj:   [f32; 16],  // 64 bytes
+    pub view_proj:       [f32; 16],  // 64 bytes — Phase 3a: for NDC depth output
     pub camera_pos:      [f32; 3],   // 12 bytes
     pub cot_half_fov:    f32,        //  4 bytes
     pub resolution:      [f32; 2],   //  8 bytes
@@ -79,11 +80,11 @@ pub struct RayMarchUniformData {
     pub max_shadow_dist: f32,        //  4 bytes
     pub feature_flags:   u32,        //  4 bytes (bit0=neighbor_blend, bit1=shadow, bit2=reflect)
     pub _pad3:           [u32; 2],   //  8 bytes
-}                                    // total: 144 bytes
+}                                    // total: 208 bytes
 
 const _: () = assert!(
-    std::mem::size_of::<RayMarchUniformData>() == 144,
-    "RayMarchUniformData must be 144 bytes"
+    std::mem::size_of::<RayMarchUniformData>() == 208,
+    "RayMarchUniformData must be 208 bytes"
 );
 
 // ---------------------------------------------------------------------------
@@ -203,10 +204,11 @@ pub fn update_ray_march_uniforms(
     let Ok((tf, proj))     = camera_query.single() else { return };
     let Ok(window)         = windows.single()      else { return };
 
-    let view_mat = tf.to_matrix().inverse();
-    let proj_mat = proj.get_clip_from_view();
-    let inv_vp   = (proj_mat * view_mat).inverse();
-    let cam_pos  = tf.translation();
+    let view_mat  = tf.to_matrix().inverse();
+    let proj_mat  = proj.get_clip_from_view();
+    let vp_mat    = proj_mat * view_mat;   // view_proj (used for NDC depth)
+    let inv_vp    = vp_mat.inverse();
+    let cam_pos   = tf.translation();
 
     let width  = window.physical_width().max(1) as f32;
     let height = window.physical_height().max(1) as f32;
@@ -217,6 +219,7 @@ pub fn update_ray_march_uniforms(
 
     let data = RayMarchUniformData {
         inv_view_proj:   inv_vp.to_cols_array(),
+        view_proj:       vp_mat.to_cols_array(),
         camera_pos:      [cam_pos.x, cam_pos.y, cam_pos.z],
         cot_half_fov,
         resolution:      [width, height],
@@ -482,11 +485,8 @@ pub fn rebuild_ray_march_bind_groups(
 // ---------------------------------------------------------------------------
 
 /// Render graph node that:
-/// 1. Conditionally dispatches the SVO ray march compute shader.
+/// 1. Dispatches the SVO ray march compute shader.
 /// 2. Blits the result to the current `ViewTarget`.
-///
-/// When the ray-march toggle is off (`is_ray_march_enabled() == false`), the
-/// node is a no-op so the tiled forward+ pipeline produces the output instead.
 pub struct SvoRayMarchNode {
     view_query: bevy::ecs::query::QueryState<&'static ViewTarget>,
 }
@@ -510,11 +510,6 @@ impl Node for SvoRayMarchNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        // Toggle guard: skip when ray march is disabled.
-        if !is_ray_march_enabled() {
-            return Ok(());
-        }
-
         let Some(compute_pipeline_res) = world.get_resource::<SvoRayMarchComputePipeline>()
         else { return Ok(()); };
         let Some(blit_pipeline_res) = world.get_resource::<SvoRayMarchBlitPipeline>()
@@ -583,7 +578,7 @@ mod tests {
 
     #[test]
     fn ray_march_uniform_size() {
-        assert_eq!(std::mem::size_of::<RayMarchUniformData>(), 144);
+        assert_eq!(std::mem::size_of::<RayMarchUniformData>(), 208);
     }
 
     #[test]

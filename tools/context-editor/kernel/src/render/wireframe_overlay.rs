@@ -13,9 +13,12 @@ use bevy::{
             BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
             BindingType, BlendState, Buffer, BufferBindingType, BufferDescriptor,
             BufferUsages, CachedRenderPipelineId, ColorTargetState, ColorWrites,
-            FragmentState, MultisampleState, PipelineCache, PrimitiveState,
-            PrimitiveTopology, RenderPassDescriptor, RenderPipelineDescriptor,
-            ShaderStages, TextureFormat, VertexAttribute,
+            CompareFunction, DepthBiasState, DepthStencilState,
+            FragmentState, LoadOp, MultisampleState, Operations,
+            PipelineCache, PrimitiveState,
+            PrimitiveTopology, RenderPassDepthStencilAttachment, RenderPassDescriptor,
+            RenderPipelineDescriptor, ShaderStages,
+            StencilState, StoreOp, TextureFormat, VertexAttribute,
             VertexFormat, VertexState, VertexStepMode,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
@@ -201,7 +204,13 @@ pub fn queue_wireframe_pipeline(
             topology: PrimitiveTopology::LineList,
             ..default()
         },
-        depth_stencil: None,
+        depth_stencil: Some(DepthStencilState {
+            format: TextureFormat::Depth32Float,
+            depth_write_enabled: false,
+            depth_compare: CompareFunction::GreaterEqual,
+            stencil: StencilState::default(),
+            bias: DepthBiasState::default(),
+        }),
         multisample: MultisampleState {
             count: 1,
             mask: !0,
@@ -294,13 +303,24 @@ impl Node for WireframeOverlayNode {
 
         let color_attachment = view_target.get_unsampled_color_attachment();
 
+        let depth_attachment = world
+            .get_resource::<crate::render::depth_bridge::SvoDepthTexture>()
+            .map(|dt| RenderPassDepthStencilAttachment {
+                view: &dt.view,
+                depth_ops: Some(Operations {
+                    load: LoadOp::Load,
+                    store: StoreOp::Discard,
+                }),
+                stencil_ops: None,
+            });
+
         {
             let mut pass = render_context
                 .command_encoder()
                 .begin_render_pass(&RenderPassDescriptor {
                     label: Some("wireframe_overlay_pass"),
                     color_attachments: &[Some(color_attachment)],
-                    depth_stencil_attachment: None,
+                    depth_stencil_attachment: depth_attachment,
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 });

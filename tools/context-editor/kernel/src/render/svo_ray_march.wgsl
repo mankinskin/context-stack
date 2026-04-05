@@ -20,6 +20,7 @@
 
 struct RayMarchUniforms {
     inv_view_proj:   mat4x4f,  // 64 bytes
+    view_proj:       mat4x4f,  // 64 bytes — Phase 3a: for NDC depth output
     camera_pos:      vec3f,    // 12 bytes
     cot_half_fov:    f32,      //  4 bytes — 1/tan(fov_y/2), for AA pixel footprint
     resolution:      vec2f,    //  8 bytes
@@ -32,7 +33,7 @@ struct RayMarchUniforms {
     max_shadow_dist: f32,      //  4 bytes — world-space max shadow ray distance
     feature_flags:   u32,      //  4 bytes — bit0=neighbor_blend bit1=shadow bit2=reflect
     _pad3:           vec2u,    //  8 bytes
-}                              // Total: 144 bytes
+}                              // Total: 208 bytes
 
 // SVO coordinate transform (matches Rust `SvoTransformData`)
 struct SvoTransform {
@@ -98,6 +99,64 @@ const BACKGROUND_B: f32 = 0.18;
 const FEAT_NEIGHBOR_BLEND: u32 = 1u;  // Phase 2a: smooth-min seam blending
 const FEAT_SHADOW_RAYS:    u32 = 2u;  // Phase 2b: shadow ray per primary hit
 const FEAT_REFLECTION:     u32 = 4u;  // Phase 2b: reflection for metallic surfaces
+
+// ---------------------------------------------------------------------------
+// PBR material helpers (Phase 3a — Cook-Torrance/GGX)
+// ---------------------------------------------------------------------------
+
+const PI: f32 = 3.14159265359;
+
+struct Material {
+    base_color: vec3f,
+    roughness:  f32,
+    metallic:   f32,
+}
+
+fn ggx_distribution(n_dot_h: f32, alpha2: f32) -> f32 {
+    let denom = n_dot_h * n_dot_h * (alpha2 - 1.0) + 1.0;
+    return alpha2 / (PI * denom * denom);
+}
+
+fn fresnel_schlick(cos_theta: f32, f0: vec3f) -> vec3f {
+    return f0 + (vec3f(1.0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
+fn geometry_schlick_ggx(n_dot: f32, k: f32) -> f32 {
+    return n_dot / (n_dot * (1.0 - k) + k);
+}
+
+fn geometry_smith(n_dot_v: f32, n_dot_l: f32, alpha: f32) -> f32 {
+    let k = (alpha + 1.0) * (alpha + 1.0) / 8.0;
+    return geometry_schlick_ggx(n_dot_v, k) * geometry_schlick_ggx(n_dot_l, k);
+}
+
+fn evaluate_pbr(
+    mat:         Material,
+    normal:      vec3f,
+    view_dir:    vec3f,
+    light_dir:   vec3f,
+    light_color: vec3f,
+) -> vec3f {
+    let h       = normalize(view_dir + light_dir);
+    let n_dot_l = max(dot(normal, light_dir), 0.0);
+    let n_dot_v = max(dot(normal, view_dir), 0.001);
+    let n_dot_h = max(dot(normal, h), 0.0);
+    let v_dot_h = max(dot(view_dir, h), 0.0);
+
+    let f0     = mix(vec3f(0.04), mat.base_color, mat.metallic);
+    let alpha  = mat.roughness * mat.roughness;
+    let alpha2 = alpha * alpha;
+    let d      = ggx_distribution(n_dot_h, alpha2);
+    let f      = fresnel_schlick(v_dot_h, f0);
+    let g      = geometry_smith(n_dot_v, n_dot_l, alpha);
+
+    let specular = (d * f * g) / max(4.0 * n_dot_v * n_dot_l, 0.001);
+    let k_s      = f;
+    let k_d      = (vec3f(1.0) - k_s) * (1.0 - mat.metallic);
+    let diffuse  = k_d * mat.base_color / PI;
+
+    return (diffuse + specular) * light_color * n_dot_l;
+}
 
 // ---------------------------------------------------------------------------
 // OctreeNode bit-decode helpers (inlined from svo_common.wgsl)
@@ -727,7 +786,7 @@ fn ray_march_main(@builtin(global_invocation_id) gid: vec3u) {
         color_buffer[color_base + 1u] = BACKGROUND_G;
         color_buffer[color_base + 2u] = BACKGROUND_B;
         color_buffer[color_base + 3u] = 1.0;
-        depth_buffer[pixel_idx]       = 1e30;
+        depth_buffer[pixel_idx]       = 0.0;  // far plane in infinite reverse-Z
         return;
     }
 
@@ -783,9 +842,19 @@ fn ray_march_main(@builtin(global_invocation_id) gid: vec3u) {
             shadow = select(1.0, 0.0, occluded);
         }
 
-        // ---- Lambertian + ambient shading ----
-        let diffuse_f = max(dot(normal, normalize(uniforms.light_dir)), 0.0) * shadow;
-        let lit = base_col * (diffuse_f * uniforms.light_color + vec3f(0.15));
+        // ---- PBR shading (Phase 3a — Cook-Torrance/GGX) ----
+        let pbr_mat  = Material(base_col, bounce_result.roughness, bounce_result.metallic);
+        let view_dir = -normalize(bounce_rd);  // surface → ray origin direction
+        let pbr_lit  = evaluate_pbr(
+            pbr_mat,
+            normal,
+            view_dir,
+            normalize(uniforms.light_dir),
+            uniforms.light_color,
+        ) * shadow;
+        // Small ambient term: non-metallic diffuse fill light.
+        let ambient = base_col * 0.03 * (1.0 - bounce_result.metallic);
+        let lit = pbr_lit + ambient;
 
         // Blend with background for semi-transparent SDF fringe pixels.
         let inv_a   = 1.0 - bounce_result.alpha;
@@ -872,7 +941,14 @@ fn ray_march_main(@builtin(global_invocation_id) gid: vec3u) {
     color_buffer[color_base + 1u] = final_color.g;
     color_buffer[color_base + 2u] = final_color.b;
     color_buffer[color_base + 3u] = 1.0;
-    depth_buffer[pixel_idx]       = first_t;
+
+    // Phase 3a: Write NDC depth for the hardware depth bridge.
+    // `first_t` is SVO-normalised; multiply by world_size to get the
+    // world-space ray parameter, then project to Bevy's infinite reverse-Z.
+    let t_world_actual = first_t * svo_tf.world_size;
+    let hit_world      = ro_world + rd_world * t_world_actual;
+    let clip_pos       = uniforms.view_proj * vec4f(hit_world, 1.0);
+    depth_buffer[pixel_idx] = clip_pos.z / clip_pos.w;
 }
 
 // ---------------------------------------------------------------------------

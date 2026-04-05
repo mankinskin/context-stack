@@ -28,10 +28,6 @@ use bevy::input::keyboard::KeyCode as BevyKeyCode;
 static WIREFRAME_ENABLED: AtomicBool = AtomicBool::new(false);
 static WIREFRAME_DEPTH: AtomicU32 = AtomicU32::new(4);
 static WIREFRAME_OCCUPIED: AtomicBool = AtomicBool::new(true);
-/// Z-prepass toggle — OFF by default to avoid redundant per-pixel SDF work.
-static ZPREPASS_ENABLED: AtomicBool = AtomicBool::new(false);
-/// Ray-march toggle — when ON, `SvoRayMarchNode` renders instead of tiled pipeline.
-static RAY_MARCH_ENABLED: AtomicBool = AtomicBool::new(true);
 /// Smooth-min neighbor blending for SDF seams (Phase 2a).
 static NEIGHBOR_BLEND_ENABLED: AtomicBool = AtomicBool::new(false);
 /// Shadow rays — primary hits cast a shadow ray toward the light (Phase 2b).
@@ -71,19 +67,6 @@ static WORLD_PRESET: AtomicU32 = AtomicU32::new(0);
 /// Active world seed — high and low 32-bit halves (Bevy writes, Dioxus reads).
 static WORLD_SEED_HI: AtomicU32 = AtomicU32::new(0xDEAD_BEEF);
 static WORLD_SEED_LO: AtomicU32 = AtomicU32::new(0xCAFE_BABE);
-
-/// Returns `true` if the z-prepass is enabled (read by `ZPrepassNode`).
-pub fn is_zprepass_enabled() -> bool {
-    ZPREPASS_ENABLED.load(Ordering::Relaxed)
-}
-
-/// Returns `true` if the SVO ray march pipeline is active.
-///
-/// When `true`, `SvoRayMarchNode` renders the scene; the tiled forward+ nodes
-/// are no-ops for that frame.
-pub fn is_ray_march_enabled() -> bool {
-    RAY_MARCH_ENABLED.load(Ordering::Relaxed)
-}
 
 /// Returns the Phase 2a/2b feature flag bitmask for use in `RayMarchUniforms`.
 ///
@@ -182,10 +165,6 @@ fn toggle_debug_keys(keys: Res<ButtonInput<BevyKeyCode>>) {
     if keys.just_pressed(BevyKeyCode::F6) {
         let v = WIREFRAME_OCCUPIED.load(Ordering::Relaxed);
         WIREFRAME_OCCUPIED.store(!v, Ordering::Relaxed);
-    }
-    if keys.just_pressed(BevyKeyCode::F7) {
-        let v = RAY_MARCH_ENABLED.load(Ordering::Relaxed);
-        RAY_MARCH_ENABLED.store(!v, Ordering::Relaxed);
     }
 }
 
@@ -537,8 +516,6 @@ pub fn DebugPanel() -> Element {
 
     // --- Mutable toggle / slider state ---
     let mut free_fly       = use_signal(|| FREE_FLY_ENABLED.load(Ordering::Relaxed));
-    let mut zprepass       = use_signal(|| ZPREPASS_ENABLED.load(Ordering::Relaxed));
-    let mut ray_march      = use_signal(|| RAY_MARCH_ENABLED.load(Ordering::Relaxed));
     let mut neighbor_blend = use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
     let mut shadow_rays    = use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
     let mut reflection_rays = use_signal(|| REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed));
@@ -618,33 +595,8 @@ pub fn DebugPanel() -> Element {
 
                 // ── Rendering ────────────────────────────────────────────────
                 TreeSection { label: "Rendering".to_string(), default_open: true,
-                    label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
-                        input {
-                            r#type: "checkbox",
-                            checked: *zprepass.read(),
-                            onclick: move |_| {
-                                let v = !*zprepass.read();
-                                zprepass.set(v);
-                                ZPREPASS_ENABLED.store(v, Ordering::Relaxed);
-                            }
-                        }
-                        "Z-Prepass"
-                    }
-
                     // Ray March sub-section
                     TreeSection { label: "Ray March".to_string(), default_open: true,
-                        label { class: "flex items-center gap-2 cursor-pointer text-white font-semibold hover:text-green-300",
-                            input {
-                                r#type: "checkbox",
-                                checked: *ray_march.read(),
-                                onclick: move |_| {
-                                    let v = !*ray_march.read();
-                                    ray_march.set(v);
-                                    RAY_MARCH_ENABLED.store(v, Ordering::Relaxed);
-                                }
-                            }
-                            "Enable"
-                        }
                         label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
                             input {
                                 r#type: "checkbox",

@@ -8,20 +8,15 @@
 //! in the render world. The hot render-loop path never allocates.
 //!
 //! ```text
-//! SvoDoubleBuffer      ─── FRONT buffer ──▶ GPU reads (gaussian gen, EWA, ...)
+//! SvoDoubleBuffer      ─── FRONT buffer ──▶ GPU reads (ray march, ...)
 //! (Resource)           ─── BACK  buffer ──▶ WASM writes dirty octree regions
 //!                          swap() ──────▶   pointer flip, < 0.01 ms
-//!
-//! SplatBuffers         ─── per-frame Gaussian pipeline buffers (no re-alloc)
-//!
-//! DoubleBindGroups     ─── pre-built BindGroups for front and back SVO.
-//!                          active_svo_group(current_is_front) selects the right one.
 //! ```
 
 pub mod svo_transform;
 pub use svo_transform::SvoTransformBuffer;
 
-use bevy::prelude::{Commands, Query, Res, Resource, Window};
+use bevy::prelude::Resource;
 use bevy::render::{
     extract_resource::ExtractResource,
     render_resource::{
@@ -38,43 +33,6 @@ use bevy::render::{
 
 /// Default SVO octree capacity (nodes). At 8 bytes/node ≈ 32 MB total.
 pub const SVO_CAPACITY_NODES: usize = 4_194_304; // 2^22
-
-/// Default maximum Gaussians generated per frame.
-pub const MAX_GAUSSIANS: u32 = 1_048_576; // 1 M
-
-/// Tile side length in pixels for the tiled forward+ renderer.
-pub const TILE_SIZE: u32 = 16;
-
-/// Maximum active-list entries (splat-tile overlaps).
-///
-/// Each sorted splat can appear in multiple tiles via AABB overlap.
-/// With separate offset/count u32s in `tile_data`, this can exceed 1M.
-pub const MAX_ACTIVE_ENTRIES: u32 = 4_194_304; // 4 M
-
-/// Byte stride of `GaussianData` in the GPU buffer.
-///
-/// WGSL layout:
-/// - `position:   vec3f`           → 12 bytes
-/// - `opacity:    f32`             →  4 bytes
-/// - `covariance: array<f32, 6>`   → 24 bytes  (upper-triangle of 3×3 Σ)
-/// - `sh_coeffs:  array<f32, 48>`  → 192 bytes (degree-3 SH, 3 channels)
-pub const GAUSSIAN_DATA_STRIDE: u64 = 232;
-
-/// Byte stride of `ProjectedGaussian` after EWA projection.
-///
-/// WGSL layout:
-/// - `center_screen: vec2f`  →  8 bytes
-/// - `cov2d_inv:     vec3f`  → 12 bytes  (a, b, c of 2×2 inverse)
-/// - `depth:         f32`    →  4 bytes
-/// - `color:         vec3f`  → 12 bytes  (SH-evaluated view-dependent RGB)
-/// - `opacity:       f32`    →  4 bytes
-pub const PROJECTED_GAUSSIAN_STRIDE: u64 = 40;
-
-/// Byte stride of `TileData` — two `u32`s per tile: `[offset, count]`.
-///
-/// - `tile_data[tile_idx * 2 + 0]` = offset into active_list
-/// - `tile_data[tile_idx * 2 + 1]` = splat count for this tile
-pub const TILE_DATA_STRIDE: u64 = 8;
 
 /// Byte size of a single `OctreeNode` (2 × u32 = child_pointer + color_data).
 pub const OCTREE_NODE_SIZE: u64 = 8;
@@ -191,146 +149,6 @@ impl SvoDoubleBuffer {
 
     pub fn current_is_front(&self) -> bool {
         self.current_is_front
-    }
-}
-
-// ---------------------------------------------------------------------------
-// SplatBuffers
-// ---------------------------------------------------------------------------
-
-/// Pre-allocated per-frame GPU buffers for the voxel splatting pipeline.
-///
-/// All buffers are sized at startup to `max_splats` and `tile_count` so no
-/// allocation occurs on the render-critical path.
-#[derive(Resource, Clone)]
-pub struct SplatBuffers {
-    /// Voxel splat kernel output — one `VoxelSplat` per occupied leaf voxel.
-    pub splats: Buffer,
-    /// EWA-projected screen-space ellipses (`ProjectedGaussian[]`).
-    pub projected: Buffer,
-    /// Radix sort keys: `tile_id (20 bit) | depth (12 bit)` per splat.
-    pub sort_keys: Buffer,
-    /// Radix sort values: indices into `projected[]`.
-    pub sort_values: Buffer,
-    /// Radix sort ping-pong scratch (keys).
-    pub sort_scratch_keys: Buffer,
-    /// Radix sort ping-pong scratch (values).
-    pub sort_scratch_values: Buffer,
-    /// Per-workgroup 16-digit histograms for the 8 radix passes
-    /// (size = workgroups × 8 passes × 16 digits × 4 bytes).
-    pub histograms: Buffer,
-    /// Per-tile packed `TileData`: `(offset << 12) | count`.
-    pub tile_data: Buffer,
-    /// Per-tile atomic counters used by the count-tile-overlaps pass.
-    pub tile_counts: Buffer,
-    /// Per-tile atomic write heads used by the scatter-to-tiles pass.
-    pub tile_write_heads: Buffer,
-    /// Active list: splat indices written by scatter, read by rasteriser.
-    pub active_list: Buffer,
-    /// Atomic u32 counter: number of splats emitted by the kernel.
-    pub splat_count: Buffer,
-    /// Per-pixel depth from the Z-prepass (one f32 per pixel, tile-aligned).
-    /// Written by `ZPrepassNode`, read by the tiled rasteriser to cull splats
-    /// behind the nearest opaque surface.
-    pub depth_prepass: Buffer,
-    /// Maximum splats this allocation supports.
-    pub max_splats: u32,
-    /// Tile grid dimensions at the configured viewport size.
-    pub tiles_x: u32,
-    pub tiles_y: u32,
-}
-
-impl SplatBuffers {
-    /// Allocate all buffers for up to `max_splats` and the given viewport.
-    pub fn new(
-        device: &RenderDevice,
-        max_splats: u32,
-        viewport_width: u32,
-        viewport_height: u32,
-    ) -> Self {
-        let n = max_splats as u64;
-        let tiles_x = (viewport_width + TILE_SIZE - 1) / TILE_SIZE;
-        let tiles_y = (viewport_height + TILE_SIZE - 1) / TILE_SIZE;
-        let tile_count = (tiles_x * tiles_y) as u64;
-        // Histogram: workgroups × 8 radix passes × 16 digits × 4 bytes
-        let wg_count = (n + 255) / 256;
-        let histogram_size = wg_count * 8 * 16 * 4;
-
-        let rw = BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC;
-        let atomic = BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC;
-
-        macro_rules! buf {
-            ($label:expr, $size:expr, $usage:expr) => {
-                device.create_buffer(&BufferDescriptor {
-                    label: Some($label),
-                    size: $size,
-                    usage: $usage,
-                    mapped_at_creation: false,
-                })
-            };
-        }
-
-        Self {
-            splats: buf!("splats", n * crate::splat::VOXEL_SPLAT_STRIDE, rw),
-            projected: buf!("projected", n * crate::splat::PROJECTED_SPLAT_STRIDE, rw),
-            sort_keys: buf!("sort_keys", n * 4, rw),
-            sort_values: buf!("sort_values", n * 4, rw),
-            sort_scratch_keys: buf!("sort_scratch_keys", n * 4, rw),
-            sort_scratch_values: buf!("sort_scratch_values", n * 4, rw),
-            histograms: buf!("radix_histograms", histogram_size, rw),
-            tile_data: buf!("tile_data", tile_count * TILE_DATA_STRIDE, rw),
-            tile_counts: buf!("tile_counts", tile_count * 4, rw),
-            tile_write_heads: buf!("tile_write_heads", tile_count * 4, rw),
-            active_list: buf!("active_list", MAX_ACTIVE_ENTRIES as u64 * 4, rw),
-            splat_count: buf!("splat_count", 4, atomic),
-            // Tile-rounded pixel buffer: one f32 per pixel. Sized to cover the
-            // full tile-aligned dispatch so the compute shader never goes OOB.
-            depth_prepass: buf!(
-                "depth_prepass",
-                (tiles_x as u64) * (TILE_SIZE as u64) * (tiles_y as u64) * (TILE_SIZE as u64) * 4,
-                BufferUsages::STORAGE | BufferUsages::COPY_DST
-            ),
-            max_splats,
-            tiles_x,
-            tiles_y,
-        }
-    }
-}
-
-/// Create (or re-create on resize) the [`SplatBuffers`] resource from the
-/// primary window dimensions.
-///
-/// On first call it creates the resource; on subsequent calls it checks
-/// whether the window size changed and re-allocates if needed so that
-/// the tile grid always matches the actual viewport.
-pub fn init_splat_buffers(
-    mut commands: Commands,
-    device: Option<Res<RenderDevice>>,
-    existing: Option<Res<SplatBuffers>>,
-    windows: Query<&Window>,
-) {
-    let Some(device) = device else { return };
-    let Ok(window) = windows.single() else { return };
-
-    let w = window.physical_width().max(1);
-    let h = window.physical_height().max(1);
-
-    let tiles_x = (w + TILE_SIZE - 1) / TILE_SIZE;
-    let tiles_y = (h + TILE_SIZE - 1) / TILE_SIZE;
-
-    if let Some(buf) = &existing {
-        if buf.tiles_x == tiles_x && buf.tiles_y == tiles_y {
-            return;
-        }
-    }
-
-    commands.insert_resource(SplatBuffers::new(&device, MAX_GAUSSIANS, w, h));
-}
-
-impl ExtractResource for SplatBuffers {
-    type Source = SplatBuffers;
-    fn extract_resource(source: &Self::Source) -> Self {
-        source.clone()
     }
 }
 
