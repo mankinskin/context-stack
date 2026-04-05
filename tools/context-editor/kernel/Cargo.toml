@@ -22,6 +22,7 @@ bevy = { version = "0.18", default-features = false, features = [
 bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
 bytemuck = { version = "1", features = ["derive"] }
 dioxus = { version = "0.7", features = ["web"] }
+futures-timer = { version = "3.0.3", features = ["wasm-bindgen"] }
 spacetimedb-sdk = { version = "1.12", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -8,6 +8,8 @@ use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
+use crate::debug_overlay::is_free_fly_enabled;
+
 const GRAVITY: f32 = 20.0;
 const FLY_THRUST: f32 = 25.0;
 const MOVE_SPEED: f32 = 8.0;
@@ -70,7 +72,13 @@ fn character_look(
     }
 }
 
-/// Physics-based WASD + gravity + jump movement.
+/// Physics-based WASD + gravity + jump movement, or unconstrained free-fly
+/// when [`crate::debug_overlay::is_free_fly_enabled`] returns `true`.
+///
+/// Free-fly controls:
+/// - `WASD` / `Arrow` — move along camera forward / right axes (no gravity)
+/// - `Q` / `E` — move down / up in world-space
+/// - `Shift` — sprint multiplier
 fn character_movement(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
@@ -82,47 +90,54 @@ fn character_movement(
     )>,
 ) {
     for (mut ctrl, mut kcc, transform, output) in &mut query {
-        let grounded = output.map_or(false, |o| o.grounded);
-
         let forward = *transform.forward();
-        let right = *transform.right();
+        let right   = *transform.right();
+        let up      = Vec3::Y;
+
         let mut move_dir = Vec3::ZERO;
-        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-            move_dir += forward;
-        }
-        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-            move_dir -= forward;
-        }
-        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-            move_dir += right;
-        }
-        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-            move_dir -= right;
-        }
-        // Remove vertical component so the player moves horizontally
-        move_dir.y = 0.0;
-        if move_dir.length_squared() > 0.0 {
-            move_dir = move_dir.normalize();
-        }
+        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp)    { move_dir += forward; }
+        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown)  { move_dir -= forward; }
+        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) { move_dir += right; }
+        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft)  { move_dir -= right; }
 
         let speed = MOVE_SPEED
-            * if keys.pressed(KeyCode::ShiftLeft) {
-                SPRINT_MULT
-            } else {
-                1.0
-            };
+            * if keys.pressed(KeyCode::ShiftLeft) { SPRINT_MULT } else { 1.0 };
 
-        // Fly: hold Space to thrust upward against gravity
-        if keys.pressed(KeyCode::Space) {
-            ctrl.vertical_velocity += FLY_THRUST * time.delta_secs();
-        }
-        ctrl.vertical_velocity -= GRAVITY * time.delta_secs();
-        if grounded && ctrl.vertical_velocity < 0.0 {
+        let displacement = if is_free_fly_enabled() {
+            // --- Free-fly mode: full 3-axis movement, no gravity ---
+            // Keep the horizontal contribution from the camera-forward direction.
+            // Q = descend, E = ascend (world-space Y).
+            if keys.pressed(KeyCode::KeyQ) { move_dir -= up; }
+            if keys.pressed(KeyCode::KeyE) { move_dir += up; }
+
+            // Reset vertical velocity so physics mode resumes correctly on toggle.
             ctrl.vertical_velocity = 0.0;
-        }
 
-        let displacement = move_dir * speed * time.delta_secs()
-            + Vec3::Y * ctrl.vertical_velocity * time.delta_secs();
+            if move_dir.length_squared() > 0.0 {
+                move_dir.normalize() * speed * time.delta_secs()
+            } else {
+                Vec3::ZERO
+            }
+        } else {
+            // --- Physics mode: gravity + ground detection ---
+            move_dir.y = 0.0;
+            if move_dir.length_squared() > 0.0 {
+                move_dir = move_dir.normalize();
+            }
+
+            let grounded = output.map_or(false, |o| o.grounded);
+
+            if keys.pressed(KeyCode::Space) {
+                ctrl.vertical_velocity += FLY_THRUST * time.delta_secs();
+            }
+            ctrl.vertical_velocity -= GRAVITY * time.delta_secs();
+            if grounded && ctrl.vertical_velocity < 0.0 {
+                ctrl.vertical_velocity = 0.0;
+            }
+
+            move_dir * speed * time.delta_secs()
+                + Vec3::Y * ctrl.vertical_velocity * time.delta_secs()
+        };
 
         kcc.translation = Some(displacement);
     }

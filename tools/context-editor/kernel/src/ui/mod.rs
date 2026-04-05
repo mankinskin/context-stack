@@ -41,7 +41,32 @@ pub fn GlassPanel(title: String, children: Element) -> Element {
         div {
             class: "glass-panel rounded-xl border border-white/20 bg-white/5 backdrop-blur-md p-4 shadow-2xl",
             div { class: "panel-header border-b border-white/10 pb-2 mb-4 font-bold text-white/80", "{title}" }
-            div { class: "panel-content overflow-y-auto max-h-64", {children} }
+            div { class: "panel-content overflow-y-auto max-h-[80vh]", {children} }
+        }
+    }
+}
+
+/// Collapsible tree section for the debug panel.
+///
+/// Renders a clickable header with a ▶/▼ indicator and conditionally shows
+/// its children. `default_open` controls the initial expansion state.
+#[component]
+pub fn TreeSection(label: String, default_open: bool, children: Element) -> Element {
+    let mut open = use_signal(move || default_open);
+
+    rsx! {
+        div { class: "tree-section",
+            button {
+                class: "flex items-center gap-1 w-full text-left text-white/60 hover:text-white text-[11px] uppercase tracking-wide py-1",
+                onclick: move |_| open.set(!open()),
+                span { class: "font-mono text-[9px]", if *open.read() { "▼" } else { "▶" } }
+                span { "{label}" }
+            }
+            if *open.read() {
+                div { class: "pl-3 border-l border-white/10 space-y-1.5 pb-1",
+                    {children}
+                }
+            }
         }
     }
 }
