@@ -1,15 +1,23 @@
-// svo_ray_march.wgsl — Direct SVO Ray March compute shader (Phase 1b)
+// svo_ray_march.wgsl — Direct SVO Ray March compute shader (Phase 1b – 4b)
 //
 // Per-pixel (workgroup 8×8) ray marching through the world-space SVO:
 //   1. Generate a world-space ray from inv_view_proj
 //   2. Transform into normalised [0,1]³ SVO space
 //   3. Hierarchically traverse the SVO with a fixed-size explicit stack
 //   4. At leaves: evaluate a box SDF for sub-voxel anti-aliasing
-//   5. Apply simplified Lambertian + ambient lighting
+//   5. Apply PBR lighting (Phase 3a) with shadow + reflection rays (Phase 2b)
 //   6. Write RGBA to color_buffer and world-t to depth_buffer
 //
-// This shader uses the existing full-SVO upload (SvoDoubleBuffer) — all node
-// indices in child_pointer are direct flat-array lookups.  Paging is Phase 4a.
+// Phase 4a — Paged SVO:
+//   - GPU buffer holds compact-packed pages (only occupied children stored).
+//   - page_table[page_id] → physical base offset; 0xFFFFFFFF = not resident.
+//   - Address resolution uses popcount-based rank arithmetic (no fixed strides).
+//   - StackEntry carries page_base + depth for per-page relative indexing.
+//
+// Phase 4b — LOD Cutoff:
+//   - lod_blend_factor() computes a screen-space size / threshold ratio.
+//   - Stochastic per-pixel descent using pcg_hash seeded by frame_index + pixel.
+//   - Non-descending nodes render as solid voxels with their propagated color.
 //
 // Output format: color_buffer stores one vec4f per pixel (RGBA, linear [0,1])
 // tightly packed as [pixel_idx * 4 + 0..3] f32 values.
@@ -22,38 +30,42 @@ struct RayMarchUniforms {
     inv_view_proj:   mat4x4f,  // 64 bytes
     view_proj:       mat4x4f,  // 64 bytes — Phase 3a: for NDC depth output
     camera_pos:      vec3f,    // 12 bytes
-    cot_half_fov:    f32,      //  4 bytes — 1/tan(fov_y/2), for AA pixel footprint
+    cot_half_fov:    f32,      //  4 bytes — 1/tan(fov_y/2), for AA footprint and LOD
     resolution:      vec2f,    //  8 bytes
     screen_width:    u32,      //  4 bytes — u32 form of resolution.x for indexing
-    _pad0:           u32,      //  4 bytes
+    frame_index:     u32,      //  4 bytes — Phase 4b: temporal noise seed
     light_dir:       vec3f,    // 12 bytes — normalised world-space light direction
     _pad1:           f32,      //  4 bytes
     light_color:     vec3f,    // 12 bytes
     max_bounces:     u32,      //  4 bytes — max secondary ray bounces (0 = primary only)
     max_shadow_dist: f32,      //  4 bytes — world-space max shadow ray distance
-    feature_flags:   u32,      //  4 bytes — bit0=neighbor_blend bit1=shadow bit2=reflect
-    _pad3:           vec2u,    //  8 bytes
-}                              // Total: 208 bytes
+    feature_flags:   u32,      //  4 bytes — bit0=neighbor_blend bit1=shadow bit2=reflect bit3=lod
+    lod_threshold:   f32,      //  4 bytes — Phase 4b: pixel screen-size threshold for LOD stop
+    lod_softness:    f32,      //  4 bytes — Phase 4b: soft-band half-width around threshold
+    _pad3:           vec4u,    // 16 bytes (explicit alignment to 16-byte boundary)
+}                              // Total: 224 bytes
 
-// SVO coordinate transform (matches Rust `SvoTransformData`)
+// SVO coordinate transform (matches Rust `SvoTransformData`, Phase 4a: page_depth added)
 struct SvoTransform {
     origin:         vec3f,
     world_size:     f32,
     inv_world_size: f32,
     max_depth:      u32,
-    _pad:           vec2u,
+    page_depth:     u32,  // Phase 4a: depth at which the tree splits into paged subtrees
+    _pad:           u32,
 }
 
 // ---------------------------------------------------------------------------
 // Bindings (group 0)
 //
-// | Binding | Type                    | Content                        |
-// |---------|-------------------------|--------------------------------|
-// |    0    | storage<read>           | octree array<vec2u>            |
-// |    1    | uniform                 | RayMarchUniforms               |
-// |    2    | uniform                 | SvoTransform                   |
-// |    3    | storage<read_write>     | depth_buffer array<f32>        |
-// |    4    | storage<read_write>     | color_buffer array<f32>        |
+// | Binding | Type                    | Content                               |
+// |---------|-------------------------|---------------------------------------|
+// |    0    | storage<read>           | octree array<vec2u> (packed pages)    |
+// |    1    | uniform                 | RayMarchUniforms                      |
+// |    2    | uniform                 | SvoTransform                          |
+// |    3    | storage<read_write>     | depth_buffer array<f32>               |
+// |    4    | storage<read_write>     | color_buffer array<f32>               |
+// |    5    | storage<read>           | page_table array<u32> (Phase 4a)      |
 // ---------------------------------------------------------------------------
 
 @group(0) @binding(0) var<storage, read>       octree:       array<vec2u>;
@@ -63,6 +75,8 @@ struct SvoTransform {
 @group(0) @binding(3) var<storage, read_write> depth_buffer: array<f32>;
 // color_buffer: four f32 per pixel (RGBA), linearised as pixel_idx * 4 + ch
 @group(0) @binding(4) var<storage, read_write> color_buffer: array<f32>;
+// page_table: virtual page_id → physical base node index; 0xFFFFFFFF = not resident
+@group(0) @binding(5) var<storage, read>       page_table:   array<u32>;
 
 // ---------------------------------------------------------------------------
 // Blit bindings (group 0, separate pipeline — compiled from same file)
@@ -99,6 +113,7 @@ const BACKGROUND_B: f32 = 0.18;
 const FEAT_NEIGHBOR_BLEND: u32 = 1u;  // Phase 2a: smooth-min seam blending
 const FEAT_SHADOW_RAYS:    u32 = 2u;  // Phase 2b: shadow ray per primary hit
 const FEAT_REFLECTION:     u32 = 4u;  // Phase 2b: reflection for metallic surfaces
+const FEAT_LOD:            u32 = 8u;  // Phase 4b: stochastic LOD cutoff
 
 // ---------------------------------------------------------------------------
 // PBR material helpers (Phase 3a — Cook-Torrance/GGX)
@@ -403,9 +418,43 @@ fn sd_box(p: vec3f, half: vec3f) -> f32 {
 
 struct StackEntry {
     node_idx:  u32,
+    depth:     u32,    // current octree depth (0 = root)
     aabb_min:  vec3f,
     aabb_size: f32,
     t_enter:   f32,
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4b — stochastic LOD cutoff helpers
+// ---------------------------------------------------------------------------
+
+/// Hashed noise: PCG hash of a seed u32 → pseudo-random u32 uniformly on [0, 2^32).
+fn pcg_hash(seed: u32) -> u32 {
+    var s = seed * 747796405u + 2891336453u;
+    let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+
+/// Stochastic LOD blend factor for the current internal node.
+///
+/// Returns a value in [0, 1]: 0.0 = always descend, 1.0 = always stop (render
+/// the node as a solid leaf using its propagated colour).  Values in between
+/// represent a soft blend band where the probability of stopping increases
+/// linearly with depth relative to `lod_threshold`.
+///
+/// # Arguments
+/// * `node_size_world` — world-space side length of the current node's AABB.
+/// * `t_world`         — world-space ray parameter at the node's entry point.
+/// * `fw_coeff`        — pixel footprint coefficient (2 / (cot_half_fov * height)).
+fn lod_blend_factor(node_size_world: f32, t_world: f32, fw_coeff: f32) -> f32 {
+    // Screen-space footprint of the node in pixels.
+    let fw     = fw_coeff * max(t_world, 1e-4);
+    let pixels = node_size_world / max(fw, 1e-6);
+    // lod_threshold: stop when the node is smaller than this many pixels.
+    // lod_softness:  blending band half-width in pixels.
+    let lo     = uniforms.lod_threshold - uniforms.lod_softness;
+    let hi     = uniforms.lod_threshold + uniforms.lod_softness;
+    return 1.0 - smoothstep(lo, hi, pixels);
 }
 
 // ---------------------------------------------------------------------------
@@ -433,6 +482,7 @@ fn traverse_svo(
     inv_rd:     vec3f,  // element-wise 1 / rd_svo
     t_scale:    f32,    // svo_t * t_scale = world-space t
     fw_coeff:   f32,    // pixel footprint coefficient: fw = fw_coeff * t_world
+    pixel_xy:   vec2u,  // Phase 4b: pixel coordinates for LOD noise seed
 ) -> TraversalResult {
     // Root AABB is [0,1]³ in SVO space.
     let root_hit = ray_aabb_slab(ro_svo, inv_rd, vec3f(0.0), vec3f(1.0));
@@ -444,7 +494,7 @@ fn traverse_svo(
     var stack: array<StackEntry, 12>;
     var sp: u32 = 0u;
 
-    stack[0] = StackEntry(0u, vec3f(0.0), 1.0, max(root_hit.x, 0.0));
+    stack[0] = StackEntry(0u, 0u, vec3f(0.0), 1.0, max(root_hit.x, 0.0));
     sp = 1u;
 
     var accum_color = vec3f(0.0);
@@ -460,6 +510,7 @@ fn traverse_svo(
         sp -= 1u;
         let entry     = stack[sp];
         let node_idx  = entry.node_idx;
+        let node_depth = entry.depth;
         let n_min     = entry.aabb_min;
         let n_size    = entry.aabb_size;
         let n_max     = n_min + vec3f(n_size);
@@ -605,6 +656,33 @@ fn traverse_svo(
         let child_size = n_size * 0.5;
         let fc         = svo_first_child(cp);
 
+        // Phase 4b: stochastic LOD cutoff.
+        // If the node is small enough in screen-space, treat it as a leaf using
+        // its propagated colour (cd) instead of descending further.
+        let lod_en = (uniforms.feature_flags & FEAT_LOD) != 0u;
+        if lod_en && cd != 0u && !svo_is_interior(cp) {
+            let t_world_lod  = t_enter * t_scale;
+            let size_world   = n_size * svo_tf.world_size;
+            let blend        = lod_blend_factor(size_world, t_world_lod, fw_coeff);
+            // Hash pixel position + depth + frame_index for temporal stability.
+            let pixel_seed   = pixel_xy.y * uniforms.screen_width + pixel_xy.x;
+            let noise_raw    = pcg_hash(pcg_hash(pixel_seed + node_depth * 1000u) ^ uniforms.frame_index);
+            let noise_f      = f32(noise_raw) / 4294967295.0; // [0, 1)
+            if noise_f < blend {
+                // Render aggregate colour as opaque leaf.
+                let contribution = 1.0 * (1.0 - accum_alpha);
+                accum_color += unpack_base_color(cd) * contribution;
+                accum_alpha += contribution;
+                if t_enter * t_scale < best_t {
+                    best_t         = t_enter * t_scale;
+                    best_normal    = vec3f(0.0, 1.0, 0.0); // default up normal for LOD surrogates
+                    best_roughness = 1.0;
+                    best_metallic  = 0.0;
+                }
+                continue;
+            }
+        }
+
         // Collect visible children and their entry t values.
         var child_t:    array<f32,   8>;
         var child_ni:   array<u32,   8>;
@@ -660,7 +738,7 @@ fn traverse_svo(
         // Push sorted children (farthest first → closest will be on top).
         for (var i = 0u; i < child_cnt; i++) {
             if sp < MAX_STACK_DEPTH {
-                stack[sp] = StackEntry(child_ni[i], child_min[i], child_size, child_t[i]);
+                stack[sp] = StackEntry(child_ni[i], node_depth + 1u, child_min[i], child_size, child_t[i]);
                 sp += 1u;
             }
         }
@@ -692,7 +770,7 @@ fn svo_trace_occlusion(
 
     var stack: array<StackEntry, 12>;
     var sp: u32 = 0u;
-    stack[0] = StackEntry(0u, vec3f(0.0), 1.0, max(root_hit.x, 0.0));
+    stack[0] = StackEntry(0u, 0u, vec3f(0.0), 1.0, max(root_hit.x, 0.0));  // occlusion: depth unused
     sp = 1u;
 
     while sp > 0u {
@@ -727,7 +805,7 @@ fn svo_trace_occlusion(
             let t_child = max(chit.x, 0.0);
             if t_child > max_t_raw { continue; }
             if sp < MAX_STACK_DEPTH {
-                stack[sp] = StackEntry(fc + ci, c_min, child_size, t_child);
+                stack[sp] = StackEntry(fc + ci, 0u, c_min, child_size, t_child);  // depth unused in occlusion
                 sp += 1u;
             }
         }
@@ -779,7 +857,7 @@ fn ray_march_main(@builtin(global_invocation_id) gid: vec3u) {
     // Pixel footprint coefficient: fw = 2 * t_world / (cot_half_fov * height)
     let fw_coeff = 2.0 / (uniforms.cot_half_fov * uniforms.resolution.y);
 
-    let result = traverse_svo(ro_svo, rd_svo, inv_rd, t_scale, fw_coeff);
+    let result = traverse_svo(ro_svo, rd_svo, inv_rd, t_scale, fw_coeff, gid.xy);
 
     if !result.hit {
         color_buffer[color_base]      = BACKGROUND_R;
@@ -890,7 +968,7 @@ fn ray_march_main(@builtin(global_invocation_id) gid: vec3u) {
             if abs(refl_inv.y) > 1e15 { refl_inv.y = 1e15 * sign(refl_inv.y + 1e-30); }
             if abs(refl_inv.z) > 1e15 { refl_inv.z = 1e15 * sign(refl_inv.z + 1e-30); }
 
-            let next = traverse_svo(refl_orig, refl_rd, refl_inv, t_scale, fw_coeff);
+            let next = traverse_svo(refl_orig, refl_rd, refl_inv, t_scale, fw_coeff, gid.xy);
             if !next.hit {
                 final_color += throughput
                              * vec3f(BACKGROUND_R, BACKGROUND_G, BACKGROUND_B);
@@ -921,7 +999,7 @@ fn ray_march_main(@builtin(global_invocation_id) gid: vec3u) {
             if abs(refr_inv.x) > 1e15 { refr_inv.x = 1e15 * sign(refr_inv.x + 1e-30); }
             if abs(refr_inv.y) > 1e15 { refr_inv.y = 1e15 * sign(refr_inv.y + 1e-30); }
             if abs(refr_inv.z) > 1e15 { refr_inv.z = 1e15 * sign(refr_inv.z + 1e-30); }
-            let next = traverse_svo(refr_orig, refr_rd, refr_inv, t_scale, fw_coeff);
+            let next = traverse_svo(refr_orig, refr_rd, refr_inv, t_scale, fw_coeff, gid.xy);
             if !next.hit {
                 final_color += throughput
                              * vec3f(BACKGROUND_R, BACKGROUND_G, BACKGROUND_B);

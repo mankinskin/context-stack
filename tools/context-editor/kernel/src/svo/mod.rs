@@ -16,6 +16,7 @@ use bevy::prelude::*;
 use bytemuck::{Pod, Zeroable};
 
 pub mod upload;
+pub mod paging;
 
 // ---------------------------------------------------------------------------
 // OctreeNode
@@ -155,6 +156,9 @@ pub struct VoxelWorld {
     pub max_depth: u32,
     /// Pending dirty byte ranges `(byte_start, byte_end_exclusive)`.
     pub dirty_ranges: Vec<(usize, usize)>,
+    /// Set when any voxel is added/removed; cleared after `propagate_colors_up()`
+    /// runs in the upload system (Phase 4a).
+    pub needs_color_propagation: bool,
 }
 
 impl Default for VoxelWorld {
@@ -172,6 +176,7 @@ impl VoxelWorld {
             root_index: 0,
             max_depth,
             dirty_ranges: Vec::new(),
+            needs_color_propagation: false,
         }
     }
 
@@ -193,6 +198,8 @@ impl VoxelWorld {
         self.nodes[node_idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
         self.mark_dirty(node_idx);
         self.reclassify_interior_around(pos);
+        // Internal node average colors need refreshing after geometry changes.
+        self.needs_color_propagation = true;
     }
 
     /// Remove the voxel at `pos` (set to empty/transparent).
@@ -204,6 +211,7 @@ impl VoxelWorld {
             self.nodes[node_idx].color_data = 0;
             self.nodes[node_idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
             self.mark_dirty(node_idx);
+            self.needs_color_propagation = true;
 
             // Neighbors can no longer be interior — clear their flags.
             let max_c = (1i32 << self.max_depth) - 1;

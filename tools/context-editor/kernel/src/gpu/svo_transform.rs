@@ -20,7 +20,7 @@ use crate::svo::VoxelWorld;
 
 /// Packed data uploaded to the `svo_transform` uniform binding.
 ///
-/// Layout (32 bytes, padded to 256 for the uniform buffer allocation):
+/// Layout (36 bytes padded to 256 for the uniform buffer allocation):
 /// ```text
 /// offset  0: origin.x        f32
 /// offset  4: origin.y        f32
@@ -28,7 +28,8 @@ use crate::svo::VoxelWorld;
 /// offset 12: world_size      f32
 /// offset 16: inv_world_size  f32
 /// offset 20: max_depth       u32
-/// offset 24: _pad[2]         u32 × 2
+/// offset 24: page_depth      u32  (Phase 4a: depth at which the tree is split into pages)
+/// offset 28: _pad            u32
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
@@ -41,7 +42,11 @@ pub struct SvoTransformData {
     pub inv_world_size: f32,
     /// Maximum octree depth (= leaf level).
     pub max_depth: u32,
-    pub _pad: [u32; 2],
+    /// Depth at which the octree is split into pageable subtrees (Phase 4a).
+    /// Nodes at depth < page_depth are in the root page (always resident).
+    /// Nodes at depth >= page_depth are in leaf pages (paged by visibility).
+    pub page_depth: u32,
+    pub _pad: u32,
 }
 
 const _: () = assert!(
@@ -103,10 +108,16 @@ pub fn update_svo_transform(
     voxel_world: Option<Res<VoxelWorld>>,
     transform_buf: Option<Res<SvoTransformBuffer>>,
     render_queue: Option<Res<RenderQueue>>,
+    page_manager: Option<Res<crate::svo::upload::SvoPageManagerResource>>,
 ) {
     let Some(voxel_world) = voxel_world else { return };
     let Some(transform_buf) = transform_buf else { return };
     let Some(render_queue) = render_queue else { return };
+
+    let page_depth = page_manager
+        .as_ref()
+        .map(|pm| pm.0.page_depth)
+        .unwrap_or(4);
 
     let origin = voxel_world.origin();
     let world_size = voxel_world.world_size();
@@ -115,7 +126,8 @@ pub fn update_svo_transform(
         world_size,
         inv_world_size: 1.0 / world_size,
         max_depth: voxel_world.max_depth,
-        _pad: [0; 2],
+        page_depth,
+        _pad: 0,
     };
 
     render_queue.write_buffer(&transform_buf.0, 0, bytemuck::bytes_of(&data));

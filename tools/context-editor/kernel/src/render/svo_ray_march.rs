@@ -52,9 +52,14 @@ use bevy::{
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::debug_overlay::ray_march_feature_flags;
+use crate::debug_overlay::{ray_march_feature_flags, lod_threshold, lod_softness};
 use crate::gpu::SvoDoubleBuffer;
+use crate::gpu::SvoPageTableBuffer;
 use crate::gpu::svo_transform::SvoTransformBuffer;
+
+// Per-frame counter incremented each time ray march uniforms are written.
+static FRAME_COUNTER: std::sync::atomic::AtomicU32 =
+    std::sync::atomic::AtomicU32::new(0);
 
 // ---------------------------------------------------------------------------
 // Uniform data (matches WGSL `RayMarchUniforms`)
@@ -72,19 +77,21 @@ pub struct RayMarchUniformData {
     pub cot_half_fov:    f32,        //  4 bytes
     pub resolution:      [f32; 2],   //  8 bytes
     pub screen_width:    u32,        //  4 bytes
-    pub _pad0:           u32,        //  4 bytes
+    pub frame_index:     u32,        //  4 bytes — Phase 4b: temporal noise seed
     pub light_dir:       [f32; 3],   // 12 bytes
     pub _pad1:           f32,        //  4 bytes
     pub light_color:     [f32; 3],   // 12 bytes
     pub max_bounces:     u32,        //  4 bytes
     pub max_shadow_dist: f32,        //  4 bytes
-    pub feature_flags:   u32,        //  4 bytes (bit0=neighbor_blend, bit1=shadow, bit2=reflect)
-    pub _pad3:           [u32; 2],   //  8 bytes
-}                                    // total: 208 bytes
+    pub feature_flags:   u32,        //  4 bytes (bit0=neighbor_blend, bit1=shadow, bit2=reflect, bit3=lod)
+    pub lod_threshold:   f32,        //  4 bytes — Phase 4b: screen-px size below which LOD stops
+    pub lod_softness:    f32,        //  4 bytes — Phase 4b: soft-band half-width in pixels
+    pub _pad3:           [u32; 4],   // 16 bytes (alignment pad to 16-byte boundary)
+}                                    // total: 224 bytes
 
 const _: () = assert!(
-    std::mem::size_of::<RayMarchUniformData>() == 208,
-    "RayMarchUniformData must be 208 bytes"
+    std::mem::size_of::<RayMarchUniformData>() == 224,
+    "RayMarchUniformData must be 224 bytes"
 );
 
 // ---------------------------------------------------------------------------
@@ -224,14 +231,16 @@ pub fn update_ray_march_uniforms(
         cot_half_fov,
         resolution:      [width, height],
         screen_width:    width as u32,
-        _pad0:           0,
+        frame_index:     FRAME_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         light_dir:       [0.267, 0.802, 0.534], // normalize(0.3, 0.9, 0.6)
         _pad1:           0.0,
         light_color:     [1.0, 0.98, 0.95],
         max_bounces:     2,
         max_shadow_dist: 200.0,
         feature_flags:   ray_march_feature_flags(),
-        _pad3:           [0; 2],
+        lod_threshold:   lod_threshold(),
+        lod_softness:    lod_softness(),
+        _pad3:           [0; 4],
     };
 
     render_queue.write_buffer(&uniform_buf.0, 0, bytemuck::bytes_of(&data));
@@ -296,6 +305,17 @@ fn compute_bind_group_layout() -> BindGroupLayoutDescriptor {
                 visibility: ShaderStages::COMPUTE,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            // 5: page_table (read-only storage — Phase 4a)
+            BindGroupLayoutEntry {
+                binding: 5,
+                visibility: ShaderStages::COMPUTE,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
                     min_binding_size: None,
                 },
@@ -442,11 +462,20 @@ pub fn rebuild_ray_march_bind_groups(
     rm_uniforms:    Option<Res<SvoRayMarchUniformBuffer>>,
     svo:            Option<Res<SvoDoubleBuffer>>,
     svo_tf:         Option<Res<SvoTransformBuffer>>,
+    page_table_buf: Option<Res<SvoPageTableBuffer>>,
 ) {
     let Some(rm_buffers)  = rm_buffers  else { return };
     let Some(rm_uniforms) = rm_uniforms else { return };
     let Some(svo)         = svo         else { return };
     let Some(svo_tf)      = svo_tf      else { return };
+
+    // Binding 5: use the real page table once available, otherwise fall back
+    // to the octree buffer so the bind group can be built on startup frames
+    // before `init_page_table_system` has run.
+    let page_table_binding = page_table_buf
+        .as_ref()
+        .map(|pt| pt.buffer.as_entire_binding())
+        .unwrap_or_else(|| svo.read_source().as_entire_binding());
 
     // Compute bind group
     {
@@ -460,6 +489,7 @@ pub fn rebuild_ray_march_bind_groups(
                 BindGroupEntry { binding: 2, resource: svo_tf.0.as_entire_binding() },
                 BindGroupEntry { binding: 3, resource: rm_buffers.depth.as_entire_binding() },
                 BindGroupEntry { binding: 4, resource: rm_buffers.color.as_entire_binding() },
+                BindGroupEntry { binding: 5, resource: page_table_binding },
             ],
         );
         commands.insert_resource(SvoRayMarchComputeBindGroup(bg));
@@ -578,7 +608,7 @@ mod tests {
 
     #[test]
     fn ray_march_uniform_size() {
-        assert_eq!(std::mem::size_of::<RayMarchUniformData>(), 208);
+        assert_eq!(std::mem::size_of::<RayMarchUniformData>(), 224);
     }
 
     #[test]

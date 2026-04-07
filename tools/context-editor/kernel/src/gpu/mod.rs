@@ -14,7 +14,9 @@
 //! ```
 
 pub mod svo_transform;
+pub mod svo_page_table;
 pub use svo_transform::SvoTransformBuffer;
+pub use svo_page_table::SvoPageTableBuffer;
 
 use bevy::prelude::Resource;
 use bevy::render::{

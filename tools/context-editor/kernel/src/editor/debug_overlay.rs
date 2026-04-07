@@ -68,18 +68,38 @@ static WORLD_PRESET: AtomicU32 = AtomicU32::new(0);
 static WORLD_SEED_HI: AtomicU32 = AtomicU32::new(0xDEAD_BEEF);
 static WORLD_SEED_LO: AtomicU32 = AtomicU32::new(0xCAFE_BABE);
 
-/// Returns the Phase 2a/2b feature flag bitmask for use in `RayMarchUniforms`.
+// --- LOD Cutoff (Phase 4b) — Dioxus writes, Bevy reads ---
+/// LOD enabled toggle (bit 3 in feature_flags).
+static LOD_ENABLED: AtomicBool = AtomicBool::new(true);
+/// LOD threshold in pixels ×1000 (default 16 000 = 16.0 px).
+static LOD_THRESHOLD_X1000: AtomicU32 = AtomicU32::new(16_000);
+/// LOD soft-band half-width in pixels ×1000 (default 1 000 = 1.0 px).
+static LOD_SOFTNESS_X1000: AtomicU32 = AtomicU32::new(1_000);
+
+/// Returns the Phase 2a–4b feature flag bitmask for use in `RayMarchUniforms`.
 ///
 /// Bit layout:
 /// - Bit 0 (0x1): neighbor blend (Phase 2a smooth-min seam removal)
 /// - Bit 1 (0x2): shadow rays (Phase 2b)
 /// - Bit 2 (0x4): reflection rays (Phase 2b)
+/// - Bit 3 (0x8): LOD cutoff (Phase 4b)
 pub fn ray_march_feature_flags() -> u32 {
     let mut flags = 0u32;
-    if NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed) { flags |= 0x1; }
-    if SHADOW_RAYS_ENABLED.load(Ordering::Relaxed)    { flags |= 0x2; }
+    if NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed)  { flags |= 0x1; }
+    if SHADOW_RAYS_ENABLED.load(Ordering::Relaxed)     { flags |= 0x2; }
     if REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed) { flags |= 0x4; }
+    if LOD_ENABLED.load(Ordering::Relaxed)             { flags |= 0x8; }
     flags
+}
+
+/// Returns the LOD screen-space size threshold in pixels (Phase 4b).
+pub fn lod_threshold() -> f32 {
+    LOD_THRESHOLD_X1000.load(Ordering::Relaxed) as f32 / 1000.0
+}
+
+/// Returns the LOD soft-band half-width in pixels (Phase 4b).
+pub fn lod_softness() -> f32 {
+    LOD_SOFTNESS_X1000.load(Ordering::Relaxed) as f32 / 1000.0
 }
 
 /// Returns `true` if free-fly camera mode is active.
@@ -517,13 +537,16 @@ pub fn DebugPanel() -> Element {
         .unwrap_or_else(|| "?".to_string());
 
     // --- Mutable toggle / slider state ---
-    let mut free_fly       = use_signal(|| FREE_FLY_ENABLED.load(Ordering::Relaxed));
-    let mut neighbor_blend = use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
-    let mut shadow_rays    = use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
+    let mut free_fly        = use_signal(|| FREE_FLY_ENABLED.load(Ordering::Relaxed));
+    let mut neighbor_blend  = use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
+    let mut shadow_rays     = use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
     let mut reflection_rays = use_signal(|| REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed));
-    let mut wireframe_en   = use_signal(|| WIREFRAME_ENABLED.load(Ordering::Relaxed));
-    let mut depth          = use_signal(|| WIREFRAME_DEPTH.load(Ordering::Relaxed));
-    let mut occupied       = use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
+    let mut wireframe_en    = use_signal(|| WIREFRAME_ENABLED.load(Ordering::Relaxed));
+    let mut depth           = use_signal(|| WIREFRAME_DEPTH.load(Ordering::Relaxed));
+    let mut occupied        = use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
+    let mut lod_en          = use_signal(|| LOD_ENABLED.load(Ordering::Relaxed));
+    let mut lod_thresh      = use_signal(|| LOD_THRESHOLD_X1000.load(Ordering::Relaxed));
+    let mut lod_soft        = use_signal(|| LOD_SOFTNESS_X1000.load(Ordering::Relaxed));
 
     rsx! {
         GlassPanel { title: "Debug".to_string(),
@@ -634,6 +657,61 @@ pub fn DebugPanel() -> Element {
                                 }
                             }
                             "Reflections"
+                        }
+                        // ── LOD Cutoff (Phase 4b) ─────────────────────────
+                        TreeSection { label: "LOD Cutoff".to_string(), default_open: true,
+                            label { class: "flex items-center gap-2 cursor-pointer text-white/70 hover:text-white",
+                                input {
+                                    r#type: "checkbox",
+                                    checked: *lod_en.read(),
+                                    onclick: move |_| {
+                                        let v = !*lod_en.read();
+                                        lod_en.set(v);
+                                        LOD_ENABLED.store(v, Ordering::Relaxed);
+                                    }
+                                }
+                                "Enable LOD"
+                            }
+                            div { class: "text-white/70 mt-1",
+                                div { class: "flex justify-between",
+                                    span { "Threshold (px)" }
+                                    span { class: "font-mono", "{*lod_thresh.read() as f32 / 1000.0:.1}" }
+                                }
+                                input {
+                                    r#type: "range",
+                                    min: "500",
+                                    max: "64000",
+                                    step: "500",
+                                    value: "{lod_thresh}",
+                                    class: "w-full accent-yellow-400",
+                                    oninput: move |evt| {
+                                        if let Ok(v) = evt.value().parse::<u32>() {
+                                            lod_thresh.set(v);
+                                            LOD_THRESHOLD_X1000.store(v, Ordering::Relaxed);
+                                        }
+                                    }
+                                }
+                            }
+                            div { class: "text-white/70 mt-1",
+                                div { class: "flex justify-between",
+                                    span { "Softness (px)" }
+                                    span { class: "font-mono", "{*lod_soft.read() as f32 / 1000.0:.1}" }
+                                }
+                                input {
+                                    r#type: "range",
+                                    min: "100",
+                                    max: "8000",
+                                    step: "100",
+                                    value: "{lod_soft}",
+                                    class: "w-full accent-yellow-400",
+                                    oninput: move |evt| {
+                                        if let Ok(v) = evt.value().parse::<u32>() {
+                                            lod_soft.set(v);
+                                            LOD_SOFTNESS_X1000.store(v, Ordering::Relaxed);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 

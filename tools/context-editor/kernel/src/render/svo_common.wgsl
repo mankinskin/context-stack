@@ -26,7 +26,11 @@ struct SvoTransform {
     world_size:     f32,
     inv_world_size: f32,
     max_depth:      u32,
-    _pad:           vec2u,
+    /// Depth at which the octree is split into paged subtrees (Phase 4a).
+    /// Nodes at depth < page_depth are in the always-resident root page.
+    /// Nodes at depth >= page_depth are in individually-paged leaf pages.
+    page_depth:     u32,
+    _pad:           u32,
 }
 
 // ---------------------------------------------------------------------------
