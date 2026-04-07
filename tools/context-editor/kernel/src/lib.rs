@@ -33,8 +33,6 @@ pub mod ticket_editor;
 pub mod doc_editor;
 pub mod code_viewer;
 pub mod debug_overlay;
-#[cfg(target_arch = "wasm32")]
-pub mod bootstrap;
 
 use std::sync::{Arc, OnceLock};
 
@@ -51,6 +49,11 @@ pub trait SandboxWorld: 'static + Send + Sync {
     // UI content providers — injected into Kernel's GlassScaffold
     fn sidebar_content(&self) -> dioxus::prelude::Element;
     fn inventory_content(&self) -> dioxus::prelude::Element;
+
+    /// Called from the kernel's Bevy app builder before `app.run()` on WASM.
+    /// Use this to add scene-specific plugins (e.g. a `BootstrapPlugin`).
+    #[cfg(target_arch = "wasm32")]
+    fn configure_bevy_app(&self, _app: &mut bevy::prelude::App) {}
 }
 
 static WORLD: OnceLock<Arc<dyn SandboxWorld>> = OnceLock::new();
@@ -123,9 +126,9 @@ fn run_bevy_wasm() {
     app.add_plugins(crate::code_viewer::CodeViewerPlugin);
     app.add_plugins(crate::debug_overlay::DebugOverlayPlugin);
 
-    // Initialise empty World Resource
+    // Initialise empty World Resource; scene content is added by the sandbox.
     app.insert_resource(crate::svo::VoxelWorld::new(10));
-    app.add_plugins(crate::bootstrap::BootstrapPlugin);
+    crate::world().configure_bevy_app(&mut app);
 
     // Seed a persistent ambient particle emitter so the particle pipeline is
     // exercised immediately. Spawns slow-drifting cyan ember particles above

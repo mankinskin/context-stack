@@ -1,8 +1,8 @@
 //! Wireframe overlay — renders SVO wireframe lines on top of voxel splats.
 //!
 //! Positions are computed by [`crate::debug_overlay::draw_svo_wireframe`] and
-//! stored in [`WireframeVertices`]. This module uploads them to a GPU vertex
-//! buffer and draws them in a render pass after TiledRaster.
+//! stored in [`WireframeData`]. This module uploads them to GPU vertex and
+//! index buffers and draws them in a render pass after TiledRaster.
 
 use bevy::{
     prelude::*,
@@ -15,7 +15,7 @@ use bevy::{
             BufferUsages, CachedRenderPipelineId, ColorTargetState, ColorWrites,
             CompareFunction, DepthBiasState, DepthStencilState,
             FragmentState, LoadOp, MultisampleState, Operations,
-            PipelineCache, PrimitiveState,
+            IndexFormat, PipelineCache, PrimitiveState,
             PrimitiveTopology, RenderPassDepthStencilAttachment, RenderPassDescriptor,
             RenderPipelineDescriptor, ShaderStages,
             StencilState, StoreOp, TextureFormat, VertexAttribute,
@@ -28,17 +28,41 @@ use bevy::{
 
 use crate::debug_overlay::DebugOverlayState;
 
-const MAX_WIREFRAME_VERTICES: u64 = 262144;
+/// Maximum octree depth used for wireframe buffer budget calculations.
+/// Must match the `max_depth` passed to `VoxelWorld::new()` in `lib.rs`.
+pub const MAX_OCTREE_DEPTH: u32 = 10;
+
+/// Maximum wireframe grid side length in cells, equal to the world size at
+/// [`MAX_OCTREE_DEPTH`]: `2^max_depth = 1024`.
+pub const MAX_WIREFRAME_GRID_SIZE: u64 = 1 << MAX_OCTREE_DEPTH;
+
+/// Number of corner vertices per wireframe cube.
+pub const WIREFRAME_VERTS_PER_CUBE: usize = 8;
+
+/// Number of indices per wireframe cube (12 edges × 2 endpoints).
+pub const WIREFRAME_INDICES_PER_CUBE: usize = 24;
+
+/// Maximum number of wireframe cubes renderable per frame.
+///
+/// The index budget is kept at `2 × MAX_WIREFRAME_GRID_SIZE²` (two full
+/// face-planes at max resolution); dividing by [`WIREFRAME_INDICES_PER_CUBE`]
+/// converts that to a cube count (~87 K cubes at `MAX_OCTREE_DEPTH = 10`).
+pub const MAX_WIREFRAME_CUBES: u64 =
+    2 * MAX_WIREFRAME_GRID_SIZE * MAX_WIREFRAME_GRID_SIZE
+    / WIREFRAME_INDICES_PER_CUBE as u64;
+
 const WIREFRAME_UNIFORM_SIZE: u64 = 80; // mat4x4f (64) + vec4f (16)
+const MAT4_BYTES: usize = core::mem::size_of::<[f32; 16]>(); // 64 — byte offset of the color field
 
 // ---------------------------------------------------------------------------
 // Main-world resources
 // ---------------------------------------------------------------------------
 
-/// Line vertex positions computed each frame by the debug overlay system.
+/// Corner positions and edge indices computed each frame by the debug overlay.
 #[derive(Resource, Default)]
-pub struct WireframeVertices {
-    pub positions: Vec<[f32; 3]>,
+pub struct WireframeData {
+    pub corners: Vec<[f32; 3]>,
+    pub indices: Vec<u32>,
 }
 
 /// GPU buffers and metadata for the wireframe overlay. Extracted to the render
@@ -46,8 +70,9 @@ pub struct WireframeVertices {
 #[derive(Resource, Clone)]
 pub struct WireframeOverlayBuffers {
     pub vertex_buf: Buffer,
+    pub index_buf: Buffer,
     pub uniform_buf: Buffer,
-    pub vertex_count: u32,
+    pub index_count: u32,
 }
 
 impl ExtractResource for WireframeOverlayBuffers {
@@ -82,9 +107,15 @@ pub fn init_wireframe_overlay(
     let Some(device) = device else { return };
 
     let vertex_buf = device.create_buffer(&BufferDescriptor {
-        label: Some("wireframe_vertices"),
-        size: MAX_WIREFRAME_VERTICES * 12,
+        label: Some("wireframe_corners"),
+        size: MAX_WIREFRAME_CUBES * WIREFRAME_VERTS_PER_CUBE as u64 * 12,
         usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let index_buf = device.create_buffer(&BufferDescriptor {
+        label: Some("wireframe_indices"),
+        size: MAX_WIREFRAME_CUBES * WIREFRAME_INDICES_PER_CUBE as u64 * 4,
+        usage: BufferUsages::INDEX | BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
     let uniform_buf = device.create_buffer(&BufferDescriptor {
@@ -96,15 +127,16 @@ pub fn init_wireframe_overlay(
 
     commands.insert_resource(WireframeOverlayBuffers {
         vertex_buf,
+        index_buf,
         uniform_buf,
-        vertex_count: 0,
+        index_count: 0,
     });
-    commands.init_resource::<WireframeVertices>();
+    commands.init_resource::<WireframeData>();
 }
 
-/// Upload wireframe vertex + uniform data to the GPU each frame.
+/// Upload wireframe corner + index + uniform data to the GPU each frame.
 pub fn upload_wireframe_data(
-    vertices: Option<Res<WireframeVertices>>,
+    data: Option<Res<WireframeData>>,
     mut buffers: Option<ResMut<WireframeOverlayBuffers>>,
     render_queue: Option<Res<RenderQueue>>,
     camera_q: Query<(&GlobalTransform, &Projection), With<Camera3d>>,
@@ -112,17 +144,24 @@ pub fn upload_wireframe_data(
 ) {
     let Some(ref mut buffers) = buffers else { return };
     let Some(render_queue) = render_queue else { return };
-    let Some(vertices) = vertices else { return };
+    let Some(data) = data else { return };
 
-    if !state.enabled || vertices.positions.is_empty() {
-        buffers.vertex_count = 0;
+    if !state.enabled || data.indices.is_empty() {
+        buffers.index_count = 0;
         return;
     }
 
-    let count = vertices.positions.len().min(MAX_WIREFRAME_VERTICES as usize);
-    let bytes: &[u8] = bytemuck::cast_slice(&vertices.positions[..count]);
-    render_queue.write_buffer(&buffers.vertex_buf, 0, bytes);
-    buffers.vertex_count = count as u32;
+    let corner_count = data.corners.len()
+        .min(MAX_WIREFRAME_CUBES as usize * WIREFRAME_VERTS_PER_CUBE);
+    let index_count = data.indices.len()
+        .min(MAX_WIREFRAME_CUBES as usize * WIREFRAME_INDICES_PER_CUBE);
+    render_queue.write_buffer(
+        &buffers.vertex_buf, 0, bytemuck::cast_slice(&data.corners[..corner_count]),
+    );
+    render_queue.write_buffer(
+        &buffers.index_buf, 0, bytemuck::cast_slice(&data.indices[..index_count]),
+    );
+    buffers.index_count = index_count as u32;
 
     let Ok((transform, projection)) = camera_q.single() else { return };
 
@@ -135,9 +174,9 @@ pub fn upload_wireframe_data(
         _ => [0.0, 1.0, 0.0, 1.0],
     };
 
-    let mut data = [0u8; 80];
-    data[..64].copy_from_slice(bytemuck::bytes_of(&view_proj.to_cols_array()));
-    data[64..80].copy_from_slice(bytemuck::bytes_of(&color));
+    let mut data = [0u8; WIREFRAME_UNIFORM_SIZE as usize];
+    data[..MAT4_BYTES].copy_from_slice(bytemuck::bytes_of(&view_proj.to_cols_array()));
+    data[MAT4_BYTES..].copy_from_slice(bytemuck::bytes_of(&color));
     render_queue.write_buffer(&buffers.uniform_buf, 0, &data);
 }
 
@@ -206,8 +245,11 @@ pub fn queue_wireframe_pipeline(
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
+            // depth_write_enabled=false: wireframe is a debug overlay, never
+            // clobber the depth buffer written by the depth-bridge pass.
             depth_write_enabled: false,
-            depth_compare: CompareFunction::GreaterEqual,
+            // Always: wireframe lines draw on top of ray-marched voxel surfaces.
+            depth_compare: CompareFunction::Always,
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
         }),
@@ -290,7 +332,7 @@ impl Node for WireframeOverlayNode {
         let Some(buffers) = world.get_resource::<WireframeOverlayBuffers>() else {
             return Ok(());
         };
-        if buffers.vertex_count == 0 {
+        if buffers.index_count == 0 {
             return Ok(());
         }
         let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0) else {
@@ -303,16 +345,24 @@ impl Node for WireframeOverlayNode {
 
         let color_attachment = view_target.get_unsampled_color_attachment();
 
-        let depth_attachment = world
+        // The pipeline has depth_stencil: Some(...), so the render pass MUST
+        // provide a depth attachment.  Skip the draw when SvoDepthTexture is
+        // not yet available (first frame, or headless mode) to avoid a WebGPU
+        // validation error.
+        let Some(depth_tex) = world
             .get_resource::<crate::render::depth_bridge::SvoDepthTexture>()
-            .map(|dt| RenderPassDepthStencilAttachment {
-                view: &dt.view,
-                depth_ops: Some(Operations {
-                    load: LoadOp::Load,
-                    store: StoreOp::Discard,
-                }),
-                stencil_ops: None,
-            });
+        else {
+            return Ok(());
+        };
+
+        let depth_attachment = RenderPassDepthStencilAttachment {
+            view: &depth_tex.view,
+            depth_ops: Some(Operations {
+                load: LoadOp::Load,
+                store: StoreOp::Discard,
+            }),
+            stencil_ops: None,
+        };
 
         {
             let mut pass = render_context
@@ -320,14 +370,15 @@ impl Node for WireframeOverlayNode {
                 .begin_render_pass(&RenderPassDescriptor {
                     label: Some("wireframe_overlay_pass"),
                     color_attachments: &[Some(color_attachment)],
-                    depth_stencil_attachment: depth_attachment,
+                    depth_stencil_attachment: Some(depth_attachment),
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 });
             pass.set_pipeline(pipeline);
             pass.set_bind_group(0, &bind_group.0, &[]);
             pass.set_vertex_buffer(0, *buffers.vertex_buf.slice(..));
-            pass.draw(0..buffers.vertex_count, 0..1);
+            pass.set_index_buffer(*buffers.index_buf.slice(..), IndexFormat::Uint32);
+            pass.draw_indexed(0..buffers.index_count, 0, 0..1);
         }
 
         Ok(())

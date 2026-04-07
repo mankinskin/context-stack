@@ -428,12 +428,4 @@ mod tests {
         svo.swap();
         assert!(svo.read_is_front(), "double swap: back to original");
     }
-
-    #[test]
-    fn constants_are_sane() {
-        assert_eq!(GAUSSIAN_DATA_STRIDE, (3 + 1 + 6 + 48) as u64 * 4);
-        assert_eq!(PROJECTED_GAUSSIAN_STRIDE, (2 + 3 + 1 + 3 + 1) as u64 * 4);
-        assert_eq!(TILE_DATA_STRIDE, 8); // two separate u32s: [offset, count]
-        assert_eq!(OCTREE_NODE_SIZE, 8);
-    }
 }

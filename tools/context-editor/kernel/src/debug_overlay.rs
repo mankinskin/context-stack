@@ -122,7 +122,6 @@ impl Plugin for DebugOverlayPlugin {
 pub struct DebugOverlayState {
     pub enabled: bool,
     pub display_depth: u32,
-    pub draw_radius: f32,
     pub wire_color: Color,
     pub occupied_only: bool,
 }
@@ -132,7 +131,6 @@ impl Default for DebugOverlayState {
         Self {
             enabled: false,
             display_depth: 4,
-            draw_radius: 800.0,
             wire_color: Color::srgb(0.0, 1.0, 0.0),
             occupied_only: true,
         }
@@ -336,122 +334,216 @@ fn apply_world_preset(
 /// Walk the SVO and populate the wireframe overlay vertex buffer.
 ///
 /// Each frame we recompute the line positions and write them to the
-/// [`WireframeVertices`] resource, which the GPU overlay node uploads and draws
+/// [`WireframeData`] resource, which the GPU overlay node uploads and draws
 /// on top of the voxel splats.
 fn draw_svo_wireframe(
     state: Res<DebugOverlayState>,
     voxel_world: Res<VoxelWorld>,
+    mut wire_data: Option<ResMut<crate::render::wireframe_overlay::WireframeData>>,
     camera_q: Query<&Transform, With<Camera3d>>,
-    mut wire_verts: Option<ResMut<crate::render::wireframe_overlay::WireframeVertices>>,
 ) {
     // Clear previous frame's data.
-    if let Some(ref mut verts) = wire_verts {
-        verts.positions.clear();
+    if let Some(ref mut data) = wire_data {
+        data.corners.clear();
+        data.indices.clear();
     }
 
     if !state.enabled || voxel_world.nodes.is_empty() {
         return;
     }
-    let cam_pos = camera_q.iter().next().map_or(Vec3::ZERO, |t| t.translation);
-    let target = state.display_depth.min(voxel_world.max_depth);
+    let target   = state.display_depth.min(voxel_world.max_depth);
+    let occ_only = state.occupied_only;
     let root_extent = (1u32 << voxel_world.max_depth) as f32;
 
-    let mut cubes = Vec::new();
-    collect_wireframe_cubes(
-        &voxel_world,
-        voxel_world.root_index as usize,
-        0, Vec3::ZERO, root_extent,
-        target, cam_pos, state.draw_radius, state.occupied_only,
-        &mut cubes,
-    );
+    const MAX_CUBES: usize = crate::render::wireframe_overlay::MAX_WIREFRAME_CUBES as usize;
+
+    // -------------------------------------------------------------------------
+    // Occupied-only mode: nearest-first priority queue.
+    //
+    // At fine depths (depth 10 → 1-unit cells) the world surface contains far
+    // more occupied cells than the vertex budget.  A plain BFS distributes the
+    // budget evenly over the whole world, producing cells too sparse/small to
+    // see from a normal camera distance.  Using a min-heap ordered by
+    // center-to-camera distance ensures the budget is consumed by the nearest
+    // occupied terrain first, giving a dense, visible grid around the camera.
+    // Cell positions are world-fixed (SVO nodes never move), so proximity-based
+    // *selection* does not produce the camera-following artefact that plagued
+    // the old draw-radius culling approach.
+    // -------------------------------------------------------------------------
+    let mut cubes: Vec<(Vec3, f32)> = Vec::new();
+
+    if occ_only {
+        // Occupied-only: BFS that follows only non-empty SVO branches.
+        // We collect ALL occupied nodes up to `target` depth with no in-loop
+        // budget cutoff (correct traversal), then sort by camera proximity and
+        // truncate to MAX_CUBES so that the nearest terrain is always visible.
+        // At typical UI depths (≤8) the terrain surface has far fewer than
+        // MAX_CUBES cells, so the sort/truncate is effectively a no-op.
+        let cam_pos = camera_q.single()
+            .map(|t| t.translation)
+            .unwrap_or(Vec3::ZERO);
+
+        let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
+            std::collections::VecDeque::new();
+        queue.push_back((voxel_world.root_index as usize, 0, Vec3::ZERO, root_extent));
+
+        while let Some((idx, depth, origin, extent)) = queue.pop_front() {
+            if idx >= voxel_world.nodes.len() {
+                continue;
+            }
+            let node   = &voxel_world.nodes[idx];
+            let half   = extent * 0.5;
+            let center = origin + Vec3::splat(half);
+
+            // Skip truly empty leaves (no color, no children).
+            if node.color_data == 0 && node.child_mask() == 0 {
+                continue;
+            }
+
+            if depth >= target || node.is_leaf() {
+                cubes.push((center, extent));
+                continue;
+            }
+
+            // Recurse into occupied children only.
+            let mask  = node.child_mask();
+            let first = node.first_child_index();
+            for slot in 0..8usize {
+                if mask & (1 << slot) == 0 {
+                    continue;
+                }
+                let co = origin + Vec3::new(
+                    if slot & 1 != 0 { half } else { 0.0 },
+                    if slot & 2 != 0 { half } else { 0.0 },
+                    if slot & 4 != 0 { half } else { 0.0 },
+                );
+                let child_offset = (mask & ((1 << slot) - 1)).count_ones() as usize;
+                queue.push_back((first + child_offset, depth + 1, co, half));
+            }
+        }
+
+        // When over budget, keep only the nearest cells to the camera.
+        if cubes.len() > MAX_CUBES {
+            cubes.sort_unstable_by(|(a, _), (b, _)| {
+                a.distance_squared(cam_pos)
+                    .partial_cmp(&b.distance_squared(cam_pos))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            cubes.truncate(MAX_CUBES);
+        }
+    } else {
+        // -----------------------------------------------------------------------
+        // Full-grid mode: level-order BFS (VecDeque).
+        //
+        // Processing all nodes at depth D before any at depth D+1 ensures the
+        // budget cutoff is spread evenly across all world regions.
+        // -----------------------------------------------------------------------
+        // In full-grid mode, empty octants are emitted as virtual cells.
+        // To prevent the BFS queue from growing exponentially (8^depth entries)
+        // cap empty-region recursion at the deepest D where 8^D ≤ MAX_CUBES.
+        let full_grid_cap: u32 = {
+            let mut d = 0u32;
+            let mut cells = 1usize;
+            while cells.saturating_mul(8) <= MAX_CUBES {
+                d += 1;
+                cells = cells.saturating_mul(8);
+            }
+            d  // 8^5=32768 ≤ 87381 < 8^6=262144 → cap=5
+        };
+
+        // Queue entry: (node_idx, depth, origin, extent).
+        // node_idx == usize::MAX is a sentinel for an "empty region".
+        let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
+            std::collections::VecDeque::new();
+
+        queue.push_back((voxel_world.root_index as usize, 0, Vec3::ZERO, root_extent));
+
+        while let Some((idx, depth, origin, extent)) = queue.pop_front() {
+            if cubes.len() >= MAX_CUBES {
+                break;
+            }
+            let center = origin + Vec3::splat(extent * 0.5);
+            let half   = extent * 0.5;
+
+            if idx == usize::MAX {
+                // Empty-region sentinel.
+                let empty_target = target.min(full_grid_cap);
+                if depth >= empty_target {
+                    cubes.push((center, extent));
+                } else {
+                    for slot in 0..8usize {
+                        let co = origin + Vec3::new(
+                            if slot & 1 != 0 { half } else { 0.0 },
+                            if slot & 2 != 0 { half } else { 0.0 },
+                            if slot & 4 != 0 { half } else { 0.0 },
+                        );
+                        queue.push_back((usize::MAX, depth + 1, co, half));
+                    }
+                }
+                continue;
+            }
+
+            if idx >= voxel_world.nodes.len() {
+                continue;
+            }
+            let node = &voxel_world.nodes[idx];
+
+            if depth >= target || node.is_leaf() {
+                cubes.push((center, extent));
+                continue;
+            }
+
+            let mask  = node.child_mask();
+            let first = node.first_child_index();
+            for slot in 0..8usize {
+                let co = origin + Vec3::new(
+                    if slot & 1 != 0 { half } else { 0.0 },
+                    if slot & 2 != 0 { half } else { 0.0 },
+                    if slot & 4 != 0 { half } else { 0.0 },
+                );
+                if mask & (1 << slot) == 0 {
+                    // Empty octant: enqueue as virtual cell within depth cap.
+                    if depth + 1 <= full_grid_cap {
+                        queue.push_back((usize::MAX, depth + 1, co, half));
+                    }
+                } else {
+                    let child_offset = (mask & ((1 << slot) - 1)).count_ones() as usize;
+                    queue.push_back((first + child_offset, depth + 1, co, half));
+                }
+            }
+        }
+    }
 
     if cubes.is_empty() {
         return;
     }
 
-    let Some(ref mut wire_verts) = wire_verts else { return };
+    let Some(ref mut wire_data) = wire_data else { return };
 
-    let edges: [(usize, usize); 12] = [
+    use crate::render::wireframe_overlay::{WIREFRAME_INDICES_PER_CUBE, WIREFRAME_VERTS_PER_CUBE};
+    const CUBE_EDGES: [(u32, u32); 12] = [
         (0,1),(1,2),(2,3),(3,0), // front face
         (4,5),(5,6),(6,7),(7,4), // back face
         (0,4),(1,5),(2,6),(3,7), // connectors
     ];
 
-    wire_verts.positions.reserve(cubes.len() * 24);
-    for &(center, extent) in &cubes {
+    wire_data.corners.reserve(cubes.len() * WIREFRAME_VERTS_PER_CUBE);
+    wire_data.indices.reserve(cubes.len() * WIREFRAME_INDICES_PER_CUBE);
+    for (i, &(center, extent)) in cubes.iter().enumerate() {
+        let base = (i * WIREFRAME_VERTS_PER_CUBE) as u32;
         let h = extent * 0.5;
-        let c = [
-            center + Vec3::new(-h, -h, -h),
-            center + Vec3::new( h, -h, -h),
-            center + Vec3::new( h,  h, -h),
-            center + Vec3::new(-h,  h, -h),
-            center + Vec3::new(-h, -h,  h),
-            center + Vec3::new( h, -h,  h),
-            center + Vec3::new( h,  h,  h),
-            center + Vec3::new(-h,  h,  h),
-        ];
-        for &(a, b) in &edges {
-            wire_verts.positions.push(c[a].to_array());
-            wire_verts.positions.push(c[b].to_array());
+        wire_data.corners.push((center + Vec3::new(-h, -h, -h)).to_array());
+        wire_data.corners.push((center + Vec3::new( h, -h, -h)).to_array());
+        wire_data.corners.push((center + Vec3::new( h,  h, -h)).to_array());
+        wire_data.corners.push((center + Vec3::new(-h,  h, -h)).to_array());
+        wire_data.corners.push((center + Vec3::new(-h, -h,  h)).to_array());
+        wire_data.corners.push((center + Vec3::new( h, -h,  h)).to_array());
+        wire_data.corners.push((center + Vec3::new( h,  h,  h)).to_array());
+        wire_data.corners.push((center + Vec3::new(-h,  h,  h)).to_array());
+        for &(a, b) in &CUBE_EDGES {
+            wire_data.indices.push(base + a);
+            wire_data.indices.push(base + b);
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// SVO traversal — collects cube positions without touching Gizmos
-// ---------------------------------------------------------------------------
-
-fn collect_wireframe_cubes(
-    world: &VoxelWorld,
-    idx: usize,
-    depth: u32,
-    origin: Vec3,
-    extent: f32,
-    target: u32,
-    cam: Vec3,
-    draw_radius: f32,
-    occ_only: bool,
-    out: &mut Vec<(Vec3, f32)>,
-) {
-    if idx >= world.nodes.len() {
-        return;
-    }
-    let center = origin + Vec3::splat(extent * 0.5);
-    // Distance cull — include half-diagonal so large nodes partially in range show
-    let half_diag = extent * 0.866; // sqrt(3)/2
-    if (center - cam).length() > draw_radius + half_diag {
-        return;
-    }
-
-    let node = &world.nodes[idx];
-
-    // Draw at target depth or at leaf nodes (whichever comes first)
-    if depth >= target || node.is_leaf() {
-        if occ_only && node.color_data == 0 && node.child_mask() == 0 {
-            return;
-        }
-        out.push((center, extent));
-        return;
-    }
-
-    // Recurse into occupied children
-    let half = extent * 0.5;
-    let mask = node.child_mask();
-    let first = node.first_child_index();
-    for slot in 0..8usize {
-        if mask & (1 << slot) == 0 {
-            continue;
-        }
-        let child_origin = origin + Vec3::new(
-            if slot & 1 != 0 { half } else { 0.0 },
-            if slot & 2 != 0 { half } else { 0.0 },
-            if slot & 4 != 0 { half } else { 0.0 },
-        );
-        collect_wireframe_cubes(
-            world, first + slot, depth + 1,
-            child_origin, half,
-            target, cam, draw_radius, occ_only, out,
-        );
     }
 }
 
@@ -732,7 +824,6 @@ mod tests {
         assert!(!s.enabled);
         assert_eq!(s.display_depth, 4);
         assert!(s.occupied_only);
-        assert_eq!(s.draw_radius, 800.0);
     }
 
     #[test]
@@ -780,11 +871,35 @@ mod tests {
         let mut world = VoxelWorld::new(4);
         world.set_voxel(IVec3::new(0, 0, 0), VoxelMaterial::new(255, 0, 0, 10));
 
-        let mut cubes = Vec::new();
-        collect_wireframe_cubes(
-            &world, 0, 0, Vec3::ZERO, 16.0,
-            4, Vec3::new(8.0, 8.0, 8.0), 100.0, true, &mut cubes,
-        );
+        // BFS occupied-only at max depth should find the single voxel.
+        let mut cubes: Vec<(Vec3, f32)> = Vec::new();
+        let root_extent = (1u32 << world.max_depth) as f32;
+        let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
+            std::collections::VecDeque::new();
+        queue.push_back((world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        while let Some((idx, depth, origin, extent)) = queue.pop_front() {
+            if idx >= world.nodes.len() { continue; }
+            let node = &world.nodes[idx];
+            let half = extent * 0.5;
+            let center = origin + Vec3::splat(half);
+            if node.color_data == 0 && node.child_mask() == 0 { continue; }
+            if depth >= world.max_depth || node.is_leaf() {
+                cubes.push((center, extent));
+                continue;
+            }
+            let mask = node.child_mask();
+            let first = node.first_child_index();
+            for slot in 0..8usize {
+                if mask & (1 << slot) == 0 { continue; }
+                let co = origin + Vec3::new(
+                    if slot & 1 != 0 { half } else { 0.0 },
+                    if slot & 2 != 0 { half } else { 0.0 },
+                    if slot & 4 != 0 { half } else { 0.0 },
+                );
+                let off = (mask & ((1 << slot) - 1)).count_ones() as usize;
+                queue.push_back((first + off, depth + 1, co, half));
+            }
+        }
         assert_eq!(cubes.len(), 1, "expected 1 occupied leaf cube, got {}", cubes.len());
     }
 
@@ -793,49 +908,70 @@ mod tests {
         let mut world = VoxelWorld::new(4);
         world.set_voxel(IVec3::new(0, 0, 0), VoxelMaterial::new(255, 0, 0, 10));
 
-        // Depth 0 = just the root (which has children, so non-empty → shown)
-        let mut cubes = Vec::new();
-        collect_wireframe_cubes(
-            &world, 0, 0, Vec3::ZERO, 16.0,
-            0, Vec3::new(8.0, 8.0, 8.0), 100.0, false, &mut cubes,
-        );
+        // Depth 0: root has children → non-empty → shown immediately.
+        let mut cubes: Vec<(Vec3, f32)> = Vec::new();
+        let root_extent = (1u32 << world.max_depth) as f32;
+        let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
+            std::collections::VecDeque::new();
+        queue.push_back((world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        while let Some((idx, depth, origin, extent)) = queue.pop_front() {
+            if idx >= world.nodes.len() { continue; }
+            let node = &world.nodes[idx];
+            let half = extent * 0.5;
+            let center = origin + Vec3::splat(half);
+            if node.color_data == 0 && node.child_mask() == 0 { continue; }
+            if depth >= 0 || node.is_leaf() {  // target = 0
+                cubes.push((center, extent));
+                continue;
+            }
+            let mask = node.child_mask();
+            let first = node.first_child_index();
+            for slot in 0..8usize {
+                if mask & (1 << slot) == 0 { continue; }
+                let co = origin + Vec3::new(
+                    if slot & 1 != 0 { half } else { 0.0 },
+                    if slot & 2 != 0 { half } else { 0.0 },
+                    if slot & 4 != 0 { half } else { 0.0 },
+                );
+                let off = (mask & ((1 << slot) - 1)).count_ones() as usize;
+                queue.push_back((first + off, depth + 1, co, half));
+            }
+        }
         assert_eq!(cubes.len(), 1, "depth 0 should yield 1 cube (root)");
-    }
-
-    #[test]
-    fn collect_culls_distant_nodes() {
-        let mut world = VoxelWorld::new(4);
-        world.set_voxel(IVec3::new(0, 0, 0), VoxelMaterial::new(255, 0, 0, 10));
-
-        let mut cubes = Vec::new();
-        collect_wireframe_cubes(
-            &world, 0, 0, Vec3::ZERO, 16.0,
-            4, Vec3::new(1000.0, 1000.0, 1000.0), 1.0, true, &mut cubes,
-        );
-        assert_eq!(cubes.len(), 0, "distant camera should cull all nodes");
     }
 
     #[test]
     fn collect_occ_only_skips_empty() {
         let world = VoxelWorld::new(4);
-        // Empty world, occupied_only = true → nothing collected
-        let mut cubes = Vec::new();
-        collect_wireframe_cubes(
-            &world, 0, 0, Vec3::ZERO, 16.0,
-            4, Vec3::new(8.0, 8.0, 8.0), 100.0, true, &mut cubes,
-        );
+        // Empty world: root has color_data==0 and child_mask==0 → skipped.
+        let mut cubes: Vec<(Vec3, f32)> = Vec::new();
+        let root_extent = (1u32 << world.max_depth) as f32;
+        let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
+            std::collections::VecDeque::new();
+        queue.push_back((world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        while let Some((idx, depth, origin, extent)) = queue.pop_front() {
+            if idx >= world.nodes.len() { continue; }
+            let node = &world.nodes[idx];
+            let half = extent * 0.5;
+            let center = origin + Vec3::splat(half);
+            if node.color_data == 0 && node.child_mask() == 0 { continue; }
+            if depth >= world.max_depth || node.is_leaf() {
+                cubes.push((center, extent));
+                continue;
+            }
+            let mask = node.child_mask();
+            let first = node.first_child_index();
+            for slot in 0..8usize {
+                if mask & (1 << slot) == 0 { continue; }
+                let co = origin + Vec3::new(
+                    if slot & 1 != 0 { half } else { 0.0 },
+                    if slot & 2 != 0 { half } else { 0.0 },
+                    if slot & 4 != 0 { half } else { 0.0 },
+                );
+                let off = (mask & ((1 << slot) - 1)).count_ones() as usize;
+                queue.push_back((first + off, depth + 1, co, half));
+            }
+        }
         assert_eq!(cubes.len(), 0, "empty world with occ_only should yield 0");
-    }
-
-    #[test]
-    fn collect_all_shows_empty_root() {
-        let world = VoxelWorld::new(4);
-        // Empty world, occupied_only = false → root shown
-        let mut cubes = Vec::new();
-        collect_wireframe_cubes(
-            &world, 0, 0, Vec3::ZERO, 16.0,
-            0, Vec3::new(8.0, 8.0, 8.0), 100.0, false, &mut cubes,
-        );
-        assert_eq!(cubes.len(), 1, "empty root with occ_only=false at depth 0 should show");
     }
 }

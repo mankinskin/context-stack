@@ -1,25 +1,25 @@
 use context_editor_kernel::{SandboxWorld, WorldEvent};
 use dioxus::prelude::*;
 
-/// The Cyberpunk/neon-noir world implementation.
+/// World implementation.
 /// Injects domain-specific sidebar, inventory, and LLM prompt context into
 /// the generic kernel scaffold.
 #[derive(Default)]
-pub struct CyberpunkWorld;
+pub struct ContextWorld;
 
-impl SandboxWorld for CyberpunkWorld {
+impl SandboxWorld for ContextWorld {
     fn name(&self) -> &str {
         "Neon Abyss 2084"
     }
 
     fn process_event(&self, event: WorldEvent) {
         // In the full implementation this dispatches to SpacetimeDB reducers.
-        log::info!("[CyberpunkWorld] event {}: {}", event.name, event.payload);
+        log::info!("[ContextWorld] event {}: {}", event.name, event.payload);
     }
 
     fn trigger_generation(&self, prompt: String) {
         // Prefix with Cyberpunk context and forward to the domain LLM integration.
-        log::info!("[CyberpunkWorld] generate → {}", prompt);
+        log::info!("[ContextWorld] generate → {}", prompt);
     }
 
     fn sidebar_content(&self) -> Element {
@@ -28,5 +28,10 @@ impl SandboxWorld for CyberpunkWorld {
 
     fn inventory_content(&self) -> Element {
         rsx! {}
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn configure_bevy_app(&self, app: &mut bevy::prelude::App) {
+        app.add_plugins(super::bootstrap::BootstrapPlugin);
     }
 }

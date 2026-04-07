@@ -1,13 +1,13 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-use crate::svo::{VoxelMaterial, VoxelWorld};
-use crate::theme::{
+use context_editor_kernel::svo::{VoxelMaterial, VoxelWorld};
+use context_editor_kernel::theme::{
     MaterialRef, MaterialRefMap, ThemePalette,
     theme_update_svo,
 };
-use crate::character::{CharacterController, CharacterPlugin};
-use crate::world_gen::{
+use context_editor_kernel::character::{CharacterController, CharacterPlugin};
+use context_editor_kernel::world_gen::{
     tree_template, boulder_template,
     MATERIAL_GRASS, MATERIAL_STONE, MATERIAL_DIRT, MATERIAL_SAND, MATERIAL_WATER,
 };
