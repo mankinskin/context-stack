@@ -22,6 +22,7 @@ pub mod ui_composite;
 pub mod wireframe_overlay;
 pub mod particle_inject;
 pub mod svo_ray_march;
+pub mod runtime_params;
 
 use bevy::{
     prelude::*,

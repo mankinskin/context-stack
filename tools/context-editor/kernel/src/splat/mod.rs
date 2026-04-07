@@ -17,6 +17,9 @@
 //! - GPU radix sort (T6c)
 //! - Tiled rasteriser with Cook-Torrance PBR (T6d + T6e)
 
+pub mod particle_splat;
+pub mod force_compute;
+
 use bytemuck::{Pod, Zeroable};
 
 // ---------------------------------------------------------------------------

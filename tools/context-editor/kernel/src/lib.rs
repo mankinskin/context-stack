@@ -1,38 +1,67 @@
-pub mod ui;
-pub mod ui_bridge;
+// ---------------------------------------------------------------------------
+// Module tree
+// ---------------------------------------------------------------------------
+
+// Core data & rendering
 pub mod svo;
-pub mod splat;
-pub mod net;
 pub mod gpu;
+pub mod net;
 pub mod physics;
 pub mod render;
-pub mod theme;
-pub mod character;
+pub mod splat;
+
+// Domain modules
+pub mod world;
 pub mod editor;
-pub mod force_compute;
-pub mod world_panel;
-pub mod particle_splat;
-pub mod panel_interaction;
-pub mod advanced_tools;
-pub mod interaction;
-pub mod runtime_params;
-pub mod sdf_cutting;
-pub mod latency_comp;
-pub mod editor_ux;
-pub mod svo_lod;
-pub mod multiplayer_backend;
-pub mod multiplayer_net;
-pub mod multiplayer_chars;
-pub mod world_gen;
-pub mod combat;
-pub mod inventory;
-pub mod skill;
-pub mod context_graph;
-pub mod llm_integration;
-pub mod ticket_editor;
-pub mod doc_editor;
-pub mod code_viewer;
-pub mod debug_overlay;
+pub mod multiplayer;
+pub mod simulation;
+pub mod ui;
+
+// ---------------------------------------------------------------------------
+// Backward-compatible re-exports — keep all existing `crate::xxx` paths working
+// ---------------------------------------------------------------------------
+
+// world/
+pub use world::svo_lod;
+pub use world::world_gen;
+pub use world::theme;
+
+// render/
+pub use render::runtime_params;
+
+// splat/
+pub use splat::particle_splat;
+pub use splat::force_compute;
+
+// multiplayer/
+pub use multiplayer::backend as multiplayer_backend;
+pub use multiplayer::net as multiplayer_net;
+pub use multiplayer::chars as multiplayer_chars;
+pub use multiplayer::latency_comp;
+pub use multiplayer::combat;
+
+// editor/ — core and ux items are re-exported via editor/mod.rs wildcard;
+// the sub-modules themselves are also re-exported for direct access.
+pub use editor::advanced_tools;
+pub use editor::sdf_cutting;
+pub use editor::debug_overlay;
+pub use editor::ux as editor_ux;
+
+// ui/
+pub use ui::bridge as ui_bridge;
+pub use ui::interaction;
+pub use ui::panel_interaction;
+pub use ui::world_panel;
+pub use ui::inventory;
+pub use ui::skill;
+pub use ui::ticket_editor;
+pub use ui::doc_editor;
+pub use ui::code_viewer;
+
+// simulation/
+pub use simulation::character;
+pub use simulation::context_graph;
+pub use simulation::llm_integration;
 
 use std::sync::{Arc, OnceLock};
 

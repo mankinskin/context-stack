@@ -1,6 +1,16 @@
 use dioxus::prelude::*;
 use crate::world;
-use crate::debug_overlay::DebugPanel;
+use crate::editor::debug_overlay::DebugPanel;
+
+pub mod bridge;
+pub mod interaction;
+pub mod panel_interaction;
+pub mod world_panel;
+pub mod inventory;
+pub mod skill;
+pub mod ticket_editor;
+pub mod doc_editor;
+pub mod code_viewer;
 
 /// Root Dioxus component — passed by function pointer to `dioxus::launch`.
 /// Renders the kernel glass scaffold, injecting world-specific UI via the
