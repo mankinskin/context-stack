@@ -109,8 +109,8 @@ impl Plugin for DebugOverlayPlugin {
         app.add_systems(Update, (
             track_camera_state,
             track_svo_state,
-            apply_world_preset,
         ));
+        app.add_systems(Update, apply_world_preset);
     }
 }
 
@@ -138,8 +138,13 @@ impl Default for DebugOverlayState {
 }
 
 /// Tracks which world preset was last applied, to detect changes from the atomic.
-#[derive(Resource, Default)]
+/// Initialised to `u32::MAX` so the first Update frame always applies preset 0.
+#[derive(Resource)]
 struct AppliedWorldPreset(u32);
+
+impl Default for AppliedWorldPreset {
+    fn default() -> Self { Self(u32::MAX) }
+}
 
 // ---------------------------------------------------------------------------
 // Bevy systems
@@ -234,101 +239,16 @@ fn track_svo_state(
     }
 }
 
-/// Detect world-preset changes and rebuild the `VoxelWorld` accordingly.
-///
-/// All four presets place terrain around the bootstrap scene centre (512, 253, 512)
-/// so the player sees results immediately without flying.
-fn apply_world_preset(
-    mut voxel_world: ResMut<VoxelWorld>,
-    mut applied: ResMut<AppliedWorldPreset>,
-) {
+/// Detect world-preset changes and rebuild the `VoxelWorld` via the
+/// sandbox-registered preset functions.
+fn apply_world_preset(world: &mut World) {
     let preset = WORLD_PRESET.load(Ordering::Relaxed);
-    if preset == applied.0 {
+    let applied = world.resource::<AppliedWorldPreset>().0;
+    if preset == applied {
         return;
     }
-    applied.0 = preset;
-
-    let max_depth = voxel_world.max_depth;
-    *voxel_world = VoxelWorld::new(max_depth);
-
-    let cx = 512_i32;
-    let cz = 512_i32;
-    let fy = 253_i32;
-
-    match preset {
-        // --- Flat: uniform grass/dirt slab, no terrain noise ---
-        1 => {
-// [WorldPreset] Flat
-            let half = 120_i32;
-            let grass = crate::svo::VoxelMaterial::new(60, 140, 40, 18);
-            let dirt  = crate::svo::VoxelMaterial::new(100, 70, 40, 22);
-            for x in (cx - half)..(cx + half) {
-                for z in (cz - half)..(cz + half) {
-                    for dy in 0..2_i32 {
-                        voxel_world.set_voxel(IVec3::new(x, fy - dy, z), grass);
-                    }
-                    for dy in 2..6_i32 {
-                        voxel_world.set_voxel(IVec3::new(x, fy - dy, z), dirt);
-                    }
-                }
-            }
-        }
-        // --- Caves: sine-wave surface with cave tunnels carved through ---
-        2 => {
-// [WorldPreset] Caves
-            let half = 96_i32;
-            let stone = crate::svo::VoxelMaterial::new(128, 128, 130, 28);
-            let grass = crate::svo::VoxelMaterial::new(60, 140, 40, 18);
-            for x in (cx - half)..(cx + half) {
-                for z in (cz - half)..(cz + half) {
-                    let h_offset = ((x as f32 * 0.08).sin() * (z as f32 * 0.06).cos() * 4.0) as i32;
-                    let surface_y = fy + h_offset;
-                    voxel_world.set_voxel(IVec3::new(x, surface_y, z), grass);
-                    for dy in 1..14_i32 {
-                        let y = surface_y - dy;
-                        // Tunnel void: alternating bands 4–9 voxels below surface.
-                        let is_cave = ((x as f32 * 0.15).sin().abs()
-                            + (z as f32 * 0.12).cos().abs()) > 1.6
-                            && dy >= 4 && dy <= 9;
-                        if !is_cave {
-                            voxel_world.set_voxel(IVec3::new(x, y, z), stone);
-                        }
-                    }
-                }
-            }
-        }
-        // --- Empty: cleared world (VoxelWorld already reset above) ---
-        3 => {
-// [WorldPreset] Empty
-        }
-        // --- Terrain (0) or unknown: rolling noise hills with biome materials ---
-        _ => {
-// [WorldPreset] Terrain
-            let half = 120_i32;
-            let grass = crate::svo::VoxelMaterial::new(60, 140, 40, 18);
-            let dirt  = crate::svo::VoxelMaterial::new(100, 70, 40, 22);
-            let stone = crate::svo::VoxelMaterial::new(128, 128, 130, 28);
-            let sand  = crate::svo::VoxelMaterial::new(210, 190, 140, 24);
-            for x in (cx - half)..(cx + half) {
-                for z in (cz - half)..(cz + half) {
-                    let dx = (x - cx) as f32;
-                    let dz = (z - cz) as f32;
-                    let h = ((dx * 0.04).sin() * 3.0
-                        + (dz * 0.05).cos() * 3.0
-                        + ((dx * 0.015 + dz * 0.02).sin() * 5.0)) as i32;
-                    let surface_y = fy + h;
-                    let top_mat = if h >= 4 { stone } else if h <= -2 { sand } else { grass };
-                    voxel_world.set_voxel(IVec3::new(x, surface_y, z), top_mat);
-                    for dy in 1..4_i32 {
-                        voxel_world.set_voxel(IVec3::new(x, surface_y - dy, z), dirt);
-                    }
-                    for dy in 4..12_i32 {
-                        voxel_world.set_voxel(IVec3::new(x, surface_y - dy, z), stone);
-                    }
-                }
-            }
-        }
-    }
+    world.resource_mut::<AppliedWorldPreset>().0 = preset;
+    crate::apply_registered_preset(preset, world);
 }
 
 /// Walk the SVO and populate the wireframe overlay vertex buffer.
@@ -590,21 +510,11 @@ pub fn DebugPanel() -> Element {
     let seed_lo = WORLD_SEED_LO.load(Ordering::Relaxed);
     let seed = ((seed_hi as u64) << 32) | (seed_lo as u64);
     let active_preset = WORLD_PRESET.load(Ordering::Relaxed);
-    let preset_names = ["Terrain", "Flat", "Caves", "Empty"];
-    let active_preset_name = preset_names.get(active_preset as usize).copied().unwrap_or("?");
-
-    // --- Pre-compute preset button classes (avoids if-expr in rsx attribute) ---
-    let pcls = |n: u32| -> &'static str {
-        if n == active_preset {
-            "px-2 py-0.5 text-[10px] rounded bg-cyan-500/40 border border-cyan-400 text-white"
-        } else {
-            "px-2 py-0.5 text-[10px] rounded bg-white/10 hover:bg-white/20 border border-white/20 text-white/60"
-        }
-    };
-    let cls0 = pcls(0);
-    let cls1 = pcls(1);
-    let cls2 = pcls(2);
-    let cls3 = pcls(3);
+    let preset_names = crate::world_preset_names();
+    let active_preset_name = preset_names
+        .get(active_preset as usize)
+        .cloned()
+        .unwrap_or_else(|| "?".to_string());
 
     // --- Mutable toggle / slider state ---
     let mut free_fly       = use_signal(|| FREE_FLY_ENABLED.load(Ordering::Relaxed));
@@ -782,25 +692,23 @@ pub fn DebugPanel() -> Element {
                         span { class: "font-mono text-cyan-400", "{active_preset_name}" }
                     }
                     div { class: "grid grid-cols-2 gap-1",
-                        button {
-                            class: "{cls0}",
-                            onclick: move |_| { WORLD_PRESET.store(0, Ordering::Relaxed); },
-                            "Terrain"
-                        }
-                        button {
-                            class: "{cls1}",
-                            onclick: move |_| { WORLD_PRESET.store(1, Ordering::Relaxed); },
-                            "Flat"
-                        }
-                        button {
-                            class: "{cls2}",
-                            onclick: move |_| { WORLD_PRESET.store(2, Ordering::Relaxed); },
-                            "Caves"
-                        }
-                        button {
-                            class: "{cls3}",
-                            onclick: move |_| { WORLD_PRESET.store(3, Ordering::Relaxed); },
-                            "Empty"
+                        for (i, name) in preset_names.iter().enumerate() {
+                            {
+                                let idx = i as u32;
+                                let name = name.clone();
+                                let cls = if idx == active_preset {
+                                    "px-2 py-0.5 text-[10px] rounded bg-cyan-500/40 border border-cyan-400 text-white"
+                                } else {
+                                    "px-2 py-0.5 text-[10px] rounded bg-white/10 hover:bg-white/20 border border-white/20 text-white/60"
+                                };
+                                rsx! {
+                                    button {
+                                        class: "{cls}",
+                                        onclick: move |_| { WORLD_PRESET.store(idx, Ordering::Relaxed); },
+                                        "{name}"
+                                    }
+                                }
+                            }
                         }
                     }
                 }

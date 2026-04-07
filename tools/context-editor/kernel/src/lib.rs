@@ -63,7 +63,58 @@ pub use simulation::character;
 pub use simulation::context_graph;
 pub use simulation::llm_integration;
 
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
+
+// ---------------------------------------------------------------------------
+// World preset registry
+// ---------------------------------------------------------------------------
+
+/// A callback that paints a world preset into the Bevy ECS.
+///
+/// The function receives exclusive world access so it can read any resource
+/// (e.g. [`ThemePalette`](crate::world::theme::ThemePalette)) while mutating
+/// [`VoxelWorld`](crate::svo::VoxelWorld).
+#[cfg(target_arch = "wasm32")]
+pub type WorldPresetFn = Arc<dyn Fn(&mut bevy::prelude::World) + Send + Sync>;
+
+#[cfg(target_arch = "wasm32")]
+static PRESET_REGISTRY: Mutex<Vec<(String, WorldPresetFn)>> = Mutex::new(Vec::new());
+
+/// Register all selectable world presets before calling [`launch`].
+///
+/// Each entry is `(name, fn)`. Index 0 is the default scene shown on startup.
+/// Presets appear in the debug panel in registration order.
+#[cfg(target_arch = "wasm32")]
+pub fn register_world_presets(
+    presets: impl IntoIterator<Item = (impl Into<String>, impl Fn(&mut bevy::prelude::World) + Send + Sync + 'static)>,
+) {
+    let mut reg = PRESET_REGISTRY.lock().unwrap();
+    for (name, f) in presets {
+        reg.push((name.into(), Arc::new(f)));
+    }
+}
+
+/// Returns the names of all registered presets (in registration order).
+#[cfg(target_arch = "wasm32")]
+pub fn world_preset_names() -> Vec<String> {
+    PRESET_REGISTRY.lock().unwrap().iter().map(|(n, _)| n.clone()).collect()
+}
+
+/// Resets [`VoxelWorld`](crate::svo::VoxelWorld) and applies preset `index`.
+///
+/// Called by the `apply_world_preset` exclusive system in `debug_overlay`.
+#[cfg(target_arch = "wasm32")]
+pub fn apply_registered_preset(index: u32, world: &mut bevy::prelude::World) {
+    use crate::svo::VoxelWorld;
+    let max_depth = world.resource::<VoxelWorld>().max_depth;
+    *world.resource_mut::<VoxelWorld>() = VoxelWorld::new(max_depth);
+    let reg = PRESET_REGISTRY.lock().unwrap();
+    if let Some((_, f)) = reg.get(index as usize) {
+        let f = f.clone();
+        drop(reg);
+        f(world);
+    }
+}
 
 pub struct WorldEvent {
     pub name: String,

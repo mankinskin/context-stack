@@ -14,13 +14,13 @@ use context_editor_kernel::world_gen::{
 use context_editor_kernel::particle_splat::{ParticleEmitter, ParticleSystem};
 
 /// Scene center in voxel/world coordinates (middle of 4096³ SVO).
-const SCENE_X: f32 = 2048.0;
-const SCENE_Z: f32 = 2048.0;
+pub const SCENE_X: f32 = 2048.0;
+pub const SCENE_Z: f32 = 2048.0;
 /// Floor surface Y level — physics collider sits here.
-const FLOOR_Y: f32 = 1024.0;
+pub const FLOOR_Y: f32 = 1024.0;
 /// SVO ground reference — a few voxels below the physics floor so
 /// the visual ground surface sits beneath the character's feet.
-const SVO_GROUND_Y: f32 = 1021.0;
+pub const SVO_GROUND_Y: f32 = 1021.0;
 
 pub struct BootstrapPlugin;
 
@@ -40,7 +40,7 @@ impl Plugin for BootstrapPlugin {
 
         app.add_systems(
             Startup,
-            (setup_baseline_scene, paint_palette_voxels, mark_runtime_ready).chain(),
+            (setup_baseline_scene, mark_runtime_ready).chain(),
         );
         app.add_systems(Update, toggle_theme);
         app.add_systems(
@@ -109,16 +109,18 @@ fn setup_baseline_scene(
 
 // ---------------------------------------------------------------------------
 // SVO voxel painting — data layer for the custom render pipeline
+//
+// Called by the preset registry as preset 0 ("Default Scene").
 // ---------------------------------------------------------------------------
 
-fn paint_palette_voxels(
-    mut voxel_world: ResMut<VoxelWorld>,
-    palette: Res<ThemePalette>,
-    mut ref_map: ResMut<MaterialRefMap>,
-) {
-    let cx = SCENE_X as i32; // 512
-    let cz = SCENE_Z as i32; // 512
-    let fy = SVO_GROUND_Y as i32; // 253 — visual ground below physics floor
+pub fn paint_default_scene(world: &mut bevy::prelude::World) {
+    let palette = world.resource::<ThemePalette>().clone();
+    let mut voxel_world = world.resource_mut::<VoxelWorld>();
+    let voxel_world = &mut *voxel_world;
+
+    let cx = SCENE_X as i32;
+    let cz = SCENE_Z as i32;
+    let fy = SVO_GROUND_Y as i32;
 
     // --- Ground slab: 240×12×240 centered at (cx, fy, cz) --------------------
     let grass = VoxelMaterial::unpack(MATERIAL_GRASS);
@@ -240,15 +242,15 @@ fn paint_palette_voxels(
 
     // --- Trees (use template from world_gen) ----------------------------------
     let tree = tree_template();
-    tree.stamp(&mut voxel_world, IVec3::new(cx + 20, fy + 1, cz + 24));
-    tree.stamp(&mut voxel_world, IVec3::new(cx - 12, fy + 1, cz + 40));
-    tree.stamp(&mut voxel_world, IVec3::new(cx + 60, fy + 1, cz + 12));
-    tree.stamp(&mut voxel_world, IVec3::new(cx - 72, fy + 1, cz - 20));
+    tree.stamp(voxel_world, IVec3::new(cx + 20, fy + 1, cz + 24));
+    tree.stamp(voxel_world, IVec3::new(cx - 12, fy + 1, cz + 40));
+    tree.stamp(voxel_world, IVec3::new(cx + 60, fy + 1, cz + 12));
+    tree.stamp(voxel_world, IVec3::new(cx - 72, fy + 1, cz - 20));
 
     // --- Boulders (use template from world_gen) -------------------------------
     let boulder = boulder_template();
-    boulder.stamp(&mut voxel_world, IVec3::new(cx + 48, fy + 1, cz - 12));
-    boulder.stamp(&mut voxel_world, IVec3::new(cx - 32, fy + 1, cz - 60));
+    boulder.stamp(voxel_world, IVec3::new(cx + 48, fy + 1, cz - 12));
+    boulder.stamp(voxel_world, IVec3::new(cx - 32, fy + 1, cz - 60));
 
     // --- SDF-type showcase (Phase 2a/2b visual verification) ------------------
     // These voxels demonstrate sphere SDF (type 1), torus SDF (type 3), and
@@ -288,7 +290,7 @@ fn paint_palette_voxels(
         }
     }
 
-    // --- Palette demo spheres (original) --------------------------------------
+    // --- Palette demo spheres -------------------------------------------------
     voxel_world.apply_sdf_brush(
         Vec3::new(SCENE_X, SVO_GROUND_Y, SCENE_Z),
         16.0,
@@ -305,8 +307,11 @@ fn paint_palette_voxels(
         palette.voxel_highlight.to_voxel_material(),
     );
 
-    // Build the ref map so theme changes can re-pack these voxels.
-    *ref_map = MaterialRefMap::build_from_world(&voxel_world, &palette);
+    // Rebuild the ref map so theme changes can re-pack palette voxels.
+    // Drop the VoxelWorld borrow first so world is available again.
+    let new_ref_map = MaterialRefMap::build_from_world(voxel_world, &palette);
+    drop(voxel_world);
+    *world.resource_mut::<MaterialRefMap>() = new_ref_map;
 }
 
 // ---------------------------------------------------------------------------
