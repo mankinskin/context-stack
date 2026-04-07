@@ -31,7 +31,11 @@ impl SandboxWorld for ContextWorld {
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn configure_bevy_app(&self, app: &mut bevy::prelude::App) {
+    fn run_bevy_app(&self, mut app: bevy::prelude::App) {
+        use context_editor_kernel::svo::VoxelWorld;
+        app.insert_resource(VoxelWorld::new(12));
         app.add_plugins(super::bootstrap::BootstrapPlugin);
+        app.add_systems(bevy::prelude::Startup, super::bootstrap::seed_ambient_emitter);
+        app.run();
     }
 }

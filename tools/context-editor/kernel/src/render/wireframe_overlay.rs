@@ -30,7 +30,7 @@ use crate::debug_overlay::DebugOverlayState;
 
 /// Maximum octree depth used for wireframe buffer budget calculations.
 /// Must match the `max_depth` passed to `VoxelWorld::new()` in `lib.rs`.
-pub const MAX_OCTREE_DEPTH: u32 = 10;
+pub const MAX_OCTREE_DEPTH: u32 = 12;
 
 /// Maximum wireframe grid side length in cells, equal to the world size at
 /// [`MAX_OCTREE_DEPTH`]: `2^max_depth = 1024`.

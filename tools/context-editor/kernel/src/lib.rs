@@ -50,10 +50,17 @@ pub trait SandboxWorld: 'static + Send + Sync {
     fn sidebar_content(&self) -> dioxus::prelude::Element;
     fn inventory_content(&self) -> dioxus::prelude::Element;
 
-    /// Called from the kernel's Bevy app builder before `app.run()` on WASM.
-    /// Use this to add scene-specific plugins (e.g. a `BootstrapPlugin`).
+    /// Receives a fully-configured kernel [`App`](bevy::prelude::App) and is
+    /// responsible for adding any world-specific resources/plugins and calling
+    /// `app.run()`. The default implementation just calls `app.run()`.
+    ///
+    /// The app already contains all kernel plugins. Typical overrides add the
+    /// world's `VoxelWorld` resource, a scene bootstrap plugin, and any
+    /// startup systems before forwarding to `app.run()`.
     #[cfg(target_arch = "wasm32")]
-    fn configure_bevy_app(&self, _app: &mut bevy::prelude::App) {}
+    fn run_bevy_app(&self, mut app: bevy::prelude::App) {
+        app.run();
+    }
 }
 
 static WORLD: OnceLock<Arc<dyn SandboxWorld>> = OnceLock::new();
@@ -80,14 +87,21 @@ pub fn launch<W: SandboxWorld + Default>() {
 
     #[cfg(target_arch = "wasm32")]
     {
-        // Start Bevy (this will "unwind" using an exception in Winit's run, so it 
+        // Start Bevy (this will "unwind" using an exception in Winit's run, so it
         // won't return, which means we must call Dioxus launch first).
-        run_bevy_wasm();
+        // build_kernel_app() contains all kernel plugins; the sandbox-app's
+        // run_bevy_app() adds world-specific resources and calls app.run().
+        crate::world().run_bevy_app(build_kernel_app());
     }
 }
 
+/// Build a Bevy [`App`](bevy::prelude::App) pre-loaded with all kernel plugins.
+///
+/// The returned app has no world-specific resources; the sandbox-app is
+/// responsible for calling `app.insert_resource(VoxelWorld::new(...))`,
+/// adding scene plugins, and invoking `app.run()`.
 #[cfg(target_arch = "wasm32")]
-fn run_bevy_wasm() {
+pub fn build_kernel_app() -> bevy::prelude::App {
     use bevy::prelude::*;
 
     let mut app = App::new();
@@ -95,7 +109,7 @@ fn run_bevy_wasm() {
     // Standard Bevy plugins (injecting the canvas config)
     app.add_plugins(DefaultPlugins.set(render::canvas_window_plugin()));
 
-    // Custom kernel plugins
+    // Kernel plugins
     app.add_plugins(crate::render::ContextEditorRenderPlugin);
     app.add_plugins(crate::physics::PhysicsPlugin);
     app.add_plugins(crate::svo::upload::SvoUploadPlugin);
@@ -126,40 +140,5 @@ fn run_bevy_wasm() {
     app.add_plugins(crate::code_viewer::CodeViewerPlugin);
     app.add_plugins(crate::debug_overlay::DebugOverlayPlugin);
 
-    // Initialise empty World Resource; scene content is added by the sandbox.
-    app.insert_resource(crate::svo::VoxelWorld::new(10));
-    crate::world().configure_bevy_app(&mut app);
-
-    // Seed a persistent ambient particle emitter so the particle pipeline is
-    // exercised immediately. Spawns slow-drifting cyan ember particles above
-    // the scene centre.
-    app.add_systems(Startup, seed_ambient_emitter);
-
-    app.run();
-}
-
-#[cfg(target_arch = "wasm32")]
-fn seed_ambient_emitter(mut system: bevy::prelude::ResMut<crate::particle_splat::ParticleSystem>) {
-    use crate::particle_splat::ParticleEmitter;
-    use bevy::prelude::Vec3;
-    // Camera settles at y≈257. Emitters at y=261, z=540 are safely in frustum.
-    // scale=1.0 matches SVO leaf-voxel size; slow upward drift + jitter spreads
-    // particles into a visible cloud rather than a single stacked pile.
-    system.emitters.push(ParticleEmitter {
-        origin: Vec3::new(512.0, 261.0, 540.0),
-        rate: 20,
-        color: [0.1, 0.9, 1.0, 1.0], // bright cyan
-        scale: 1.0,
-        initial_velocity: Vec3::new(0.0, 1.0, 0.0),
-        lifetime: 6.0,
-    });
-    // Magenta cluster slightly right for visual separation.
-    system.emitters.push(ParticleEmitter {
-        origin: Vec3::new(518.0, 261.0, 537.0),
-        rate: 15,
-        color: [1.0, 0.1, 0.8, 1.0], // bright magenta
-        scale: 1.0,
-        initial_velocity: Vec3::new(0.3, 1.2, 0.0),
-        lifetime: 6.0,
-    });
+    app
 }

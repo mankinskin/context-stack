@@ -417,8 +417,8 @@ fn draw_svo_wireframe(
                     if slot & 2 != 0 { half } else { 0.0 },
                     if slot & 4 != 0 { half } else { 0.0 },
                 );
-                let child_offset = (mask & ((1 << slot) - 1)).count_ones() as usize;
-                queue.push_back((first + child_offset, depth + 1, co, half));
+                // SVO stores children at first_child + slot (fixed 8-slot block).
+                queue.push_back((first + slot, depth + 1, co, half));
             }
         }
 
@@ -507,8 +507,8 @@ fn draw_svo_wireframe(
                         queue.push_back((usize::MAX, depth + 1, co, half));
                     }
                 } else {
-                    let child_offset = (mask & ((1 << slot) - 1)).count_ones() as usize;
-                    queue.push_back((first + child_offset, depth + 1, co, half));
+                    // SVO stores children at first_child + slot (fixed 8-slot block).
+                    queue.push_back((first + slot, depth + 1, co, half));
                 }
             }
         }
