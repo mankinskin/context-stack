@@ -51,11 +51,9 @@ pub const MIN_REPULSION_DIST: f32 = 0.5;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TicketState {
     New,
-    InRefinement,
     Ready,
     InImplementation,
     InReview,
-    InValidation,
     Done,
     Cancelled,
 }
@@ -64,11 +62,9 @@ impl TicketState {
     pub fn from_str(s: &str) -> Self {
         match s {
             "new" => Self::New,
-            "in-refinement" => Self::InRefinement,
             "ready" => Self::Ready,
             "in-implementation" => Self::InImplementation,
             "in-review" => Self::InReview,
-            "in-validation" => Self::InValidation,
             "done" => Self::Done,
             "cancelled" => Self::Cancelled,
             _ => Self::New,
@@ -78,11 +74,9 @@ impl TicketState {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::New => "new",
-            Self::InRefinement => "in-refinement",
             Self::Ready => "ready",
             Self::InImplementation => "in-implementation",
             Self::InReview => "in-review",
-            Self::InValidation => "in-validation",
             Self::Done => "done",
             Self::Cancelled => "cancelled",
         }
@@ -97,11 +91,9 @@ impl TicketState {
     pub fn tint_color(&self) -> (f32, f32, f32) {
         match self {
             Self::New => (0.3, 0.5, 1.0),               // Blue
-            Self::InRefinement => (0.4, 0.6, 1.0),      // Light blue
             Self::Ready => (0.3, 0.8, 0.5),             // Teal-green
             Self::InImplementation => (1.0, 0.85, 0.2), // Yellow
             Self::InReview => (1.0, 0.6, 0.2),          // Orange
-            Self::InValidation => (0.9, 0.5, 0.9),      // Purple
             Self::Done => (0.2, 0.9, 0.3),              // Green
             Self::Cancelled => (0.5, 0.5, 0.5),         // Gray
         }
