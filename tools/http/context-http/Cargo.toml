@@ -18,7 +18,7 @@ graphql = ["dep:async-graphql", "dep:async-graphql-axum"]
 
 [dependencies]
 context-api = { path = "../../../crates/context-api" }
-viewer-api = { path = "../../viewer/viewer-api" }
+viewer-api = { path = "../../../viewer-api/tools/viewer/viewer-api" }
 
 axum = { version = "0.8", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
