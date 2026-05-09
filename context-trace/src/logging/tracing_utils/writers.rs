@@ -1,7 +1,7 @@
 //! Log file writers for test tracing
 //!
 //! Provides `FlushingWriter` (ensures data is flushed on every write for panic safety)
-//! and `PrettyJsonWriter` (buffers JSON, applies transformations, pretty-prints).
+//! and `PrettyJsonWriter` (buffers JSON, applies transformations, emits JSONL).
 
 use std::{
     fs,
@@ -66,10 +66,11 @@ impl Write for FlushingWriter {
     }
 }
 
-/// A writer that pretty-prints JSON output with indentation
+/// A writer that normalizes tracing JSON output into JSONL.
 ///
 /// Wraps another writer and buffers JSON objects. When a complete JSON
-/// object is detected, it's parsed and re-serialized with indentation.
+/// object is detected, it's parsed, normalized, and re-serialized as a
+/// single compact JSON value followed by `\n`.
 /// Also collects fn_sig entries into a shared signature store and strips
 /// them from the output.
 #[derive(Clone)]
@@ -106,7 +107,7 @@ impl<W: Write + Clone> Write for PrettyJsonWriter<W> {
 
         // Check if we have a complete JSON object (ends with newline)
         if buffer.ends_with(b"\n") {
-            // Try to parse and pretty-print the JSON
+            // Try to parse and normalize the JSON into a single JSONL record.
             if let Ok(json_str) = std::str::from_utf8(&buffer) {
                 let trimmed = json_str.trim();
                 if !trimmed.is_empty() {
@@ -123,12 +124,12 @@ impl<W: Write + Clone> Write for PrettyJsonWriter<W> {
                             Some(&self.signatures),
                         );
 
-                        // Write pretty-printed JSON
-                        let pretty = serde_json::to_string_pretty(&value)
+                        // Write compact JSON so each event occupies exactly one line.
+                        let jsonl = serde_json::to_string(&value)
                             .unwrap_or_else(|_| trimmed.to_string());
                         let mut inner = self.inner.clone();
-                        inner.write_all(pretty.as_bytes())?;
-                        inner.write_all(b"\n\n")?; // Double newline between entries
+                        inner.write_all(jsonl.as_bytes())?;
+                        inner.write_all(b"\n")?;
                         inner.flush()?;
                         buffer.clear();
                         return Ok(buf.len());

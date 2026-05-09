@@ -1,7 +1,7 @@
 //! Scoped tracing capture for per-command log files.
 //!
 //! Provides `build_capture_dispatch()` which creates a `tracing::Dispatch`
-//! that writes pretty-printed JSON to a file — the same format as
+//! that writes JSONL to a file — the same format as
 //! `TestTracing`, compatible with `LogParser`.
 
 use std::{
@@ -45,14 +45,14 @@ pub struct CaptureDispatch {
     pub signatures: SignatureStore,
 }
 
-/// Build a [`tracing::Dispatch`] that captures events to a JSON log file.
+/// Build a [`tracing::Dispatch`] that captures events to a JSONL log file.
 ///
-/// The returned dispatch writes pretty-printed JSON to `log_file_path`
+/// The returned dispatch writes one compact JSON object per line to `log_file_path`
 /// in the same format as `TestTracing`, compatible with `LogParser`.
 ///
 /// # Arguments
 ///
-/// * `log_file_path` — Where to write the JSON log.
+/// * `log_file_path` — Where to write the JSONL log.
 /// * `level_filter` — A `tracing` filter directive string, e.g. `"TRACE"` or
 ///   `"context_search=DEBUG,context_insert=TRACE"`.
 ///

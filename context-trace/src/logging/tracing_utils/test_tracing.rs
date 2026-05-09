@@ -200,7 +200,8 @@ impl TestTracing {
         // Build layers based on configuration
         // Timestamp display is controlled by the formatter's show_timestamp config,
         // so we always use CompactTimer and let the formatter decide whether to call format_time.
-        // For file output, we use JSON format for easy parsing by the log viewer
+        // For file output, we use JSON format and normalize each event to JSONL
+        // in `PrettyJsonWriter` for easy downstream parsing.
         // Create dispatcher based on configuration
         let dispatcher = match (log_to_stdout, log_file_path.as_ref()) {
             (true, Some(path)) => {
@@ -226,7 +227,7 @@ impl TestTracing {
                     .fmt_fields(super::SpanFieldFormatter)
                     .with_filter(stdout_filter);
 
-                // File layer uses pretty-printed JSON format for human readability
+                // File layer emits JSON which `PrettyJsonWriter` rewrites as JSONL.
                 let file_layer = tracing_subscriber::fmt::layer()
                     .with_writer(move || pretty_writer.clone())
                     .with_span_events(span_events)
@@ -265,7 +266,7 @@ impl TestTracing {
                 )
             },
             (false, Some(path)) => {
-                // Only file - use pretty-printed JSON format for human readability
+                // Only file - emit JSON which `PrettyJsonWriter` rewrites as JSONL.
                 let file =
                     fs::File::create(path).expect("Failed to create log file");
                 let flushing_writer = FlushingWriter::new(file);
