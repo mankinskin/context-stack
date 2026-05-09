@@ -15,6 +15,9 @@ modules:
 - name: match
   description: Match handling and root cursor operations
   path: match/
+- name: policy
+  description: Traversal policy traits and search kind configuration
+  path: policy/
 - name: search
   description: Core search algorithms and entry points
   path: search/

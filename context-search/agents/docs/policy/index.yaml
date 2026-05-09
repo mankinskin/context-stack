@@ -1,0 +1,14 @@
+name: policy
+description: Traversal policy traits and search kind configuration
+
+files:
+  - name: policy.rs
+    description: SearchKind and DirectedTraversalPolicy traits for configuring traversal behavior
+
+key_types:
+  - SearchKind: Trait defining the container, traversal policy, and end node for a search mode
+  - DirectedTraversalPolicy: Trait responsible for generating ordered parent batches during traversal
+
+source_files:
+  - src/policy.rs
+last_synced: null

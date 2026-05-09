@@ -1,0 +1,15 @@
+name: overlap
+description: Structural overlap bundling and partition extraction helpers
+
+files:
+  - name: mod.rs
+    description: OverlapBundleInput, PartitionOutcome, and bundle_overlap entry points
+
+key_types:
+  - OverlapBundleInput: Input bundle describing the anchor path, overlap path, and participating tokens
+  - PartitionOutcome: Outcome of extracting one side of the structural overlap partition
+  - bundle_overlap: Entry point for collapsing an overlap into a bundled token
+
+source_files:
+  - src/overlap/mod.rs
+last_synced: null

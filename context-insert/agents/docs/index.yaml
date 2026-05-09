@@ -12,15 +12,23 @@ modules:
 - name: join
   description: Join operations for merging split results
   path: join/
+- name: overlap
+  description: Structural overlap bundling and partition extraction helpers
+  path: overlap/
 - name: split
   description: Split operations for decomposing patterns
   path: split/
+- name: visualization
+  description: Insert visualization event emission helpers
+  path: visualization/
 exported_items:
   types:
     - InsertCtx: Context for insertion operations
     - InsertResult: Result of an insertion operation
     - InitInterval: Initial interval for graph setup
     - IntervalGraph: Graph with interval representation
+    - OverlapBundleInput: Input bundle for structural overlap bundling
+    - PartitionOutcome: Result of extracting one structural overlap partition
     - SplitCache: Cache for split operations
     - SplitPositionCache: Position cache for splits
     - SplitVertexCache: Vertex cache for splits
@@ -43,5 +51,7 @@ source_files:
 - src/insert/
 - src/interval/
 - src/join/
+- src/overlap/
 - src/split/
+- src/visualization.rs
 last_synced: null

@@ -1,0 +1,15 @@
+name: visualization
+description: Insert visualization event emission helpers
+
+files:
+  - name: visualization.rs
+    description: Thread-local step tracking and GraphOpEvent emission for insert operations
+
+key_types:
+  - reset_step_counter: Resets the per-insert visualization step counter and path graph
+  - emit_insert_event: Emits a visualization event for an insert operation step
+  - emit_insert_event_with_delta: Emits an insert event including graph mutation details
+
+source_files:
+  - src/visualization.rs
+last_synced: null
