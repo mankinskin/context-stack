@@ -8,20 +8,53 @@ use bevy::{
     prelude::*,
     render::{
         extract_resource::ExtractResource,
-        render_graph::{Node, NodeRunError, RenderGraphContext},
-        render_resource::{
-            BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-            BindingType, BlendState, Buffer, BufferBindingType, BufferDescriptor,
-            BufferUsages, CachedRenderPipelineId, ColorTargetState, ColorWrites,
-            CompareFunction, DepthBiasState, DepthStencilState,
-            FragmentState, LoadOp, MultisampleState, Operations,
-            IndexFormat, PipelineCache, PrimitiveState,
-            PrimitiveTopology, RenderPassDepthStencilAttachment, RenderPassDescriptor,
-            RenderPipelineDescriptor, ShaderStages,
-            StencilState, StoreOp, TextureFormat, VertexAttribute,
-            VertexFormat, VertexState, VertexStepMode,
+        render_graph::{
+            Node,
+            NodeRunError,
+            RenderGraphContext,
         },
-        renderer::{RenderContext, RenderDevice, RenderQueue},
+        render_resource::{
+            BindGroup,
+            BindGroupEntry,
+            BindGroupLayoutDescriptor,
+            BindGroupLayoutEntry,
+            BindingType,
+            BlendState,
+            Buffer,
+            BufferBindingType,
+            BufferDescriptor,
+            BufferUsages,
+            CachedRenderPipelineId,
+            ColorTargetState,
+            ColorWrites,
+            CompareFunction,
+            DepthBiasState,
+            DepthStencilState,
+            FragmentState,
+            IndexFormat,
+            LoadOp,
+            MultisampleState,
+            Operations,
+            PipelineCache,
+            PrimitiveState,
+            PrimitiveTopology,
+            RenderPassDepthStencilAttachment,
+            RenderPassDescriptor,
+            RenderPipelineDescriptor,
+            ShaderStages,
+            StencilState,
+            StoreOp,
+            TextureFormat,
+            VertexAttribute,
+            VertexFormat,
+            VertexState,
+            VertexStepMode,
+        },
+        renderer::{
+            RenderContext,
+            RenderDevice,
+            RenderQueue,
+        },
         view::ViewTarget,
     },
 };
@@ -49,7 +82,7 @@ pub const WIREFRAME_INDICES_PER_CUBE: usize = 24;
 /// converts that to a cube count (~87 K cubes at `MAX_OCTREE_DEPTH = 10`).
 pub const MAX_WIREFRAME_CUBES: u64 =
     2 * MAX_WIREFRAME_GRID_SIZE * MAX_WIREFRAME_GRID_SIZE
-    / WIREFRAME_INDICES_PER_CUBE as u64;
+        / WIREFRAME_INDICES_PER_CUBE as u64;
 
 const WIREFRAME_UNIFORM_SIZE: u64 = 80; // mat4x4f (64) + vec4f (16)
 const MAT4_BYTES: usize = core::mem::size_of::<[f32; 16]>(); // 64 — byte offset of the color field
@@ -142,8 +175,12 @@ pub fn upload_wireframe_data(
     camera_q: Query<(&GlobalTransform, &Projection), With<Camera3d>>,
     state: Res<DebugOverlayState>,
 ) {
-    let Some(ref mut buffers) = buffers else { return };
-    let Some(render_queue) = render_queue else { return };
+    let Some(ref mut buffers) = buffers else {
+        return;
+    };
+    let Some(render_queue) = render_queue else {
+        return;
+    };
     let Some(data) = data else { return };
 
     if !state.enabled || data.indices.is_empty() {
@@ -151,19 +188,29 @@ pub fn upload_wireframe_data(
         return;
     }
 
-    let corner_count = data.corners.len()
+    let corner_count = data
+        .corners
+        .len()
         .min(MAX_WIREFRAME_CUBES as usize * WIREFRAME_VERTS_PER_CUBE);
-    let index_count = data.indices.len()
+    let index_count = data
+        .indices
+        .len()
         .min(MAX_WIREFRAME_CUBES as usize * WIREFRAME_INDICES_PER_CUBE);
     render_queue.write_buffer(
-        &buffers.vertex_buf, 0, bytemuck::cast_slice(&data.corners[..corner_count]),
+        &buffers.vertex_buf,
+        0,
+        bytemuck::cast_slice(&data.corners[..corner_count]),
     );
     render_queue.write_buffer(
-        &buffers.index_buf, 0, bytemuck::cast_slice(&data.indices[..index_count]),
+        &buffers.index_buf,
+        0,
+        bytemuck::cast_slice(&data.indices[..index_count]),
     );
     buffers.index_count = index_count as u32;
 
-    let Ok((transform, projection)) = camera_q.single() else { return };
+    let Ok((transform, projection)) = camera_q.single() else {
+        return;
+    };
 
     let view_mat = transform.to_matrix().inverse();
     let proj_mat = projection.get_clip_from_view();
@@ -175,7 +222,8 @@ pub fn upload_wireframe_data(
     };
 
     let mut data = [0u8; WIREFRAME_UNIFORM_SIZE as usize];
-    data[..MAT4_BYTES].copy_from_slice(bytemuck::bytes_of(&view_proj.to_cols_array()));
+    data[..MAT4_BYTES]
+        .copy_from_slice(bytemuck::bytes_of(&view_proj.to_cols_array()));
     data[MAT4_BYTES..].copy_from_slice(bytemuck::bytes_of(&color));
     render_queue.write_buffer(&buffers.uniform_buf, 0, &data);
 }
@@ -185,8 +233,9 @@ pub fn upload_wireframe_data(
 // ---------------------------------------------------------------------------
 
 fn wireframe_bind_group_layout_desc() -> BindGroupLayoutDescriptor {
-    BindGroupLayoutDescriptor::new("bgl_wireframe_overlay", &[
-        BindGroupLayoutEntry {
+    BindGroupLayoutDescriptor::new(
+        "bgl_wireframe_overlay",
+        &[BindGroupLayoutEntry {
             binding: 0,
             visibility: ShaderStages::VERTEX_FRAGMENT,
             ty: BindingType::Buffer {
@@ -195,8 +244,8 @@ fn wireframe_bind_group_layout_desc() -> BindGroupLayoutDescriptor {
                 min_binding_size: None,
             },
             count: None,
-        },
-    ])
+        }],
+    )
 }
 
 pub fn queue_wireframe_pipeline(
@@ -208,9 +257,8 @@ pub fn queue_wireframe_pipeline(
     if existing.is_some() {
         return;
     }
-    let shader = asset_server.load(
-        "embedded://context_editor_kernel/render/wireframe_overlay.wgsl",
-    );
+    let shader = asset_server
+        .load("embedded://context_editor_kernel/render/wireframe_overlay.wgsl");
     let id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
         label: Some("wireframe_overlay_pipeline".into()),
         layout: vec![wireframe_bind_group_layout_desc()],
@@ -310,7 +358,10 @@ impl FromWorld for WireframeOverlayNode {
 }
 
 impl Node for WireframeOverlayNode {
-    fn update(&mut self, world: &mut World) {
+    fn update(
+        &mut self,
+        world: &mut World,
+    ) {
         self.view_query.update_archetypes(world);
     }
 
@@ -320,22 +371,28 @@ impl Node for WireframeOverlayNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let Some(pipeline_res) = world.get_resource::<WireframeOverlayPipeline>() else {
+        let Some(pipeline_res) =
+            world.get_resource::<WireframeOverlayPipeline>()
+        else {
             return Ok(());
         };
-        let Some(bind_group) = world.get_resource::<WireframeOverlayBindGroup>() else {
+        let Some(bind_group) =
+            world.get_resource::<WireframeOverlayBindGroup>()
+        else {
             return Ok(());
         };
         let Some(pipeline_cache) = world.get_resource::<PipelineCache>() else {
             return Ok(());
         };
-        let Some(buffers) = world.get_resource::<WireframeOverlayBuffers>() else {
+        let Some(buffers) = world.get_resource::<WireframeOverlayBuffers>()
+        else {
             return Ok(());
         };
         if buffers.index_count == 0 {
             return Ok(());
         }
-        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0) else {
+        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0)
+        else {
             return Ok(());
         };
         let binding = self.view_query.query_manual(world);
@@ -365,19 +422,22 @@ impl Node for WireframeOverlayNode {
         };
 
         {
-            let mut pass = render_context
-                .command_encoder()
-                .begin_render_pass(&RenderPassDescriptor {
+            let mut pass = render_context.command_encoder().begin_render_pass(
+                &RenderPassDescriptor {
                     label: Some("wireframe_overlay_pass"),
                     color_attachments: &[Some(color_attachment)],
                     depth_stencil_attachment: Some(depth_attachment),
                     timestamp_writes: None,
                     occlusion_query_set: None,
-                });
+                },
+            );
             pass.set_pipeline(pipeline);
             pass.set_bind_group(0, &bind_group.0, &[]);
             pass.set_vertex_buffer(0, *buffers.vertex_buf.slice(..));
-            pass.set_index_buffer(*buffers.index_buf.slice(..), IndexFormat::Uint32);
+            pass.set_index_buffer(
+                *buffers.index_buf.slice(..),
+                IndexFormat::Uint32,
+            );
             pass.draw_indexed(0..buffers.index_count, 0, 0..1);
         }
 

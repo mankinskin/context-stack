@@ -1,16 +1,18 @@
+use crate::{
+    editor::debug_overlay::DebugPanel,
+    world,
+};
 use dioxus::prelude::*;
-use crate::world;
-use crate::editor::debug_overlay::DebugPanel;
 
 pub mod bridge;
+pub mod code_viewer;
+pub mod doc_editor;
 pub mod interaction;
-pub mod panel_interaction;
-pub mod world_panel;
 pub mod inventory;
+pub mod panel_interaction;
 pub mod skill;
 pub mod ticket_editor;
-pub mod doc_editor;
-pub mod code_viewer;
+pub mod world_panel;
 
 /// Root Dioxus component — passed by function pointer to `dioxus::launch`.
 /// Renders the kernel glass scaffold, injecting world-specific UI via the
@@ -46,7 +48,10 @@ pub fn root_app() -> Element {
 }
 
 #[component]
-pub fn GlassPanel(title: String, children: Element) -> Element {
+pub fn GlassPanel(
+    title: String,
+    children: Element,
+) -> Element {
     rsx! {
         div {
             class: "glass-panel rounded-xl border border-white/20 bg-white/5 backdrop-blur-md p-4 shadow-2xl",
@@ -61,7 +66,11 @@ pub fn GlassPanel(title: String, children: Element) -> Element {
 /// Renders a clickable header with a ▶/▼ indicator and conditionally shows
 /// its children. `default_open` controls the initial expansion state.
 #[component]
-pub fn TreeSection(label: String, default_open: bool, children: Element) -> Element {
+pub fn TreeSection(
+    label: String,
+    default_open: bool,
+    children: Element,
+) -> Element {
     let mut open = use_signal(move || default_open);
 
     rsx! {

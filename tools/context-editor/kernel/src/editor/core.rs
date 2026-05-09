@@ -9,7 +9,10 @@
 
 use bevy::prelude::*;
 
-use crate::svo::{VoxelMaterial, VoxelWorld};
+use crate::svo::{
+    VoxelMaterial,
+    VoxelWorld,
+};
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -63,7 +66,10 @@ pub struct HitInfo {
 pub struct EditorPlugin;
 
 impl Plugin for EditorPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<EditorState>();
         app.init_resource::<VoxelHit>();
         app.add_systems(
@@ -85,14 +91,20 @@ impl Plugin for EditorPlugin {
 // ---------------------------------------------------------------------------
 
 /// Press E to toggle the editor on/off.
-fn toggle_editor(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<EditorState>) {
+fn toggle_editor(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<EditorState>,
+) {
     if keys.just_pressed(KeyCode::KeyE) {
         state.enabled = !state.enabled;
     }
 }
 
 /// Press 1 for paint, 2 for carve.
-fn toggle_tool(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<EditorState>) {
+fn toggle_tool(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<EditorState>,
+) {
     if !state.enabled {
         return;
     }
@@ -105,7 +117,10 @@ fn toggle_tool(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<EditorState>) 
 }
 
 /// Scroll wheel (or +/−) to adjust brush size.
-fn adjust_brush_size(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<EditorState>) {
+fn adjust_brush_size(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<EditorState>,
+) {
     if !state.enabled {
         return;
     }
@@ -175,7 +190,7 @@ fn apply_tool(
                     }
                 }
             }
-        }
+        },
         EditorTool::Carve => {
             let center = info.cell;
             for dx in -brush_ri..=brush_ri {
@@ -188,7 +203,7 @@ fn apply_tool(
                     }
                 }
             }
-        }
+        },
     }
 }
 

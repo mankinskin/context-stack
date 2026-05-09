@@ -1,17 +1,35 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-use context_editor_kernel::svo::{VoxelMaterial, VoxelWorld};
-use context_editor_kernel::theme::{
-    MaterialRef, MaterialRefMap, ThemePalette,
-    theme_update_svo,
+use context_editor_kernel::{
+    character::{
+        CharacterController,
+        CharacterPlugin,
+    },
+    particle_splat::{
+        ParticleEmitter,
+        ParticleSystem,
+    },
+    svo::{
+        VoxelMaterial,
+        VoxelWorld,
+    },
+    theme::{
+        theme_update_svo,
+        MaterialRef,
+        MaterialRefMap,
+        ThemePalette,
+    },
+    world_gen::{
+        boulder_template,
+        tree_template,
+        MATERIAL_DIRT,
+        MATERIAL_GRASS,
+        MATERIAL_SAND,
+        MATERIAL_STONE,
+        MATERIAL_WATER,
+    },
 };
-use context_editor_kernel::character::{CharacterController, CharacterPlugin};
-use context_editor_kernel::world_gen::{
-    tree_template, boulder_template,
-    MATERIAL_GRASS, MATERIAL_STONE, MATERIAL_DIRT, MATERIAL_SAND, MATERIAL_WATER,
-};
-use context_editor_kernel::particle_splat::{ParticleEmitter, ParticleSystem};
 
 /// Scene center in voxel/world coordinates (middle of 4096³ SVO).
 pub const SCENE_X: f32 = 2048.0;
@@ -28,9 +46,11 @@ pub struct BootstrapPlugin;
 #[derive(Component)]
 struct PaletteMesh(MaterialRef);
 
-
 impl Plugin for BootstrapPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         let palette = ThemePalette::dark_default();
         app.insert_resource(ClearColor(palette.ambient_color));
         app.insert_resource(palette);
@@ -54,9 +74,7 @@ impl Plugin for BootstrapPlugin {
 // Scene setup — multiple objects driven by palette materials
 // ---------------------------------------------------------------------------
 
-fn setup_baseline_scene(
-    mut commands: Commands,
-) {
+fn setup_baseline_scene(mut commands: Commands) {
     // Floor / terrain (with physics collider) — centered in SVO world
     // Keep as invisible physics ground plane; voxel terrain is rendered by the
     // splat pipeline from the SVO data painted in paint_palette_voxels().
@@ -104,7 +122,6 @@ fn setup_baseline_scene(
         Collider::capsule_y(0.8, 0.3),
         KinematicCharacterController::default(),
     ));
-
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +172,10 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
                 // Doorway on south face, 4 blocks wide, 12 tall
                 let is_door = dz <= -7 && dx.abs() <= 1 && y <= fy + 12;
                 if is_wall && !is_door {
-                    voxel_world.set_voxel(IVec3::new(tower_x + dx, y, tower_z + dz), stone);
+                    voxel_world.set_voxel(
+                        IVec3::new(tower_x + dx, y, tower_z + dz),
+                        stone,
+                    );
                 }
             }
         }
@@ -183,8 +203,14 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
     for y in (fy + 1)..=(fy + 24) {
         for t in 0..4 {
             for w in 0..4 {
-                voxel_world.set_voxel(IVec3::new(arch_x - 8 + t, y, arch_z + w), stone);
-                voxel_world.set_voxel(IVec3::new(arch_x + 5 + t, y, arch_z + w), stone);
+                voxel_world.set_voxel(
+                    IVec3::new(arch_x - 8 + t, y, arch_z + w),
+                    stone,
+                );
+                voxel_world.set_voxel(
+                    IVec3::new(arch_x + 5 + t, y, arch_z + w),
+                    stone,
+                );
             }
         }
     }
@@ -192,7 +218,10 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
     for dx in -8..=8 {
         for t in 0..4 {
             for w in 0..4 {
-                voxel_world.set_voxel(IVec3::new(arch_x + dx, fy + 25 + t, arch_z + w), stone);
+                voxel_world.set_voxel(
+                    IVec3::new(arch_x + dx, fy + 25 + t, arch_z + w),
+                    stone,
+                );
             }
         }
     }
@@ -206,7 +235,8 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
         let y = fy + 1 + layer;
         for dx in -r..=r {
             for dz in -r..=r {
-                voxel_world.set_voxel(IVec3::new(pyr_x + dx, y, pyr_z + dz), sand);
+                voxel_world
+                    .set_voxel(IVec3::new(pyr_x + dx, y, pyr_z + dz), sand);
             }
         }
     }
@@ -219,7 +249,10 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
         for dz in -12..=12 {
             // Carve 8 blocks deep, fill with water
             for dy in 0..8 {
-                voxel_world.set_voxel(IVec3::new(pool_x + dx, fy - dy, pool_z + dz), water);
+                voxel_world.set_voxel(
+                    IVec3::new(pool_x + dx, fy - dy, pool_z + dz),
+                    water,
+                );
             }
         }
     }
@@ -231,7 +264,8 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
             // Window gaps every 24 blocks, 8 wide, at heights 9-16
             let rel_x = (x - (cx - 60)) % 24;
             let rel_y = y - fy;
-            let is_window = (rel_x >= 8 && rel_x <= 15) && (rel_y >= 9 && rel_y <= 16);
+            let is_window =
+                (rel_x >= 8 && rel_x <= 15) && (rel_y >= 9 && rel_y <= 16);
             if !is_window {
                 for w in 0..4 {
                     voxel_world.set_voxel(IVec3::new(x, y, wall_z + w), stone);
@@ -259,33 +293,63 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
 
     // Sphere-type voxels: a 7×4×3 block of blue-white spheroids to the left.
     // cx-8 → viewing angle ≈11° from camera centre, well within any FOV.
-    let sphere_mat = VoxelMaterial { r: 80, g: 160, b: 230, roughness: 6, metallic: false, sdf_type: 1 };
+    let sphere_mat = VoxelMaterial {
+        r: 80,
+        g: 160,
+        b: 230,
+        roughness: 6,
+        metallic: false,
+        sdf_type: 1,
+    };
     for dy in 1..=4 {
         for dx in -3_i32..=3 {
             for dz in 0..3_i32 {
-                voxel_world.set_voxel(IVec3::new(cx - 8 + dx, fy + dy, cz + 30 + dz), sphere_mat);
+                voxel_world.set_voxel(
+                    IVec3::new(cx - 8 + dx, fy + dy, cz + 30 + dz),
+                    sphere_mat,
+                );
             }
         }
     }
 
     // Torus-type voxels: a 7×4×3 block of amber tori to the right.
     // cx+8 → same ~11° from centre, symmetric with spheres.
-    let torus_mat = VoxelMaterial { r: 230, g: 130, b: 40, roughness: 6, metallic: false, sdf_type: 3 };
+    let torus_mat = VoxelMaterial {
+        r: 230,
+        g: 130,
+        b: 40,
+        roughness: 6,
+        metallic: false,
+        sdf_type: 3,
+    };
     for dy in 1..=4 {
         for dx in -3_i32..=3 {
             for dz in 0..3_i32 {
-                voxel_world.set_voxel(IVec3::new(cx + 8 + dx, fy + dy, cz + 30 + dz), torus_mat);
+                voxel_world.set_voxel(
+                    IVec3::new(cx + 8 + dx, fy + dy, cz + 30 + dz),
+                    torus_mat,
+                );
             }
         }
     }
 
     // Metallic-reflective wall: a 17×14×2 silver slab as a backdrop behind
     // the showcase blocks, close enough to show reflections in ray march mode.
-    let metallic_mat = VoxelMaterial { r: 192, g: 192, b: 200, roughness: 2, metallic: true, sdf_type: 0 };
+    let metallic_mat = VoxelMaterial {
+        r: 192,
+        g: 192,
+        b: 200,
+        roughness: 2,
+        metallic: true,
+        sdf_type: 0,
+    };
     for dy in 1..=14 {
         for dx in -8_i32..=8 {
             for dz in 0..2_i32 {
-                voxel_world.set_voxel(IVec3::new(cx + dx, fy + dy, cz + 18 + dz), metallic_mat);
+                voxel_world.set_voxel(
+                    IVec3::new(cx + dx, fy + dy, cz + 18 + dz),
+                    metallic_mat,
+                );
             }
         }
     }

@@ -7,10 +7,18 @@
 //! - Bandwidth-aware chunk loading/unloading
 
 use bevy::prelude::*;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{
+    HashMap,
+    HashSet,
+    VecDeque,
+};
 
 use crate::multiplayer_backend::{
-    PlayerIdentity, VoxelDelta, spatial_hash, world_to_chunk, CHUNK_SIZE,
+    spatial_hash,
+    world_to_chunk,
+    PlayerIdentity,
+    VoxelDelta,
+    CHUNK_SIZE,
 };
 
 // ---------------------------------------------------------------------------
@@ -96,10 +104,7 @@ pub enum ChunkState {
         last_delta_tick: u64,
     },
     /// LOD-reduced chunk (aggregated nodes only).
-    LodLevel {
-        depth: u8,
-        node_count: usize,
-    },
+    LodLevel { depth: u8, node_count: usize },
     /// Chunk is being unloaded.
     Unloading,
 }
@@ -139,7 +144,11 @@ impl Default for ChunkSubscriptionManager {
 
 impl ChunkSubscriptionManager {
     /// Determine the LOD level for a chunk based on distance from center.
-    pub fn lod_for_distance(&self, center: IVec3, chunk: IVec3) -> u8 {
+    pub fn lod_for_distance(
+        &self,
+        center: IVec3,
+        chunk: IVec3,
+    ) -> u8 {
         let dist = chebyshev_distance(center, chunk);
         if dist <= self.near_radius {
             0 // Full detail
@@ -158,7 +167,7 @@ impl ChunkSubscriptionManager {
                 ChunkState::FullDetail { .. } => near += 1,
                 ChunkState::LodLevel { depth, .. } if *depth <= 2 => mid += 1,
                 ChunkState::LodLevel { .. } => far += 1,
-                _ => {}
+                _ => {},
             }
         }
         (near, mid, far)
@@ -166,7 +175,10 @@ impl ChunkSubscriptionManager {
 }
 
 /// Generate a set of chunk positions within a radius (Chebyshev / cube region).
-pub fn chunk_sphere(center: IVec3, radius: i32) -> HashSet<IVec3> {
+pub fn chunk_sphere(
+    center: IVec3,
+    radius: i32,
+) -> HashSet<IVec3> {
     let mut set = HashSet::new();
     for z in -radius..=radius {
         for y in -radius..=radius {
@@ -179,7 +191,10 @@ pub fn chunk_sphere(center: IVec3, radius: i32) -> HashSet<IVec3> {
 }
 
 /// Chebyshev distance between two chunk positions.
-pub fn chebyshev_distance(a: IVec3, b: IVec3) -> i32 {
+pub fn chebyshev_distance(
+    a: IVec3,
+    b: IVec3,
+) -> i32 {
     let d = (a - b).abs();
     d.x.max(d.y).max(d.z)
 }
@@ -206,7 +221,10 @@ pub struct DeltaQueue {
 }
 
 impl DeltaQueue {
-    pub fn push(&mut self, delta: PendingDelta) {
+    pub fn push(
+        &mut self,
+        delta: PendingDelta,
+    ) {
         if self.deltas.len() >= MAX_PENDING_DELTAS {
             self.deltas.pop_front();
         }
@@ -246,7 +264,10 @@ pub struct OfflineMutation {
 }
 
 impl OfflineMutationQueue {
-    pub fn push(&mut self, mutation: OfflineMutation) {
+    pub fn push(
+        &mut self,
+        mutation: OfflineMutation,
+    ) {
         if self.mutations.len() < MAX_OFFLINE_QUEUE {
             self.mutations.push(mutation);
         }
@@ -262,7 +283,12 @@ impl OfflineMutationQueue {
 // ---------------------------------------------------------------------------
 
 /// Convert chunk position + local coordinates to world coordinates.
-pub fn chunk_local_to_world(chunk: IVec3, lx: u8, ly: u8, lz: u8) -> IVec3 {
+pub fn chunk_local_to_world(
+    chunk: IVec3,
+    lx: u8,
+    ly: u8,
+    lz: u8,
+) -> IVec3 {
     IVec3::new(
         chunk.x * CHUNK_SIZE as i32 + lx as i32,
         chunk.y * CHUNK_SIZE as i32 + ly as i32,
@@ -299,7 +325,8 @@ fn update_subscriptions_system(
 
     // Compute desired chunk sets for each tier
     let far_set = chunk_sphere(new_chunk, sub_mgr.far_radius);
-    let currently_loaded: HashSet<IVec3> = sub_mgr.loaded_chunks.keys().copied().collect();
+    let currently_loaded: HashSet<IVec3> =
+        sub_mgr.loaded_chunks.keys().copied().collect();
 
     // Unsubscribe chunks outside far range
     sub_mgr.pending_unsubscribe.clear();
@@ -361,7 +388,10 @@ fn bandwidth_tracking_system(
 pub struct MultiplayerNetPlugin;
 
 impl Plugin for MultiplayerNetPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<NetworkConnection>();
         app.init_resource::<ChunkSubscriptionManager>();
         app.init_resource::<DeltaQueue>();
@@ -460,7 +490,9 @@ mod tests {
         for i in 0..MAX_PENDING_DELTAS + 100 {
             q.push(PendingDelta {
                 chunk_pos: IVec3::ZERO,
-                local_x: 0, local_y: 0, local_z: 0,
+                local_x: 0,
+                local_y: 0,
+                local_z: 0,
                 new_color: i as u32,
                 tick: i as u64,
             });
@@ -473,7 +505,9 @@ mod tests {
         let mut q = DeltaQueue::default();
         q.push(PendingDelta {
             chunk_pos: IVec3::ZERO,
-            local_x: 1, local_y: 2, local_z: 3,
+            local_x: 1,
+            local_y: 2,
+            local_z: 3,
             new_color: 0xFF,
             tick: 1,
         });
@@ -485,7 +519,12 @@ mod tests {
     #[test]
     fn offline_mutation_queue() {
         let mut q = OfflineMutationQueue::default();
-        q.push(OfflineMutation { x: 1, y: 2, z: 3, new_color: 0xAA });
+        q.push(OfflineMutation {
+            x: 1,
+            y: 2,
+            z: 3,
+            new_color: 0xAA,
+        });
         let drained = q.drain_all();
         assert_eq!(drained.len(), 1);
         assert!(q.mutations.is_empty());
@@ -506,18 +545,27 @@ mod tests {
     #[test]
     fn tier_counts_mixed() {
         let mut mgr = ChunkSubscriptionManager::default();
-        mgr.loaded_chunks.insert(IVec3::ZERO, ChunkState::FullDetail {
-            node_count: 100,
-            last_delta_tick: 0,
-        });
-        mgr.loaded_chunks.insert(IVec3::X, ChunkState::LodLevel {
-            depth: 2,
-            node_count: 50,
-        });
-        mgr.loaded_chunks.insert(IVec3::Y, ChunkState::LodLevel {
-            depth: 4,
-            node_count: 10,
-        });
+        mgr.loaded_chunks.insert(
+            IVec3::ZERO,
+            ChunkState::FullDetail {
+                node_count: 100,
+                last_delta_tick: 0,
+            },
+        );
+        mgr.loaded_chunks.insert(
+            IVec3::X,
+            ChunkState::LodLevel {
+                depth: 2,
+                node_count: 50,
+            },
+        );
+        mgr.loaded_chunks.insert(
+            IVec3::Y,
+            ChunkState::LodLevel {
+                depth: 4,
+                node_count: 10,
+            },
+        );
         assert_eq!(mgr.tier_counts(), (1, 1, 1));
     }
 }

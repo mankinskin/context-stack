@@ -7,8 +7,14 @@
 
 use bevy::prelude::*;
 
-use crate::svo::{OctreeNode, VoxelMaterial, VoxelWorld};
-use crate::multiplayer_backend::CHUNK_SIZE;
+use crate::{
+    multiplayer_backend::CHUNK_SIZE,
+    svo::{
+        OctreeNode,
+        VoxelMaterial,
+        VoxelWorld,
+    },
+};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -45,7 +51,12 @@ pub const MATERIAL_WATER: u32 = VoxelMaterial::new(30, 80, 180, 4).pack();
 ///
 /// Produces values in [-1.0, 1.0]. Not a true Simplex implementation but
 /// shares the same API and determinism guarantees for procedural generation.
-pub fn noise3d(seed: u64, x: f32, y: f32, z: f32) -> f32 {
+pub fn noise3d(
+    seed: u64,
+    x: f32,
+    y: f32,
+    z: f32,
+) -> f32 {
     let ix = (x.floor() as i32) as u64;
     let iy = (y.floor() as i32) as u64;
     let iz = (z.floor() as i32) as u64;
@@ -67,7 +78,12 @@ pub fn noise3d(seed: u64, x: f32, y: f32, z: f32) -> f32 {
     let v001 = hash_to_float(seed, ix, iy, iz.wrapping_add(1));
     let v101 = hash_to_float(seed, ix.wrapping_add(1), iy, iz.wrapping_add(1));
     let v011 = hash_to_float(seed, ix, iy.wrapping_add(1), iz.wrapping_add(1));
-    let v111 = hash_to_float(seed, ix.wrapping_add(1), iy.wrapping_add(1), iz.wrapping_add(1));
+    let v111 = hash_to_float(
+        seed,
+        ix.wrapping_add(1),
+        iy.wrapping_add(1),
+        iz.wrapping_add(1),
+    );
 
     // Trilinear interpolation
     let x00 = lerp(v000, v100, ux);
@@ -80,12 +96,22 @@ pub fn noise3d(seed: u64, x: f32, y: f32, z: f32) -> f32 {
 }
 
 /// 2D noise (for biome selection).
-pub fn noise2d(seed: u64, x: f32, z: f32) -> f32 {
+pub fn noise2d(
+    seed: u64,
+    x: f32,
+    z: f32,
+) -> f32 {
     noise3d(seed, x, 0.0, z)
 }
 
 /// Fractal Brownian Motion — layered noise for terrain detail.
-pub fn fbm(seed: u64, x: f32, y: f32, z: f32, octaves: u32) -> f32 {
+pub fn fbm(
+    seed: u64,
+    x: f32,
+    y: f32,
+    z: f32,
+    octaves: u32,
+) -> f32 {
     let mut value = 0.0f32;
     let mut amplitude = 1.0f32;
     let mut frequency = 1.0f32;
@@ -103,16 +129,30 @@ pub fn fbm(seed: u64, x: f32, y: f32, z: f32, octaves: u32) -> f32 {
         frequency *= 2.0;
     }
 
-    if max_amp > 0.0 { value / max_amp } else { 0.0 }
+    if max_amp > 0.0 {
+        value / max_amp
+    } else {
+        0.0
+    }
 }
 
-fn hash_to_float(seed: u64, x: u64, y: u64, z: u64) -> f32 {
+fn hash_to_float(
+    seed: u64,
+    x: u64,
+    y: u64,
+    z: u64,
+) -> f32 {
     let h = hash_combine(seed, x, y, z);
     // Map to [-1.0, 1.0]
     (h as f32 / u32::MAX as f32) * 2.0 - 1.0
 }
 
-fn hash_combine(seed: u64, x: u64, y: u64, z: u64) -> u32 {
+fn hash_combine(
+    seed: u64,
+    x: u64,
+    y: u64,
+    z: u64,
+) -> u32 {
     let mut h = seed
         .wrapping_mul(6364136223846793005)
         .wrapping_add(x.wrapping_mul(1442695040888963407))
@@ -124,7 +164,11 @@ fn hash_combine(seed: u64, x: u64, y: u64, z: u64) -> u32 {
     (h & 0xFFFFFFFF) as u32
 }
 
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
+fn lerp(
+    a: f32,
+    b: f32,
+    t: f32,
+) -> f32 {
     a + (b - a) * t
 }
 
@@ -206,10 +250,17 @@ impl WorldGenerator {
     /// Sample terrain density at world coordinates.
     ///
     /// Positive = solid, negative = air.
-    pub fn sample_density(&self, x: f32, y: f32, z: f32) -> f32 {
+    pub fn sample_density(
+        &self,
+        x: f32,
+        y: f32,
+        z: f32,
+    ) -> f32 {
         let terrain = noise3d(self.seed, x * 0.01, y * 0.02, z * 0.01);
-        let mountains = fbm(self.seed.wrapping_add(1), x * 0.005, 0.0, z * 0.005, 4) * 80.0;
-        let caves = noise3d(self.seed.wrapping_add(2), x * 0.05, y * 0.05, z * 0.05);
+        let mountains =
+            fbm(self.seed.wrapping_add(1), x * 0.005, 0.0, z * 0.005, 4) * 80.0;
+        let caves =
+            noise3d(self.seed.wrapping_add(2), x * 0.05, y * 0.05, z * 0.05);
 
         let base_height = BASE_HEIGHT + terrain * 20.0 + mountains;
         let height_density = base_height - y;
@@ -220,17 +271,27 @@ impl WorldGenerator {
     }
 
     /// Sample biome at world xz coordinates.
-    pub fn sample_biome(&self, x: f32, z: f32) -> Biome {
+    pub fn sample_biome(
+        &self,
+        x: f32,
+        z: f32,
+    ) -> Biome {
         let v = noise2d(self.seed.wrapping_add(100), x * 0.002, z * 0.002);
         Biome::from_noise(v)
     }
 
     /// Sample material at world coordinates given density.
-    pub fn sample_material(&self, x: f32, y: f32, z: f32) -> u32 {
+    pub fn sample_material(
+        &self,
+        x: f32,
+        y: f32,
+        z: f32,
+    ) -> u32 {
         let biome = self.sample_biome(x, z);
         let surface_height = BASE_HEIGHT
             + noise3d(self.seed, x * 0.01, 0.0, z * 0.01) * 20.0
-            + fbm(self.seed.wrapping_add(1), x * 0.005, 0.0, z * 0.005, 4) * 80.0;
+            + fbm(self.seed.wrapping_add(1), x * 0.005, 0.0, z * 0.005, 4)
+                * 80.0;
 
         if y > surface_height - 2.0 {
             biome.surface_material()
@@ -262,9 +323,11 @@ impl WorldGenerator {
                     let wy = wy_base + ly;
                     let wz = wz_base + lz;
 
-                    let density = self.sample_density(wx as f32, wy as f32, wz as f32);
+                    let density =
+                        self.sample_density(wx as f32, wy as f32, wz as f32);
                     if density > 0.0 {
-                        let color = self.sample_material(wx as f32, wy as f32, wz as f32);
+                        let color = self
+                            .sample_material(wx as f32, wy as f32, wz as f32);
                         let mat = VoxelMaterial::unpack(color);
                         world.set_voxel(IVec3::new(wx, wy, wz), mat);
                         count += 1;
@@ -291,7 +354,11 @@ pub struct StructureTemplate {
 
 impl StructureTemplate {
     /// Stamp this structure into the world at the given anchor position.
-    pub fn stamp(&self, world: &mut VoxelWorld, anchor: IVec3) {
+    pub fn stamp(
+        &self,
+        world: &mut VoxelWorld,
+        anchor: IVec3,
+    ) {
         for (offset, color) in &self.voxels {
             let mat = VoxelMaterial::unpack(*color);
             world.set_voxel(anchor + *offset, mat);
@@ -370,7 +437,10 @@ pub struct RegrowthTracker {
 impl RegrowthTracker {
     /// Check and remove entries that have passed the regrowth threshold.
     /// Returns positions that should regrow.
-    pub fn tick_regrowth(&mut self, current_tick: u64) -> Vec<IVec3> {
+    pub fn tick_regrowth(
+        &mut self,
+        current_tick: u64,
+    ) -> Vec<IVec3> {
         let mut regrown = Vec::new();
         self.entries.retain(|e| {
             if current_tick - e.delta_tick >= REGROWTH_TICKS {
@@ -392,7 +462,10 @@ impl RegrowthTracker {
 pub struct WorldGenPlugin;
 
 impl Plugin for WorldGenPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<WorldGenerator>();
         app.init_resource::<RegrowthTracker>();
     }
@@ -446,10 +519,16 @@ mod tests {
 
     #[test]
     fn biome_surface_materials_differ() {
-        let mats: Vec<u32> = [Biome::Snow, Biome::Forest, Biome::Desert, Biome::Mountain, Biome::Ocean]
-            .iter()
-            .map(|b| b.surface_material())
-            .collect();
+        let mats: Vec<u32> = [
+            Biome::Snow,
+            Biome::Forest,
+            Biome::Desert,
+            Biome::Mountain,
+            Biome::Ocean,
+        ]
+        .iter()
+        .map(|b| b.surface_material())
+        .collect();
         // All unique
         for i in 0..mats.len() {
             for j in (i + 1)..mats.len() {
@@ -506,8 +585,12 @@ mod tests {
         let tree = tree_template();
         assert!(!tree.voxels.is_empty());
         // Has both trunk and leaf colors
-        let colors: std::collections::HashSet<u32> = tree.voxels.iter().map(|(_, c)| *c).collect();
-        assert!(colors.len() >= 2, "tree should have at least trunk + leaves");
+        let colors: std::collections::HashSet<u32> =
+            tree.voxels.iter().map(|(_, c)| *c).collect();
+        assert!(
+            colors.len() >= 2,
+            "tree should have at least trunk + leaves"
+        );
     }
 
     #[test]
@@ -520,8 +603,18 @@ mod tests {
     #[test]
     fn regrowth_tracker_basic() {
         let mut tracker = RegrowthTracker::default();
-        tracker.entries.push(RegrowthEntry { x: 1, y: 2, z: 3, delta_tick: 0 });
-        tracker.entries.push(RegrowthEntry { x: 4, y: 5, z: 6, delta_tick: 1000 });
+        tracker.entries.push(RegrowthEntry {
+            x: 1,
+            y: 2,
+            z: 3,
+            delta_tick: 0,
+        });
+        tracker.entries.push(RegrowthEntry {
+            x: 4,
+            y: 5,
+            z: 6,
+            delta_tick: 1000,
+        });
 
         let regrown = tracker.tick_regrowth(REGROWTH_TICKS + 1);
         assert_eq!(regrown.len(), 1);
@@ -532,7 +625,12 @@ mod tests {
     #[test]
     fn regrowth_tracker_none_expired() {
         let mut tracker = RegrowthTracker::default();
-        tracker.entries.push(RegrowthEntry { x: 0, y: 0, z: 0, delta_tick: 100 });
+        tracker.entries.push(RegrowthEntry {
+            x: 0,
+            y: 0,
+            z: 0,
+            delta_tick: 100,
+        });
         let regrown = tracker.tick_regrowth(200);
         assert!(regrown.is_empty());
     }

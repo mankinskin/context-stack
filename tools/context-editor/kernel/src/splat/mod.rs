@@ -17,10 +17,13 @@
 //! - GPU radix sort (T6c)
 //! - Tiled rasteriser with Cook-Torrance PBR (T6d + T6e)
 
-pub mod particle_splat;
 pub mod force_compute;
+pub mod particle_splat;
 
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 // ---------------------------------------------------------------------------
 // VoxelSplat — mirrors the WGSL struct in voxel_splat_kernel.wgsl
@@ -125,7 +128,8 @@ pub struct ProjectedSplat {
 }
 
 /// Byte stride of a single [`ProjectedSplat`] in the GPU buffer.
-pub const PROJECTED_SPLAT_STRIDE: u64 = std::mem::size_of::<ProjectedSplat>() as u64; // 48
+pub const PROJECTED_SPLAT_STRIDE: u64 =
+    std::mem::size_of::<ProjectedSplat>() as u64; // 48
 
 // ---------------------------------------------------------------------------
 // CameraUniforms — per-frame camera data for sort key build (T6b)
@@ -163,7 +167,8 @@ pub struct CameraUniforms {
 }
 
 /// Byte size of [`CameraUniforms`] (160 bytes).
-pub const CAMERA_UNIFORMS_SIZE: u64 = std::mem::size_of::<CameraUniforms>() as u64;
+pub const CAMERA_UNIFORMS_SIZE: u64 =
+    std::mem::size_of::<CameraUniforms>() as u64;
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -231,7 +236,10 @@ mod tests {
     /// exactly one splat each.
     #[test]
     fn expected_splat_count_matches_leaf_nodes() {
-        use crate::svo::{VoxelWorld, VoxelMaterial};
+        use crate::svo::{
+            VoxelMaterial,
+            VoxelWorld,
+        };
         use bevy::math::Vec3;
 
         let mut world = VoxelWorld::new(4);

@@ -2,10 +2,18 @@
 //!
 //! Extends the core [`EditorState`] with a productive editing workflow.
 
+use crate::{
+    editor::{
+        EditorState,
+        VoxelHit,
+    },
+    svo::{
+        VoxelMaterial,
+        VoxelWorld,
+    },
+    theme::ThemePalette,
+};
 use bevy::prelude::*;
-use crate::svo::{VoxelMaterial, VoxelWorld};
-use crate::editor::{EditorState, VoxelHit};
-use crate::theme::ThemePalette;
 
 // ---------------------------------------------------------------------------
 // Undo / Redo
@@ -46,7 +54,10 @@ impl Default for EditHistory {
 
 impl EditHistory {
     /// Record a new edit (clears redo stack).
-    pub fn push_edit(&mut self, snapshot: EditSnapshot) {
+    pub fn push_edit(
+        &mut self,
+        snapshot: EditSnapshot,
+    ) {
         if snapshot.changes.is_empty() {
             return;
         }
@@ -73,31 +84,37 @@ impl EditHistory {
 }
 
 /// Apply an undo by restoring old voxel values.
-pub fn apply_undo(world: &mut VoxelWorld, snapshot: &EditSnapshot) {
+pub fn apply_undo(
+    world: &mut VoxelWorld,
+    snapshot: &EditSnapshot,
+) {
     for change in &snapshot.changes {
         match change.old {
             Some(packed) => {
                 let mat = VoxelMaterial::unpack(packed);
                 world.set_voxel(change.pos, mat);
-            }
+            },
             None => {
                 world.remove_voxel(change.pos);
-            }
+            },
         }
     }
 }
 
 /// Apply a redo by restoring new voxel values.
-pub fn apply_redo(world: &mut VoxelWorld, snapshot: &EditSnapshot) {
+pub fn apply_redo(
+    world: &mut VoxelWorld,
+    snapshot: &EditSnapshot,
+) {
     for change in &snapshot.changes {
         match change.new {
             Some(packed) => {
                 let mat = VoxelMaterial::unpack(packed);
                 world.set_voxel(change.pos, mat);
-            }
+            },
             None => {
                 world.remove_voxel(change.pos);
-            }
+            },
         }
     }
 }
@@ -134,7 +151,10 @@ impl Default for SymmetryState {
 
 /// Given a voxel position and symmetry mode, return all mirrored positions
 /// (including the original).
-pub fn mirror_positions(pos: IVec3, symmetry: &SymmetryState) -> Vec<IVec3> {
+pub fn mirror_positions(
+    pos: IVec3,
+    symmetry: &SymmetryState,
+) -> Vec<IVec3> {
     let p = pos;
     let piv = symmetry.pivot;
     match symmetry.mode {
@@ -146,7 +166,7 @@ pub fn mirror_positions(pos: IVec3, symmetry: &SymmetryState) -> Vec<IVec3> {
             } else {
                 vec![p, IVec3::new(mirrored_x, p.y, p.z)]
             }
-        }
+        },
         Symmetry::MirrorXZ => {
             let mx = piv.x * 2 - p.x;
             let mz = piv.z * 2 - p.z;
@@ -161,7 +181,7 @@ pub fn mirror_positions(pos: IVec3, symmetry: &SymmetryState) -> Vec<IVec3> {
                 result.push(IVec3::new(mx, p.y, mz));
             }
             result
-        }
+        },
         Symmetry::Radial(n) => {
             if n <= 1 {
                 return vec![p];
@@ -174,11 +194,17 @@ pub fn mirror_positions(pos: IVec3, symmetry: &SymmetryState) -> Vec<IVec3> {
                 let angle = (i as f32) * std::f32::consts::TAU / (n as f32);
                 let rx = fx * angle.cos() - fz * angle.sin();
                 let rz = fx * angle.sin() + fz * angle.cos();
-                result.push(piv + IVec3::new(rx.round() as i32, rel.y, rz.round() as i32));
+                result.push(
+                    piv + IVec3::new(
+                        rx.round() as i32,
+                        rel.y,
+                        rz.round() as i32,
+                    ),
+                );
             }
             result.dedup();
             result
-        }
+        },
     }
 }
 
@@ -262,8 +288,14 @@ fn material_picker_input(
     mut editor: ResMut<EditorState>,
 ) {
     let slot_keys = [
-        KeyCode::F1, KeyCode::F2, KeyCode::F3, KeyCode::F4,
-        KeyCode::F5, KeyCode::F6, KeyCode::F7, KeyCode::F8,
+        KeyCode::F1,
+        KeyCode::F2,
+        KeyCode::F3,
+        KeyCode::F4,
+        KeyCode::F5,
+        KeyCode::F6,
+        KeyCode::F7,
+        KeyCode::F8,
     ];
 
     for (i, &key) in slot_keys.iter().enumerate() {
@@ -303,7 +335,8 @@ fn undo_redo_input(
     mut history: ResMut<EditHistory>,
     mut world: ResMut<VoxelWorld>,
 ) {
-    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    let ctrl = keys.pressed(KeyCode::ControlLeft)
+        || keys.pressed(KeyCode::ControlRight);
 
     if ctrl && keys.just_pressed(KeyCode::KeyZ) {
         if let Some(snap) = history.undo() {
@@ -343,7 +376,10 @@ fn cycle_symmetry(
 pub struct EditorUxPlugin;
 
 impl Plugin for EditorUxPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<EditHistory>();
         app.init_resource::<SymmetryState>();
         app.init_resource::<BrushPreview>();
@@ -417,7 +453,10 @@ mod tests {
         assert_eq!(history.redos.len(), 1);
 
         history.push_edit(snap2);
-        assert!(history.redos.is_empty(), "redo stack should be cleared after new edit");
+        assert!(
+            history.redos.is_empty(),
+            "redo stack should be cleared after new edit"
+        );
     }
 
     #[test]
@@ -503,7 +542,10 @@ mod tests {
         // The voxel should be removed
         let node = world.descend_to(IVec3::ZERO);
         if let Some(idx) = node {
-            assert_eq!(world.nodes[idx].color_data, 0, "voxel should be cleared after undo");
+            assert_eq!(
+                world.nodes[idx].color_data, 0,
+                "voxel should be cleared after undo"
+            );
         }
     }
 

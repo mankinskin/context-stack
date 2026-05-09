@@ -13,20 +13,32 @@
 //!                          swap() ──────▶   pointer flip, < 0.01 ms
 //! ```
 
-pub mod svo_transform;
 pub mod svo_page_table;
-pub use svo_transform::SvoTransformBuffer;
+pub mod svo_transform;
 pub use svo_page_table::SvoPageTableBuffer;
+pub use svo_transform::SvoTransformBuffer;
 
-use bevy::prelude::Resource;
-use bevy::render::{
-    extract_resource::ExtractResource,
-    render_resource::{
-        BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry,
-        BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
-        SamplerBindingType, ShaderStages, TextureSampleType, TextureViewDimension,
+use bevy::{
+    prelude::Resource,
+    render::{
+        extract_resource::ExtractResource,
+        render_resource::{
+            BindGroup,
+            BindGroupEntry,
+            BindGroupLayout,
+            BindGroupLayoutEntry,
+            BindingType,
+            Buffer,
+            BufferBindingType,
+            BufferDescriptor,
+            BufferUsages,
+            SamplerBindingType,
+            ShaderStages,
+            TextureSampleType,
+            TextureViewDimension,
+        },
+        renderer::RenderDevice,
     },
-    renderer::RenderDevice,
 };
 
 // ---------------------------------------------------------------------------
@@ -115,7 +127,10 @@ impl ExtractResource for SvoDoubleBuffer {
 
 impl SvoDoubleBuffer {
     /// Allocate both buffers for `capacity_nodes` octree nodes.
-    pub fn new(device: &RenderDevice, capacity_nodes: usize) -> Self {
+    pub fn new(
+        device: &RenderDevice,
+        capacity_nodes: usize,
+    ) -> Self {
         let size = capacity_nodes as u64 * OCTREE_NODE_SIZE;
         let usage = BufferUsages::STORAGE | BufferUsages::COPY_DST;
         let make = |label: &'static str| {
@@ -136,12 +151,20 @@ impl SvoDoubleBuffer {
 
     /// Buffer open for **writing** this frame (WASM → GPU upload target).
     pub fn write_target(&self) -> &Buffer {
-        if self.current_is_front { &self.back } else { &self.front }
+        if self.current_is_front {
+            &self.back
+        } else {
+            &self.front
+        }
     }
 
     /// Buffer bound for **reading** by the render graph this frame.
     pub fn read_source(&self) -> &Buffer {
-        if self.current_is_front { &self.front } else { &self.back }
+        if self.current_is_front {
+            &self.front
+        } else {
+            &self.back
+        }
     }
 
     /// Pointer-flip swap — no allocation, no GPU stall.
@@ -188,10 +211,10 @@ impl SvoDoubleBuffer {
 /// ```
 #[derive(Resource)]
 pub struct GpuBindGroupLayouts {
-    pub svo_group:      BindGroupLayout,
+    pub svo_group: BindGroupLayout,
     pub gaussian_group: BindGroupLayout,
-    pub tile_group:     BindGroupLayout,
-    pub texture_group:  BindGroupLayout,
+    pub tile_group: BindGroupLayout,
+    pub texture_group: BindGroupLayout,
 }
 
 impl GpuBindGroupLayouts {
@@ -225,7 +248,9 @@ impl GpuBindGroupLayouts {
                 // global uniforms
                 BindGroupLayoutEntry {
                     binding: 2,
-                    visibility: ShaderStages::COMPUTE | ShaderStages::VERTEX | ShaderStages::FRAGMENT,
+                    visibility: ShaderStages::COMPUTE
+                        | ShaderStages::VERTEX
+                        | ShaderStages::FRAGMENT,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -318,7 +343,9 @@ impl GpuBindGroupLayouts {
                     binding: 0,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Texture {
-                        sample_type: TextureSampleType::Float { filterable: true },
+                        sample_type: TextureSampleType::Float {
+                            filterable: true,
+                        },
                         view_dimension: TextureViewDimension::D2,
                         multisampled: false,
                     },
@@ -333,7 +360,12 @@ impl GpuBindGroupLayouts {
             ],
         );
 
-        Self { svo_group, gaussian_group, tile_group, texture_group }
+        Self {
+            svo_group,
+            gaussian_group,
+            tile_group,
+            texture_group,
+        }
     }
 }
 
@@ -350,7 +382,7 @@ impl GpuBindGroupLayouts {
 #[derive(Resource)]
 pub struct DoubleBindGroups {
     front_svo_group: BindGroup,
-    back_svo_group:  BindGroup,
+    back_svo_group: BindGroup,
 }
 
 impl DoubleBindGroups {
@@ -390,7 +422,10 @@ impl DoubleBindGroups {
     }
 
     /// Returns the bind group for the SVO buffer currently being read by the GPU.
-    pub fn active_svo_group(&self, current_is_front: bool) -> &BindGroup {
+    pub fn active_svo_group(
+        &self,
+        current_is_front: bool,
+    ) -> &BindGroup {
         if current_is_front {
             &self.front_svo_group
         } else {
@@ -416,17 +451,31 @@ mod tests {
             current_is_front: bool,
         }
         impl FakeSvo {
-            fn write_is_back(&self) -> bool { self.current_is_front }
-            fn read_is_front(&self) -> bool { self.current_is_front }
-            fn swap(&mut self) { self.current_is_front = !self.current_is_front; }
+            fn write_is_back(&self) -> bool {
+                self.current_is_front
+            }
+            fn read_is_front(&self) -> bool {
+                self.current_is_front
+            }
+            fn swap(&mut self) {
+                self.current_is_front = !self.current_is_front;
+            }
         }
 
-        let mut svo = FakeSvo { current_is_front: true };
+        let mut svo = FakeSvo {
+            current_is_front: true,
+        };
         assert!(svo.read_is_front(), "before swap: GPU reads front");
         assert!(svo.write_is_back(), "before swap: WASM writes back");
         svo.swap();
-        assert!(!svo.read_is_front(), "after swap: GPU reads back (old back)");
-        assert!(!svo.write_is_back(), "after swap: WASM writes front (old front)");
+        assert!(
+            !svo.read_is_front(),
+            "after swap: GPU reads back (old back)"
+        );
+        assert!(
+            !svo.write_is_back(),
+            "after swap: WASM writes front (old front)"
+        );
         svo.swap();
         assert!(svo.read_is_front(), "double swap: back to original");
     }

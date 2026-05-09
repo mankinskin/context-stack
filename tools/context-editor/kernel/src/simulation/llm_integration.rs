@@ -165,7 +165,10 @@ pub fn validate_voxels(
 
         // Coordinate range check
         if x < -64 || x > 64 || y < -64 || y > 64 || z < -64 || z > 64 {
-            return Err(format!("Voxel coordinate ({}, {}, {}) out of range [-64, 64]", x, y, z));
+            return Err(format!(
+                "Voxel coordinate ({}, {}, {}) out of range [-64, 64]",
+                x, y, z
+            ));
         }
 
         // Distance from player
@@ -242,12 +245,14 @@ pub fn validate_wgsl_snippet(wgsl: &str) -> ShaderValidation {
                     body_end = i;
                     break;
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
     if depth != 0 {
-        return ShaderValidation::ParseError("Unbalanced braces in function body".into());
+        return ShaderValidation::ParseError(
+            "Unbalanced braces in function body".into(),
+        );
     }
 
     let body = &body_region[1..body_end];
@@ -346,7 +351,11 @@ impl Default for CustomSdfPipeline {
 
 impl CustomSdfPipeline {
     /// Stage a new shader for compilation on the next frame.
-    pub fn stage(&mut self, shader_id: u64, full_wgsl: String) {
+    pub fn stage(
+        &mut self,
+        shader_id: u64,
+        full_wgsl: String,
+    ) {
         self.active_source = Some(full_wgsl);
         self.active_shader_id = Some(shader_id);
         self.dirty = true;
@@ -403,7 +412,10 @@ pub struct GenerationRequestQueue {
 }
 
 impl GenerationRequestQueue {
-    pub fn submit(&mut self, request: GenerationRequest) {
+    pub fn submit(
+        &mut self,
+        request: GenerationRequest,
+    ) {
         self.pending.push_back(request);
     }
 
@@ -423,7 +435,10 @@ pub struct GenerationResultQueue {
 }
 
 impl GenerationResultQueue {
-    pub fn push(&mut self, result: GenerationResult) {
+    pub fn push(
+        &mut self,
+        result: GenerationResult,
+    ) {
         self.results.push_back(result);
     }
 
@@ -458,7 +473,10 @@ impl GenerationRateLimiter {
     }
 
     /// Tick down the cooldown.
-    pub fn tick(&mut self, dt: f32) {
+    pub fn tick(
+        &mut self,
+        dt: f32,
+    ) {
         self.cooldown_remaining = (self.cooldown_remaining - dt).max(0.0);
     }
 
@@ -483,7 +501,10 @@ impl Default for GenerationHistory {
 }
 
 impl GenerationHistory {
-    pub fn push(&mut self, entry: GeneratedContent) {
+    pub fn push(
+        &mut self,
+        entry: GeneratedContent,
+    ) {
         if self.entries.len() >= MAX_HISTORY_SIZE {
             self.entries.pop_front();
         }
@@ -494,7 +515,10 @@ impl GenerationHistory {
         self.entries.back()
     }
 
-    pub fn find_by_id(&self, content_id: u64) -> Option<&GeneratedContent> {
+    pub fn find_by_id(
+        &self,
+        content_id: u64,
+    ) -> Option<&GeneratedContent> {
         self.entries.iter().find(|e| e.content_id == content_id)
     }
 
@@ -514,12 +538,22 @@ impl CustomShaderTable {
         self.shaders.iter().filter(|s| s.active)
     }
 
-    pub fn find_by_id(&self, shader_id: u64) -> Option<&CustomShader> {
+    pub fn find_by_id(
+        &self,
+        shader_id: u64,
+    ) -> Option<&CustomShader> {
         self.shaders.iter().find(|s| s.shader_id == shader_id)
     }
 
-    pub fn add_or_update(&mut self, shader: CustomShader) {
-        if let Some(existing) = self.shaders.iter_mut().find(|s| s.shader_id == shader.shader_id) {
+    pub fn add_or_update(
+        &mut self,
+        shader: CustomShader,
+    ) {
+        if let Some(existing) = self
+            .shaders
+            .iter_mut()
+            .find(|s| s.shader_id == shader.shader_id)
+        {
             *existing = shader;
         } else {
             self.shaders.push(shader);
@@ -532,7 +566,10 @@ impl CustomShaderTable {
 // ---------------------------------------------------------------------------
 
 /// System: tick down the generation rate limiter.
-fn rate_limit_system(time: Res<Time>, mut limiter: ResMut<GenerationRateLimiter>) {
+fn rate_limit_system(
+    time: Res<Time>,
+    mut limiter: ResMut<GenerationRateLimiter>,
+) {
     limiter.tick(time.delta_secs());
 }
 
@@ -559,10 +596,13 @@ fn process_results_system(
                     creator: PlayerIdentity::local(),
                     prompt: String::new(),
                     mode: GenerationMode::VoxelStructure,
-                    result_data: format!("{{\"voxels_count\":{}}}", voxel_count),
+                    result_data: format!(
+                        "{{\"voxels_count\":{}}}",
+                        voxel_count
+                    ),
                     created_tick: 0,
                 });
-            }
+            },
             GenerationResult::Shader {
                 wgsl_source,
                 function_name,
@@ -592,10 +632,10 @@ fn process_results_system(
                     });
                 }
                 // Invalid shaders are silently dropped (already validated server-side)
-            }
+            },
             GenerationResult::Error(_msg) => {
                 // Error handling would show a toast in the UI
-            }
+            },
         }
     }
 }
@@ -634,10 +674,10 @@ fn drain_requests_system(
         match request.mode {
             GenerationMode::VoxelStructure => {
                 // Stub: in production, SpacetimeDB reducer `ai_generate` handles this
-            }
+            },
             GenerationMode::ShaderEffect | GenerationMode::SpellModifier => {
                 // Stub: in production, SpacetimeDB reducer `ai_generate` handles this
-            }
+            },
         }
     }
 }
@@ -650,7 +690,10 @@ fn drain_requests_system(
 pub struct LlmIntegrationPlugin;
 
 impl Plugin for LlmIntegrationPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<GenerationRequestQueue>();
         app.init_resource::<GenerationResultQueue>();
         app.init_resource::<GenerationRateLimiter>();
@@ -683,9 +726,18 @@ mod tests {
 
     #[test]
     fn generation_mode_from_u8_valid() {
-        assert_eq!(GenerationMode::from_u8(0), Some(GenerationMode::VoxelStructure));
-        assert_eq!(GenerationMode::from_u8(1), Some(GenerationMode::ShaderEffect));
-        assert_eq!(GenerationMode::from_u8(2), Some(GenerationMode::SpellModifier));
+        assert_eq!(
+            GenerationMode::from_u8(0),
+            Some(GenerationMode::VoxelStructure)
+        );
+        assert_eq!(
+            GenerationMode::from_u8(1),
+            Some(GenerationMode::ShaderEffect)
+        );
+        assert_eq!(
+            GenerationMode::from_u8(2),
+            Some(GenerationMode::SpellModifier)
+        );
     }
 
     #[test]
@@ -766,7 +818,8 @@ mod tests {
 
     #[test]
     fn validate_voxels_too_many() {
-        let voxels: Vec<[i64; 4]> = (0..4097).map(|i| [0, 0, i % 64, 0xFF]).collect();
+        let voxels: Vec<[i64; 4]> =
+            (0..4097).map(|i| [0, 0, i % 64, 0xFF]).collect();
         let result = validate_voxels(&voxels, (0.0, 0.0, 0.0));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Too many voxels"));
@@ -810,7 +863,10 @@ fn sd_custom(p: vec3<f32>, time: f32) -> f32 {
     #[test]
     fn validate_wgsl_missing_entry_point() {
         let wgsl = "fn some_other_fn(p: vec3<f32>) -> f32 { return 0.0; }";
-        assert_eq!(validate_wgsl_snippet(wgsl), ShaderValidation::MissingEntryPoint);
+        assert_eq!(
+            validate_wgsl_snippet(wgsl),
+            ShaderValidation::MissingEntryPoint
+        );
     }
 
     #[test]
@@ -1004,7 +1060,9 @@ fn sd_custom(p: vec3<f32>, time: f32) -> f32 {
         table.add_or_update(CustomShader {
             shader_id: 1,
             creator: PlayerIdentity::local(),
-            wgsl_source: "fn sd_custom(p: vec3<f32>, time: f32) -> f32 { return 0.0; }".into(),
+            wgsl_source:
+                "fn sd_custom(p: vec3<f32>, time: f32) -> f32 { return 0.0; }"
+                    .into(),
             function_name: "sd_custom".into(),
             active: true,
         });
@@ -1109,9 +1167,12 @@ fn sd_custom(p: vec3<f32>, time: f32) -> f32 {
     #[test]
     fn result_queue_voxel_result() {
         let mut queue = GenerationResultQueue::default();
-        queue.push(GenerationResult::Voxels(vec![
-            GeneratedVoxel { x: 0, y: 1, z: 2, color: 0xFF },
-        ]));
+        queue.push(GenerationResult::Voxels(vec![GeneratedVoxel {
+            x: 0,
+            y: 1,
+            z: 2,
+            color: 0xFF,
+        }]));
         if let Some(GenerationResult::Voxels(v)) = queue.pop() {
             assert_eq!(v.len(), 1);
             assert_eq!(v[0].x, 0);
@@ -1124,10 +1185,14 @@ fn sd_custom(p: vec3<f32>, time: f32) -> f32 {
     fn result_queue_shader_result() {
         let mut queue = GenerationResultQueue::default();
         queue.push(GenerationResult::Shader {
-            wgsl_source: "fn sd_custom(p: vec3<f32>, time: f32) -> f32 { return 0.0; }".into(),
+            wgsl_source:
+                "fn sd_custom(p: vec3<f32>, time: f32) -> f32 { return 0.0; }"
+                    .into(),
             function_name: "sd_custom".into(),
         });
-        if let Some(GenerationResult::Shader { function_name, .. }) = queue.pop() {
+        if let Some(GenerationResult::Shader { function_name, .. }) =
+            queue.pop()
+        {
             assert_eq!(function_name, "sd_custom");
         } else {
             panic!("Expected Shader result");

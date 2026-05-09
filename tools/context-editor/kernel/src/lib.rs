@@ -3,67 +3,83 @@
 // ---------------------------------------------------------------------------
 
 // Core data & rendering
-pub mod svo;
 pub mod gpu;
 pub mod net;
 pub mod physics;
 pub mod render;
 pub mod splat;
+pub mod svo;
 
 // Domain modules
-pub mod world;
 pub mod editor;
 pub mod multiplayer;
 pub mod simulation;
 pub mod ui;
+pub mod world;
 
 // ---------------------------------------------------------------------------
 // Backward-compatible re-exports — keep all existing `crate::xxx` paths working
 // ---------------------------------------------------------------------------
 
 // world/
-pub use world::svo_lod;
-pub use world::world_gen;
-pub use world::theme;
+pub use world::{
+    svo_lod,
+    theme,
+    world_gen,
+};
 
 // render/
 pub use render::runtime_params;
 
 // splat/
-pub use splat::particle_splat;
-pub use splat::force_compute;
+pub use splat::{
+    force_compute,
+    particle_splat,
+};
 
 // multiplayer/
-pub use multiplayer::backend as multiplayer_backend;
-pub use multiplayer::net as multiplayer_net;
-pub use multiplayer::chars as multiplayer_chars;
-pub use multiplayer::latency_comp;
-pub use multiplayer::combat;
+pub use multiplayer::{
+    backend as multiplayer_backend,
+    chars as multiplayer_chars,
+    combat,
+    latency_comp,
+    net as multiplayer_net,
+};
 
 // editor/ — core and ux items are re-exported via editor/mod.rs wildcard;
 // the sub-modules themselves are also re-exported for direct access.
-pub use editor::advanced_tools;
-pub use editor::sdf_cutting;
-pub use editor::debug_overlay;
-pub use editor::ux as editor_ux;
+pub use editor::{
+    advanced_tools,
+    debug_overlay,
+    sdf_cutting,
+    ux as editor_ux,
+};
 
 // ui/
-pub use ui::bridge as ui_bridge;
-pub use ui::interaction;
-pub use ui::panel_interaction;
-pub use ui::world_panel;
-pub use ui::inventory;
-pub use ui::skill;
-pub use ui::ticket_editor;
-pub use ui::doc_editor;
-pub use ui::code_viewer;
+pub use ui::{
+    bridge as ui_bridge,
+    code_viewer,
+    doc_editor,
+    interaction,
+    inventory,
+    panel_interaction,
+    skill,
+    ticket_editor,
+    world_panel,
+};
 
 // simulation/
-pub use simulation::character;
-pub use simulation::context_graph;
-pub use simulation::llm_integration;
+pub use simulation::{
+    character,
+    context_graph,
+    llm_integration,
+};
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{
+    Arc,
+    Mutex,
+    OnceLock,
+};
 
 // ---------------------------------------------------------------------------
 // World preset registry
@@ -78,7 +94,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 pub type WorldPresetFn = Arc<dyn Fn(&mut bevy::prelude::World) + Send + Sync>;
 
 #[cfg(target_arch = "wasm32")]
-static PRESET_REGISTRY: Mutex<Vec<(String, WorldPresetFn)>> = Mutex::new(Vec::new());
+static PRESET_REGISTRY: Mutex<Vec<(String, WorldPresetFn)>> =
+    Mutex::new(Vec::new());
 
 /// Register all selectable world presets before calling [`launch`].
 ///
@@ -86,7 +103,12 @@ static PRESET_REGISTRY: Mutex<Vec<(String, WorldPresetFn)>> = Mutex::new(Vec::ne
 /// Presets appear in the debug panel in registration order.
 #[cfg(target_arch = "wasm32")]
 pub fn register_world_presets(
-    presets: impl IntoIterator<Item = (impl Into<String>, impl Fn(&mut bevy::prelude::World) + Send + Sync + 'static)>,
+    presets: impl IntoIterator<
+        Item = (
+            impl Into<String>,
+            impl Fn(&mut bevy::prelude::World) + Send + Sync + 'static,
+        ),
+    >
 ) {
     let mut reg = PRESET_REGISTRY.lock().unwrap();
     for (name, f) in presets {
@@ -97,14 +119,22 @@ pub fn register_world_presets(
 /// Returns the names of all registered presets (in registration order).
 #[cfg(target_arch = "wasm32")]
 pub fn world_preset_names() -> Vec<String> {
-    PRESET_REGISTRY.lock().unwrap().iter().map(|(n, _)| n.clone()).collect()
+    PRESET_REGISTRY
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(n, _)| n.clone())
+        .collect()
 }
 
 /// Resets [`VoxelWorld`](crate::svo::VoxelWorld) and applies preset `index`.
 ///
 /// Called by the `apply_world_preset` exclusive system in `debug_overlay`.
 #[cfg(target_arch = "wasm32")]
-pub fn apply_registered_preset(index: u32, world: &mut bevy::prelude::World) {
+pub fn apply_registered_preset(
+    index: u32,
+    world: &mut bevy::prelude::World,
+) {
     use crate::svo::VoxelWorld;
     let max_depth = world.resource::<VoxelWorld>().max_depth;
     *world.resource_mut::<VoxelWorld>() = VoxelWorld::new(max_depth);
@@ -123,8 +153,14 @@ pub struct WorldEvent {
 
 pub trait SandboxWorld: 'static + Send + Sync {
     fn name(&self) -> &str;
-    fn process_event(&self, event: WorldEvent);
-    fn trigger_generation(&self, prompt: String);
+    fn process_event(
+        &self,
+        event: WorldEvent,
+    );
+    fn trigger_generation(
+        &self,
+        prompt: String,
+    );
 
     // UI content providers — injected into Kernel's GlassScaffold
     fn sidebar_content(&self) -> dioxus::prelude::Element;
@@ -138,7 +174,10 @@ pub trait SandboxWorld: 'static + Send + Sync {
     /// world's `VoxelWorld` resource, a scene bootstrap plugin, and any
     /// startup systems before forwarding to `app.run()`.
     #[cfg(target_arch = "wasm32")]
-    fn run_bevy_app(&self, mut app: bevy::prelude::App) {
+    fn run_bevy_app(
+        &self,
+        mut app: bevy::prelude::App,
+    ) {
         app.run();
     }
 }

@@ -214,7 +214,12 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn new(id: String, title: String, doc_type: DocType, source: String) -> Self {
+    pub fn new(
+        id: String,
+        title: String,
+        doc_type: DocType,
+        source: String,
+    ) -> Self {
         let elements = parse_markdown(&source);
         Self {
             id,
@@ -238,7 +243,8 @@ impl Document {
         self.elements
             .iter()
             .filter_map(|e| match e {
-                MarkdownElement::CrossReference { target_id, .. } => Some(target_id.as_str()),
+                MarkdownElement::CrossReference { target_id, .. } =>
+                    Some(target_id.as_str()),
                 _ => None,
             })
             .collect()
@@ -249,7 +255,8 @@ impl Document {
         self.elements
             .iter()
             .map(|e| match e {
-                MarkdownElement::CodeBlock { code, .. } => code.lines().count().max(1),
+                MarkdownElement::CodeBlock { code, .. } =>
+                    code.lines().count().max(1),
                 _ => 1,
             })
             .sum()
@@ -295,16 +302,25 @@ impl Default for DocStore {
 }
 
 impl DocStore {
-    pub fn insert(&mut self, doc: Document) {
+    pub fn insert(
+        &mut self,
+        doc: Document,
+    ) {
         self.documents.insert(doc.id.clone(), doc);
         self.dirty = true;
     }
 
-    pub fn get(&self, id: &str) -> Option<&Document> {
+    pub fn get(
+        &self,
+        id: &str,
+    ) -> Option<&Document> {
         self.documents.get(id)
     }
 
-    pub fn remove(&mut self, id: &str) -> Option<Document> {
+    pub fn remove(
+        &mut self,
+        id: &str,
+    ) -> Option<Document> {
         self.dirty = true;
         self.documents.remove(id)
     }
@@ -313,8 +329,14 @@ impl DocStore {
         self.documents.len()
     }
 
-    pub fn by_type(&self, doc_type: DocType) -> Vec<&Document> {
-        self.documents.values().filter(|d| d.doc_type == doc_type).collect()
+    pub fn by_type(
+        &self,
+        doc_type: DocType,
+    ) -> Vec<&Document> {
+        self.documents
+            .values()
+            .filter(|d| d.doc_type == doc_type)
+            .collect()
     }
 }
 
@@ -326,7 +348,10 @@ pub struct DocNavigation {
 }
 
 impl DocNavigation {
-    pub fn navigate_to(&mut self, pos: Vec3) {
+    pub fn navigate_to(
+        &mut self,
+        pos: Vec3,
+    ) {
         self.target_position = Some(pos);
         self.lerp_progress = 0.0;
     }
@@ -399,17 +424,14 @@ fn navigation_system(
 pub struct DocEditorPlugin;
 
 impl Plugin for DocEditorPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<DocStore>();
         app.init_resource::<DocNavigation>();
 
-        app.add_systems(
-            Update,
-            (
-                scroll_system,
-                navigation_system,
-            ),
-        );
+        app.add_systems(Update, (scroll_system, navigation_system));
     }
 }
 
@@ -460,18 +482,27 @@ mod tests {
         assert_eq!(elements.len(), 2);
         assert_eq!(
             elements[0],
-            MarkdownElement::Heading { level: 1, text: "Title".into() }
+            MarkdownElement::Heading {
+                level: 1,
+                text: "Title".into()
+            }
         );
         assert_eq!(
             elements[1],
-            MarkdownElement::Heading { level: 2, text: "Subtitle".into() }
+            MarkdownElement::Heading {
+                level: 2,
+                text: "Subtitle".into()
+            }
         );
     }
 
     #[test]
     fn parse_paragraph() {
         let elements = parse_markdown("Hello world");
-        assert_eq!(elements, vec![MarkdownElement::Paragraph("Hello world".into())]);
+        assert_eq!(
+            elements,
+            vec![MarkdownElement::Paragraph("Hello world".into())]
+        );
     }
 
     #[test]
@@ -548,7 +579,10 @@ fn hello() {}
 ";
         let elements = parse_markdown(md);
         assert!(elements.len() >= 6);
-        assert!(matches!(elements[0], MarkdownElement::Heading { level: 1, .. }));
+        assert!(matches!(
+            elements[0],
+            MarkdownElement::Heading { level: 1, .. }
+        ));
     }
 
     // --- Document ---
@@ -593,7 +627,12 @@ fn hello() {}
     #[test]
     fn store_insert_and_get() {
         let mut store = DocStore::default();
-        store.insert(Document::new("d1".into(), "Doc 1".into(), DocType::Guide, "body".into()));
+        store.insert(Document::new(
+            "d1".into(),
+            "Doc 1".into(),
+            DocType::Guide,
+            "body".into(),
+        ));
         assert_eq!(store.count(), 1);
         assert_eq!(store.get("d1").unwrap().title, "Doc 1");
     }
@@ -601,7 +640,12 @@ fn hello() {}
     #[test]
     fn store_remove() {
         let mut store = DocStore::default();
-        store.insert(Document::new("d1".into(), "Doc 1".into(), DocType::Guide, "".into()));
+        store.insert(Document::new(
+            "d1".into(),
+            "Doc 1".into(),
+            DocType::Guide,
+            "".into(),
+        ));
         assert!(store.remove("d1").is_some());
         assert_eq!(store.count(), 0);
     }
@@ -609,9 +653,24 @@ fn hello() {}
     #[test]
     fn store_by_type() {
         let mut store = DocStore::default();
-        store.insert(Document::new("d1".into(), "A".into(), DocType::Guide, "".into()));
-        store.insert(Document::new("d2".into(), "B".into(), DocType::CrateDoc, "".into()));
-        store.insert(Document::new("d3".into(), "C".into(), DocType::Guide, "".into()));
+        store.insert(Document::new(
+            "d1".into(),
+            "A".into(),
+            DocType::Guide,
+            "".into(),
+        ));
+        store.insert(Document::new(
+            "d2".into(),
+            "B".into(),
+            DocType::CrateDoc,
+            "".into(),
+        ));
+        store.insert(Document::new(
+            "d3".into(),
+            "C".into(),
+            DocType::Guide,
+            "".into(),
+        ));
         assert_eq!(store.by_type(DocType::Guide).len(), 2);
         assert_eq!(store.by_type(DocType::CrateDoc).len(), 1);
         assert_eq!(store.by_type(DocType::Readme).len(), 0);

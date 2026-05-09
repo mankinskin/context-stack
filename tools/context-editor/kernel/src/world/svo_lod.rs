@@ -9,7 +9,11 @@
 use bevy::prelude::*;
 use std::collections::VecDeque;
 
-use crate::svo::{OctreeNode, VoxelMaterial, VoxelWorld};
+use crate::svo::{
+    OctreeNode,
+    VoxelMaterial,
+    VoxelWorld,
+};
 
 // ---------------------------------------------------------------------------
 // LOD selection
@@ -81,7 +85,8 @@ impl Default for LodParams {
 /// Only non-empty children (color_data != 0) contribute.
 /// Returns 0 if all children are empty.
 pub fn compute_avg_color(children: &[OctreeNode]) -> u32 {
-    let (mut r_sum, mut g_sum, mut b_sum, mut rough_sum) = (0u32, 0u32, 0u32, 0u32);
+    let (mut r_sum, mut g_sum, mut b_sum, mut rough_sum) =
+        (0u32, 0u32, 0u32, 0u32);
     let mut count = 0u32;
 
     for child in children {
@@ -117,7 +122,10 @@ pub fn propagate_lod_colors(world: &mut VoxelWorld) {
     propagate_node(world, world.root_index as usize);
 }
 
-fn propagate_node(world: &mut VoxelWorld, idx: usize) -> u32 {
+fn propagate_node(
+    world: &mut VoxelWorld,
+    idx: usize,
+) -> u32 {
     let node = world.nodes[idx];
     if node.is_leaf() {
         return node.color_data;
@@ -191,7 +199,10 @@ impl ChunkLruCache {
     /// Touch a chunk, moving it to the front (most recently used).
     ///
     /// Returns true if the chunk was already cached.
-    pub fn touch(&mut self, id: ChunkId) -> bool {
+    pub fn touch(
+        &mut self,
+        id: ChunkId,
+    ) -> bool {
         if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
             let entry = self.entries.remove(pos).unwrap();
             self.entries.push_front(entry);
@@ -204,11 +215,16 @@ impl ChunkLruCache {
     /// Insert a chunk into the cache. Evicts LRU entries if needed.
     ///
     /// Returns the list of evicted chunk IDs.
-    pub fn insert(&mut self, data: ChunkData) -> Vec<ChunkId> {
+    pub fn insert(
+        &mut self,
+        data: ChunkData,
+    ) -> Vec<ChunkId> {
         let mut evicted = Vec::new();
 
         // Evict from the back until we have space
-        while self.used_bytes + data.byte_size > self.budget_bytes && !self.entries.is_empty() {
+        while self.used_bytes + data.byte_size > self.budget_bytes
+            && !self.entries.is_empty()
+        {
             if let Some(old) = self.entries.pop_back() {
                 self.used_bytes = self.used_bytes.saturating_sub(old.byte_size);
                 evicted.push(old.id);
@@ -221,7 +237,10 @@ impl ChunkLruCache {
     }
 
     /// Remove a specific chunk from the cache.
-    pub fn remove(&mut self, id: ChunkId) -> bool {
+    pub fn remove(
+        &mut self,
+        id: ChunkId,
+    ) -> bool {
         if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
             let entry = self.entries.remove(pos).unwrap();
             self.used_bytes = self.used_bytes.saturating_sub(entry.byte_size);
@@ -285,7 +304,10 @@ pub struct GlassOccluder {
 
 impl GlassOccluder {
     /// Returns true if this occluder covers the given screen-space point.
-    pub fn contains(&self, point: Vec2) -> bool {
+    pub fn contains(
+        &self,
+        point: Vec2,
+    ) -> bool {
         point.x >= self.screen_min.x
             && point.x <= self.screen_max.x
             && point.y >= self.screen_min.y
@@ -360,19 +382,16 @@ fn lod_streaming_system(
 pub struct SvoLodPlugin;
 
 impl Plugin for SvoLodPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<LodParams>();
         app.insert_resource(ChunkLruCache::new(64 * 1024 * 1024)); // 64 MiB default
         app.insert_resource(LodStreamingState::new(4));
         app.init_resource::<GlassOccluders>();
 
-        app.add_systems(
-            Update,
-            (
-                lod_propagation_system,
-                lod_streaming_system,
-            ),
-        );
+        app.add_systems(Update, (lod_propagation_system, lod_streaming_system));
     }
 }
 
@@ -397,7 +416,10 @@ mod tests {
     #[test]
     fn lod_depth_mid_range_between_min_and_max() {
         let d = lod_depth_for_distance(50.0, 3, 10, 5.0, 500.0, 0.25);
-        assert!(d >= 3 && d <= 10, "mid-range LOD depth must be in [3, 10], got {d}");
+        assert!(
+            d >= 3 && d <= 10,
+            "mid-range LOD depth must be in [3, 10], got {d}"
+        );
     }
 
     #[test]
@@ -451,14 +473,26 @@ mod tests {
         propagate_lod_colors(&mut world);
         // Root should now have a non-zero avg color
         let root_color = world.nodes[world.root_index as usize].color_data;
-        assert_ne!(root_color, 0, "root must have averaged color after propagation");
+        assert_ne!(
+            root_color, 0,
+            "root must have averaged color after propagation"
+        );
     }
 
     #[test]
     fn chunk_lru_insert_and_touch() {
         let mut cache = ChunkLruCache::new(1024);
-        let id = ChunkId { x: 0, y: 0, z: 0, lod_level: 5 };
-        let data = ChunkData { id, buffer_offset: 0, byte_size: 256 };
+        let id = ChunkId {
+            x: 0,
+            y: 0,
+            z: 0,
+            lod_level: 5,
+        };
+        let data = ChunkData {
+            id,
+            buffer_offset: 0,
+            byte_size: 256,
+        };
         let evicted = cache.insert(data);
         assert!(evicted.is_empty());
         assert_eq!(cache.len(), 1);
@@ -472,8 +506,17 @@ mod tests {
     fn chunk_lru_eviction_on_budget() {
         let mut cache = ChunkLruCache::new(512);
         for i in 0..3 {
-            let id = ChunkId { x: i, y: 0, z: 0, lod_level: 3 };
-            let data = ChunkData { id, buffer_offset: (i as usize) * 256, byte_size: 256 };
+            let id = ChunkId {
+                x: i,
+                y: 0,
+                z: 0,
+                lod_level: 3,
+            };
+            let data = ChunkData {
+                id,
+                buffer_offset: (i as usize) * 256,
+                byte_size: 256,
+            };
             cache.insert(data);
         }
         // Budget is 512, inserting 3 × 256 = 768 → first chunk should be evicted
@@ -484,8 +527,17 @@ mod tests {
     #[test]
     fn chunk_lru_remove() {
         let mut cache = ChunkLruCache::new(1024);
-        let id = ChunkId { x: 1, y: 2, z: 3, lod_level: 7 };
-        let data = ChunkData { id, buffer_offset: 0, byte_size: 100 };
+        let id = ChunkId {
+            x: 1,
+            y: 2,
+            z: 3,
+            lod_level: 7,
+        };
+        let data = ChunkData {
+            id,
+            buffer_offset: 0,
+            byte_size: 100,
+        };
         cache.insert(data);
         assert!(cache.remove(id));
         assert_eq!(cache.len(), 0);
@@ -513,7 +565,8 @@ mod tests {
             screen_max: Vec2::ONE,
             blur_strength: 0.8,
         });
-        let depth = effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
+        let depth =
+            effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
         assert_eq!(depth, 10 - params.glass_lod_reduction);
     }
 
@@ -526,7 +579,8 @@ mod tests {
             screen_max: Vec2::ONE,
             blur_strength: 0.3, // below threshold
         });
-        let depth = effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
+        let depth =
+            effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
         assert_eq!(depth, 10);
     }
 
@@ -540,7 +594,8 @@ mod tests {
             screen_max: Vec2::ONE,
             blur_strength: 1.0,
         });
-        let depth = effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
+        let depth =
+            effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
         assert_eq!(depth, 10);
     }
 

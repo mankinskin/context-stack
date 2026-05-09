@@ -145,9 +145,9 @@ impl EdgeKind {
     /// Packed RGBA voxel color for this edge type.
     pub fn edge_color(&self) -> u32 {
         match self {
-            Self::DependsOn => 0xFF8844FF,   // Orange — dependency
-            Self::Blocks => 0xFF4444FF,       // Red — blocker
-            Self::RelatedTo => 0x88AAFFFF,    // Light blue — informational
+            Self::DependsOn => 0xFF8844FF, // Orange — dependency
+            Self::Blocks => 0xFF4444FF,    // Red — blocker
+            Self::RelatedTo => 0x88AAFFFF, // Light blue — informational
         }
     }
 
@@ -236,21 +236,33 @@ impl Default for TicketStore {
 }
 
 impl TicketStore {
-    pub fn upsert(&mut self, ticket: TicketData) {
+    pub fn upsert(
+        &mut self,
+        ticket: TicketData,
+    ) {
         self.tickets.insert(ticket.id.clone(), ticket);
         self.dirty = true;
     }
 
-    pub fn remove(&mut self, id: &str) -> Option<TicketData> {
+    pub fn remove(
+        &mut self,
+        id: &str,
+    ) -> Option<TicketData> {
         self.dirty = true;
         self.tickets.remove(id)
     }
 
-    pub fn get(&self, id: &str) -> Option<&TicketData> {
+    pub fn get(
+        &self,
+        id: &str,
+    ) -> Option<&TicketData> {
         self.tickets.get(id)
     }
 
-    pub fn add_edge(&mut self, edge: TicketEdge) {
+    pub fn add_edge(
+        &mut self,
+        edge: TicketEdge,
+    ) {
         self.edges.push(edge);
         self.dirty = true;
     }
@@ -264,7 +276,10 @@ impl TicketStore {
     }
 
     /// Get all tickets connected to a given ticket via edges.
-    pub fn neighbors(&self, ticket_id: &str) -> Vec<&str> {
+    pub fn neighbors(
+        &self,
+        ticket_id: &str,
+    ) -> Vec<&str> {
         let mut result = Vec::new();
         for edge in &self.edges {
             if edge.from == ticket_id {
@@ -277,7 +292,10 @@ impl TicketStore {
     }
 
     /// Tickets filtered by state.
-    pub fn by_state(&self, state: TicketState) -> Vec<&TicketData> {
+    pub fn by_state(
+        &self,
+        state: TicketState,
+    ) -> Vec<&TicketData> {
         self.tickets.values().filter(|t| t.state == state).collect()
     }
 
@@ -361,7 +379,9 @@ pub fn force_directed_step(
 
     // Spring attraction along edges
     for edge in edges {
-        if let (Some(&pa), Some(&pb)) = (positions.get(&edge.from), positions.get(&edge.to)) {
+        if let (Some(&pa), Some(&pb)) =
+            (positions.get(&edge.from), positions.get(&edge.to))
+        {
             let delta = pb - pa;
             let dist = delta.length();
             let force = delta.normalize_or_zero() * SPRING_K * dist;
@@ -377,7 +397,9 @@ pub fn force_directed_step(
 
     // Apply velocity with damping and clamping
     for id in &ids {
-        if let (Some(vel), Some(pos)) = (velocities.get_mut(id), positions.get_mut(id)) {
+        if let (Some(vel), Some(pos)) =
+            (velocities.get_mut(id), positions.get_mut(id))
+        {
             *vel *= LAYOUT_DAMPING;
             let speed = vel.length();
             if speed > MAX_VELOCITY {
@@ -395,14 +417,13 @@ pub fn force_directed_step(
 /// Draw a 3D voxel line between two world positions (Bresenham-like).
 ///
 /// Returns the list of integer voxel coordinates along the line.
-pub fn voxel_line_3d(from: Vec3, to: Vec3) -> Vec<(i32, i32, i32)> {
+pub fn voxel_line_3d(
+    from: Vec3,
+    to: Vec3,
+) -> Vec<(i32, i32, i32)> {
     let mut result = Vec::new();
     let delta = to - from;
-    let steps = delta
-        .abs()
-        .max_element()
-        .ceil()
-        .max(1.0) as usize;
+    let steps = delta.abs().max_element().ceil().max(1.0) as usize;
 
     for i in 0..=steps {
         let t = i as f32 / steps as f32;
@@ -482,18 +503,15 @@ fn selection_system(
 pub struct TicketEditorPlugin;
 
 impl Plugin for TicketEditorPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<TicketStore>();
         app.init_resource::<TicketSelection>();
         app.init_resource::<LayoutMode>();
 
-        app.add_systems(
-            Update,
-            (
-                layout_system,
-                selection_system,
-            ),
-        );
+        app.add_systems(Update, (layout_system, selection_system));
     }
 }
 
@@ -547,9 +565,18 @@ mod tests {
 
     #[test]
     fn priority_roughness_order() {
-        assert!(Priority::Critical.glass_roughness() < Priority::High.glass_roughness());
-        assert!(Priority::High.glass_roughness() < Priority::Medium.glass_roughness());
-        assert!(Priority::Medium.glass_roughness() < Priority::Low.glass_roughness());
+        assert!(
+            Priority::Critical.glass_roughness()
+                < Priority::High.glass_roughness()
+        );
+        assert!(
+            Priority::High.glass_roughness()
+                < Priority::Medium.glass_roughness()
+        );
+        assert!(
+            Priority::Medium.glass_roughness()
+                < Priority::Low.glass_roughness()
+        );
     }
 
     #[test]
@@ -563,8 +590,14 @@ mod tests {
 
     #[test]
     fn edge_kind_colors_distinct() {
-        assert_ne!(EdgeKind::DependsOn.edge_color(), EdgeKind::Blocks.edge_color());
-        assert_ne!(EdgeKind::Blocks.edge_color(), EdgeKind::RelatedTo.edge_color());
+        assert_ne!(
+            EdgeKind::DependsOn.edge_color(),
+            EdgeKind::Blocks.edge_color()
+        );
+        assert_ne!(
+            EdgeKind::Blocks.edge_color(),
+            EdgeKind::RelatedTo.edge_color()
+        );
     }
 
     #[test]
@@ -700,19 +733,28 @@ mod tests {
     fn store_state_counts() {
         let mut store = TicketStore::default();
         store.upsert(TicketData {
-            id: "a".into(), title: "A".into(),
-            state: TicketState::New, priority: Priority::None,
-            ticket_type: "t".into(), description: "".into(),
+            id: "a".into(),
+            title: "A".into(),
+            state: TicketState::New,
+            priority: Priority::None,
+            ticket_type: "t".into(),
+            description: "".into(),
         });
         store.upsert(TicketData {
-            id: "b".into(), title: "B".into(),
-            state: TicketState::New, priority: Priority::None,
-            ticket_type: "t".into(), description: "".into(),
+            id: "b".into(),
+            title: "B".into(),
+            state: TicketState::New,
+            priority: Priority::None,
+            ticket_type: "t".into(),
+            description: "".into(),
         });
         store.upsert(TicketData {
-            id: "c".into(), title: "C".into(),
-            state: TicketState::Done, priority: Priority::None,
-            ticket_type: "t".into(), description: "".into(),
+            id: "c".into(),
+            title: "C".into(),
+            state: TicketState::Done,
+            priority: Priority::None,
+            ticket_type: "t".into(),
+            description: "".into(),
         });
         let counts = store.state_counts();
         assert_eq!(*counts.get(&TicketState::New).unwrap(), 2);
@@ -737,10 +779,20 @@ mod tests {
 
     #[test]
     fn grid_positions_respects_columns() {
-        let ids: Vec<&str> = (0..10).map(|i| match i {
-            0 => "a", 1 => "b", 2 => "c", 3 => "d", 4 => "e",
-            5 => "f", 6 => "g", 7 => "h", 8 => "i", _ => "j",
-        }).collect();
+        let ids: Vec<&str> = (0..10)
+            .map(|i| match i {
+                0 => "a",
+                1 => "b",
+                2 => "c",
+                3 => "d",
+                4 => "e",
+                5 => "f",
+                6 => "g",
+                7 => "h",
+                8 => "i",
+                _ => "j",
+            })
+            .collect();
         let positions = grid_positions(&ids);
         // First row: z=0, second row: z=GRID_SPACING
         let first_pos = positions["a"];
@@ -825,7 +877,8 @@ mod tests {
 
     #[test]
     fn voxel_line_horizontal() {
-        let line = voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(5.0, 0.0, 0.0));
+        let line =
+            voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(5.0, 0.0, 0.0));
         assert!(line.len() >= 5);
         assert_eq!(line[0], (0, 0, 0));
         assert_eq!(*line.last().unwrap(), (5, 0, 0));
@@ -838,7 +891,8 @@ mod tests {
 
     #[test]
     fn voxel_line_diagonal() {
-        let line = voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(3.0, 3.0, 3.0));
+        let line =
+            voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(3.0, 3.0, 3.0));
         assert!(!line.is_empty());
         assert_eq!(line[0], (0, 0, 0));
         assert_eq!(*line.last().unwrap(), (3, 3, 3));
@@ -846,7 +900,8 @@ mod tests {
 
     #[test]
     fn voxel_line_no_duplicates() {
-        let line = voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(10.0, 5.0, 3.0));
+        let line =
+            voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(10.0, 5.0, 3.0));
         for i in 1..line.len() {
             assert_ne!(line[i], line[i - 1], "Duplicate entry at index {}", i);
         }

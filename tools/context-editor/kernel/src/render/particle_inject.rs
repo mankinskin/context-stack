@@ -11,13 +11,27 @@
 use bevy::{
     prelude::*,
     render::{
-        render_graph::{Node, NodeRunError, RenderGraphContext},
-        render_resource::{
-            BindGroup, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-            BindingType, BufferBindingType, CachedComputePipelineId, ComputePassDescriptor,
-            ComputePipelineDescriptor, PipelineCache, ShaderStages,
+        render_graph::{
+            Node,
+            NodeRunError,
+            RenderGraphContext,
         },
-        renderer::{RenderContext, RenderDevice},
+        render_resource::{
+            BindGroup,
+            BindGroupLayoutDescriptor,
+            BindGroupLayoutEntry,
+            BindingType,
+            BufferBindingType,
+            CachedComputePipelineId,
+            ComputePassDescriptor,
+            ComputePipelineDescriptor,
+            PipelineCache,
+            ShaderStages,
+        },
+        renderer::{
+            RenderContext,
+            RenderDevice,
+        },
     },
 };
 
@@ -33,7 +47,8 @@ use crate::particle_splat::ParticleSplatBuffer;
 /// @binding(1) var<storage, read_write> splats
 /// @binding(2) var<uniform>             uniforms
 /// ```
-pub fn particle_inject_bind_group_layout_descriptor() -> BindGroupLayoutDescriptor {
+pub fn particle_inject_bind_group_layout_descriptor(
+) -> BindGroupLayoutDescriptor {
     BindGroupLayoutDescriptor::new(
         "bgl_particle_inject",
         &[
@@ -151,13 +166,16 @@ impl Node for ParticleComputeNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let Some(pipeline_res) = world.get_resource::<ParticleInjectPipeline>() else {
+        let Some(pipeline_res) = world.get_resource::<ParticleInjectPipeline>()
+        else {
             return Ok(());
         };
-        let Some(bind_group) = world.get_resource::<ParticleInjectBindGroup>() else {
+        let Some(bind_group) = world.get_resource::<ParticleInjectBindGroup>()
+        else {
             return Ok(());
         };
-        let Some(particles) = world.get_resource::<ParticleSplatBuffer>() else {
+        let Some(particles) = world.get_resource::<ParticleSplatBuffer>()
+        else {
             return Ok(());
         };
         let Some(pipeline_cache) = world.get_resource::<PipelineCache>() else {
@@ -169,7 +187,9 @@ impl Node for ParticleComputeNode {
             return Ok(());
         }
 
-        let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_res.0) else {
+        let Some(pipeline) =
+            pipeline_cache.get_compute_pipeline(pipeline_res.0)
+        else {
             return Ok(());
         };
 

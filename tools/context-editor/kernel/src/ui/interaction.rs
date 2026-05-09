@@ -58,7 +58,10 @@ pub struct InteractionQueue {
 
 impl InteractionQueue {
     /// Push an event from the Dioxus/DOM side (safe to call from any thread).
-    pub fn push(&self, event: KernelEvent) {
+    pub fn push(
+        &self,
+        event: KernelEvent,
+    ) {
         if let Ok(mut q) = self.pending.lock() {
             q.push(event);
         }
@@ -87,7 +90,11 @@ pub struct InteractionHits {
 // ---------------------------------------------------------------------------
 
 /// Convert screen coordinates to a world ray using the inverse view-projection.
-pub fn screen_to_world_ray(screen_pos: Vec2, viewport: Vec2, view_proj: Mat4) -> WorldRay {
+pub fn screen_to_world_ray(
+    screen_pos: Vec2,
+    viewport: Vec2,
+    view_proj: Mat4,
+) -> WorldRay {
     let ndc = Vec2::new(
         (screen_pos.x / viewport.x) * 2.0 - 1.0,
         1.0 - (screen_pos.y / viewport.y) * 2.0,
@@ -109,7 +116,10 @@ pub fn screen_to_world_ray(screen_pos: Vec2, viewport: Vec2, view_proj: Mat4) ->
 pub struct InteractionBridgePlugin;
 
 impl Plugin for InteractionBridgePlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<InteractionQueue>();
         app.init_resource::<InteractionHits>();
         app.add_systems(Update, process_interactions);
@@ -137,7 +147,9 @@ fn process_interactions(
         }
 
         // Ray-cast against SVO
-        if let Some((pos, normal)) = svo.raycast(event.ray.origin, event.ray.direction, 200.0) {
+        if let Some((pos, normal)) =
+            svo.raycast(event.ray.origin, event.ray.direction, 200.0)
+        {
             hits.hits.push(WorldHit {
                 position: pos,
                 normal,
@@ -161,10 +173,18 @@ mod tests {
         let viewport = Vec2::new(800.0, 600.0);
         let center = Vec2::new(400.0, 300.0);
         // Use a perspective projection looking down -Z
-        let vp = Mat4::perspective_rh(std::f32::consts::FRAC_PI_2, 4.0 / 3.0, 0.1, 100.0);
+        let vp = Mat4::perspective_rh(
+            std::f32::consts::FRAC_PI_2,
+            4.0 / 3.0,
+            0.1,
+            100.0,
+        );
         let ray = screen_to_world_ray(center, viewport, vp);
         // Center of screen → ray direction should be mostly -Z
-        assert!(ray.direction.z < 0.0, "center ray should point into screen (-Z)");
+        assert!(
+            ray.direction.z < 0.0,
+            "center ray should point into screen (-Z)"
+        );
         // x and y should be near zero
         assert!(ray.direction.x.abs() < 0.01);
         assert!(ray.direction.y.abs() < 0.01);
@@ -175,7 +195,12 @@ mod tests {
         let viewport = Vec2::new(800.0, 600.0);
         // Top-left corner
         let corner = Vec2::new(0.0, 0.0);
-        let vp = Mat4::perspective_rh(std::f32::consts::FRAC_PI_2, 4.0 / 3.0, 0.1, 100.0);
+        let vp = Mat4::perspective_rh(
+            std::f32::consts::FRAC_PI_2,
+            4.0 / 3.0,
+            0.1,
+            100.0,
+        );
         let ray = screen_to_world_ray(corner, viewport, vp);
         // Should have negative x and positive y components
         assert!(ray.direction.x < 0.0);

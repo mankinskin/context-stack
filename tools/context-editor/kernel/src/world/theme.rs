@@ -16,7 +16,10 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-use crate::svo::{VoxelMaterial, VoxelWorld};
+use crate::svo::{
+    VoxelMaterial,
+    VoxelWorld,
+};
 
 // ---------------------------------------------------------------------------
 // MaterialRef — palette slot identifier
@@ -228,7 +231,10 @@ impl ThemePalette {
     }
 
     /// Resolve a [`MaterialRef`] to the corresponding [`MaterialDef`].
-    pub fn resolve(&self, mat_ref: MaterialRef) -> &MaterialDef {
+    pub fn resolve(
+        &self,
+        mat_ref: MaterialRef,
+    ) -> &MaterialDef {
         match mat_ref {
             MaterialRef::Primary => &self.voxel_primary,
             MaterialRef::Secondary => &self.voxel_secondary,
@@ -251,7 +257,10 @@ pub struct MaterialRefMap {
 impl MaterialRefMap {
     /// Build the ref map by scanning all SVO leaf nodes and matching their
     /// packed `color_data` against the current palette materials.
-    pub fn build_from_world(world: &VoxelWorld, palette: &ThemePalette) -> Self {
+    pub fn build_from_world(
+        world: &VoxelWorld,
+        palette: &ThemePalette,
+    ) -> Self {
         let mut refs = HashMap::new();
         let slots = [
             (palette.voxel_primary.pack(), MaterialRef::Primary),
@@ -374,7 +383,9 @@ mod tests {
         let leaf_idx = world
             .nodes
             .iter()
-            .position(|n| n.is_leaf() && n.color_data == dark.voxel_primary.pack())
+            .position(|n| {
+                n.is_leaf() && n.color_data == dark.voxel_primary.pack()
+            })
             .expect("painted voxel must exist");
 
         let mut ref_map = MaterialRefMap::default();
@@ -387,7 +398,10 @@ mod tests {
             world.mark_dirty(leaf_idx);
         }
 
-        assert_eq!(world.nodes[leaf_idx].color_data, light.voxel_primary.pack());
+        assert_eq!(
+            world.nodes[leaf_idx].color_data,
+            light.voxel_primary.pack()
+        );
         assert!(!world.take_dirty_ranges().is_empty());
     }
 }

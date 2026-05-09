@@ -17,9 +17,17 @@
 //! packs them into a GPU buffer. The composite shader draws filled rounded
 //! rectangles with optional frosted-glass scene sampling.
 
-use bevy::prelude::*;
-use bevy::render::renderer::{RenderDevice, RenderQueue};
-use bytemuck::{Pod, Zeroable};
+use bevy::{
+    prelude::*,
+    render::renderer::{
+        RenderDevice,
+        RenderQueue,
+    },
+};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 /// Maximum number of UI panels the GPU buffer can hold.
 pub const MAX_UI_PANELS: usize = 32;
@@ -81,7 +89,10 @@ pub struct UiPanelBuffer {
 pub struct UiBridgePlugin;
 
 impl Plugin for UiBridgePlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<UiPanelList>();
         app.add_systems(Update, extract_dom_panels);
         app.add_systems(
@@ -104,11 +115,23 @@ fn extract_dom_panels(mut panel_list: ResMut<UiPanelList>) {
     {
         use web_sys::wasm_bindgen::JsCast;
 
-        let Some(window) = web_sys::window() else { return };
-        let Some(document) = window.document() else { return };
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let Some(document) = window.document() else {
+            return;
+        };
 
-        let vw = window.inner_width().ok().and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
-        let vh = window.inner_height().ok().and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
+        let vw = window
+            .inner_width()
+            .ok()
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1.0) as f32;
+        let vh = window
+            .inner_height()
+            .ok()
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1.0) as f32;
         if vw < 1.0 || vh < 1.0 {
             return;
         }
@@ -119,7 +142,9 @@ fn extract_dom_panels(mut panel_list: ResMut<UiPanelList>) {
 
         let count = node_list.length().min(MAX_UI_PANELS as u32);
         for i in 0..count {
-            let Some(node) = node_list.item(i) else { continue };
+            let Some(node) = node_list.item(i) else {
+                continue;
+            };
             let Ok(el) = node.dyn_into::<web_sys::Element>() else {
                 continue;
             };
@@ -216,7 +241,11 @@ fn update_ui_panel_buffer(
 // ---------------------------------------------------------------------------
 
 /// Returns `true` if the given viewport-normalised point (0..1) hits any panel.
-pub fn hit_test_panels(panel_list: &UiPanelList, ndc_x: f32, ndc_y: f32) -> bool {
+pub fn hit_test_panels(
+    panel_list: &UiPanelList,
+    ndc_x: f32,
+    ndc_y: f32,
+) -> bool {
     panel_list.panels.iter().any(|p| {
         ndc_x >= p.rect[0]
             && ndc_x <= p.rect[0] + p.rect[2]

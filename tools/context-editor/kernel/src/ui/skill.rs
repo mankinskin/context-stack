@@ -5,12 +5,18 @@
 //! shields refract rays, frost modifies roughness, gravity warps ray direction.
 
 use bevy::prelude::*;
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 use std::collections::VecDeque;
 
 use crate::multiplayer_backend::{
-    MultiplayerConnection, PlayerIdentity, PlayerTable,
-    ReducerQueue, ReducerRequest,
+    MultiplayerConnection,
+    PlayerIdentity,
+    PlayerTable,
+    ReducerQueue,
+    ReducerRequest,
 };
 
 // ---------------------------------------------------------------------------
@@ -72,7 +78,10 @@ impl SpellType {
     }
 
     /// Mana cost for this spell at the given power level.
-    pub fn mana_cost(self, power: f32) -> i32 {
+    pub fn mana_cost(
+        self,
+        power: f32,
+    ) -> i32 {
         let base = match self {
             SpellType::Fireball => 15,
             SpellType::Shield => 25,
@@ -173,34 +182,51 @@ pub enum SpellSdf {
 
 impl SpellSdf {
     /// Sample the signed distance at point `p`.
-    pub fn evaluate(&self, p: Vec3) -> f32 {
+    pub fn evaluate(
+        &self,
+        p: Vec3,
+    ) -> f32 {
         match self {
-            SpellSdf::Fireball { center, radius, .. } => {
-                (p - *center).length() - radius
-            }
-            SpellSdf::Shield { center, outer_radius, thickness, .. } => {
+            SpellSdf::Fireball { center, radius, .. } =>
+                (p - *center).length() - radius,
+            SpellSdf::Shield {
+                center,
+                outer_radius,
+                thickness,
+                ..
+            } => {
                 let d_outer = (p - *center).length() - outer_radius;
-                let d_inner = (p - *center).length() - (outer_radius - thickness);
+                let d_inner =
+                    (p - *center).length() - (outer_radius - thickness);
                 d_outer.max(-d_inner)
-            }
-            SpellSdf::Frost { center, radius, .. } => {
-                (p - *center).length() - radius
-            }
-            SpellSdf::Gravity { center, radius, .. } => {
-                (p - *center).length() - radius
-            }
-            SpellSdf::Lightning { origin, direction, length, radius, .. } => {
+            },
+            SpellSdf::Frost { center, radius, .. } =>
+                (p - *center).length() - radius,
+            SpellSdf::Gravity { center, radius, .. } =>
+                (p - *center).length() - radius,
+            SpellSdf::Lightning {
+                origin,
+                direction,
+                length,
+                radius,
+                ..
+            } => {
                 // Capsule SDF along the beam direction
                 let dir = direction.normalize_or_zero();
                 let end = *origin + dir * *length;
                 sd_capsule_line(p, *origin, end, *radius)
-            }
+            },
         }
     }
 }
 
 /// Signed distance from point to a capsule (line segment + radius).
-fn sd_capsule_line(p: Vec3, a: Vec3, b: Vec3, r: f32) -> f32 {
+fn sd_capsule_line(
+    p: Vec3,
+    a: Vec3,
+    b: Vec3,
+    r: f32,
+) -> f32 {
     let pa = p - a;
     let ba = b - a;
     let h = (pa.dot(ba) / ba.dot(ba)).clamp(0.0, 1.0);
@@ -354,16 +380,26 @@ pub struct SpellCooldowns {
 }
 
 impl SpellCooldowns {
-    pub fn can_cast(&self, spell_type: SpellType) -> bool {
-        self.global_remaining <= 0.0 && self.per_type[spell_type as usize] <= 0.0
+    pub fn can_cast(
+        &self,
+        spell_type: SpellType,
+    ) -> bool {
+        self.global_remaining <= 0.0
+            && self.per_type[spell_type as usize] <= 0.0
     }
 
-    pub fn trigger(&mut self, spell_type: SpellType) {
+    pub fn trigger(
+        &mut self,
+        spell_type: SpellType,
+    ) {
         self.global_remaining = GLOBAL_COOLDOWN;
         self.per_type[spell_type as usize] = spell_type.lifetime() * 0.5;
     }
 
-    pub fn tick(&mut self, dt: f32) {
+    pub fn tick(
+        &mut self,
+        dt: f32,
+    ) {
         self.global_remaining = (self.global_remaining - dt).max(0.0);
         for cd in &mut self.per_type {
             *cd = (*cd - dt).max(0.0);
@@ -406,7 +442,10 @@ fn advance_spells_system(
 }
 
 /// System: update spell cooldowns.
-fn cooldown_system(time: Res<Time>, mut cooldowns: ResMut<SpellCooldowns>) {
+fn cooldown_system(
+    time: Res<Time>,
+    mut cooldowns: ResMut<SpellCooldowns>,
+) {
     cooldowns.tick(time.delta_secs());
 }
 
@@ -431,16 +470,15 @@ fn spell_buffer_system(
 pub struct SkillPlugin;
 
 impl Plugin for SkillPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<SpellCooldowns>();
         app.init_resource::<SpellBuffer>();
         app.add_systems(
             Update,
-            (
-                cooldown_system,
-                advance_spells_system,
-                spell_buffer_system,
-            ),
+            (cooldown_system, advance_spells_system, spell_buffer_system),
         );
     }
 }
@@ -482,8 +520,14 @@ mod tests {
 
     #[test]
     fn base_radius_varies_by_type() {
-        assert!(SpellType::Gravity.base_radius() > SpellType::Fireball.base_radius());
-        assert!(SpellType::Shield.base_radius() > SpellType::Lightning.base_radius());
+        assert!(
+            SpellType::Gravity.base_radius()
+                > SpellType::Fireball.base_radius()
+        );
+        assert!(
+            SpellType::Shield.base_radius()
+                > SpellType::Lightning.base_radius()
+        );
     }
 
     #[test]
@@ -507,8 +551,13 @@ mod tests {
     #[test]
     fn active_spell_expires() {
         let mut spell = ActiveSpell::from_server(
-            1, PlayerIdentity::local(), SpellType::Fireball,
-            Vec3::ZERO, Vec3::X, 1.0, 3.0,
+            1,
+            PlayerIdentity::local(),
+            SpellType::Fireball,
+            Vec3::ZERO,
+            Vec3::X,
+            1.0,
+            3.0,
         );
         assert!(!spell.is_expired());
         spell.elapsed = 3.0;
@@ -518,8 +567,13 @@ mod tests {
     #[test]
     fn active_spell_to_sdf_fireball() {
         let spell = ActiveSpell::from_server(
-            1, PlayerIdentity::local(), SpellType::Fireball,
-            Vec3::new(1.0, 2.0, 3.0), Vec3::X, 1.0, 3.0,
+            1,
+            PlayerIdentity::local(),
+            SpellType::Fireball,
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::X,
+            1.0,
+            3.0,
         );
         let sdf = spell.to_sdf();
         assert!(matches!(sdf, SpellSdf::Fireball { .. }));
@@ -528,8 +582,13 @@ mod tests {
     #[test]
     fn active_spell_to_sdf_shield() {
         let spell = ActiveSpell::from_server(
-            2, PlayerIdentity::local(), SpellType::Shield,
-            Vec3::ZERO, Vec3::Y, 1.5, SHIELD_DURATION,
+            2,
+            PlayerIdentity::local(),
+            SpellType::Shield,
+            Vec3::ZERO,
+            Vec3::Y,
+            1.5,
+            SHIELD_DURATION,
         );
         let sdf = spell.to_sdf();
         assert!(matches!(sdf, SpellSdf::Shield { .. }));
@@ -646,8 +705,13 @@ mod tests {
     #[test]
     fn gpu_spell_pack_roundtrip() {
         let spell = ActiveSpell::from_server(
-            7, PlayerIdentity::new(99), SpellType::Fireball,
-            Vec3::new(1.0, 2.0, 3.0), Vec3::Z, 1.5, 3.0,
+            7,
+            PlayerIdentity::new(99),
+            SpellType::Fireball,
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::Z,
+            1.5,
+            3.0,
         );
         let packed = SpellBuffer::pack_spell(&spell);
         assert_eq!(packed.spell_type, 0); // Fireball = 0
@@ -664,13 +728,23 @@ mod tests {
 
     #[test]
     fn sd_capsule_line_on_axis() {
-        let d = sd_capsule_line(Vec3::new(5.0, 0.0, 0.0), Vec3::ZERO, Vec3::new(10.0, 0.0, 0.0), 0.5);
+        let d = sd_capsule_line(
+            Vec3::new(5.0, 0.0, 0.0),
+            Vec3::ZERO,
+            Vec3::new(10.0, 0.0, 0.0),
+            0.5,
+        );
         assert!(d < 0.0); // inside
     }
 
     #[test]
     fn sd_capsule_line_far_away() {
-        let d = sd_capsule_line(Vec3::new(5.0, 100.0, 0.0), Vec3::ZERO, Vec3::new(10.0, 0.0, 0.0), 0.5);
+        let d = sd_capsule_line(
+            Vec3::new(5.0, 100.0, 0.0),
+            Vec3::ZERO,
+            Vec3::new(10.0, 0.0, 0.0),
+            0.5,
+        );
         assert!(d > 0.0); // outside
     }
 }

@@ -14,9 +14,17 @@
 //! Particles ray-march their motion vector against the SVO to detect
 //! solid voxel hits, then reflect with restitution and friction.
 
-use bevy::prelude::*;
-use bevy::render::renderer::{RenderDevice, RenderQueue};
-use bytemuck::{Pod, Zeroable};
+use bevy::{
+    prelude::*,
+    render::renderer::{
+        RenderDevice,
+        RenderQueue,
+    },
+};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 /// Maximum number of concurrent force events.
 pub const MAX_FORCE_EVENTS: usize = 16;
@@ -89,7 +97,10 @@ pub struct ForceBuffer {
 pub struct ForceComputePlugin;
 
 impl Plugin for ForceComputePlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<ForceEventQueue>();
         app.add_systems(
             PostUpdate,
@@ -140,7 +151,8 @@ fn update_force_buffers(
     time: Res<Time>,
     mut force_buf: Option<ResMut<ForceBuffer>>,
 ) {
-    let (Some(rq), Some(ref mut buf)) = (render_queue, force_buf.as_mut()) else {
+    let (Some(rq), Some(ref mut buf)) = (render_queue, force_buf.as_mut())
+    else {
         return;
     };
 
@@ -162,7 +174,11 @@ fn update_force_buffers(
             })
             .collect();
 
-        rq.write_buffer(&buf.event_buffer, 0, bytemuck::cast_slice(&gpu_events));
+        rq.write_buffer(
+            &buf.event_buffer,
+            0,
+            bytemuck::cast_slice(&gpu_events),
+        );
     }
 
     // Write uniforms

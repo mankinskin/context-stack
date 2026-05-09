@@ -18,28 +18,39 @@
 
 pub mod depth_bridge;
 pub mod glass;
+pub mod particle_inject;
+pub mod runtime_params;
+pub mod svo_ray_march;
 pub mod ui_composite;
 pub mod wireframe_overlay;
-pub mod particle_inject;
-pub mod svo_ray_march;
-pub mod runtime_params;
 
 use bevy::{
+    core_pipeline::core_3d::graph::{
+        Core3d,
+        Node3d,
+    },
     prelude::*,
-    core_pipeline::core_3d::graph::{Core3d, Node3d},
     render::{
         extract_resource::ExtractResourcePlugin,
-        render_graph::{Node, NodeRunError, RenderGraph, RenderGraphContext, RenderLabel},
+        render_graph::{
+            Node,
+            NodeRunError,
+            RenderGraph,
+            RenderGraphContext,
+            RenderLabel,
+        },
         renderer::RenderContext,
-        Render, RenderApp, RenderSystems,
+        Render,
+        RenderApp,
+        RenderSystems,
     },
 };
 
 use depth_bridge::DepthBridgeNode;
-use ui_composite::UiCompositeNode;
-use wireframe_overlay::WireframeOverlayNode;
 use particle_inject::ParticleComputeNode;
 use svo_ray_march::SvoRayMarchNode;
+use ui_composite::UiCompositeNode;
+use wireframe_overlay::WireframeOverlayNode;
 
 // ---------------------------------------------------------------------------
 // Node labels
@@ -179,7 +190,10 @@ pub fn sync_canvas_resolution(mut windows: Query<&mut Window>) {
 pub struct ContextEditorRenderPlugin;
 
 impl Plugin for ContextEditorRenderPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         // Embed WGSL shaders into the binary so they are available on WASM
         // without a filesystem or asset-serving HTTP path.
         bevy::asset::embedded_asset!(app, "depth_bridge.wgsl");
@@ -321,8 +335,10 @@ impl Plugin for ContextEditorRenderPlugin {
         );
 
         // Construct nodes that need FromWorld before borrowing the graph.
-        let wireframe_node = WireframeOverlayNode::from_world(render_app.world_mut());
-        let svo_ray_march_node = SvoRayMarchNode::from_world(render_app.world_mut());
+        let wireframe_node =
+            WireframeOverlayNode::from_world(render_app.world_mut());
+        let svo_ray_march_node =
+            SvoRayMarchNode::from_world(render_app.world_mut());
 
         let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
 
@@ -332,27 +348,55 @@ impl Plugin for ContextEditorRenderPlugin {
         // to be overwritten by Bevy's built-in upscaling pass.
         let core3d = graph.sub_graph_mut(Core3d);
 
-        core3d.add_node(ContextEditorLabel::BufferSwap, BufferSwapNode::default());
+        core3d.add_node(
+            ContextEditorLabel::BufferSwap,
+            BufferSwapNode::default(),
+        );
         core3d.add_node(
             ContextEditorLabel::ParticleCompute,
             ParticleComputeNode::default(),
         );
         core3d.add_node(ContextEditorLabel::SvoRayMarch, svo_ray_march_node);
-        core3d.add_node(ContextEditorLabel::DepthBridge, DepthBridgeNode::default());
-        core3d.add_node(ContextEditorLabel::UiComposite, UiCompositeNode::default());
+        core3d.add_node(
+            ContextEditorLabel::DepthBridge,
+            DepthBridgeNode::default(),
+        );
+        core3d.add_node(
+            ContextEditorLabel::UiComposite,
+            UiCompositeNode::default(),
+        );
         core3d.add_node(ContextEditorLabel::WireframeOverlay, wireframe_node);
 
         // Wire the sequential edge chain:
         // BufferSwap → ParticleCompute → SvoRayMarch → DepthBridge → UiComposite → WireframeOverlay
-        core3d.add_node_edge(ContextEditorLabel::BufferSwap, ContextEditorLabel::ParticleCompute);
-        core3d.add_node_edge(ContextEditorLabel::ParticleCompute, ContextEditorLabel::SvoRayMarch);
-        core3d.add_node_edge(ContextEditorLabel::SvoRayMarch, ContextEditorLabel::DepthBridge);
-        core3d.add_node_edge(ContextEditorLabel::DepthBridge, ContextEditorLabel::UiComposite);
-        core3d.add_node_edge(ContextEditorLabel::UiComposite, ContextEditorLabel::WireframeOverlay);
+        core3d.add_node_edge(
+            ContextEditorLabel::BufferSwap,
+            ContextEditorLabel::ParticleCompute,
+        );
+        core3d.add_node_edge(
+            ContextEditorLabel::ParticleCompute,
+            ContextEditorLabel::SvoRayMarch,
+        );
+        core3d.add_node_edge(
+            ContextEditorLabel::SvoRayMarch,
+            ContextEditorLabel::DepthBridge,
+        );
+        core3d.add_node_edge(
+            ContextEditorLabel::DepthBridge,
+            ContextEditorLabel::UiComposite,
+        );
+        core3d.add_node_edge(
+            ContextEditorLabel::UiComposite,
+            ContextEditorLabel::WireframeOverlay,
+        );
 
         // Anchor into the existing Core3d sub-graph:
         //   ... → EndMainPass → [our chain] → Tonemapping → Upscaling → ...
-        core3d.add_node_edge(Node3d::EndMainPass, ContextEditorLabel::BufferSwap);
-        core3d.add_node_edge(ContextEditorLabel::WireframeOverlay, Node3d::Tonemapping);
+        core3d
+            .add_node_edge(Node3d::EndMainPass, ContextEditorLabel::BufferSwap);
+        core3d.add_node_edge(
+            ContextEditorLabel::WireframeOverlay,
+            Node3d::Tonemapping,
+        );
     }
 }

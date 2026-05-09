@@ -4,8 +4,10 @@
 //! grounding, wall sliding, and jumping. Mouse look uses pointer lock
 //! on WASM targets.
 
-use bevy::input::mouse::AccumulatedMouseMotion;
-use bevy::prelude::*;
+use bevy::{
+    input::mouse::AccumulatedMouseMotion,
+    prelude::*,
+};
 use bevy_rapier3d::prelude::*;
 
 use crate::debug_overlay::is_free_fly_enabled;
@@ -35,7 +37,10 @@ pub struct CharacterController {
 pub struct CharacterPlugin;
 
 impl Plugin for CharacterPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.add_systems(
             Update,
             (character_look, character_movement, pointer_lock_system),
@@ -67,8 +72,10 @@ fn character_look(
 
     for (mut transform, mut ctrl) in &mut query {
         ctrl.yaw -= delta.x * MOUSE_SENSITIVITY;
-        ctrl.pitch = (ctrl.pitch - delta.y * MOUSE_SENSITIVITY).clamp(-1.54, 1.54);
-        transform.rotation = Quat::from_euler(EulerRot::YXZ, ctrl.yaw, ctrl.pitch, 0.0);
+        ctrl.pitch =
+            (ctrl.pitch - delta.y * MOUSE_SENSITIVITY).clamp(-1.54, 1.54);
+        transform.rotation =
+            Quat::from_euler(EulerRot::YXZ, ctrl.yaw, ctrl.pitch, 0.0);
     }
 }
 
@@ -91,24 +98,40 @@ fn character_movement(
 ) {
     for (mut ctrl, mut kcc, transform, output) in &mut query {
         let forward = *transform.forward();
-        let right   = *transform.right();
-        let up      = Vec3::Y;
+        let right = *transform.right();
+        let up = Vec3::Y;
 
         let mut move_dir = Vec3::ZERO;
-        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp)    { move_dir += forward; }
-        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown)  { move_dir -= forward; }
-        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) { move_dir += right; }
-        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft)  { move_dir -= right; }
+        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
+            move_dir += forward;
+        }
+        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
+            move_dir -= forward;
+        }
+        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
+            move_dir += right;
+        }
+        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
+            move_dir -= right;
+        }
 
         let speed = MOVE_SPEED
-            * if keys.pressed(KeyCode::ShiftLeft) { SPRINT_MULT } else { 1.0 };
+            * if keys.pressed(KeyCode::ShiftLeft) {
+                SPRINT_MULT
+            } else {
+                1.0
+            };
 
         let displacement = if is_free_fly_enabled() {
             // --- Free-fly mode: full 3-axis movement, no gravity ---
             // Keep the horizontal contribution from the camera-forward direction.
             // Q = descend, E = ascend (world-space Y).
-            if keys.pressed(KeyCode::KeyQ) { move_dir -= up; }
-            if keys.pressed(KeyCode::KeyE) { move_dir += up; }
+            if keys.pressed(KeyCode::KeyQ) {
+                move_dir -= up;
+            }
+            if keys.pressed(KeyCode::KeyE) {
+                move_dir += up;
+            }
 
             // Reset vertical velocity so physics mode resumes correctly on toggle.
             ctrl.vertical_velocity = 0.0;

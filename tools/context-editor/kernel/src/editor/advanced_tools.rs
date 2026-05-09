@@ -3,12 +3,24 @@
 //! Extends the editor with sophisticated manipulation tools that operate
 //! on the SVO through the VoxelWorld API.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{
+    HashSet,
+    VecDeque,
+};
 
 use bevy::prelude::*;
 
-use crate::editor::{EditorState, HitInfo, VoxelHit};
-use crate::svo::{VoxelMaterial, VoxelWorld};
+use crate::{
+    editor::{
+        EditorState,
+        HitInfo,
+        VoxelHit,
+    },
+    svo::{
+        VoxelMaterial,
+        VoxelWorld,
+    },
+};
 
 // ---------------------------------------------------------------------------
 // Tool Enum Extension
@@ -49,7 +61,10 @@ pub const FILL_MAX_REGION: usize = 4096;
 pub struct AdvancedToolsPlugin;
 
 impl Plugin for AdvancedToolsPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<AdvancedToolState>();
         app.add_systems(
             Update,
@@ -89,7 +104,8 @@ fn select_advanced_tool(
         state.active = Some(AdvancedTool::Clone);
     }
     // Pressing 1 or 2 (core tools) deselects advanced tool
-    if keys.just_pressed(KeyCode::Digit1) || keys.just_pressed(KeyCode::Digit2) {
+    if keys.just_pressed(KeyCode::Digit1) || keys.just_pressed(KeyCode::Digit2)
+    {
         state.active = None;
     }
 }
@@ -115,7 +131,8 @@ fn apply_fill(
 
     // Start from the air voxel adjacent to the hit surface
     let start = info.cell + info.normal.round().as_ivec3();
-    let filled = flood_fill(&svo, start, editor.current_material, FILL_MAX_REGION);
+    let filled =
+        flood_fill(&svo, start, editor.current_material, FILL_MAX_REGION);
 
     for (pos, mat) in filled {
         svo.set_voxel(pos, mat);
@@ -216,13 +233,19 @@ fn apply_smooth(
 }
 
 /// Read a voxel's material from the SVO.
-fn read_material(svo: &VoxelWorld, pos: IVec3) -> Option<VoxelMaterial> {
+fn read_material(
+    svo: &VoxelWorld,
+    pos: IVec3,
+) -> Option<VoxelMaterial> {
     let idx = svo.descend_to(pos)?;
     Some(VoxelMaterial::unpack(svo.nodes[idx].color_data))
 }
 
 /// Average the 6-connected neighbor materials of a solid voxel.
-pub fn average_neighbors(svo: &VoxelWorld, pos: IVec3) -> Option<VoxelMaterial> {
+pub fn average_neighbors(
+    svo: &VoxelWorld,
+    pos: IVec3,
+) -> Option<VoxelMaterial> {
     // Only smooth existing voxels
     read_material(svo, pos)?;
 
@@ -347,7 +370,11 @@ fn apply_clone(
 }
 
 /// Capture a spherical region of voxels centred at the hit point.
-pub fn capture_region(svo: &VoxelWorld, info: &HitInfo, brush_size: u32) -> ClipboardRegion {
+pub fn capture_region(
+    svo: &VoxelWorld,
+    info: &HitInfo,
+    brush_size: u32,
+) -> ClipboardRegion {
     let brush_ri = brush_size as i32;
     let brush_r = brush_size as f32;
     let mut voxels = Vec::new();

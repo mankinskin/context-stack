@@ -18,13 +18,23 @@
 
 use bevy::{
     prelude::*,
-    render::renderer::{RenderDevice, RenderQueue},
+    render::renderer::{
+        RenderDevice,
+        RenderQueue,
+    },
 };
 use bytemuck::cast_slice;
 
-use crate::gpu::{SvoDoubleBuffer, SvoPageTableBuffer};
-use crate::svo::VoxelWorld;
-use crate::svo::paging::PageManager;
+use crate::{
+    gpu::{
+        SvoDoubleBuffer,
+        SvoPageTableBuffer,
+    },
+    svo::{
+        paging::PageManager,
+        VoxelWorld,
+    },
+};
 
 pub use paging_resource::SvoPageManagerResource;
 
@@ -64,7 +74,10 @@ pub struct SvoUploadedThisFrame(pub bool);
 pub struct SvoUploadPlugin;
 
 impl Plugin for SvoUploadPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<SvoUploadedThisFrame>();
         app.init_resource::<SvoPageManagerResource>();
         app.add_systems(
@@ -77,8 +90,12 @@ impl Plugin for SvoUploadPlugin {
                     svo_paged_upload_system,
                     double_buffer_swap_system,
                 )
-                .chain()
-                .run_if(|svo: Option<Res<crate::gpu::SvoDoubleBuffer>>| svo.is_some()),
+                    .chain()
+                    .run_if(
+                        |svo: Option<Res<crate::gpu::SvoDoubleBuffer>>| {
+                            svo.is_some()
+                        },
+                    ),
             ),
         );
     }
@@ -225,8 +242,11 @@ pub fn double_buffer_swap_system(
 
 #[cfg(test)]
 mod tests {
+    use crate::svo::{
+        VoxelMaterial,
+        VoxelWorld,
+    };
     use bevy::math::IVec3;
-    use crate::svo::{VoxelMaterial, VoxelWorld};
 
     #[test]
     fn upload_system_clears_dirty_on_take() {
@@ -249,7 +269,10 @@ mod tests {
         for z in 0..4i32 {
             for y in 0..4i32 {
                 for x in 0..4i32 {
-                    world.set_voxel(IVec3::new(x, y, z), VoxelMaterial::new(1, 2, 3, 4));
+                    world.set_voxel(
+                        IVec3::new(x, y, z),
+                        VoxelMaterial::new(1, 2, 3, 4),
+                    );
                 }
             }
         }

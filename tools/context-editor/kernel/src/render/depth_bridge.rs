@@ -20,21 +20,58 @@ use bevy::{
     prelude::*,
     render::{
         extract_resource::ExtractResource,
-        render_graph::{Node, NodeRunError, RenderGraphContext},
-        render_resource::{
-            BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-            BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
-            CachedRenderPipelineId, CompareFunction, DepthBiasState, DepthStencilState,
-            Extent3d, FragmentState, LoadOp, MultisampleState, Operations, PipelineCache,
-            PrimitiveState, RenderPassDepthStencilAttachment, RenderPassDescriptor,
-            RenderPipelineDescriptor, ShaderStages, StencilState, StoreOp, Texture,
-            TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
-            TextureViewDescriptor, VertexState,
+        render_graph::{
+            Node,
+            NodeRunError,
+            RenderGraphContext,
         },
-        renderer::{RenderContext, RenderDevice, RenderQueue},
+        render_resource::{
+            BindGroup,
+            BindGroupEntry,
+            BindGroupLayoutDescriptor,
+            BindGroupLayoutEntry,
+            BindingType,
+            Buffer,
+            BufferBindingType,
+            BufferDescriptor,
+            BufferUsages,
+            CachedRenderPipelineId,
+            CompareFunction,
+            DepthBiasState,
+            DepthStencilState,
+            Extent3d,
+            FragmentState,
+            LoadOp,
+            MultisampleState,
+            Operations,
+            PipelineCache,
+            PrimitiveState,
+            RenderPassDepthStencilAttachment,
+            RenderPassDescriptor,
+            RenderPipelineDescriptor,
+            ShaderStages,
+            StencilState,
+            StoreOp,
+            Texture,
+            TextureDescriptor,
+            TextureDimension,
+            TextureFormat,
+            TextureUsages,
+            TextureView,
+            TextureViewDescriptor,
+            VertexState,
+        },
+        renderer::{
+            RenderContext,
+            RenderDevice,
+            RenderQueue,
+        },
     },
 };
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 use crate::render::svo_ray_march::SvoRayMarchBuffers;
 
@@ -48,7 +85,7 @@ const DEPTH_BRIDGE_UNIFORM_SIZE: u64 = 32;
 #[derive(Copy, Clone, Debug, Default, Pod, Zeroable)]
 pub struct DepthBridgeUniformData {
     pub screen_width: u32,
-    pub _pad: [u32; 7],  // WGSL: vec3u at offset 16 due to align(16) → struct = 32 bytes
+    pub _pad: [u32; 7], // WGSL: vec3u at offset 16 due to align(16) → struct = 32 bytes
 }
 
 const _: () = assert!(
@@ -79,7 +116,7 @@ pub fn init_depth_bridge_uniforms(
     let Some(device) = device else { return };
     let buf = device.create_buffer(&BufferDescriptor {
         label: Some("depth_bridge_uniforms"),
-        size:  DEPTH_BRIDGE_UNIFORM_SIZE,
+        size: DEPTH_BRIDGE_UNIFORM_SIZE,
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -88,15 +125,22 @@ pub fn init_depth_bridge_uniforms(
 
 /// Write screen_width from the active window each frame.
 pub fn update_depth_bridge_uniforms(
-    windows:      Query<&Window>,
+    windows: Query<&Window>,
     render_queue: Option<Res<RenderQueue>>,
-    uniform_buf:  Option<Res<DepthBridgeUniformBuffer>>,
+    uniform_buf: Option<Res<DepthBridgeUniformBuffer>>,
 ) {
-    let Some(render_queue) = render_queue else { return };
-    let Some(uniform_buf)  = uniform_buf  else { return };
+    let Some(render_queue) = render_queue else {
+        return;
+    };
+    let Some(uniform_buf) = uniform_buf else {
+        return;
+    };
     let Ok(window) = windows.single() else { return };
     let w = window.physical_width().max(1);
-    let data = DepthBridgeUniformData { screen_width: w, _pad: [0; 7] };
+    let data = DepthBridgeUniformData {
+        screen_width: w,
+        _pad: [0; 7],
+    };
     render_queue.write_buffer(&uniform_buf.0, 0, bytemuck::bytes_of(&data));
 }
 
@@ -112,9 +156,9 @@ pub fn update_depth_bridge_uniforms(
 #[derive(Resource, Clone)]
 pub struct SvoDepthTexture {
     pub texture: Texture,
-    pub view:    TextureView,
-    pub width:   u32,
-    pub height:  u32,
+    pub view: TextureView,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl ExtractResource for SvoDepthTexture {
@@ -127,9 +171,9 @@ impl ExtractResource for SvoDepthTexture {
 /// Create (or recreate on resize) the hardware depth texture.
 pub fn init_svo_depth_texture(
     mut commands: Commands,
-    device:       Option<Res<RenderDevice>>,
-    existing:     Option<Res<SvoDepthTexture>>,
-    windows:      Query<&Window>,
+    device: Option<Res<RenderDevice>>,
+    existing: Option<Res<SvoDepthTexture>>,
+    windows: Query<&Window>,
 ) {
     let Some(device) = device else { return };
     let Ok(window) = windows.single() else { return };
@@ -144,7 +188,11 @@ pub fn init_svo_depth_texture(
 
     let texture = device.create_texture(&TextureDescriptor {
         label: Some("svo_depth_texture"),
-        size: Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        size: Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: TextureDimension::D2,
@@ -153,7 +201,12 @@ pub fn init_svo_depth_texture(
         view_formats: &[],
     });
     let view = texture.create_view(&TextureViewDescriptor::default());
-    commands.insert_resource(SvoDepthTexture { texture, view, width: w, height: h });
+    commands.insert_resource(SvoDepthTexture {
+        texture,
+        view,
+        width: w,
+        height: h,
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -200,17 +253,16 @@ pub struct DepthBridgeBindGroup(pub BindGroup);
 
 /// Queue the depth bridge render pipeline for compilation (runs once at startup).
 pub fn queue_depth_bridge_pipeline(
-    mut commands:   Commands,
+    mut commands: Commands,
     pipeline_cache: Res<PipelineCache>,
-    asset_server:   Res<AssetServer>,
-    existing:       Option<Res<DepthBridgePipeline>>,
+    asset_server: Res<AssetServer>,
+    existing: Option<Res<DepthBridgePipeline>>,
 ) {
     if existing.is_some() {
         return;
     }
-    let shader = asset_server.load(
-        "embedded://context_editor_kernel/render/depth_bridge.wgsl",
-    );
+    let shader = asset_server
+        .load("embedded://context_editor_kernel/render/depth_bridge.wgsl");
     let id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
         label: Some("depth_bridge_pipeline".into()),
         layout: vec![depth_bridge_bind_group_layout()],
@@ -249,22 +301,31 @@ pub fn queue_depth_bridge_pipeline(
 /// Rebuild the depth bridge bind group each frame (buffers may be recreated on
 /// resize, so the binding must always point to the current buffer handle).
 pub fn rebuild_depth_bridge_bind_group(
-    mut commands:   Commands,
-    device:         Res<RenderDevice>,
+    mut commands: Commands,
+    device: Res<RenderDevice>,
     pipeline_cache: Res<PipelineCache>,
-    rm_buffers:     Option<Res<SvoRayMarchBuffers>>,
-    db_uniforms:    Option<Res<DepthBridgeUniformBuffer>>,
+    rm_buffers: Option<Res<SvoRayMarchBuffers>>,
+    db_uniforms: Option<Res<DepthBridgeUniformBuffer>>,
 ) {
-    let Some(rm_buffers)  = rm_buffers  else { return };
-    let Some(db_uniforms) = db_uniforms else { return };
+    let Some(rm_buffers) = rm_buffers else { return };
+    let Some(db_uniforms) = db_uniforms else {
+        return;
+    };
 
-    let layout = pipeline_cache.get_bind_group_layout(&depth_bridge_bind_group_layout());
+    let layout =
+        pipeline_cache.get_bind_group_layout(&depth_bridge_bind_group_layout());
     let bg = device.create_bind_group(
         "bg_depth_bridge",
         &layout,
         &[
-            BindGroupEntry { binding: 0, resource: rm_buffers.depth.as_entire_binding() },
-            BindGroupEntry { binding: 1, resource: db_uniforms.0.as_entire_binding() },
+            BindGroupEntry {
+                binding: 0,
+                resource: rm_buffers.depth.as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 1,
+                resource: db_uniforms.0.as_entire_binding(),
+            },
         ],
     );
     commands.insert_resource(DepthBridgeBindGroup(bg));
@@ -287,12 +348,23 @@ impl Node for DepthBridgeNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let Some(pipeline_res)   = world.get_resource::<DepthBridgePipeline>()  else { return Ok(()); };
-        let Some(bind_group)     = world.get_resource::<DepthBridgeBindGroup>() else { return Ok(()); };
-        let Some(depth_tex)      = world.get_resource::<SvoDepthTexture>()      else { return Ok(()); };
-        let Some(pipeline_cache) = world.get_resource::<PipelineCache>()        else { return Ok(()); };
+        let Some(pipeline_res) = world.get_resource::<DepthBridgePipeline>()
+        else {
+            return Ok(());
+        };
+        let Some(bind_group) = world.get_resource::<DepthBridgeBindGroup>()
+        else {
+            return Ok(());
+        };
+        let Some(depth_tex) = world.get_resource::<SvoDepthTexture>() else {
+            return Ok(());
+        };
+        let Some(pipeline_cache) = world.get_resource::<PipelineCache>() else {
+            return Ok(());
+        };
 
-        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0) else {
+        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0)
+        else {
             return Ok(());
         };
 
@@ -303,7 +375,7 @@ impl Node for DepthBridgeNode {
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                 view: &depth_tex.view,
                 depth_ops: Some(Operations {
-                    load:  LoadOp::Clear(0.0),  // clear to 0 = far in infinite reverse-Z
+                    load: LoadOp::Clear(0.0), // clear to 0 = far in infinite reverse-Z
                     store: StoreOp::Store,
                 }),
                 stencil_ops: None,

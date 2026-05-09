@@ -6,12 +6,20 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-use crate::multiplayer_backend::{
-    InventorySlot, ItemBlueprint, BlueprintTable, PlayerIdentity,
-    MultiplayerConnection, ReducerQueue, ReducerRequest,
-    validate_interaction_range, PlayerTable,
+use crate::{
+    multiplayer_backend::{
+        validate_interaction_range,
+        BlueprintTable,
+        InventorySlot,
+        ItemBlueprint,
+        MultiplayerConnection,
+        PlayerIdentity,
+        PlayerTable,
+        ReducerQueue,
+        ReducerRequest,
+    },
+    svo::OctreeNode,
 };
-use crate::svo::OctreeNode;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -56,8 +64,15 @@ pub struct CachedSlot {
 #[derive(Clone, Debug)]
 pub enum DragState {
     None,
-    Dragging { slot_index: usize, screen_pos: Vec2 },
-    Previewing { slot_index: usize, world_pos: Vec3, valid: bool },
+    Dragging {
+        slot_index: usize,
+        screen_pos: Vec2,
+    },
+    Previewing {
+        slot_index: usize,
+        world_pos: Vec3,
+        valid: bool,
+    },
 }
 
 impl Default for DragState {
@@ -127,7 +142,10 @@ pub fn voxel_count(voxel_data: &[u8]) -> usize {
 // ---------------------------------------------------------------------------
 
 /// Find a slot by slot_index in the cache.
-pub fn find_slot(cache: &InventoryCache, slot_index: u8) -> Option<&CachedSlot> {
+pub fn find_slot(
+    cache: &InventoryCache,
+    slot_index: u8,
+) -> Option<&CachedSlot> {
     cache.slots.iter().find(|s| s.slot_index == slot_index)
 }
 
@@ -136,9 +154,10 @@ pub fn find_stackable_slot(
     cache: &InventoryCache,
     blueprint_id: u32,
 ) -> Option<usize> {
-    cache.slots.iter().position(|s| {
-        s.blueprint_id == blueprint_id && s.quantity < MAX_STACK
-    })
+    cache
+        .slots
+        .iter()
+        .position(|s| s.blueprint_id == blueprint_id && s.quantity < MAX_STACK)
 }
 
 /// Find the first empty slot index not used by any cached slot.
@@ -210,7 +229,11 @@ pub fn build_ghost_preview(
         voxel_offsets: offsets,
         world_origin: origin,
         color,
-        opacity: if valid { GHOST_OPACITY } else { GHOST_OPACITY * 0.5 },
+        opacity: if valid {
+            GHOST_OPACITY
+        } else {
+            GHOST_OPACITY * 0.5
+        },
         valid,
     }
 }
@@ -238,9 +261,15 @@ fn hotbar_select_system(
     mut cache: ResMut<InventoryCache>,
 ) {
     let keys = [
-        KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3,
-        KeyCode::Digit4, KeyCode::Digit5, KeyCode::Digit6,
-        KeyCode::Digit7, KeyCode::Digit8, KeyCode::Digit9,
+        KeyCode::Digit1,
+        KeyCode::Digit2,
+        KeyCode::Digit3,
+        KeyCode::Digit4,
+        KeyCode::Digit5,
+        KeyCode::Digit6,
+        KeyCode::Digit7,
+        KeyCode::Digit8,
+        KeyCode::Digit9,
     ];
     for (i, key) in keys.iter().enumerate() {
         if input.just_pressed(*key) {
@@ -256,7 +285,12 @@ fn drop_item_system(
     mut reducer_queue: ResMut<ReducerQueue>,
 ) {
     if mouse.just_released(MouseButton::Left) {
-        if let DragState::Previewing { slot_index, world_pos, valid } = &cache.drag_state {
+        if let DragState::Previewing {
+            slot_index,
+            world_pos,
+            valid,
+        } = &cache.drag_state
+        {
             if *valid {
                 reducer_queue.push(ReducerRequest::DropItem {
                     slot_index: *slot_index as u8,
@@ -274,7 +308,10 @@ fn drop_item_system(
 pub struct InventoryPlugin;
 
 impl Plugin for InventoryPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<InventoryCache>();
         app.add_systems(
             Update,
@@ -299,9 +336,9 @@ mod tests {
     fn sample_voxel_data() -> Vec<u8> {
         let mut data = Vec::new();
         // 3 voxels at different positions
-        data.extend_from_slice(&[0, 0, 0, 255, 0, 0, 20]);   // red at origin
-        data.extend_from_slice(&[1, 0, 0, 0, 255, 0, 15]);    // green at (1,0,0)
-        data.extend_from_slice(&[0, 1, 0, 0, 0, 255, 10]);    // blue at (0,1,0)
+        data.extend_from_slice(&[0, 0, 0, 255, 0, 0, 20]); // red at origin
+        data.extend_from_slice(&[1, 0, 0, 0, 255, 0, 15]); // green at (1,0,0)
+        data.extend_from_slice(&[0, 1, 0, 0, 0, 255, 10]); // blue at (0,1,0)
         data
     }
 
@@ -441,7 +478,8 @@ mod tests {
     fn ghost_preview_valid_placement() {
         let slot = sample_cached_slot();
         let data = sample_voxel_data();
-        let preview = build_ghost_preview(&slot, Vec3::new(5.0, 10.0, 3.0), true, &data);
+        let preview =
+            build_ghost_preview(&slot, Vec3::new(5.0, 10.0, 3.0), true, &data);
         assert!(preview.valid);
         assert_eq!(preview.world_origin, IVec3::new(5, 10, 3));
         assert_eq!(preview.voxel_offsets.len(), 3);
@@ -452,7 +490,8 @@ mod tests {
     fn ghost_preview_invalid_placement() {
         let slot = sample_cached_slot();
         let data = sample_voxel_data();
-        let preview = build_ghost_preview(&slot, Vec3::new(0.0, 0.0, 0.0), false, &data);
+        let preview =
+            build_ghost_preview(&slot, Vec3::new(0.0, 0.0, 0.0), false, &data);
         assert!(!preview.valid);
         assert!(preview.opacity < GHOST_OPACITY);
     }

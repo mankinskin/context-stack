@@ -31,7 +31,11 @@ pub enum CsgOp {
 /// - `union(a,b) = min(a,b)`
 /// - `intersection(a,b) = max(a,b)`
 /// - `subtraction(a,b) = max(a, -b)`
-pub fn sdf_csg(op: CsgOp, d_a: f32, d_b: f32) -> f32 {
+pub fn sdf_csg(
+    op: CsgOp,
+    d_a: f32,
+    d_b: f32,
+) -> f32 {
     match op {
         CsgOp::Union => d_a.min(d_b),
         CsgOp::Intersection => d_a.max(d_b),
@@ -42,7 +46,11 @@ pub fn sdf_csg(op: CsgOp, d_a: f32, d_b: f32) -> f32 {
 /// Smooth-minimum CSG union with blending radius `k`.
 ///
 /// Produces a rounded transition between two SDFs.
-pub fn sdf_smooth_union(d_a: f32, d_b: f32, k: f32) -> f32 {
+pub fn sdf_smooth_union(
+    d_a: f32,
+    d_b: f32,
+    k: f32,
+) -> f32 {
     if k <= 0.0 {
         return d_a.min(d_b);
     }
@@ -51,7 +59,11 @@ pub fn sdf_smooth_union(d_a: f32, d_b: f32, k: f32) -> f32 {
 }
 
 /// Smooth subtraction: smooth `max(a, -b)` with blending radius `k`.
-pub fn sdf_smooth_subtraction(d_a: f32, d_b: f32, k: f32) -> f32 {
+pub fn sdf_smooth_subtraction(
+    d_a: f32,
+    d_b: f32,
+    k: f32,
+) -> f32 {
     if k <= 0.0 {
         return d_a.max(-d_b);
     }
@@ -59,7 +71,11 @@ pub fn sdf_smooth_subtraction(d_a: f32, d_b: f32, k: f32) -> f32 {
     lerp(d_a, -d_b, h) + k * h * (1.0 - h)
 }
 
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
+fn lerp(
+    a: f32,
+    b: f32,
+    t: f32,
+) -> f32 {
     a + (b - a) * t
 }
 
@@ -68,19 +84,31 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 // ---------------------------------------------------------------------------
 
 /// Signed distance to a sphere of given `radius` centred at `center`.
-pub fn sdf_sphere(point: Vec3, center: Vec3, radius: f32) -> f32 {
+pub fn sdf_sphere(
+    point: Vec3,
+    center: Vec3,
+    radius: f32,
+) -> f32 {
     (point - center).length() - radius
 }
 
 /// Signed distance to an axis-aligned box with `half_extents` centred at `center`.
-pub fn sdf_box(point: Vec3, center: Vec3, half_extents: Vec3) -> f32 {
+pub fn sdf_box(
+    point: Vec3,
+    center: Vec3,
+    half_extents: Vec3,
+) -> f32 {
     let d = (point - center).abs() - half_extents;
     d.max(Vec3::ZERO).length() + d.x.max(d.y.max(d.z)).min(0.0)
 }
 
 /// Signed distance to an infinite plane with normal `n` (must be unit) passing
 /// through `point_on_plane`.
-pub fn sdf_plane(point: Vec3, normal: Vec3, point_on_plane: Vec3) -> f32 {
+pub fn sdf_plane(
+    point: Vec3,
+    normal: Vec3,
+    point_on_plane: Vec3,
+) -> f32 {
     (point - point_on_plane).dot(normal)
 }
 
@@ -169,7 +197,10 @@ pub fn emit_cut_particles(
 
 /// Tick all cut particles forward by `dt` seconds.
 /// Removes expired particles.
-pub fn tick_cut_particles(pool: &mut CutParticles, dt: f32) {
+pub fn tick_cut_particles(
+    pool: &mut CutParticles,
+    dt: f32,
+) {
     for p in &mut pool.particles {
         p.age += dt;
         p.velocity.y -= 9.81 * dt; // gravity
@@ -204,7 +235,10 @@ pub struct GlassImpacts {
 pub const MAX_GLASS_IMPACTS: usize = 32;
 
 /// Spawn a glass impact at the cut location.
-pub fn spawn_glass_impact(impacts: &mut GlassImpacts, request: &CutRequest) {
+pub fn spawn_glass_impact(
+    impacts: &mut GlassImpacts,
+    request: &CutRequest,
+) {
     if impacts.impacts.len() >= MAX_GLASS_IMPACTS {
         // Remove oldest
         impacts.impacts.remove(0);
@@ -220,7 +254,10 @@ pub fn spawn_glass_impact(impacts: &mut GlassImpacts, request: &CutRequest) {
 }
 
 /// Tick glass impacts, removing expired ones.
-pub fn tick_glass_impacts(impacts: &mut GlassImpacts, dt: f32) {
+pub fn tick_glass_impacts(
+    impacts: &mut GlassImpacts,
+    dt: f32,
+) {
     for imp in &mut impacts.impacts {
         imp.age += dt;
         // Expand radius over time for ripple effect
@@ -260,7 +297,8 @@ pub fn apply_sdf_cut(
             for z in (cz - half)..=(cz + half) {
                 let pos = IVec3::new(x, y, z);
                 let world_pos = Vec3::new(x as f32, y as f32, z as f32);
-                let dist = sdf_sphere(world_pos, request.center, request.radius);
+                let dist =
+                    sdf_sphere(world_pos, request.center, request.radius);
 
                 if dist < 0.0 {
                     // Voxel is inside the cutting sphere — remove it
@@ -299,12 +337,18 @@ pub fn apply_sdf_cut(
 // ---------------------------------------------------------------------------
 
 /// Per-frame system: tick cut particles with delta time.
-fn tick_cut_particles_system(time: Res<Time>, mut pool: ResMut<CutParticles>) {
+fn tick_cut_particles_system(
+    time: Res<Time>,
+    mut pool: ResMut<CutParticles>,
+) {
     tick_cut_particles(&mut pool, time.delta_secs());
 }
 
 /// Per-frame system: tick glass impacts with delta time.
-fn tick_glass_impacts_system(time: Res<Time>, mut impacts: ResMut<GlassImpacts>) {
+fn tick_glass_impacts_system(
+    time: Res<Time>,
+    mut impacts: ResMut<GlassImpacts>,
+) {
     tick_glass_impacts(&mut impacts, time.delta_secs());
 }
 
@@ -316,10 +360,16 @@ fn tick_glass_impacts_system(time: Res<Time>, mut impacts: ResMut<GlassImpacts>)
 pub struct SdfCuttingPlugin;
 
 impl Plugin for SdfCuttingPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<CutParticles>();
         app.init_resource::<GlassImpacts>();
-        app.add_systems(Update, (tick_cut_particles_system, tick_glass_impacts_system));
+        app.add_systems(
+            Update,
+            (tick_cut_particles_system, tick_glass_impacts_system),
+        );
     }
 }
 
@@ -342,12 +392,16 @@ mod tests {
     #[test]
     fn csg_union_takes_minimum() {
         assert!((sdf_csg(CsgOp::Union, 2.0, 3.0) - 2.0).abs() < f32::EPSILON);
-        assert!((sdf_csg(CsgOp::Union, -1.0, 1.0) - (-1.0)).abs() < f32::EPSILON);
+        assert!(
+            (sdf_csg(CsgOp::Union, -1.0, 1.0) - (-1.0)).abs() < f32::EPSILON
+        );
     }
 
     #[test]
     fn csg_intersection_takes_maximum() {
-        assert!((sdf_csg(CsgOp::Intersection, 2.0, 3.0) - 3.0).abs() < f32::EPSILON);
+        assert!(
+            (sdf_csg(CsgOp::Intersection, 2.0, 3.0) - 3.0).abs() < f32::EPSILON
+        );
     }
 
     #[test]
@@ -396,7 +450,10 @@ mod tests {
 
         // Tick past lifetime
         tick_cut_particles(&mut pool, 2.0);
-        assert!(pool.particles.is_empty(), "all particles should have expired");
+        assert!(
+            pool.particles.is_empty(),
+            "all particles should have expired"
+        );
     }
 
     #[test]
@@ -427,7 +484,12 @@ mod tests {
             direction: Vec3::Y,
             impact_strength: 1.0,
         };
-        emit_cut_particles(&mut pool, &req, [255; 4], MAX_CUT_PARTICLES as u32 + 100);
+        emit_cut_particles(
+            &mut pool,
+            &req,
+            [255; 4],
+            MAX_CUT_PARTICLES as u32 + 100,
+        );
         assert_eq!(pool.particles.len(), MAX_CUT_PARTICLES);
     }
 

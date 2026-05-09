@@ -7,12 +7,28 @@
 use bevy::prelude::*;
 use std::collections::VecDeque;
 
-use crate::multiplayer_backend::{
-    CombatEvent, CombatEventQueue, ItemBlueprint, MultiplayerConnection,
-    PlayerIdentity, PlayerTable, ReducerQueue, ReducerRequest,
+use crate::{
+    multiplayer_backend::{
+        CombatEvent,
+        CombatEventQueue,
+        ItemBlueprint,
+        MultiplayerConnection,
+        PlayerIdentity,
+        PlayerTable,
+        ReducerQueue,
+        ReducerRequest,
+    },
+    multiplayer_chars::{
+        sd_capsule,
+        RemotePlayer,
+        CAPSULE_HEIGHT,
+        CAPSULE_RADIUS,
+    },
+    particle_splat::{
+        Particle,
+        ParticleSystem,
+    },
 };
-use crate::multiplayer_chars::{sd_capsule, CAPSULE_HEIGHT, CAPSULE_RADIUS, RemotePlayer};
-use crate::particle_splat::{Particle, ParticleSystem};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -66,7 +82,10 @@ pub enum WeaponSdf {
     /// Axe: handle + rounded head.
     Axe { handle_length: f32, head_size: Vec3 },
     /// Hammer: sphere at end of capsule handle.
-    Hammer { handle_length: f32, head_radius: f32 },
+    Hammer {
+        handle_length: f32,
+        head_radius: f32,
+    },
     /// Fist: default unarmed capsule.
     Fist { radius: f32 },
 }
@@ -75,8 +94,16 @@ impl WeaponSdf {
     /// Generate weapon SDF from an item blueprint's voxel bounds.
     pub fn from_blueprint(bp: &ItemBlueprint) -> Self {
         let bounds = compute_voxel_bounds(&bp.voxel_data);
-        let aspect_xz = if bounds.z > 0.001 { bounds.x / bounds.z } else { 10.0 };
-        let aspect_yx = if bounds.x > 0.001 { bounds.y / bounds.x } else { 10.0 };
+        let aspect_xz = if bounds.z > 0.001 {
+            bounds.x / bounds.z
+        } else {
+            10.0
+        };
+        let aspect_yx = if bounds.x > 0.001 {
+            bounds.y / bounds.x
+        } else {
+            10.0
+        };
 
         if aspect_xz > 3.0 {
             // Long and thin → sword
@@ -104,8 +131,14 @@ impl WeaponSdf {
     pub fn reach(&self) -> f32 {
         match self {
             WeaponSdf::Sword { reach, .. } => *reach,
-            WeaponSdf::Axe { handle_length, head_size } => handle_length + head_size.y,
-            WeaponSdf::Hammer { handle_length, head_radius } => handle_length + head_radius,
+            WeaponSdf::Axe {
+                handle_length,
+                head_size,
+            } => handle_length + head_size.y,
+            WeaponSdf::Hammer {
+                handle_length,
+                head_radius,
+            } => handle_length + head_radius,
             WeaponSdf::Fist { radius } => *radius + FIST_REACH,
         }
     }
@@ -217,7 +250,12 @@ pub fn sweep_test(
         let capsule_top = *pos + Vec3::Y * CAPSULE_HEIGHT;
 
         // Check distance from sweep line to capsule
-        let capsule_dist = sd_capsule(sweep_origin + dir * reach * 0.5, capsule_bottom, capsule_top, CAPSULE_RADIUS);
+        let capsule_dist = sd_capsule(
+            sweep_origin + dir * reach * 0.5,
+            capsule_bottom,
+            capsule_top,
+            CAPSULE_RADIUS,
+        );
 
         if capsule_dist < reach {
             let hit_pos = *pos + Vec3::Y * (CAPSULE_HEIGHT * 0.5);
@@ -250,7 +288,11 @@ pub struct DamageNumber {
 }
 
 impl DamageNumber {
-    pub fn new(value: i32, pos: Vec3, is_damage: bool) -> Self {
+    pub fn new(
+        value: i32,
+        pos: Vec3,
+        is_damage: bool,
+    ) -> Self {
         Self {
             value,
             world_pos: pos,
@@ -346,9 +388,13 @@ impl Default for PlayerVitals {
 // ---------------------------------------------------------------------------
 
 /// System: tick attack cooldown.
-fn attack_cooldown_system(time: Res<Time>, mut state: ResMut<AttackState>) {
+fn attack_cooldown_system(
+    time: Res<Time>,
+    mut state: ResMut<AttackState>,
+) {
     if state.cooldown_remaining > 0.0 {
-        state.cooldown_remaining = (state.cooldown_remaining - time.delta_secs()).max(0.0);
+        state.cooldown_remaining =
+            (state.cooldown_remaining - time.delta_secs()).max(0.0);
     }
 }
 
@@ -367,13 +413,15 @@ fn process_combat_events_system(
 ) {
     let drained: Vec<CombatEvent> = std::mem::take(&mut events.events);
     for event in drained {
-        let hit_pos = Vec3::new(event.hit_pos.0, event.hit_pos.1, event.hit_pos.2);
+        let hit_pos =
+            Vec3::new(event.hit_pos.0, event.hit_pos.1, event.hit_pos.2);
 
         // --- Debris particles ---
         spawn_debris_particles(&mut particles, hit_pos, DEBRIS_PARTICLE_COUNT);
 
         // --- Damage number ---
-        let dmg_num = DamageNumber::new(event.damage, hit_pos + Vec3::Y * 0.5, true);
+        let dmg_num =
+            DamageNumber::new(event.damage, hit_pos + Vec3::Y * 0.5, true);
         if damage_numbers.active.len() >= MAX_DAMAGE_NUMBERS {
             damage_numbers.active.pop_front();
         }
@@ -387,7 +435,11 @@ fn process_combat_events_system(
 }
 
 /// Spawn debris particles outward from an impact point.
-fn spawn_debris_particles(particles: &mut ParticleSystem, hit_pos: Vec3, count: usize) {
+fn spawn_debris_particles(
+    particles: &mut ParticleSystem,
+    hit_pos: Vec3,
+    count: usize,
+) {
     for i in 0..count {
         // Distribute outward in a hemisphere above the hit
         let angle = (i as f32 / count as f32) * std::f32::consts::TAU;
@@ -407,7 +459,10 @@ fn spawn_debris_particles(particles: &mut ParticleSystem, hit_pos: Vec3, count: 
 }
 
 /// System: update floating damage numbers (position, opacity, lifetime).
-fn damage_number_system(time: Res<Time>, mut pool: ResMut<DamageNumberPool>) {
+fn damage_number_system(
+    time: Res<Time>,
+    mut pool: ResMut<DamageNumberPool>,
+) {
     let dt = time.delta_secs();
     pool.active.retain_mut(|num| {
         num.age += dt;
@@ -418,7 +473,10 @@ fn damage_number_system(time: Res<Time>, mut pool: ResMut<DamageNumberPool>) {
 }
 
 /// System: update battle-glass distortion effect.
-fn battle_glass_system(time: Res<Time>, mut effect: ResMut<BattleGlassEffect>) {
+fn battle_glass_system(
+    time: Res<Time>,
+    mut effect: ResMut<BattleGlassEffect>,
+) {
     if effect.timer > 0.0 {
         effect.timer = (effect.timer - time.delta_secs()).max(0.0);
         let t = effect.timer / BATTLE_GLASS_DURATION;
@@ -448,8 +506,10 @@ fn vitals_sync_system(
     // Smooth animation toward current values
     let dt = time.delta_secs();
     let lerp_speed = 8.0;
-    vitals.display_hp += (vitals.current_hp as f32 - vitals.display_hp) * lerp_speed * dt;
-    vitals.display_mana += (vitals.current_mana as f32 - vitals.display_mana) * lerp_speed * dt;
+    vitals.display_hp +=
+        (vitals.current_hp as f32 - vitals.display_hp) * lerp_speed * dt;
+    vitals.display_mana +=
+        (vitals.current_mana as f32 - vitals.display_mana) * lerp_speed * dt;
 }
 
 /// System: handle respawn after death.
@@ -486,7 +546,10 @@ fn respawn_system(
 pub struct CombatPlugin;
 
 impl Plugin for CombatPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<AttackState>();
         app.init_resource::<DamageNumberPool>();
         app.init_resource::<BattleGlassEffect>();
@@ -649,7 +712,10 @@ mod tests {
         let t = effect.timer / BATTLE_GLASS_DURATION;
         effect.distortion = BATTLE_GLASS_MAX_DISTORTION * t;
         effect.tint_red = 0.3 * t;
-        assert!((effect.distortion - BATTLE_GLASS_MAX_DISTORTION * 0.5).abs() < 0.001);
+        assert!(
+            (effect.distortion - BATTLE_GLASS_MAX_DISTORTION * 0.5).abs()
+                < 0.001
+        );
         assert!((effect.tint_red - 0.15).abs() < 0.001);
     }
 
@@ -736,12 +802,24 @@ mod tests {
 
     /// Create a voxel data buffer representing a bounding box of (w, h, d) voxels.
     /// Only corner voxels are stored (min and max).
-    fn make_voxel_line(w: u8, h: u8, d: u8) -> Vec<u8> {
+    fn make_voxel_line(
+        w: u8,
+        h: u8,
+        d: u8,
+    ) -> Vec<u8> {
         let mut data = Vec::new();
         // Origin voxel
         data.extend_from_slice(&[0, 0, 0, 0xFF, 0x00, 0x00, 0x00]);
         // Far corner voxel
-        data.extend_from_slice(&[w.saturating_sub(1), h.saturating_sub(1), d.saturating_sub(1), 0xFF, 0x00, 0x00, 0x00]);
+        data.extend_from_slice(&[
+            w.saturating_sub(1),
+            h.saturating_sub(1),
+            d.saturating_sub(1),
+            0xFF,
+            0x00,
+            0x00,
+            0x00,
+        ]);
         data
     }
 }

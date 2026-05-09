@@ -9,13 +9,26 @@
 
 use bevy::prelude::*;
 use dioxus::prelude::*;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
-use std::time::Duration;
+use std::{
+    sync::atomic::{
+        AtomicBool,
+        AtomicI32,
+        AtomicU32,
+        AtomicU64,
+        Ordering,
+    },
+    time::Duration,
+};
 
-use crate::character::CharacterController;
-use crate::svo::VoxelWorld;
-use crate::ui::{GlassPanel, TreeSection};
-use crate::world_gen::WorldGenerator;
+use crate::{
+    character::CharacterController,
+    svo::VoxelWorld,
+    ui::{
+        GlassPanel,
+        TreeSection,
+    },
+    world_gen::WorldGenerator,
+};
 
 // Re-alias Bevy's KeyCode to avoid ambiguity with dioxus::prelude::KeyCode.
 use bevy::input::keyboard::KeyCode as BevyKeyCode;
@@ -85,10 +98,18 @@ static LOD_SOFTNESS_X1000: AtomicU32 = AtomicU32::new(1_000);
 /// - Bit 3 (0x8): LOD cutoff (Phase 4b)
 pub fn ray_march_feature_flags() -> u32 {
     let mut flags = 0u32;
-    if NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed)  { flags |= 0x1; }
-    if SHADOW_RAYS_ENABLED.load(Ordering::Relaxed)     { flags |= 0x2; }
-    if REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed) { flags |= 0x4; }
-    if LOD_ENABLED.load(Ordering::Relaxed)             { flags |= 0x8; }
+    if NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed) {
+        flags |= 0x1;
+    }
+    if SHADOW_RAYS_ENABLED.load(Ordering::Relaxed) {
+        flags |= 0x2;
+    }
+    if REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed) {
+        flags |= 0x4;
+    }
+    if LOD_ENABLED.load(Ordering::Relaxed) {
+        flags |= 0x8;
+    }
     flags
 }
 
@@ -116,20 +137,24 @@ pub fn is_free_fly_enabled() -> bool {
 pub struct DebugOverlayPlugin;
 
 impl Plugin for DebugOverlayPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<DebugOverlayState>();
         app.init_resource::<AppliedWorldPreset>();
         app.add_systems(Startup, init_platform_info);
-        app.add_systems(Update, (
-            toggle_debug_keys,
-            sync_debug_from_shared,
-            draw_svo_wireframe,
-            track_frame_time,
-        ).chain());
-        app.add_systems(Update, (
-            track_camera_state,
-            track_svo_state,
-        ));
+        app.add_systems(
+            Update,
+            (
+                toggle_debug_keys,
+                sync_debug_from_shared,
+                draw_svo_wireframe,
+                track_frame_time,
+            )
+                .chain(),
+        );
+        app.add_systems(Update, (track_camera_state, track_svo_state));
         app.add_systems(Update, apply_world_preset);
     }
 }
@@ -163,7 +188,9 @@ impl Default for DebugOverlayState {
 struct AppliedWorldPreset(u32);
 
 impl Default for AppliedWorldPreset {
-    fn default() -> Self { Self(u32::MAX) }
+    fn default() -> Self {
+        Self(u32::MAX)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -231,16 +258,20 @@ fn init_platform_info() {
 
 /// Write camera world position and orientation into shared atomics each frame.
 fn track_camera_state(
-    camera_q: Query<(&Transform, Option<&CharacterController>), With<Camera3d>>,
+    camera_q: Query<(&Transform, Option<&CharacterController>), With<Camera3d>>
 ) {
-    let Ok((tf, ctrl)) = camera_q.single() else { return };
+    let Ok((tf, ctrl)) = camera_q.single() else {
+        return;
+    };
     let pos = tf.translation;
     CAMERA_X_DM.store((pos.x * 10.0) as i32, Ordering::Relaxed);
     CAMERA_Y_DM.store((pos.y * 10.0) as i32, Ordering::Relaxed);
     CAMERA_Z_DM.store((pos.z * 10.0) as i32, Ordering::Relaxed);
     if let Some(c) = ctrl {
-        CAMERA_YAW_DEG10.store((c.yaw.to_degrees() * 10.0) as i32, Ordering::Relaxed);
-        CAMERA_PITCH_DEG10.store((c.pitch.to_degrees() * 10.0) as i32, Ordering::Relaxed);
+        CAMERA_YAW_DEG10
+            .store((c.yaw.to_degrees() * 10.0) as i32, Ordering::Relaxed);
+        CAMERA_PITCH_DEG10
+            .store((c.pitch.to_degrees() * 10.0) as i32, Ordering::Relaxed);
     }
 }
 
@@ -250,7 +281,8 @@ fn track_svo_state(
     generator: Option<Res<WorldGenerator>>,
 ) {
     SVO_NODE_COUNT.store(voxel_world.nodes.len() as u64, Ordering::Relaxed);
-    SVO_DIRTY_RANGES.store(voxel_world.dirty_ranges.len() as u32, Ordering::Relaxed);
+    SVO_DIRTY_RANGES
+        .store(voxel_world.dirty_ranges.len() as u32, Ordering::Relaxed);
     SVO_MAX_DEPTH.store(voxel_world.max_depth, Ordering::Relaxed);
     if let Some(gen) = generator {
         let seed = gen.seed;
@@ -279,7 +311,9 @@ fn apply_world_preset(world: &mut World) {
 fn draw_svo_wireframe(
     state: Res<DebugOverlayState>,
     voxel_world: Res<VoxelWorld>,
-    mut wire_data: Option<ResMut<crate::render::wireframe_overlay::WireframeData>>,
+    mut wire_data: Option<
+        ResMut<crate::render::wireframe_overlay::WireframeData>,
+    >,
     camera_q: Query<&Transform, With<Camera3d>>,
 ) {
     // Clear previous frame's data.
@@ -291,11 +325,12 @@ fn draw_svo_wireframe(
     if !state.enabled || voxel_world.nodes.is_empty() {
         return;
     }
-    let target   = state.display_depth.min(voxel_world.max_depth);
+    let target = state.display_depth.min(voxel_world.max_depth);
     let occ_only = state.occupied_only;
     let root_extent = (1u32 << voxel_world.max_depth) as f32;
 
-    const MAX_CUBES: usize = crate::render::wireframe_overlay::MAX_WIREFRAME_CUBES as usize;
+    const MAX_CUBES: usize =
+        crate::render::wireframe_overlay::MAX_WIREFRAME_CUBES as usize;
 
     // -------------------------------------------------------------------------
     // Occupied-only mode: nearest-first priority queue.
@@ -319,20 +354,26 @@ fn draw_svo_wireframe(
         // truncate to MAX_CUBES so that the nearest terrain is always visible.
         // At typical UI depths (≤8) the terrain surface has far fewer than
         // MAX_CUBES cells, so the sort/truncate is effectively a no-op.
-        let cam_pos = camera_q.single()
+        let cam_pos = camera_q
+            .single()
             .map(|t| t.translation)
             .unwrap_or(Vec3::ZERO);
 
         let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
             std::collections::VecDeque::new();
-        queue.push_back((voxel_world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        queue.push_back((
+            voxel_world.root_index as usize,
+            0,
+            Vec3::ZERO,
+            root_extent,
+        ));
 
         while let Some((idx, depth, origin, extent)) = queue.pop_front() {
             if idx >= voxel_world.nodes.len() {
                 continue;
             }
-            let node   = &voxel_world.nodes[idx];
-            let half   = extent * 0.5;
+            let node = &voxel_world.nodes[idx];
+            let half = extent * 0.5;
             let center = origin + Vec3::splat(half);
 
             // Skip truly empty leaves (no color, no children).
@@ -346,17 +387,18 @@ fn draw_svo_wireframe(
             }
 
             // Recurse into occupied children only.
-            let mask  = node.child_mask();
+            let mask = node.child_mask();
             let first = node.first_child_index();
             for slot in 0..8usize {
                 if mask & (1 << slot) == 0 {
                     continue;
                 }
-                let co = origin + Vec3::new(
-                    if slot & 1 != 0 { half } else { 0.0 },
-                    if slot & 2 != 0 { half } else { 0.0 },
-                    if slot & 4 != 0 { half } else { 0.0 },
-                );
+                let co = origin
+                    + Vec3::new(
+                        if slot & 1 != 0 { half } else { 0.0 },
+                        if slot & 2 != 0 { half } else { 0.0 },
+                        if slot & 4 != 0 { half } else { 0.0 },
+                    );
                 // SVO stores children at first_child + slot (fixed 8-slot block).
                 queue.push_back((first + slot, depth + 1, co, half));
             }
@@ -388,7 +430,7 @@ fn draw_svo_wireframe(
                 d += 1;
                 cells = cells.saturating_mul(8);
             }
-            d  // 8^5=32768 ≤ 87381 < 8^6=262144 → cap=5
+            d // 8^5=32768 ≤ 87381 < 8^6=262144 → cap=5
         };
 
         // Queue entry: (node_idx, depth, origin, extent).
@@ -396,14 +438,19 @@ fn draw_svo_wireframe(
         let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
             std::collections::VecDeque::new();
 
-        queue.push_back((voxel_world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        queue.push_back((
+            voxel_world.root_index as usize,
+            0,
+            Vec3::ZERO,
+            root_extent,
+        ));
 
         while let Some((idx, depth, origin, extent)) = queue.pop_front() {
             if cubes.len() >= MAX_CUBES {
                 break;
             }
             let center = origin + Vec3::splat(extent * 0.5);
-            let half   = extent * 0.5;
+            let half = extent * 0.5;
 
             if idx == usize::MAX {
                 // Empty-region sentinel.
@@ -412,11 +459,12 @@ fn draw_svo_wireframe(
                     cubes.push((center, extent));
                 } else {
                     for slot in 0..8usize {
-                        let co = origin + Vec3::new(
-                            if slot & 1 != 0 { half } else { 0.0 },
-                            if slot & 2 != 0 { half } else { 0.0 },
-                            if slot & 4 != 0 { half } else { 0.0 },
-                        );
+                        let co = origin
+                            + Vec3::new(
+                                if slot & 1 != 0 { half } else { 0.0 },
+                                if slot & 2 != 0 { half } else { 0.0 },
+                                if slot & 4 != 0 { half } else { 0.0 },
+                            );
                         queue.push_back((usize::MAX, depth + 1, co, half));
                     }
                 }
@@ -433,14 +481,15 @@ fn draw_svo_wireframe(
                 continue;
             }
 
-            let mask  = node.child_mask();
+            let mask = node.child_mask();
             let first = node.first_child_index();
             for slot in 0..8usize {
-                let co = origin + Vec3::new(
-                    if slot & 1 != 0 { half } else { 0.0 },
-                    if slot & 2 != 0 { half } else { 0.0 },
-                    if slot & 4 != 0 { half } else { 0.0 },
-                );
+                let co = origin
+                    + Vec3::new(
+                        if slot & 1 != 0 { half } else { 0.0 },
+                        if slot & 2 != 0 { half } else { 0.0 },
+                        if slot & 4 != 0 { half } else { 0.0 },
+                    );
                 if mask & (1 << slot) == 0 {
                     // Empty octant: enqueue as virtual cell within depth cap.
                     if depth + 1 <= full_grid_cap {
@@ -458,28 +507,62 @@ fn draw_svo_wireframe(
         return;
     }
 
-    let Some(ref mut wire_data) = wire_data else { return };
+    let Some(ref mut wire_data) = wire_data else {
+        return;
+    };
 
-    use crate::render::wireframe_overlay::{WIREFRAME_INDICES_PER_CUBE, WIREFRAME_VERTS_PER_CUBE};
+    use crate::render::wireframe_overlay::{
+        WIREFRAME_INDICES_PER_CUBE,
+        WIREFRAME_VERTS_PER_CUBE,
+    };
     const CUBE_EDGES: [(u32, u32); 12] = [
-        (0,1),(1,2),(2,3),(3,0), // front face
-        (4,5),(5,6),(6,7),(7,4), // back face
-        (0,4),(1,5),(2,6),(3,7), // connectors
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0), // front face
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4), // back face
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7), // connectors
     ];
 
-    wire_data.corners.reserve(cubes.len() * WIREFRAME_VERTS_PER_CUBE);
-    wire_data.indices.reserve(cubes.len() * WIREFRAME_INDICES_PER_CUBE);
+    wire_data
+        .corners
+        .reserve(cubes.len() * WIREFRAME_VERTS_PER_CUBE);
+    wire_data
+        .indices
+        .reserve(cubes.len() * WIREFRAME_INDICES_PER_CUBE);
     for (i, &(center, extent)) in cubes.iter().enumerate() {
         let base = (i * WIREFRAME_VERTS_PER_CUBE) as u32;
         let h = extent * 0.5;
-        wire_data.corners.push((center + Vec3::new(-h, -h, -h)).to_array());
-        wire_data.corners.push((center + Vec3::new( h, -h, -h)).to_array());
-        wire_data.corners.push((center + Vec3::new( h,  h, -h)).to_array());
-        wire_data.corners.push((center + Vec3::new(-h,  h, -h)).to_array());
-        wire_data.corners.push((center + Vec3::new(-h, -h,  h)).to_array());
-        wire_data.corners.push((center + Vec3::new( h, -h,  h)).to_array());
-        wire_data.corners.push((center + Vec3::new( h,  h,  h)).to_array());
-        wire_data.corners.push((center + Vec3::new(-h,  h,  h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-h, -h, -h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(h, -h, -h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(h, h, -h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-h, h, -h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-h, -h, h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(h, -h, h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(h, h, h)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-h, h, h)).to_array());
         for &(a, b) in &CUBE_EDGES {
             wire_data.indices.push(base + a);
             wire_data.indices.push(base + b);
@@ -506,7 +589,11 @@ pub fn DebugPanel() -> Element {
 
     // --- Performance ---
     let frame_us = FRAME_TIME_US.load(Ordering::Relaxed);
-    let fps = if frame_us == 0 { 0.0 } else { 1_000_000.0 / frame_us as f64 };
+    let fps = if frame_us == 0 {
+        0.0
+    } else {
+        1_000_000.0 / frame_us as f64
+    };
     let ms = frame_us as f64 / 1000.0;
     let cpu_threads = CPU_THREADS.load(Ordering::Relaxed);
     let vram_mb = VRAM_ESTIMATE_MB.load(Ordering::Relaxed);
@@ -515,15 +602,15 @@ pub fn DebugPanel() -> Element {
     let cam_x = CAMERA_X_DM.load(Ordering::Relaxed) as f32 / 10.0;
     let cam_y = CAMERA_Y_DM.load(Ordering::Relaxed) as f32 / 10.0;
     let cam_z = CAMERA_Z_DM.load(Ordering::Relaxed) as f32 / 10.0;
-    let yaw_deg   = CAMERA_YAW_DEG10.load(Ordering::Relaxed) as f32 / 10.0;
+    let yaw_deg = CAMERA_YAW_DEG10.load(Ordering::Relaxed) as f32 / 10.0;
     let pitch_deg = CAMERA_PITCH_DEG10.load(Ordering::Relaxed) as f32 / 10.0;
 
     // --- SVO (display values) ---
-    let node_count  = SVO_NODE_COUNT.load(Ordering::Relaxed);
-    let dirty       = SVO_DIRTY_RANGES.load(Ordering::Relaxed);
-    let max_depth   = SVO_MAX_DEPTH.load(Ordering::Relaxed);
-    let resolution  = if max_depth > 0 { 1u64 << max_depth } else { 0 };
-    let capacity    = crate::gpu::SVO_CAPACITY_NODES as u64;
+    let node_count = SVO_NODE_COUNT.load(Ordering::Relaxed);
+    let dirty = SVO_DIRTY_RANGES.load(Ordering::Relaxed);
+    let max_depth = SVO_MAX_DEPTH.load(Ordering::Relaxed);
+    let resolution = if max_depth > 0 { 1u64 << max_depth } else { 0 };
+    let capacity = crate::gpu::SVO_CAPACITY_NODES as u64;
 
     // --- World seed ---
     let seed_hi = WORLD_SEED_HI.load(Ordering::Relaxed);
@@ -537,16 +624,23 @@ pub fn DebugPanel() -> Element {
         .unwrap_or_else(|| "?".to_string());
 
     // --- Mutable toggle / slider state ---
-    let mut free_fly        = use_signal(|| FREE_FLY_ENABLED.load(Ordering::Relaxed));
-    let mut neighbor_blend  = use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
-    let mut shadow_rays     = use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
-    let mut reflection_rays = use_signal(|| REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed));
-    let mut wireframe_en    = use_signal(|| WIREFRAME_ENABLED.load(Ordering::Relaxed));
-    let mut depth           = use_signal(|| WIREFRAME_DEPTH.load(Ordering::Relaxed));
-    let mut occupied        = use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
-    let mut lod_en          = use_signal(|| LOD_ENABLED.load(Ordering::Relaxed));
-    let mut lod_thresh      = use_signal(|| LOD_THRESHOLD_X1000.load(Ordering::Relaxed));
-    let mut lod_soft        = use_signal(|| LOD_SOFTNESS_X1000.load(Ordering::Relaxed));
+    let mut free_fly = use_signal(|| FREE_FLY_ENABLED.load(Ordering::Relaxed));
+    let mut neighbor_blend =
+        use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
+    let mut shadow_rays =
+        use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
+    let mut reflection_rays =
+        use_signal(|| REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed));
+    let mut wireframe_en =
+        use_signal(|| WIREFRAME_ENABLED.load(Ordering::Relaxed));
+    let mut depth = use_signal(|| WIREFRAME_DEPTH.load(Ordering::Relaxed));
+    let mut occupied =
+        use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
+    let mut lod_en = use_signal(|| LOD_ENABLED.load(Ordering::Relaxed));
+    let mut lod_thresh =
+        use_signal(|| LOD_THRESHOLD_X1000.load(Ordering::Relaxed));
+    let mut lod_soft =
+        use_signal(|| LOD_SOFTNESS_X1000.load(Ordering::Relaxed));
 
     rsx! {
         GlassPanel { title: "Debug".to_string(),
@@ -862,13 +956,22 @@ mod tests {
         let root_extent = (1u32 << world.max_depth) as f32;
         let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
             std::collections::VecDeque::new();
-        queue.push_back((world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        queue.push_back((
+            world.root_index as usize,
+            0,
+            Vec3::ZERO,
+            root_extent,
+        ));
         while let Some((idx, depth, origin, extent)) = queue.pop_front() {
-            if idx >= world.nodes.len() { continue; }
+            if idx >= world.nodes.len() {
+                continue;
+            }
             let node = &world.nodes[idx];
             let half = extent * 0.5;
             let center = origin + Vec3::splat(half);
-            if node.color_data == 0 && node.child_mask() == 0 { continue; }
+            if node.color_data == 0 && node.child_mask() == 0 {
+                continue;
+            }
             if depth >= world.max_depth || node.is_leaf() {
                 cubes.push((center, extent));
                 continue;
@@ -876,17 +979,25 @@ mod tests {
             let mask = node.child_mask();
             let first = node.first_child_index();
             for slot in 0..8usize {
-                if mask & (1 << slot) == 0 { continue; }
-                let co = origin + Vec3::new(
-                    if slot & 1 != 0 { half } else { 0.0 },
-                    if slot & 2 != 0 { half } else { 0.0 },
-                    if slot & 4 != 0 { half } else { 0.0 },
-                );
+                if mask & (1 << slot) == 0 {
+                    continue;
+                }
+                let co = origin
+                    + Vec3::new(
+                        if slot & 1 != 0 { half } else { 0.0 },
+                        if slot & 2 != 0 { half } else { 0.0 },
+                        if slot & 4 != 0 { half } else { 0.0 },
+                    );
                 let off = (mask & ((1 << slot) - 1)).count_ones() as usize;
                 queue.push_back((first + off, depth + 1, co, half));
             }
         }
-        assert_eq!(cubes.len(), 1, "expected 1 occupied leaf cube, got {}", cubes.len());
+        assert_eq!(
+            cubes.len(),
+            1,
+            "expected 1 occupied leaf cube, got {}",
+            cubes.len()
+        );
     }
 
     #[test]
@@ -899,26 +1010,39 @@ mod tests {
         let root_extent = (1u32 << world.max_depth) as f32;
         let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
             std::collections::VecDeque::new();
-        queue.push_back((world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        queue.push_back((
+            world.root_index as usize,
+            0,
+            Vec3::ZERO,
+            root_extent,
+        ));
         while let Some((idx, depth, origin, extent)) = queue.pop_front() {
-            if idx >= world.nodes.len() { continue; }
+            if idx >= world.nodes.len() {
+                continue;
+            }
             let node = &world.nodes[idx];
             let half = extent * 0.5;
             let center = origin + Vec3::splat(half);
-            if node.color_data == 0 && node.child_mask() == 0 { continue; }
-            if depth >= 0 || node.is_leaf() {  // target = 0
+            if node.color_data == 0 && node.child_mask() == 0 {
+                continue;
+            }
+            if depth >= 0 || node.is_leaf() {
+                // target = 0
                 cubes.push((center, extent));
                 continue;
             }
             let mask = node.child_mask();
             let first = node.first_child_index();
             for slot in 0..8usize {
-                if mask & (1 << slot) == 0 { continue; }
-                let co = origin + Vec3::new(
-                    if slot & 1 != 0 { half } else { 0.0 },
-                    if slot & 2 != 0 { half } else { 0.0 },
-                    if slot & 4 != 0 { half } else { 0.0 },
-                );
+                if mask & (1 << slot) == 0 {
+                    continue;
+                }
+                let co = origin
+                    + Vec3::new(
+                        if slot & 1 != 0 { half } else { 0.0 },
+                        if slot & 2 != 0 { half } else { 0.0 },
+                        if slot & 4 != 0 { half } else { 0.0 },
+                    );
                 let off = (mask & ((1 << slot) - 1)).count_ones() as usize;
                 queue.push_back((first + off, depth + 1, co, half));
             }
@@ -934,13 +1058,22 @@ mod tests {
         let root_extent = (1u32 << world.max_depth) as f32;
         let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
             std::collections::VecDeque::new();
-        queue.push_back((world.root_index as usize, 0, Vec3::ZERO, root_extent));
+        queue.push_back((
+            world.root_index as usize,
+            0,
+            Vec3::ZERO,
+            root_extent,
+        ));
         while let Some((idx, depth, origin, extent)) = queue.pop_front() {
-            if idx >= world.nodes.len() { continue; }
+            if idx >= world.nodes.len() {
+                continue;
+            }
             let node = &world.nodes[idx];
             let half = extent * 0.5;
             let center = origin + Vec3::splat(half);
-            if node.color_data == 0 && node.child_mask() == 0 { continue; }
+            if node.color_data == 0 && node.child_mask() == 0 {
+                continue;
+            }
             if depth >= world.max_depth || node.is_leaf() {
                 cubes.push((center, extent));
                 continue;
@@ -948,12 +1081,15 @@ mod tests {
             let mask = node.child_mask();
             let first = node.first_child_index();
             for slot in 0..8usize {
-                if mask & (1 << slot) == 0 { continue; }
-                let co = origin + Vec3::new(
-                    if slot & 1 != 0 { half } else { 0.0 },
-                    if slot & 2 != 0 { half } else { 0.0 },
-                    if slot & 4 != 0 { half } else { 0.0 },
-                );
+                if mask & (1 << slot) == 0 {
+                    continue;
+                }
+                let co = origin
+                    + Vec3::new(
+                        if slot & 1 != 0 { half } else { 0.0 },
+                        if slot & 2 != 0 { half } else { 0.0 },
+                        if slot & 4 != 0 { half } else { 0.0 },
+                    );
                 let off = (mask & ((1 << slot) - 1)).count_ones() as usize;
                 queue.push_back((first + off, depth + 1, co, half));
             }

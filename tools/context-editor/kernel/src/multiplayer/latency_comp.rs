@@ -62,7 +62,10 @@ impl PredictionBuffer {
     }
 
     /// Push a new predicted state, overwriting the oldest if at capacity.
-    pub fn push(&mut self, state: PredictedState) {
+    pub fn push(
+        &mut self,
+        state: PredictedState,
+    ) {
         if self.buf.len() < self.capacity {
             self.buf.push(state);
         } else {
@@ -72,13 +75,20 @@ impl PredictionBuffer {
     }
 
     /// Find the predicted state for a given tick.
-    pub fn find_tick(&self, tick: u64) -> Option<&PredictedState> {
+    pub fn find_tick(
+        &self,
+        tick: u64,
+    ) -> Option<&PredictedState> {
         self.buf.iter().find(|s| s.tick == tick)
     }
 
     /// Return all states with tick > `since` in tick order.
-    pub fn states_after(&self, since: u64) -> Vec<&PredictedState> {
-        let mut result: Vec<&PredictedState> = self.buf.iter().filter(|s| s.tick > since).collect();
+    pub fn states_after(
+        &self,
+        since: u64,
+    ) -> Vec<&PredictedState> {
+        let mut result: Vec<&PredictedState> =
+            self.buf.iter().filter(|s| s.tick > since).collect();
         result.sort_by_key(|s| s.tick);
         result
     }
@@ -212,7 +222,10 @@ impl HermiteState {
     }
 
     /// Advance time by `dt` seconds.
-    pub fn tick(&mut self, dt: f32) {
+    pub fn tick(
+        &mut self,
+        dt: f32,
+    ) {
         self.t = (self.t + dt).min(self.duration);
     }
 
@@ -285,7 +298,10 @@ pub struct RemoteGhosts {
 pub struct LatencyCompPlugin;
 
 impl Plugin for LatencyCompPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<RollbackThresholds>();
         app.init_resource::<LocalPrediction>();
         app.init_resource::<RemoteGhosts>();
@@ -335,7 +351,10 @@ mod tests {
             input_applied: false,
         };
         let thresholds = RollbackThresholds::default(); // 0.1 pos
-        assert_eq!(reconcile(&snapshot, &predicted, &thresholds), ReconcileResult::Agree);
+        assert_eq!(
+            reconcile(&snapshot, &predicted, &thresholds),
+            ReconcileResult::Agree
+        );
     }
 
     #[test]
@@ -357,7 +376,7 @@ mod tests {
         match reconcile(&snapshot, &predicted, &thresholds) {
             ReconcileResult::Rollback { position_error, .. } => {
                 assert!((position_error - 5.0).abs() < 0.01);
-            }
+            },
             ReconcileResult::Agree => panic!("should have rolled back"),
         }
     }
@@ -379,11 +398,17 @@ mod tests {
         let state = HermiteState::from_snapshots(&prev, &next, 1.0);
 
         // At t=0, position should be p0
-        let h0 = HermiteState { t: 0.0, ..state.clone() };
+        let h0 = HermiteState {
+            t: 0.0,
+            ..state.clone()
+        };
         assert!((h0.position() - Vec3::ZERO).length() < 0.01);
 
         // At t=duration, position should be p1
-        let h1 = HermiteState { t: 1.0, ..state.clone() };
+        let h1 = HermiteState {
+            t: 1.0,
+            ..state.clone()
+        };
         assert!((h1.position() - Vec3::new(10.0, 0.0, 0.0)).length() < 0.01);
     }
 
@@ -405,7 +430,11 @@ mod tests {
         state.t = 0.5;
         let mid = state.position();
         // Midpoint should be roughly halfway
-        assert!(mid.x > 3.0 && mid.x < 7.0, "midpoint x={} should be roughly 5", mid.x);
+        assert!(
+            mid.x > 3.0 && mid.x < 7.0,
+            "midpoint x={} should be roughly 5",
+            mid.x
+        );
     }
 
     #[test]
@@ -432,7 +461,11 @@ mod tests {
         // dt = 1.0 per tick, 3 ticks to reapply (10, 11, 12)
         let corrected = apply_rollback(&snapshot, &buf, 1.0);
         // Should have moved 3 units from 9.0 → 12.0
-        assert!((corrected.x - 12.0).abs() < 0.01, "corrected.x={}", corrected.x);
+        assert!(
+            (corrected.x - 12.0).abs() < 0.01,
+            "corrected.x={}",
+            corrected.x
+        );
     }
 
     #[test]

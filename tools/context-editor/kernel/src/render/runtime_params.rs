@@ -5,7 +5,10 @@
 //! the very next frame — no pipeline recreation required.
 
 use bevy::prelude::*;
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 // ---------------------------------------------------------------------------
 // Per-subsystem parameter resources
@@ -253,8 +256,10 @@ impl GpuRenderUniforms {
         viewport: Vec2,
         frame: u32,
     ) -> Self {
-        let grid_w = (viewport.x as u32 + params.tile.tile_size - 1) / params.tile.tile_size;
-        let grid_h = (viewport.y as u32 + params.tile.tile_size - 1) / params.tile.tile_size;
+        let grid_w = (viewport.x as u32 + params.tile.tile_size - 1)
+            / params.tile.tile_size;
+        let grid_h = (viewport.y as u32 + params.tile.tile_size - 1)
+            / params.tile.tile_size;
 
         Self {
             view_matrix: view.to_cols_array(),
@@ -377,7 +382,10 @@ pub fn upload_render_uniforms(
 pub struct RuntimeParamsPlugin;
 
 impl Plugin for RuntimeParamsPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<RenderParams>();
         app.add_systems(
             PostUpdate,
@@ -411,7 +419,11 @@ mod tests {
     fn gpu_uniforms_size_is_pod() {
         // Must be a multiple of 16 for WebGPU alignment.
         let size = std::mem::size_of::<GpuRenderUniforms>();
-        assert_eq!(size % 16, 0, "GpuRenderUniforms must be 16-byte aligned, got {size}");
+        assert_eq!(
+            size % 16,
+            0,
+            "GpuRenderUniforms must be 16-byte aligned, got {size}"
+        );
     }
 
     #[test]

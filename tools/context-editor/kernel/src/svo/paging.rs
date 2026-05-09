@@ -28,8 +28,15 @@
 
 use std::collections::HashSet;
 
-use bevy::math::{Mat4, Vec3, Vec4};
-use bytemuck::{Pod, Zeroable};
+use bevy::math::{
+    Mat4,
+    Vec3,
+    Vec4,
+};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 use super::VoxelWorld;
 
@@ -102,7 +109,11 @@ impl Frustum {
     /// Returns `true` if the AABB [`min`, `max`] intersects or is inside the
     /// frustum (conservative — an AABB is only rejected when its entire extent
     /// is on the negative side of any single plane).
-    pub fn test_aabb(&self, min: Vec3, max: Vec3) -> bool {
+    pub fn test_aabb(
+        &self,
+        min: Vec3,
+        max: Vec3,
+    ) -> bool {
         for plane in &self.planes {
             // Positive vertex: the AABB corner most aligned with the plane normal.
             let px = if plane.x >= 0.0 { max.x } else { min.x };
@@ -250,7 +261,13 @@ impl PageManager {
             for bit in 0u8..8 {
                 if mask & (1 << bit) != 0 {
                     let child_idx = first_child + bit as usize;
-                    self.assign_page_ids(svo, child_idx, depth + 1, counter, boundary_first_page);
+                    self.assign_page_ids(
+                        svo,
+                        child_idx,
+                        depth + 1,
+                        counter,
+                        boundary_first_page,
+                    );
                 }
             }
         }
@@ -347,8 +364,11 @@ impl PageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::svo::{
+        VoxelMaterial,
+        VoxelWorld,
+    };
     use bevy::math::IVec3;
-    use crate::svo::{VoxelMaterial, VoxelWorld};
 
     fn make_small_world() -> VoxelWorld {
         let mut w = VoxelWorld::new(6);
@@ -375,8 +395,7 @@ mod tests {
         let (_gpu_nodes, page_table) = pm.build(&w, None);
         for (id, &base) in page_table.iter().enumerate() {
             assert_ne!(
-                base,
-                0xFFFF_FFFF,
+                base, 0xFFFF_FFFF,
                 "page {id} should be resident when no frustum is given"
             );
         }
@@ -391,7 +410,10 @@ mod tests {
         };
         let (_gpu_nodes, page_table) = pm.build(&w, Some(&reject_all));
         for &base in &page_table {
-            assert_eq!(base, 0xFFFF_FFFF, "rejecting frustum should evict all pages");
+            assert_eq!(
+                base, 0xFFFF_FFFF,
+                "rejecting frustum should evict all pages"
+            );
         }
     }
 

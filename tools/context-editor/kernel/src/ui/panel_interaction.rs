@@ -4,8 +4,8 @@
 //! panel planes, and dispatches input events (hover, click, drag).
 //! Panels have priority over world geometry (SVO raycasts) for input.
 
-use bevy::prelude::*;
 use crate::world_panel::WorldPanel;
+use bevy::prelude::*;
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -37,7 +37,10 @@ pub struct PanelDragState {
 pub struct PanelInteractionPlugin;
 
 impl Plugin for PanelInteractionPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<HoveredPanel>();
         app.init_resource::<PanelClick>();
         app.init_resource::<PanelDragState>();
@@ -76,16 +79,16 @@ pub fn camera_ray(
             let half_h = (persp.fov * 0.5).tan() * persp.near;
             let half_w = half_h * persp.aspect_ratio;
             Vec3::new(ndc.x * half_w, ndc.y * half_h, -persp.near)
-        }
+        },
         Projection::Orthographic(ortho) => {
             let half_w = (ortho.area.max.x - ortho.area.min.x) * 0.5;
             let half_h = (ortho.area.max.y - ortho.area.min.y) * 0.5;
             Vec3::new(ndc.x * half_w, ndc.y * half_h, -ortho.near)
-        }
+        },
         _ => {
             // Custom projections: fall back to a sensible default direction
             Vec3::new(ndc.x, ndc.y, -1.0)
-        }
+        },
     };
 
     let ray_dir = camera_tf
@@ -267,7 +270,10 @@ mod tests {
             corner_radius: 0.0,
             roughness: 0.5,
             tint: [1.0; 4],
-            anchor: crate::world_panel::PanelAnchor::WorldFixed(Vec3::ZERO, Quat::IDENTITY),
+            anchor: crate::world_panel::PanelAnchor::WorldFixed(
+                Vec3::ZERO,
+                Quat::IDENTITY,
+            ),
         };
         let tf = GlobalTransform::from_translation(Vec3::new(0.0, 0.0, -5.0));
         let ray = Ray3 {
@@ -289,7 +295,10 @@ mod tests {
             corner_radius: 0.0,
             roughness: 0.5,
             tint: [1.0; 4],
-            anchor: crate::world_panel::PanelAnchor::WorldFixed(Vec3::ZERO, Quat::IDENTITY),
+            anchor: crate::world_panel::PanelAnchor::WorldFixed(
+                Vec3::ZERO,
+                Quat::IDENTITY,
+            ),
         };
         let tf = GlobalTransform::from_translation(Vec3::new(0.0, 0.0, 5.0));
         let ray = Ray3 {
@@ -307,7 +316,10 @@ mod tests {
             corner_radius: 0.0,
             roughness: 0.5,
             tint: [1.0; 4],
-            anchor: crate::world_panel::PanelAnchor::WorldFixed(Vec3::ZERO, Quat::IDENTITY),
+            anchor: crate::world_panel::PanelAnchor::WorldFixed(
+                Vec3::ZERO,
+                Quat::IDENTITY,
+            ),
         };
         let tf = GlobalTransform::from_translation(Vec3::new(0.0, 0.0, -5.0));
         // Ray aimed at offset (2, 0), panel only +-0.5

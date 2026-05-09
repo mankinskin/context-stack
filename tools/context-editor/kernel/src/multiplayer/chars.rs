@@ -6,7 +6,10 @@
 //! refraction, cast shadows, and display floating nameplates.
 
 use bevy::prelude::*;
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 use crate::multiplayer_backend::PlayerIdentity;
 
@@ -54,7 +57,11 @@ pub struct RemotePlayer {
 
 impl RemotePlayer {
     /// Push a new server snapshot, shifting current to previous.
-    pub fn push_snapshot(&mut self, snapshot: PlayerSnapshot, timestamp: f64) {
+    pub fn push_snapshot(
+        &mut self,
+        snapshot: PlayerSnapshot,
+        timestamp: f64,
+    ) {
         self.prev_state = self.curr_state;
         self.prev_timestamp = self.curr_timestamp;
         self.curr_state = snapshot;
@@ -62,21 +69,31 @@ impl RemotePlayer {
     }
 
     /// Interpolate position between prev and curr states.
-    pub fn interpolated_position(&self, now: f64) -> Vec3 {
+    pub fn interpolated_position(
+        &self,
+        now: f64,
+    ) -> Vec3 {
         let dt = self.curr_timestamp - self.prev_timestamp;
         let alpha = if dt > 0.0 {
-            ((now - self.prev_timestamp) / dt).clamp(0.0, MAX_EXTRAPOLATION as f64) as f32
+            ((now - self.prev_timestamp) / dt)
+                .clamp(0.0, MAX_EXTRAPOLATION as f64) as f32
         } else {
             1.0
         };
-        self.prev_state.position.lerp(self.curr_state.position, alpha)
+        self.prev_state
+            .position
+            .lerp(self.curr_state.position, alpha)
     }
 
     /// Interpolate yaw between prev and curr states.
-    pub fn interpolated_yaw(&self, now: f64) -> f32 {
+    pub fn interpolated_yaw(
+        &self,
+        now: f64,
+    ) -> f32 {
         let dt = self.curr_timestamp - self.prev_timestamp;
         let alpha = if dt > 0.0 {
-            ((now - self.prev_timestamp) / dt).clamp(0.0, MAX_EXTRAPOLATION as f64) as f32
+            ((now - self.prev_timestamp) / dt)
+                .clamp(0.0, MAX_EXTRAPOLATION as f64) as f32
         } else {
             1.0
         };
@@ -85,7 +102,11 @@ impl RemotePlayer {
 }
 
 /// Lerp between two angles, taking the shortest path.
-pub fn lerp_angle(a: f32, b: f32, t: f32) -> f32 {
+pub fn lerp_angle(
+    a: f32,
+    b: f32,
+    t: f32,
+) -> f32 {
     let mut diff = b - a;
     while diff > std::f32::consts::PI {
         diff -= 2.0 * std::f32::consts::PI;
@@ -121,7 +142,12 @@ pub struct GpuPlayerCapsule {
 }
 
 /// SDF capsule distance function (CPU-side, mirrors WGSL).
-pub fn sd_capsule(p: Vec3, a: Vec3, b: Vec3, r: f32) -> f32 {
+pub fn sd_capsule(
+    p: Vec3,
+    a: Vec3,
+    b: Vec3,
+    r: f32,
+) -> f32 {
     let pa = p - a;
     let ba = b - a;
     let h = pa.dot(ba) / ba.dot(ba);
@@ -197,8 +223,11 @@ fn update_nameplates_system(
 
     for mut np in nameplates.iter_mut() {
         // Find matching remote player
-        if let Some(rp) = players.iter().find(|p| p.entity_id == np.player_entity_id) {
-            let head_pos = rp.interpolated_position(now) + Vec3::Y * (CAPSULE_HEIGHT + 0.3);
+        if let Some(rp) =
+            players.iter().find(|p| p.entity_id == np.player_entity_id)
+        {
+            let head_pos = rp.interpolated_position(now)
+                + Vec3::Y * (CAPSULE_HEIGHT + 0.3);
             let to_cam = cam_pos - head_pos;
             // Simple visibility: within 50 units and in front of camera
             np.visible = to_cam.length() < 50.0;
@@ -214,15 +243,15 @@ fn update_nameplates_system(
 pub struct MultiplayerCharactersPlugin;
 
 impl Plugin for MultiplayerCharactersPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<PlayerCapsuleBuffer>();
 
         app.add_systems(
             Update,
-            (
-                interpolate_remote_players_system,
-                update_nameplates_system,
-            ),
+            (interpolate_remote_players_system, update_nameplates_system),
         );
     }
 }
@@ -326,7 +355,10 @@ mod tests {
             Vec3::new(0.0, 1.8, 0.0),
             0.3,
         );
-        assert!(d.abs() < 0.05, "point on capsule surface should have distance ~0, got {d}");
+        assert!(
+            d.abs() < 0.05,
+            "point on capsule surface should have distance ~0, got {d}"
+        );
     }
 
     #[test]
@@ -337,7 +369,10 @@ mod tests {
             Vec3::new(0.0, 1.8, 0.0),
             0.3,
         );
-        assert!(d < 0.0, "point inside capsule should have negative distance");
+        assert!(
+            d < 0.0,
+            "point inside capsule should have negative distance"
+        );
     }
 
     #[test]
@@ -348,7 +383,10 @@ mod tests {
             Vec3::new(0.0, 1.8, 0.0),
             0.3,
         );
-        assert!(d > 4.0, "point far from capsule should have large positive distance");
+        assert!(
+            d > 4.0,
+            "point far from capsule should have large positive distance"
+        );
     }
 
     #[test]

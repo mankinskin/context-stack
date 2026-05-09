@@ -4,13 +4,25 @@
 //! containing the SVO root origin, world size, and max_depth that the ray march
 //! shader needs to transform world-space rays into normalised [0,1]³ SVO space.
 
-use bevy::prelude::*;
-use bevy::render::{
-    extract_resource::ExtractResource,
-    render_resource::{Buffer, BufferDescriptor, BufferUsages},
-    renderer::{RenderDevice, RenderQueue},
+use bevy::{
+    prelude::*,
+    render::{
+        extract_resource::ExtractResource,
+        render_resource::{
+            Buffer,
+            BufferDescriptor,
+            BufferUsages,
+        },
+        renderer::{
+            RenderDevice,
+            RenderQueue,
+        },
+    },
 };
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 use crate::svo::VoxelWorld;
 
@@ -110,14 +122,18 @@ pub fn update_svo_transform(
     render_queue: Option<Res<RenderQueue>>,
     page_manager: Option<Res<crate::svo::upload::SvoPageManagerResource>>,
 ) {
-    let Some(voxel_world) = voxel_world else { return };
-    let Some(transform_buf) = transform_buf else { return };
-    let Some(render_queue) = render_queue else { return };
+    let Some(voxel_world) = voxel_world else {
+        return;
+    };
+    let Some(transform_buf) = transform_buf else {
+        return;
+    };
+    let Some(render_queue) = render_queue else {
+        return;
+    };
 
-    let page_depth = page_manager
-        .as_ref()
-        .map(|pm| pm.0.page_depth)
-        .unwrap_or(4);
+    let page_depth =
+        page_manager.as_ref().map(|pm| pm.0.page_depth).unwrap_or(4);
 
     let origin = voxel_world.origin();
     let world_size = voxel_world.world_size();
@@ -153,7 +169,11 @@ mod tests {
         let origin = [0.0_f32, 0.0, 0.0];
         let inv = 1.0 / world_size;
         let p = [0.0_f32, 0.0, 0.0]; // origin
-        let svo = [(p[0] - origin[0]) * inv, (p[1] - origin[1]) * inv, (p[2] - origin[2]) * inv];
+        let svo = [
+            (p[0] - origin[0]) * inv,
+            (p[1] - origin[1]) * inv,
+            (p[2] - origin[2]) * inv,
+        ];
         assert_eq!(svo, [0.0, 0.0, 0.0]);
 
         let p_far = [world_size, world_size, world_size];

@@ -4,8 +4,8 @@
 //! in the tiled rasteriser's glass pre-loop. Each panel can billboard towards
 //! the camera, attach to an entity, or remain fixed in world space.
 
-use bevy::prelude::*;
 use crate::render::glass::GlassPanel;
+use bevy::prelude::*;
 
 // ---------------------------------------------------------------------------
 // Components
@@ -39,7 +39,10 @@ pub struct WorldPanel {
 pub struct WorldPanelPlugin;
 
 impl Plugin for WorldPanelPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.add_systems(Update, (billboard_system, entity_attach_system));
     }
 }
@@ -78,7 +81,8 @@ fn entity_attach_system(
     for (panel, mut tf) in &mut panels {
         if let PanelAnchor::EntityAttached(entity, offset) = &panel.anchor {
             if let Ok(host_tf) = transforms.get(*entity) {
-                tf.translation = host_tf.translation + host_tf.rotation * *offset;
+                tf.translation =
+                    host_tf.translation + host_tf.rotation * *offset;
                 tf.rotation = host_tf.rotation;
             }
         }
@@ -129,7 +133,8 @@ mod tests {
     #[test]
     fn panel_anchor_variants() {
         let _fixed = PanelAnchor::WorldFixed(Vec3::ZERO, Quat::IDENTITY);
-        let _attached = PanelAnchor::EntityAttached(Entity::PLACEHOLDER, Vec3::Y);
+        let _attached =
+            PanelAnchor::EntityAttached(Entity::PLACEHOLDER, Vec3::Y);
         let _billboard = PanelAnchor::Billboard {
             target: Entity::PLACEHOLDER,
             offset: Vec3::Y * 2.0,

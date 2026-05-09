@@ -9,11 +9,20 @@
 //! The [`GlassPanelBuffer`] resource holds a packed storage buffer read
 //! by `tiled_raster.wgsl` at `@group(0) @binding(4)`.
 
-use bevy::prelude::*;
-use bevy::render::{
-    extract_resource::ExtractResource,
-    render_resource::{Buffer, BufferDescriptor, BufferUsages},
-    renderer::{RenderDevice, RenderQueue},
+use bevy::{
+    prelude::*,
+    render::{
+        extract_resource::ExtractResource,
+        render_resource::{
+            Buffer,
+            BufferDescriptor,
+            BufferUsages,
+        },
+        renderer::{
+            RenderDevice,
+            RenderQueue,
+        },
+    },
 };
 
 /// Maximum number of glass panels evaluated per frame.
@@ -23,7 +32,8 @@ pub const MAX_GLASS_PANELS: u32 = 16;
 pub const GLASS_PANEL_GPU_SIZE: u64 = 64;
 
 /// Total glass buffer size.
-pub const GLASS_BUFFER_SIZE: u64 = GLASS_PANEL_GPU_SIZE * MAX_GLASS_PANELS as u64;
+pub const GLASS_BUFFER_SIZE: u64 =
+    GLASS_PANEL_GPU_SIZE * MAX_GLASS_PANELS as u64;
 
 // ---------------------------------------------------------------------------
 // ECS Component
@@ -138,8 +148,12 @@ pub fn update_glass_panel_buffer(
     glass_buffer: Option<ResMut<GlassPanelBuffer>>,
     render_queue: Option<Res<RenderQueue>>,
 ) {
-    let Some(mut glass_buffer) = glass_buffer else { return };
-    let Some(render_queue) = render_queue else { return };
+    let Some(mut glass_buffer) = glass_buffer else {
+        return;
+    };
+    let Some(render_queue) = render_queue else {
+        return;
+    };
 
     let mut panels = Vec::new();
     for (transform, panel) in query.iter().take(MAX_GLASS_PANELS as usize) {
@@ -147,7 +161,11 @@ pub fn update_glass_panel_buffer(
         panels.push(GlassPanelGpu {
             center: [pos.x, pos.y, pos.z],
             corner_radius: panel.corner_radius,
-            half_size: [panel.half_size.x, panel.half_size.y, panel.half_size.z],
+            half_size: [
+                panel.half_size.x,
+                panel.half_size.y,
+                panel.half_size.z,
+            ],
             ior: panel.ior,
             tint: panel.tint,
             blur_roughness: panel.blur_roughness,

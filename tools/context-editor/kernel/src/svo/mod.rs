@@ -13,10 +13,13 @@
 //! Gaussians are **ephemeral** — regenerated from the SVO every frame.
 
 use bevy::prelude::*;
-use bytemuck::{Pod, Zeroable};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
-pub mod upload;
 pub mod paging;
+pub mod upload;
 
 // ---------------------------------------------------------------------------
 // OctreeNode
@@ -50,7 +53,10 @@ impl OctreeNode {
     pub const INTERIOR_FLAG: u32 = 0x8000_0000;
 
     pub const fn leaf(color_data: u32) -> Self {
-        Self { child_pointer: 0, color_data }
+        Self {
+            child_pointer: 0,
+            color_data,
+        }
     }
 
     pub fn is_leaf(&self) -> bool {
@@ -98,17 +104,55 @@ pub struct VoxelMaterial {
 }
 
 impl VoxelMaterial {
-    pub const fn new(r: u8, g: u8, b: u8, roughness: u8) -> Self {
-        Self { r, g, b, roughness, metallic: false, sdf_type: 0 }
+    pub const fn new(
+        r: u8,
+        g: u8,
+        b: u8,
+        roughness: u8,
+    ) -> Self {
+        Self {
+            r,
+            g,
+            b,
+            roughness,
+            metallic: false,
+            sdf_type: 0,
+        }
     }
 
-    pub const fn new_metallic(r: u8, g: u8, b: u8, roughness: u8, metallic: bool) -> Self {
-        Self { r, g, b, roughness, metallic, sdf_type: 0 }
+    pub const fn new_metallic(
+        r: u8,
+        g: u8,
+        b: u8,
+        roughness: u8,
+        metallic: bool,
+    ) -> Self {
+        Self {
+            r,
+            g,
+            b,
+            roughness,
+            metallic,
+            sdf_type: 0,
+        }
     }
 
     /// Create a material with an explicit SDF shape type.
-    pub const fn new_sdf(r: u8, g: u8, b: u8, roughness: u8, sdf_type: u8) -> Self {
-        Self { r, g, b, roughness, metallic: false, sdf_type }
+    pub const fn new_sdf(
+        r: u8,
+        g: u8,
+        b: u8,
+        roughness: u8,
+        sdf_type: u8,
+    ) -> Self {
+        Self {
+            r,
+            g,
+            b,
+            roughness,
+            metallic: false,
+            sdf_type,
+        }
     }
 
     /// Pack into a u32 matching the WGSL `unpack_material()` bit layout.
@@ -191,8 +235,17 @@ impl VoxelWorld {
     ///
     /// Also updates the INTERIOR_FLAG on this voxel and all 6 face-neighbors:
     /// a voxel is interior if all 6 axis-aligned neighbors are occupied.
-    pub fn set_voxel(&mut self, pos: IVec3, material: VoxelMaterial) {
-        let node_idx = self.descend_and_allocate(pos.as_uvec3(), 0, self.root_index as usize, 0);
+    pub fn set_voxel(
+        &mut self,
+        pos: IVec3,
+        material: VoxelMaterial,
+    ) {
+        let node_idx = self.descend_and_allocate(
+            pos.as_uvec3(),
+            0,
+            self.root_index as usize,
+            0,
+        );
         self.nodes[node_idx].color_data = material.pack();
         // Clear any stale interior flag from before (will be recalculated).
         self.nodes[node_idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
@@ -206,7 +259,10 @@ impl VoxelWorld {
     ///
     /// Clears the INTERIOR_FLAG from all 6 face-neighbors since they are now
     /// exposed to empty space.
-    pub fn remove_voxel(&mut self, pos: IVec3) {
+    pub fn remove_voxel(
+        &mut self,
+        pos: IVec3,
+    ) {
         if let Some(node_idx) = self.descend_to(pos) {
             self.nodes[node_idx].color_data = 0;
             self.nodes[node_idx].child_pointer &= !OctreeNode::INTERIOR_FLAG;
@@ -216,10 +272,22 @@ impl VoxelWorld {
             // Neighbors can no longer be interior — clear their flags.
             let max_c = (1i32 << self.max_depth) - 1;
             let mut to_clear: Vec<usize> = Vec::new();
-            for &dir in &[IVec3::X, -IVec3::X, IVec3::Y, -IVec3::Y, IVec3::Z, -IVec3::Z] {
+            for &dir in &[
+                IVec3::X,
+                -IVec3::X,
+                IVec3::Y,
+                -IVec3::Y,
+                IVec3::Z,
+                -IVec3::Z,
+            ] {
                 let np = pos + dir;
-                if np.x < 0 || np.y < 0 || np.z < 0
-                    || np.x > max_c || np.y > max_c || np.z > max_c {
+                if np.x < 0
+                    || np.y < 0
+                    || np.z < 0
+                    || np.x > max_c
+                    || np.y > max_c
+                    || np.z > max_c
+                {
                     continue;
                 }
                 if let Some(nidx) = self.descend_to(np) {
@@ -238,7 +306,12 @@ impl VoxelWorld {
     /// Paint all voxels within `radius` of `center` with `material`.
     ///
     /// Returns the number of voxels modified.
-    pub fn apply_sdf_brush(&mut self, center: Vec3, radius: f32, material: VoxelMaterial) -> u32 {
+    pub fn apply_sdf_brush(
+        &mut self,
+        center: Vec3,
+        radius: f32,
+        material: VoxelMaterial,
+    ) -> u32 {
         let mut count = 0u32;
         let min = (center - Vec3::splat(radius)).floor().as_ivec3();
         let max = (center + Vec3::splat(radius)).ceil().as_ivec3();
@@ -246,7 +319,8 @@ impl VoxelWorld {
             for y in min.y..=max.y {
                 for x in min.x..=max.x {
                     let pos = IVec3::new(x, y, z);
-                    let dist = (pos.as_vec3() + Vec3::splat(0.5) - center).length();
+                    let dist =
+                        (pos.as_vec3() + Vec3::splat(0.5) - center).length();
                     if dist <= radius {
                         self.set_voxel(pos, material);
                         count += 1;
@@ -260,7 +334,11 @@ impl VoxelWorld {
     /// Remove all voxels within `radius` of `center`.
     ///
     /// Returns the number of voxels cleared.
-    pub fn carve_sdf_brush(&mut self, center: Vec3, radius: f32) -> u32 {
+    pub fn carve_sdf_brush(
+        &mut self,
+        center: Vec3,
+        radius: f32,
+    ) -> u32 {
         let mut count = 0u32;
         let min = (center - Vec3::splat(radius)).floor().as_ivec3();
         let max = (center + Vec3::splat(radius)).ceil().as_ivec3();
@@ -268,7 +346,8 @@ impl VoxelWorld {
             for y in min.y..=max.y {
                 for x in min.x..=max.x {
                     let pos = IVec3::new(x, y, z);
-                    let dist = (pos.as_vec3() + Vec3::splat(0.5) - center).length();
+                    let dist =
+                        (pos.as_vec3() + Vec3::splat(0.5) - center).length();
                     if dist <= radius {
                         self.remove_voxel(pos);
                         count += 1;
@@ -285,10 +364,17 @@ impl VoxelWorld {
 
     /// Check whether the voxel at `pos` is occupied (non-zero color_data).
     /// Out-of-bounds positions are treated as empty.
-    pub fn is_occupied_at(&self, pos: IVec3) -> bool {
+    pub fn is_occupied_at(
+        &self,
+        pos: IVec3,
+    ) -> bool {
         let max_c = (1i32 << self.max_depth) - 1;
-        if pos.x < 0 || pos.y < 0 || pos.z < 0
-            || pos.x > max_c || pos.y > max_c || pos.z > max_c
+        if pos.x < 0
+            || pos.y < 0
+            || pos.z < 0
+            || pos.x > max_c
+            || pos.y > max_c
+            || pos.z > max_c
         {
             return false;
         }
@@ -298,8 +384,18 @@ impl VoxelWorld {
     }
 
     /// Returns `true` if all 6 axis-aligned neighbors of `pos` are occupied.
-    fn all_face_neighbors_occupied(&self, pos: IVec3) -> bool {
-        for &dir in &[IVec3::X, -IVec3::X, IVec3::Y, -IVec3::Y, IVec3::Z, -IVec3::Z] {
+    fn all_face_neighbors_occupied(
+        &self,
+        pos: IVec3,
+    ) -> bool {
+        for &dir in &[
+            IVec3::X,
+            -IVec3::X,
+            IVec3::Y,
+            -IVec3::Y,
+            IVec3::Z,
+            -IVec3::Z,
+        ] {
             if !self.is_occupied_at(pos + dir) {
                 return false;
             }
@@ -311,12 +407,18 @@ impl VoxelWorld {
     ///
     /// Called after every `set_voxel` so the splat kernel can skip voxels
     /// that are guaranteed not to be visible.
-    fn reclassify_interior_around(&mut self, pos: IVec3) {
+    fn reclassify_interior_around(
+        &mut self,
+        pos: IVec3,
+    ) {
         let dirs = [
             IVec3::ZERO,
-            IVec3::X, -IVec3::X,
-            IVec3::Y, -IVec3::Y,
-            IVec3::Z, -IVec3::Z,
+            IVec3::X,
+            -IVec3::X,
+            IVec3::Y,
+            -IVec3::Y,
+            IVec3::Z,
+            -IVec3::Z,
         ];
         let max_c = (1i32 << self.max_depth) - 1;
 
@@ -325,8 +427,12 @@ impl VoxelWorld {
             .iter()
             .filter_map(|&d| {
                 let cp = pos + d;
-                if cp.x < 0 || cp.y < 0 || cp.z < 0
-                    || cp.x > max_c || cp.y > max_c || cp.z > max_c
+                if cp.x < 0
+                    || cp.y < 0
+                    || cp.z < 0
+                    || cp.x > max_c
+                    || cp.y > max_c
+                    || cp.z > max_c
                 {
                     return None;
                 }
@@ -398,15 +504,16 @@ impl VoxelWorld {
             }
             return;
         }
-        let child_mask  = node.child_mask();
+        let child_mask = node.child_mask();
         let first_child = node.first_child_index();
-        let child_half  = size / 2;
+        let child_half = size / 2;
         for slot in 0u8..8 {
             if child_mask & (1 << slot) == 0 {
                 continue;
             }
-            let child_offset = (child_mask & ((1 << slot) - 1)).count_ones() as usize;
-            let child_idx    = first_child + child_offset;
+            let child_offset =
+                (child_mask & ((1 << slot) - 1)).count_ones() as usize;
+            let child_idx = first_child + child_offset;
             let dx = if slot & 1 != 0 { child_half } else { 0 };
             let dy = if slot & 2 != 0 { child_half } else { 0 };
             let dz = if slot & 4 != 0 { child_half } else { 0 };
@@ -423,7 +530,10 @@ impl VoxelWorld {
     // Dirty-range tracking
     // -----------------------------------------------------------------------
 
-    pub fn mark_dirty(&mut self, node_idx: usize) {
+    pub fn mark_dirty(
+        &mut self,
+        node_idx: usize,
+    ) {
         const STRIDE: usize = 8; // size_of::<OctreeNode>()
         let byte_start = node_idx * STRIDE;
         self.dirty_ranges.push((byte_start, byte_start + STRIDE));
@@ -470,7 +580,9 @@ impl VoxelWorld {
         let mut positions = vec![[0.0f32; 4]; self.nodes.len()];
         self.fill_positions(
             self.root_index as usize,
-            0.0, 0.0, 0.0,
+            0.0,
+            0.0,
+            0.0,
             world_size,
             &mut positions,
         );
@@ -480,7 +592,9 @@ impl VoxelWorld {
     fn fill_positions(
         &self,
         idx: usize,
-        ox: f32, oy: f32, oz: f32,
+        ox: f32,
+        oy: f32,
+        oz: f32,
         size: f32,
         out: &mut Vec<[f32; 4]>,
     ) {
@@ -502,7 +616,14 @@ impl VoxelWorld {
             let cx = if slot & 1 != 0 { ox + half } else { ox };
             let cy = if slot & 2 != 0 { oy + half } else { oy };
             let cz = if slot & 4 != 0 { oz + half } else { oz };
-            self.fill_positions(first_child + slot, cx, cy, cz, child_size, out);
+            self.fill_positions(
+                first_child + slot,
+                cx,
+                cy,
+                cz,
+                child_size,
+                out,
+            );
         }
     }
 
@@ -513,7 +634,10 @@ impl VoxelWorld {
     /// Traverse to the leaf node at the given position, returning its index.
     ///
     /// Returns `None` if the position is out of bounds or the node is empty.
-    pub fn descend_to(&self, pos: IVec3) -> Option<usize> {
+    pub fn descend_to(
+        &self,
+        pos: IVec3,
+    ) -> Option<usize> {
         if pos.x < 0 || pos.y < 0 || pos.z < 0 {
             return None;
         }
@@ -530,9 +654,15 @@ impl VoxelWorld {
             let cx = (pos.x as u32).wrapping_sub(ox) >= size;
             let cy = (pos.y as u32).wrapping_sub(oy) >= size;
             let cz = (pos.z as u32).wrapping_sub(oz) >= size;
-            if cx { ox += size; }
-            if cy { oy += size; }
-            if cz { oz += size; }
+            if cx {
+                ox += size;
+            }
+            if cy {
+                oy += size;
+            }
+            if cz {
+                oz += size;
+            }
             let child_bit = child_index(cx, cy, cz);
             if node.child_mask() & (1 << child_bit) == 0 {
                 return None; // child slot empty
@@ -558,13 +688,20 @@ impl VoxelWorld {
         while t < max_dist {
             let p = origin + dir * t;
             let cell = p.floor().as_ivec3();
-            if self.descend_to(cell).map(|i| self.nodes[i].color_data != 0).unwrap_or(false) {
+            if self
+                .descend_to(cell)
+                .map(|i| self.nodes[i].color_data != 0)
+                .unwrap_or(false)
+            {
                 // Approximate surface normal via central differences
                 let eps = 0.5;
                 let normal = Vec3::new(
-                    self.density(cell + IVec3::X) - self.density(cell - IVec3::X),
-                    self.density(cell + IVec3::Y) - self.density(cell - IVec3::Y),
-                    self.density(cell + IVec3::Z) - self.density(cell - IVec3::Z),
+                    self.density(cell + IVec3::X)
+                        - self.density(cell - IVec3::X),
+                    self.density(cell + IVec3::Y)
+                        - self.density(cell - IVec3::Y),
+                    self.density(cell + IVec3::Z)
+                        - self.density(cell - IVec3::Z),
                 ) * eps;
                 let normal = if normal.length_squared() > 0.0 {
                     -normal.normalize()
@@ -578,9 +715,18 @@ impl VoxelWorld {
         None
     }
 
-    fn density(&self, pos: IVec3) -> f32 {
+    fn density(
+        &self,
+        pos: IVec3,
+    ) -> f32 {
         self.descend_to(pos)
-            .map(|i| if self.nodes[i].color_data != 0 { 1.0 } else { 0.0 })
+            .map(|i| {
+                if self.nodes[i].color_data != 0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
             .unwrap_or(0.0)
     }
 
@@ -641,7 +787,11 @@ impl VoxelWorld {
 ///
 /// Convention: bit 0 = X, bit 1 = Y, bit 2 = Z.
 #[inline]
-fn child_index(cx: bool, cy: bool, cz: bool) -> usize {
+fn child_index(
+    cx: bool,
+    cy: bool,
+    cz: bool,
+) -> usize {
     (cx as usize) | ((cy as usize) << 1) | ((cz as usize) << 2)
 }
 
@@ -668,7 +818,9 @@ fn merge_ranges(sorted: &[(usize, usize)]) -> Vec<(usize, usize)> {
 mod tests {
     use super::*;
 
-    fn red() -> VoxelMaterial { VoxelMaterial::new(255, 0, 0, 16) }
+    fn red() -> VoxelMaterial {
+        VoxelMaterial::new(255, 0, 0, 16)
+    }
 
     #[test]
     fn material_pack_roundtrip() {
@@ -707,7 +859,10 @@ mod tests {
         let ranges = world.take_dirty_ranges();
         assert!(!ranges.is_empty(), "set_voxel must mark dirty ranges");
         // take clears
-        assert!(world.take_dirty_ranges().is_empty(), "take_dirty_ranges must clear state");
+        assert!(
+            world.take_dirty_ranges().is_empty(),
+            "take_dirty_ranges must clear state"
+        );
     }
 
     #[test]
@@ -726,7 +881,8 @@ mod tests {
     #[test]
     fn apply_sdf_brush_sphere() {
         let mut world = VoxelWorld::new(5);
-        let painted = world.apply_sdf_brush(Vec3::new(8.0, 8.0, 8.0), 3.0, red());
+        let painted =
+            world.apply_sdf_brush(Vec3::new(8.0, 8.0, 8.0), 3.0, red());
         assert!(painted > 0, "apply_sdf_brush must paint at least one voxel");
     }
 

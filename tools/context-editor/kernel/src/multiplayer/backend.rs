@@ -179,9 +179,14 @@ pub struct CombatEvent {
 /// Compute a spatial hash for chunk coordinates.
 ///
 /// Uses FNV-1a–style mixing to distribute chunks across hash space.
-pub fn spatial_hash(cx: i32, cy: i32, cz: i32) -> u64 {
+pub fn spatial_hash(
+    cx: i32,
+    cy: i32,
+    cz: i32,
+) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
-    for byte in cx.to_le_bytes()
+    for byte in cx
+        .to_le_bytes()
         .iter()
         .chain(&cy.to_le_bytes())
         .chain(&cz.to_le_bytes())
@@ -193,7 +198,11 @@ pub fn spatial_hash(cx: i32, cy: i32, cz: i32) -> u64 {
 }
 
 /// Convert world voxel coordinates to chunk coordinates.
-pub fn world_to_chunk(x: i32, y: i32, z: i32) -> (i32, i32, i32) {
+pub fn world_to_chunk(
+    x: i32,
+    y: i32,
+    z: i32,
+) -> (i32, i32, i32) {
     (
         x.div_euclid(CHUNK_SIZE as i32),
         y.div_euclid(CHUNK_SIZE as i32),
@@ -202,7 +211,11 @@ pub fn world_to_chunk(x: i32, y: i32, z: i32) -> (i32, i32, i32) {
 }
 
 /// Convert world voxel coordinates to local-within-chunk coordinates.
-pub fn world_to_local(x: i32, y: i32, z: i32) -> (u8, u8, u8) {
+pub fn world_to_local(
+    x: i32,
+    y: i32,
+    z: i32,
+) -> (u8, u8, u8) {
     (
         x.rem_euclid(CHUNK_SIZE as i32) as u8,
         y.rem_euclid(CHUNK_SIZE as i32) as u8,
@@ -217,12 +230,29 @@ pub fn world_to_local(x: i32, y: i32, z: i32) -> (u8, u8, u8) {
 /// Client-sent reducer requests (serialized and sent to SpacetimeDB).
 #[derive(Clone, Debug)]
 pub enum ReducerRequest {
-    UpdateVoxel { x: i32, y: i32, z: i32, new_color: u32 },
-    PlayerMove { position: (f32, f32, f32), yaw: f32 },
-    PerformAttack { direction: (f32, f32, f32), weapon_slot: u8 },
-    PickupItem { item_entity_id: u64 },
-    DropItem { slot_index: u8 },
-    Respawn { position: (f32, f32, f32) },
+    UpdateVoxel {
+        x: i32,
+        y: i32,
+        z: i32,
+        new_color: u32,
+    },
+    PlayerMove {
+        position: (f32, f32, f32),
+        yaw: f32,
+    },
+    PerformAttack {
+        direction: (f32, f32, f32),
+        weapon_slot: u8,
+    },
+    PickupItem {
+        item_entity_id: u64,
+    },
+    DropItem {
+        slot_index: u8,
+    },
+    Respawn {
+        position: (f32, f32, f32),
+    },
 }
 
 /// Server response for reducer calls.
@@ -265,7 +295,10 @@ pub struct PlayerTable {
 
 impl PlayerTable {
     /// Get the local player's row.
-    pub fn local_player(&self, identity: &PlayerIdentity) -> Option<&PlayerRow> {
+    pub fn local_player(
+        &self,
+        identity: &PlayerIdentity,
+    ) -> Option<&PlayerRow> {
         self.players.get(identity)
     }
 
@@ -289,7 +322,10 @@ pub struct InventoryTable {
 
 impl InventoryTable {
     /// Get items in a specific slot.
-    pub fn get_slot(&self, index: u8) -> Option<&InventorySlot> {
+    pub fn get_slot(
+        &self,
+        index: u8,
+    ) -> Option<&InventorySlot> {
         self.slots.iter().find(|s| s.slot_index == index)
     }
 
@@ -306,7 +342,10 @@ pub struct ReducerQueue {
 }
 
 impl ReducerQueue {
-    pub fn push(&mut self, req: ReducerRequest) {
+    pub fn push(
+        &mut self,
+        req: ReducerRequest,
+    ) {
         self.pending.push(req);
     }
 
@@ -337,7 +376,10 @@ pub fn validate_interaction_range(
 }
 
 /// Compute damage from weapon stats against a target.
-pub fn compute_damage(base_damage: i32, weapon_weight: f32) -> i32 {
+pub fn compute_damage(
+    base_damage: i32,
+    weapon_weight: f32,
+) -> i32 {
     let weight_bonus = (weapon_weight * 2.0) as i32;
     (base_damage + weight_bonus).max(1)
 }
@@ -355,7 +397,10 @@ pub struct LocalGameTick {
 
 impl Default for LocalGameTick {
     fn default() -> Self {
-        Self { tick: 0, timer_ms: 0.0 }
+        Self {
+            tick: 0,
+            timer_ms: 0.0,
+        }
     }
 }
 
@@ -394,13 +439,15 @@ fn drain_reducer_queue_system(
     for req in requests {
         match req {
             ReducerRequest::PlayerMove { position, yaw } => {
-                if let Some(player) = players.players.get_mut(&connection.identity) {
+                if let Some(player) =
+                    players.players.get_mut(&connection.identity)
+                {
                     player.position = position;
                     player.rotation_yaw = yaw;
                 }
-            }
+            },
             // Other reducers would need SVO access etc. — stubbed for now.
-            _ => {}
+            _ => {},
         }
     }
 }
@@ -413,7 +460,10 @@ fn drain_reducer_queue_system(
 pub struct MultiplayerBackendPlugin;
 
 impl Plugin for MultiplayerBackendPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<MultiplayerConnection>();
         app.init_resource::<PlayerTable>();
         app.init_resource::<BlueprintTable>();
@@ -430,10 +480,7 @@ impl Plugin for MultiplayerBackendPlugin {
 
         app.add_systems(
             Update,
-            (
-                local_tick_system,
-                drain_reducer_queue_system,
-            ),
+            (local_tick_system, drain_reducer_queue_system),
         );
     }
 }
@@ -500,7 +547,10 @@ mod tests {
 
     #[test]
     fn validate_interaction_range_too_far() {
-        assert!(!validate_interaction_range((0.0, 0.0, 0.0), (20.0, 0.0, 0.0)));
+        assert!(!validate_interaction_range(
+            (0.0, 0.0, 0.0),
+            (20.0, 0.0, 0.0)
+        ));
     }
 
     #[test]
@@ -532,8 +582,12 @@ mod tests {
     fn player_table_online_count() {
         let mut table = PlayerTable::default();
         assert_eq!(table.online_count(), 0);
-        table.players.insert(PlayerIdentity::new(1), PlayerRow::default());
-        table.players.insert(PlayerIdentity::new(2), PlayerRow::default());
+        table
+            .players
+            .insert(PlayerIdentity::new(1), PlayerRow::default());
+        table
+            .players
+            .insert(PlayerIdentity::new(2), PlayerRow::default());
         assert_eq!(table.online_count(), 2);
     }
 
@@ -565,7 +619,10 @@ mod tests {
             yaw: 0.5,
         });
         queue.push(ReducerRequest::UpdateVoxel {
-            x: 0, y: 0, z: 0, new_color: 0xFF0000,
+            x: 0,
+            y: 0,
+            z: 0,
+            new_color: 0xFF0000,
         });
         let drained = queue.drain();
         assert_eq!(drained.len(), 2);

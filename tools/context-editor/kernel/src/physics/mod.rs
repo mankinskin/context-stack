@@ -37,7 +37,10 @@ pub struct DirtyChunks(pub std::collections::HashSet<IVec3>);
 
 impl DirtyChunks {
     /// Mark the chunk containing `voxel_pos` as dirty.
-    pub fn mark(&mut self, voxel_pos: IVec3) {
+    pub fn mark(
+        &mut self,
+        voxel_pos: IVec3,
+    ) {
         self.0.insert(chunk_origin(voxel_pos));
     }
 }
@@ -76,12 +79,16 @@ pub struct VoxelChunkCollider {
 pub struct PhysicsPlugin;
 
 impl Plugin for PhysicsPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
             .init_resource::<DirtyChunks>()
             .add_systems(
                 PostUpdate,
-                (dirty_chunks_propagation_system, rapier_rebuild_system).chain(),
+                (dirty_chunks_propagation_system, rapier_rebuild_system)
+                    .chain(),
             );
     }
 }
@@ -119,7 +126,9 @@ pub fn rapier_rebuild_system(
         if !chunk.dirty {
             continue;
         }
-        if let Some(new_collider) = rebuild_chunk_collider(&voxel_world, chunk.chunk_pos, CHUNK_SIZE) {
+        if let Some(new_collider) =
+            rebuild_chunk_collider(&voxel_world, chunk.chunk_pos, CHUNK_SIZE)
+        {
             *collider = new_collider;
         }
         chunk.dirty = false;
@@ -131,7 +140,10 @@ pub fn rapier_rebuild_system(
 // ---------------------------------------------------------------------------
 
 /// Sample the SVO at `pos` — returns `true` if an occupied voxel exists.
-fn is_solid(world: &VoxelWorld, pos: IVec3) -> bool {
+fn is_solid(
+    world: &VoxelWorld,
+    pos: IVec3,
+) -> bool {
     world
         .descend_to(pos)
         .map(|idx| world.nodes[idx].color_data != 0)
@@ -162,7 +174,8 @@ pub fn rebuild_chunk_collider(
             for dx in 0..chunk_size {
                 let voxel = chunk_pos + IVec3::new(dx, dy, dz);
                 if is_solid(world, voxel) {
-                    grid[(dz as usize * n + dy as usize) * n + dx as usize] = true;
+                    grid[(dz as usize * n + dy as usize) * n + dx as usize] =
+                        true;
                 }
             }
         }
@@ -234,7 +247,11 @@ pub fn rebuild_chunk_collider(
                     y as f32 + sy * 0.5,
                     z as f32 + sz * 0.5,
                 );
-                boxes.push((center, Quat::IDENTITY, Collider::cuboid(sx * 0.5, sy * 0.5, sz * 0.5)));
+                boxes.push((
+                    center,
+                    Quat::IDENTITY,
+                    Collider::cuboid(sx * 0.5, sy * 0.5, sz * 0.5),
+                ));
             }
         }
     }
@@ -256,7 +273,10 @@ pub fn rebuild_chunk_collider(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::svo::{VoxelMaterial, VoxelWorld};
+    use crate::svo::{
+        VoxelMaterial,
+        VoxelWorld,
+    };
 
     fn red() -> VoxelMaterial {
         VoxelMaterial::new(200, 0, 0, 128)

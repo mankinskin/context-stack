@@ -5,10 +5,20 @@
 //! main splat buffer alongside SVO-derived voxel splats. The radix sort and
 //! tiled rasteriser process them identically.
 
-use bevy::prelude::*;
-use bevy::render::extract_resource::ExtractResource;
-use bevy::render::renderer::{RenderDevice, RenderQueue};
-use bytemuck::{Pod, Zeroable};
+use bevy::{
+    prelude::*,
+    render::{
+        extract_resource::ExtractResource,
+        renderer::{
+            RenderDevice,
+            RenderQueue,
+        },
+    },
+};
+use bytemuck::{
+    Pod,
+    Zeroable,
+};
 
 /// Maximum number of dynamic particles in the GPU buffer.
 pub const MAX_PARTICLES: usize = 100_000;
@@ -90,7 +100,10 @@ pub struct ParticleSplatBuffer {
 pub struct ParticleSplatPlugin;
 
 impl Plugin for ParticleSplatPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<ParticleSystem>();
         app.add_systems(Update, simulate_particles);
         app.add_systems(
@@ -105,7 +118,10 @@ impl Plugin for ParticleSplatPlugin {
 // ---------------------------------------------------------------------------
 
 /// Simulate particles: emit new, age existing, remove dead.
-fn simulate_particles(time: Res<Time>, mut system: ResMut<ParticleSystem>) {
+fn simulate_particles(
+    time: Res<Time>,
+    mut system: ResMut<ParticleSystem>,
+) {
     let dt = time.delta_secs();
 
     // Diagnostic: log particle count at milestones so the browser console
@@ -122,10 +138,12 @@ fn simulate_particles(time: Res<Time>, mut system: ResMut<ParticleSystem>) {
             // Golden-angle sunflower jitter so each spawn goes to a slightly
             // different XZ position — prevents all particles stacking at
             // exactly the origin and creates a natural-looking cloud spread.
-            let spawn_idx = (system.particles.len() + new_particles.len()) as f32;
+            let spawn_idx =
+                (system.particles.len() + new_particles.len()) as f32;
             let angle = spawn_idx * 2.399_963; // golden angle ≈ 137.5°
             let radius = spawn_idx.sqrt() * 0.25; // grows slowly, ~3 units at 144 particles
-            let jitter = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+            let jitter =
+                Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
             new_particles.push(Particle {
                 position: emitter.origin + jitter,
                 velocity: emitter.initial_velocity,
@@ -144,8 +162,12 @@ fn simulate_particles(time: Res<Time>, mut system: ResMut<ParticleSystem>) {
         let new_total = system.particles.len();
         if count_before == 0 && new_total > 0 {
             web_sys::console::log_1(
-                &format!("[particles] first {} particles spawned, {} emitters",
-                    new_total, system.emitters.len()).into()
+                &format!(
+                    "[particles] first {} particles spawned, {} emitters",
+                    new_total,
+                    system.emitters.len()
+                )
+                .into(),
             );
         }
     }

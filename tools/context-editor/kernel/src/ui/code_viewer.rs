@@ -112,15 +112,15 @@ impl TokenKind {
     /// RGBA color for this token kind (theme-derived).
     pub fn color(&self) -> u32 {
         match self {
-            Self::Keyword => 0xC586C0FF,    // Purple
-            Self::Type => 0x4EC9B0FF,       // Teal
-            Self::String => 0xCE9178FF,     // Orange-brown
-            Self::Number => 0xB5CEA8FF,     // Light green
-            Self::Comment => 0x6A9955FF,    // Green
-            Self::Operator => 0xD4D4D4FF,   // Light gray
+            Self::Keyword => 0xC586C0FF,  // Purple
+            Self::Type => 0x4EC9B0FF,     // Teal
+            Self::String => 0xCE9178FF,   // Orange-brown
+            Self::Number => 0xB5CEA8FF,   // Light green
+            Self::Comment => 0x6A9955FF,  // Green
+            Self::Operator => 0xD4D4D4FF, // Light gray
             Self::Punctuation => 0xD4D4D4FF,
-            Self::Function => 0xDCDCAAFF,   // Yellow
-            Self::Plain => 0xD4D4D4FF,      // Light gray
+            Self::Function => 0xDCDCAAFF, // Yellow
+            Self::Plain => 0xD4D4D4FF,    // Light gray
         }
     }
 }
@@ -138,19 +138,17 @@ pub struct SyntaxToken {
 
 /// Rust keywords for simple highlighting.
 const RUST_KEYWORDS: &[&str] = &[
-    "fn", "let", "mut", "const", "pub", "struct", "enum", "impl", "use",
-    "mod", "crate", "self", "super", "if", "else", "match", "for", "while",
-    "loop", "return", "break", "continue", "where", "trait", "type", "as",
-    "in", "ref", "move", "async", "await", "unsafe", "extern", "dyn",
+    "fn", "let", "mut", "const", "pub", "struct", "enum", "impl", "use", "mod",
+    "crate", "self", "super", "if", "else", "match", "for", "while", "loop",
+    "return", "break", "continue", "where", "trait", "type", "as", "in", "ref",
+    "move", "async", "await", "unsafe", "extern", "dyn",
 ];
 
 /// Rust built-in types for highlighting.
 const RUST_TYPES: &[&str] = &[
-    "u8", "u16", "u32", "u64", "u128", "usize",
-    "i8", "i16", "i32", "i64", "i128", "isize",
-    "f32", "f64", "bool", "char", "str", "String",
-    "Vec", "HashMap", "Option", "Result", "Box",
-    "Self",
+    "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64",
+    "i128", "isize", "f32", "f64", "bool", "char", "str", "String", "Vec",
+    "HashMap", "Option", "Result", "Box", "Self",
 ];
 
 /// Tokenize a single line of Rust source code.
@@ -232,9 +230,8 @@ pub fn tokenize_rust_line(line: &str) -> Vec<SyntaxToken> {
         if !ch.is_alphanumeric() && ch != '_' {
             flush_buf(&mut buf, &mut tokens);
             let kind = match ch {
-                '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^' | '%' => {
-                    TokenKind::Operator
-                }
+                '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^'
+                | '%' => TokenKind::Operator,
                 _ => TokenKind::Punctuation,
             };
             tokens.push(SyntaxToken {
@@ -264,7 +261,10 @@ pub fn tokenize_rust_line(line: &str) -> Vec<SyntaxToken> {
 }
 
 /// Flush accumulated buffer as a classified token.
-fn flush_buf(buf: &mut String, tokens: &mut Vec<SyntaxToken>) {
+fn flush_buf(
+    buf: &mut String,
+    tokens: &mut Vec<SyntaxToken>,
+) {
     if buf.is_empty() {
         return;
     }
@@ -294,9 +294,13 @@ pub struct SourceFile {
 }
 
 impl SourceFile {
-    pub fn new(path: String, content: &str) -> Self {
+    pub fn new(
+        path: String,
+        content: &str,
+    ) -> Self {
         let language = Language::from_path(&path);
-        let lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        let lines: Vec<String> =
+            content.lines().map(|l| l.to_string()).collect();
         Self {
             path,
             language,
@@ -309,7 +313,11 @@ impl SourceFile {
     }
 
     /// Get a range of lines (0-indexed, clamped).
-    pub fn get_range(&self, start: usize, end: usize) -> &[String] {
+    pub fn get_range(
+        &self,
+        start: usize,
+        end: usize,
+    ) -> &[String] {
         let s = start.min(self.lines.len());
         let e = end.min(self.lines.len());
         &self.lines[s..e]
@@ -332,7 +340,10 @@ pub struct CodePanel {
 }
 
 impl CodePanel {
-    pub fn new(file_path: String, language: Language) -> Self {
+    pub fn new(
+        file_path: String,
+        language: Language,
+    ) -> Self {
         Self {
             file_path,
             language,
@@ -347,13 +358,21 @@ impl CodePanel {
         self.visible_end.saturating_sub(self.visible_start)
     }
 
-    pub fn is_line_highlighted(&self, line: usize) -> bool {
+    pub fn is_line_highlighted(
+        &self,
+        line: usize,
+    ) -> bool {
         self.highlight_lines.contains(&line)
     }
 
     /// Scroll by a given number of lines, clamping to valid range.
-    pub fn scroll(&mut self, delta_lines: i32, total_lines: usize) {
-        let new_start = (self.visible_start as i32 + delta_lines).max(0) as usize;
+    pub fn scroll(
+        &mut self,
+        delta_lines: i32,
+        total_lines: usize,
+    ) {
+        let new_start =
+            (self.visible_start as i32 + delta_lines).max(0) as usize;
         let window = self.visible_line_count();
         let max_start = total_lines.saturating_sub(window);
         self.visible_start = new_start.min(max_start);
@@ -378,11 +397,17 @@ pub struct SourceFileCache {
 }
 
 impl SourceFileCache {
-    pub fn insert(&mut self, file: SourceFile) {
+    pub fn insert(
+        &mut self,
+        file: SourceFile,
+    ) {
         self.files.insert(file.path.clone(), file);
     }
 
-    pub fn get(&self, path: &str) -> Option<&SourceFile> {
+    pub fn get(
+        &self,
+        path: &str,
+    ) -> Option<&SourceFile> {
         self.files.get(path)
     }
 
@@ -433,7 +458,10 @@ fn scroll_code_system(
 pub struct CodeViewerPlugin;
 
 impl Plugin for CodeViewerPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(
+        &self,
+        app: &mut App,
+    ) {
         app.init_resource::<SourceFileCache>();
         app.init_resource::<CodeSelection>();
 
@@ -495,21 +523,31 @@ mod tests {
     #[test]
     fn tokenize_keyword() {
         let tokens = tokenize_rust_line("fn main");
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Plain && t.text == "main"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Plain && t.text == "main"));
     }
 
     #[test]
     fn tokenize_type() {
         let tokens = tokenize_rust_line("let x: u32");
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "let"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Type && t.text == "u32"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Keyword && t.text == "let"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Type && t.text == "u32"));
     }
 
     #[test]
     fn tokenize_string_literal() {
         let tokens = tokenize_rust_line("let s = \"hello world\";");
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::String && t.text.contains("hello")));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::String && t.text.contains("hello")));
     }
 
     #[test]
@@ -523,35 +561,46 @@ mod tests {
     #[test]
     fn tokenize_number() {
         let tokens = tokenize_rust_line("42");
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Number && t.text == "42"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Number && t.text == "42"));
     }
 
     #[test]
     fn tokenize_escaped_string() {
         let tokens = tokenize_rust_line(r#""hello \"world\"""#);
         // Should be one string token
-        let string_tokens: Vec<_> = tokens.iter().filter(|t| t.kind == TokenKind::String).collect();
+        let string_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| t.kind == TokenKind::String)
+            .collect();
         assert_eq!(string_tokens.len(), 1);
     }
 
     #[test]
     fn tokenize_operators() {
         let tokens = tokenize_rust_line("a + b");
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Operator && t.text == "+"));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Operator && t.text == "+"));
     }
 
     // --- SourceFile ---
 
     #[test]
     fn source_file_new() {
-        let file = SourceFile::new("src/main.rs".into(), "fn main() {\n    println!(\"hi\");\n}");
+        let file = SourceFile::new(
+            "src/main.rs".into(),
+            "fn main() {\n    println!(\"hi\");\n}",
+        );
         assert_eq!(file.language, Language::Rust);
         assert_eq!(file.line_count(), 3);
     }
 
     #[test]
     fn source_file_get_range() {
-        let file = SourceFile::new("t.rs".into(), "line0\nline1\nline2\nline3\nline4");
+        let file =
+            SourceFile::new("t.rs".into(), "line0\nline1\nline2\nline3\nline4");
         let range = file.get_range(1, 4);
         assert_eq!(range.len(), 3);
         assert_eq!(range[0], "line1");

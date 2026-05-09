@@ -8,11 +8,17 @@
 //! treats a non-resident page hit as an opaque solid using the nearest
 //! resident ancestor's propagated average color.
 
-use bevy::prelude::Resource;
-use bevy::render::{
-    extract_resource::ExtractResource,
-    render_resource::{Buffer, BufferDescriptor, BufferUsages},
-    renderer::RenderDevice,
+use bevy::{
+    prelude::Resource,
+    render::{
+        extract_resource::ExtractResource,
+        render_resource::{
+            Buffer,
+            BufferDescriptor,
+            BufferUsages,
+        },
+        renderer::RenderDevice,
+    },
 };
 
 // ---------------------------------------------------------------------------
@@ -44,7 +50,10 @@ impl SvoPageTableBuffer {
     /// Minimum allocation: 4096 pages × 4 bytes = 16 KiB.
     const MIN_PAGES: usize = 4096;
 
-    pub fn new(device: &RenderDevice, page_count: usize) -> Self {
+    pub fn new(
+        device: &RenderDevice,
+        page_count: usize,
+    ) -> Self {
         let capacity = page_count.max(Self::MIN_PAGES);
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some("svo_page_table"),

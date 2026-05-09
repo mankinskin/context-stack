@@ -11,9 +11,16 @@
 //! coordinates so the player spawns in a sensible location.
 
 use bevy::prelude::*;
-use context_editor_kernel::svo::{VoxelMaterial, VoxelWorld};
+use context_editor_kernel::svo::{
+    VoxelMaterial,
+    VoxelWorld,
+};
 
-use crate::bootstrap::{SCENE_X, SCENE_Z, SVO_GROUND_Y};
+use crate::bootstrap::{
+    SCENE_X,
+    SCENE_Z,
+    SVO_GROUND_Y,
+};
 
 // ---------------------------------------------------------------------------
 // Preset 1 — Terrain
@@ -28,9 +35,9 @@ pub fn paint_terrain(world: &mut World) {
 
     let half = 120_i32;
     let grass = VoxelMaterial::new(60, 140, 40, 18);
-    let dirt  = VoxelMaterial::new(100, 70, 40, 22);
+    let dirt = VoxelMaterial::new(100, 70, 40, 22);
     let stone = VoxelMaterial::new(128, 128, 130, 28);
-    let sand  = VoxelMaterial::new(210, 190, 140, 24);
+    let sand = VoxelMaterial::new(210, 190, 140, 24);
 
     for x in (cx - half)..(cx + half) {
         for z in (cz - half)..(cz + half) {
@@ -38,9 +45,16 @@ pub fn paint_terrain(world: &mut World) {
             let dz = (z - cz) as f32;
             let h = ((dx * 0.04).sin() * 3.0
                 + (dz * 0.05).cos() * 3.0
-                + ((dx * 0.015 + dz * 0.02).sin() * 5.0)) as i32;
+                + ((dx * 0.015 + dz * 0.02).sin() * 5.0))
+                as i32;
             let surface_y = fy + h;
-            let top_mat = if h >= 4 { stone } else if h <= -2 { sand } else { grass };
+            let top_mat = if h >= 4 {
+                stone
+            } else if h <= -2 {
+                sand
+            } else {
+                grass
+            };
             vw.set_voxel(IVec3::new(x, surface_y, z), top_mat);
             for dy in 1..4_i32 {
                 vw.set_voxel(IVec3::new(x, surface_y - dy, z), dirt);
@@ -65,7 +79,7 @@ pub fn paint_flat(world: &mut World) {
 
     let half = 120_i32;
     let grass = VoxelMaterial::new(60, 140, 40, 18);
-    let dirt  = VoxelMaterial::new(100, 70, 40, 22);
+    let dirt = VoxelMaterial::new(100, 70, 40, 22);
 
     for x in (cx - half)..(cx + half) {
         for z in (cz - half)..(cz + half) {
@@ -96,14 +110,18 @@ pub fn paint_caves(world: &mut World) {
 
     for x in (cx - half)..(cx + half) {
         for z in (cz - half)..(cz + half) {
-            let h_offset = ((x as f32 * 0.08).sin() * (z as f32 * 0.06).cos() * 4.0) as i32;
+            let h_offset = ((x as f32 * 0.08).sin()
+                * (z as f32 * 0.06).cos()
+                * 4.0) as i32;
             let surface_y = fy + h_offset;
             vw.set_voxel(IVec3::new(x, surface_y, z), grass);
             for dy in 1..14_i32 {
                 let y = surface_y - dy;
                 let is_cave = ((x as f32 * 0.15).sin().abs()
-                    + (z as f32 * 0.12).cos().abs()) > 1.6
-                    && dy >= 4 && dy <= 9;
+                    + (z as f32 * 0.12).cos().abs())
+                    > 1.6
+                    && dy >= 4
+                    && dy <= 9;
                 if !is_cave {
                     vw.set_voxel(IVec3::new(x, y, z), stone);
                 }
