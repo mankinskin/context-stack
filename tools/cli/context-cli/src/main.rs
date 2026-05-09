@@ -10,6 +10,7 @@ mod repl;
 use std::collections::HashSet;
 
 use clap::{
+    CommandFactory,
     Parser,
     Subcommand,
 };
@@ -40,7 +41,7 @@ struct Cli {
     #[arg(long, global = true)]
     trace: bool,
 
-    /// Subcommand to execute. If omitted, starts the interactive REPL.
+    /// Subcommand to execute. If omitted, print the help message.
     #[command(subcommand)]
     command: Option<CliCommand>,
 }
@@ -474,8 +475,8 @@ fn main() {
     match cli.command {
         Some(cmd) => execute_subcommand(&mut manager, cmd, cli.trace),
         None => {
-            // No subcommand → start REPL
-            repl::run(&mut manager);
+            let mut command = Cli::command();
+            print!("{}", command.render_long_help());
         },
     }
 }
