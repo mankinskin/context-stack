@@ -139,7 +139,8 @@ context-cli save demo
 
 # Interactive REPL
 context-cli repl
-# or just:
+
+# Help
 context-cli
 ```
 
