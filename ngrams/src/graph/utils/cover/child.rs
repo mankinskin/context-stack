@@ -1,7 +1,6 @@
 use context_trace::{
     graph::{
         vertex::{
-            token::Token,
             data::{
                 VertexData,
                 VertexDataBuilder,
@@ -12,9 +11,10 @@ use context_trace::{
             },
             key::VertexKey,
             pattern::Pattern,
+            token::Token,
             wide::Wide,
-            VertexIndex,
             ChildPatterns,
+            VertexIndex,
         },
         Hypergraph,
     },

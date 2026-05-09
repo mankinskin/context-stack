@@ -1,11 +1,26 @@
 //! Native filesystem storage implementation
 
-use super::{Storage, StorageError};
-use serde::{de::DeserializeOwned, Serialize};
+use super::{
+    Storage,
+    StorageError,
+};
+use serde::{
+    de::DeserializeOwned,
+    Serialize,
+};
 use std::{
-    fs::{self, File},
-    io::{BufReader, BufWriter},
-    path::{absolute, PathBuf},
+    fs::{
+        self,
+        File,
+    },
+    io::{
+        BufReader,
+        BufWriter,
+    },
+    path::{
+        absolute,
+        PathBuf,
+    },
 };
 
 lazy_static::lazy_static! {
@@ -39,62 +54,78 @@ impl NativeStorage {
     }
 
     /// Get the full path for a key
-    fn key_to_path(&self, key: &str) -> PathBuf {
+    fn key_to_path(
+        &self,
+        key: &str,
+    ) -> PathBuf {
         self.base_dir.join(key)
     }
 }
 
 impl Storage for NativeStorage {
-    fn store<T: Serialize>(&self, key: &str, data: &T) -> Result<(), StorageError> {
+    fn store<T: Serialize>(
+        &self,
+        key: &str,
+        data: &T,
+    ) -> Result<(), StorageError> {
         let path = self.key_to_path(key);
-        
+
         println!("Write to storage: {}", path.display());
-        
+
         // Remove existing file if present
         if path.exists() {
             fs::remove_file(&path)?;
         }
-        
+
         // Create parent directories
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        
+
         // Write data using ciborium (CBOR format)
         let file = File::create(&path)?;
         let writer = BufWriter::new(file);
         ciborium::into_writer(data, writer)?;
-        
+
         Ok(())
     }
 
-    fn load<T: DeserializeOwned>(&self, key: &str) -> Result<T, StorageError> {
+    fn load<T: DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Result<T, StorageError> {
         let path = self.key_to_path(key);
-        
+
         println!("Read from storage: {}", path.display());
-        
+
         if !path.exists() {
             return Err(StorageError::NotFound(key.to_string()));
         }
-        
+
         let file = File::open(&path)?;
         let reader = BufReader::new(file);
         let data = ciborium::from_reader(reader)?;
-        
+
         Ok(data)
     }
 
-    fn exists(&self, key: &str) -> bool {
+    fn exists(
+        &self,
+        key: &str,
+    ) -> bool {
         self.key_to_path(key).exists()
     }
 
-    fn remove(&self, key: &str) -> Result<(), StorageError> {
+    fn remove(
+        &self,
+        key: &str,
+    ) -> Result<(), StorageError> {
         let path = self.key_to_path(key);
-        
+
         if path.exists() {
             fs::remove_file(&path)?;
         }
-        
+
         Ok(())
     }
 }

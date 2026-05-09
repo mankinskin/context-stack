@@ -1,6 +1,9 @@
 //! Configuration options for the ngrams crate
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{
+    AtomicBool,
+    Ordering,
+};
 
 /// Global flag for cache file writing (disabled by default)
 static CACHE_ENABLED: AtomicBool = AtomicBool::new(false);

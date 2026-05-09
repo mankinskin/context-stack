@@ -23,7 +23,7 @@ pub use crate::{
     cancellation::Cancellation,
     config::CacheConfig,
     graph::{
-        Status,
         vocabulary::ProcessStatus,
+        Status,
     },
 };

@@ -16,10 +16,7 @@ use serde::{
 #[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
 #[cfg_attr(
     feature = "ts-gen",
-    ts(
-        export,
-        export_to = "../../../packages/context-types/src/generated/"
-    )
+    ts(export, export_to = "../../../packages/context-types/src/generated/")
 )]
 pub struct WorkspaceMetadata {
     /// Workspace name (matches the directory name under `.context-engine/`).

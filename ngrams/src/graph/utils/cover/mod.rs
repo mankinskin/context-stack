@@ -1,12 +1,8 @@
 pub(crate) mod child;
-pub(crate) mod parent;
 pub(crate) mod frequency;
+pub(crate) mod parent;
 
 use child::ChildCoverPass;
-use itertools::Itertools;
-use pretty_assertions::assert_matches;
-use range_ext::intersect::Intersect;
-use derivative::Derivative;
 use context_trace::{
     graph::{
         vertex::{
@@ -28,6 +24,10 @@ use context_trace::{
     HashSet,
     VertexSet,
 };
+use derivative::Derivative;
+use itertools::Itertools;
+use pretty_assertions::assert_matches;
+use range_ext::intersect::Intersect;
 use std::{
     cmp::{
         Ordering,
@@ -42,12 +42,12 @@ use std::{
     ops::Range,
 };
 
-use derive_new::new;
 use derive_more::{
     Deref,
     DerefMut,
     IntoIterator,
 };
+use derive_new::new;
 
 use crate::graph::{
     labelling::LabellingCtx,
@@ -69,39 +69,35 @@ use crate::graph::{
             VocabEntry,
         },
         NGramId,
-        ProcessStatus, Vocabulary,
+        ProcessStatus,
+        Vocabulary,
     },
 };
 
 #[derive(Debug, Deref, DerefMut, Default, IntoIterator, new)]
-pub(crate) struct ChildCover
-{
+pub(crate) struct ChildCover {
     #[into_iterator(owned, ref)]
     #[deref]
     #[deref_mut]
     entries: HashMap<usize, NGramId>,
 }
-impl ChildCover
-{
+impl ChildCover {
     // find largest labelled children
     pub(crate) fn from_key(
         ctx: &LabellingCtx,
         key: VertexKey,
-    ) -> Self
-    {
+    ) -> Self {
         let mut ctx = ChildCoverPass::new(ctx, key);
         ctx.run();
         ctx.cover
     }
-    pub(crate) fn as_ranges(&self) -> HashSet<Range<usize>>
-    {
+    pub(crate) fn as_ranges(&self) -> HashSet<Range<usize>> {
         self.entries
             .iter()
             .map(|(off, id)| *off..(off + id.width().0))
             .collect()
     }
-    pub(crate) fn any_intersect(&self) -> bool
-    {
+    pub(crate) fn any_intersect(&self) -> bool {
         let ranges = self.as_ranges();
         ranges
             .iter()
@@ -112,8 +108,7 @@ impl ChildCover
         &self,
         off: usize,
         node: impl Wide,
-    ) -> bool
-    {
+    ) -> bool {
         self.iter().any(|(&p, &c)| {
             let node_end = off + node.width();
             let probe_end = p + c.width();

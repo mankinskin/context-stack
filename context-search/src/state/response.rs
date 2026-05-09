@@ -1,6 +1,9 @@
 use context_trace::{
+    graph::visualization::{
+        GraphOpEvent,
+        Transition,
+    },
     *,
-    graph::visualization::{GraphOpEvent, Transition},
 };
 
 use crate::{
@@ -28,7 +31,10 @@ pub struct Response {
 /// enumerating the full event trace.  Use `response.events` or
 /// `response.transitions()` to assert on events separately.
 impl PartialEq for Response {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
         self.cache == other.cache && self.end == other.end
     }
 }

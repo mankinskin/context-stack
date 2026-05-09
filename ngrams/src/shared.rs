@@ -9,18 +9,16 @@ use std::hash::{
     DefaultHasher,
 };
 
-pub(crate) use {
-    itertools::*,
-    ngram::*,
-    range_ext::intersect::Intersect,
-    std::{
-        borrow::Borrow,
-        default::Default,
-        fmt::Debug,
-        hash::Hash,
-    },
-    tap::prelude::*,
+pub(crate) use itertools::*;
+pub(crate) use ngram::*;
+pub(crate) use range_ext::intersect::Intersect;
+pub(crate) use std::{
+    borrow::Borrow,
+    default::Default,
+    fmt::Debug,
+    hash::Hash,
 };
+pub(crate) use tap::prelude::*;
 
 #[cfg(any(test, feature = "test-hashing"))]
 pub(crate) type HashSet<T> =

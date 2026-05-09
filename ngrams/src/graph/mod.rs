@@ -172,7 +172,7 @@ impl Corpus {
             texts: texts.into_iter().map(|s| s.to_string()).collect(),
         }
     }
-    
+
     /// Get the storage key for this corpus
     pub(crate) fn storage_key(&self) -> &str {
         &self.name

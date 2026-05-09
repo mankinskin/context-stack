@@ -8,9 +8,7 @@ use {
         },
         tests::search::event_helpers::*,
     },
-    context_trace::{
-        *,
-    },
+    context_trace::*,
     pretty_assertions::assert_eq,
 };
 

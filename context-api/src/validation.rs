@@ -7,12 +7,12 @@
 use std::collections::HashSet;
 
 use context_trace::{
+    VertexSet,
     graph::{
+        Hypergraph,
         kind::BaseGraphKind,
         vertex::atom::Atom,
-        Hypergraph,
     },
-    VertexSet,
 };
 
 use crate::error::PatternError;

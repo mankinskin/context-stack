@@ -4,21 +4,21 @@ use builder::PartitionBuilder;
 use context_trace::{
     graph::{
         vertex::{
-            token::Token,
             data::{
                 VertexData,
                 VertexDataBuilder,
             },
+            has_vertex_data::HasVertexData,
             has_vertex_index::{
                 HasVertexIndex,
                 ToToken,
             },
             has_vertex_key::HasVertexKey,
-            has_vertex_data::HasVertexData,
             pattern::Pattern,
+            token::Token,
             wide::Wide,
-            VertexIndex,
             ChildPatterns,
+            VertexIndex,
         },
         Hypergraph,
     },

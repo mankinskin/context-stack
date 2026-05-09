@@ -26,26 +26,48 @@ pub(crate) trait VisitTracking: TraversalPass {
     fn visited_mut(&mut self) -> &mut Self::Collection;
 }
 pub(crate) trait VisitorCollection<N: PassNode> {
-    type Ref<'t>: VisitorCollection<N> where N: 't;
-    fn insert(&mut self, node: N) -> bool;
+    type Ref<'t>: VisitorCollection<N>
+    where
+        N: 't;
+    fn insert(
+        &mut self,
+        node: N,
+    ) -> bool;
 }
 
-impl<N: PassNode> VisitorCollection<N> for HashSet<N>
-{
-    type Ref<'t> = &'t mut Self where N: 't;
-    fn insert(&mut self, node: N) -> bool {
+impl<N: PassNode> VisitorCollection<N> for HashSet<N> {
+    type Ref<'t>
+        = &'t mut Self
+    where
+        N: 't;
+    fn insert(
+        &mut self,
+        node: N,
+    ) -> bool {
         <&mut Self as VisitorCollection<N>>::insert(&mut &mut *self, node)
     }
 }
 impl<N: PassNode> VisitorCollection<N> for &'_ mut HashSet<N> {
-    type Ref<'t> = &'t mut HashSet<N> where N: 't;
-    fn insert(&mut self, node: N) -> bool {
+    type Ref<'t>
+        = &'t mut HashSet<N>
+    where
+        N: 't;
+    fn insert(
+        &mut self,
+        node: N,
+    ) -> bool {
         HashSet::insert(*self, node)
     }
 }
 impl<N: PassNode> VisitorCollection<N> for () {
-    type Ref<'t> = Self where N: 't;
-    fn insert(&mut self, node: N) -> bool {
+    type Ref<'t>
+        = Self
+    where
+        N: 't;
+    fn insert(
+        &mut self,
+        node: N,
+    ) -> bool {
         true
     }
 }

@@ -161,7 +161,10 @@ pub fn bundle_overlap(
     if input.self_overlap {
         // In the self-overlap case, the shared token is the postfix
         // of the anchor — the token at the root of the anchor postfix path.
-        let shared: Token = GraphRootChild::<End>::graph_root_child(&input.anchor_postfix_path, graph);
+        let shared: Token = GraphRootChild::<End>::graph_root_child(
+            &input.anchor_postfix_path,
+            graph,
+        );
         let left = left_partition_from_postfix_path(
             graph,
             &input.anchor_postfix_path,
@@ -170,18 +173,21 @@ pub fn bundle_overlap(
         // Find or create the right extension token [shared, t1].
         // In the common repetition case (t1 == postfix), this is the
         // anchor itself, which already exists in the graph.
-        use crate::insert::{ToInsertCtx, outcome::InsertOutcome};
-        let right_ext: Token =
-            match <HypergraphRef as ToInsertCtx<IndexWithPath>>::insert_next_match(
-                graph,
-                vec![shared, input.t1],
-            ) {
-                Ok(o) => {
-                    let outcome: InsertOutcome = o;
-                    outcome.token()
-                },
-                Err(_) => graph.insert_pattern(vec![shared, input.t1]),
-            };
+        use crate::insert::{
+            ToInsertCtx,
+            outcome::InsertOutcome,
+        };
+        let right_ext: Token = match <HypergraphRef as ToInsertCtx<
+            IndexWithPath,
+        >>::insert_next_match(
+            graph, vec![shared, input.t1]
+        ) {
+            Ok(o) => {
+                let outcome: InsertOutcome = o;
+                outcome.token()
+            },
+            Err(_) => graph.insert_pattern(vec![shared, input.t1]),
+        };
 
         let primary_pat = vec![anchor, input.t1];
         let overlap_pat = match left.token() {

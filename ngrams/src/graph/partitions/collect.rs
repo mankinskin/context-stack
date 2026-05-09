@@ -103,7 +103,8 @@ impl TraversalPass for AccumulateCtx<'_> {
         let queue =
             Self::Queue::from_iter(TopDown::starting_nodes(self.vocab()));
         for vk in queue.iter() {
-            let data = self.vocab().containment.expect_vertex_data(vk.vertex_key());
+            let data =
+                self.vocab().containment.expect_vertex_data(vk.vertex_key());
             let builder =
                 VertexDataBuilder::default().width(data.width()).key(**vk);
             self.result.insert_vertex_builder(builder);

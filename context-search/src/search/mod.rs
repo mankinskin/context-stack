@@ -11,7 +11,10 @@ use crate::{
         PatternCursor,
     },
     r#match::{
-        iterator::{BfsStepResult, SearchIterator},
+        iterator::{
+            BfsStepResult,
+            SearchIterator,
+        },
         root_cursor::{
             ConclusiveEnd,
             RootAdvanceResult,
@@ -39,7 +42,11 @@ use context::{
 };
 use context_trace::{
     graph::{
-        search_path::{EdgeRef, PathNode, VizPathGraph},
+        search_path::{
+            EdgeRef,
+            PathNode,
+            VizPathGraph,
+        },
         visualization::{
             GraphOpEvent,
             LocationInfo,
@@ -184,9 +191,9 @@ where
                 self.viz_cursor_pos = *cursor_pos;
                 (*cursor_pos, Some(node.index))
             },
-            Transition::ChildMismatch { cursor_pos, node, .. } => {
-                (*cursor_pos, Some(node.index))
-            },
+            Transition::ChildMismatch {
+                cursor_pos, node, ..
+            } => (*cursor_pos, Some(node.index)),
             _ => (self.viz_cursor_pos, None),
         };
 
@@ -225,7 +232,12 @@ where
         self.collected_events.push(event);
 
         // Emit corresponding query path event for certain transitions
-        self.emit_query_event(&transition, query_tokens, query_width, cursor_pos);
+        self.emit_query_event(
+            &transition,
+            query_tokens,
+            query_width,
+            cursor_pos,
+        );
     }
 
     /// Emit a query path event corresponding to a search transition.
@@ -245,24 +257,41 @@ where
                 // Find the query token at this cursor position
                 let query_token_idx = self.query_token_at_pos(*cursor_pos);
                 Some(Transition::ChildMatch {
-                    node: PathNode { index: query_token_idx, width: 1 }, // Query token
+                    node: PathNode {
+                        index: query_token_idx,
+                        width: 1,
+                    }, // Query token
                     cursor_pos: *cursor_pos,
                 })
             },
-            Transition::ChildMismatch { cursor_pos, expected, .. } => {
+            Transition::ChildMismatch {
+                cursor_pos,
+                expected,
+                ..
+            } => {
                 let query_token_idx = self.query_token_at_pos(*cursor_pos);
                 Some(Transition::ChildMismatch {
-                    node: PathNode { index: query_token_idx, width: 1 },
+                    node: PathNode {
+                        index: query_token_idx,
+                        width: 1,
+                    },
                     cursor_pos: *cursor_pos,
                     expected: *expected,
-                    actual: PathNode { index: query_token_idx, width: 1 },
+                    actual: PathNode {
+                        index: query_token_idx,
+                        width: 1,
+                    },
                 })
             },
             Transition::StartNode { .. } => {
                 // Query starts at first token
-                let first_query_token = query_tokens.first().copied().unwrap_or(0);
+                let first_query_token =
+                    query_tokens.first().copied().unwrap_or(0);
                 Some(Transition::StartNode {
-                    node: PathNode { index: first_query_token, width: 1 },
+                    node: PathNode {
+                        index: first_query_token,
+                        width: 1,
+                    },
                 })
             },
             Transition::Done { success, .. } => {
@@ -305,7 +334,10 @@ where
     }
 
     /// Find the query token index at a given cursor position.
-    fn query_token_at_pos(&self, cursor_pos: usize) -> usize {
+    fn query_token_at_pos(
+        &self,
+        cursor_pos: usize,
+    ) -> usize {
         let tokens = self.query.path_root();
         let mut pos = 0;
         for token in tokens.iter() {
@@ -322,18 +354,22 @@ where
     fn infer_location(transition: &Transition) -> (Option<usize>, Vec<usize>) {
         match transition {
             Transition::StartNode { node } => (Some(node.index), vec![]),
-            Transition::VisitParent { from, .. } => (Some(from.index), vec![from.index]),
-            Transition::CandidateMatch { root, .. } => (Some(root.index), vec![root.index]),
-            Transition::VisitChild { from, .. } => (Some(from.index), vec![from.index]),
-            Transition::ParentExplore { current_root, .. } => {
-                (Some(*current_root), vec![*current_root])
-            },
-            Transition::Done { final_node, .. } => {
-                (*final_node, final_node.iter().copied().collect())
-            },
-            Transition::ChildMatch { node, .. } => (Some(node.index), vec![node.index]),
-            Transition::ChildMismatch { node, .. } => (Some(node.index), vec![]),
-            Transition::CandidateMismatch { node, .. } => (Some(node.index), vec![]),
+            Transition::VisitParent { from, .. } =>
+                (Some(from.index), vec![from.index]),
+            Transition::CandidateMatch { root, .. } =>
+                (Some(root.index), vec![root.index]),
+            Transition::VisitChild { from, .. } =>
+                (Some(from.index), vec![from.index]),
+            Transition::ParentExplore { current_root, .. } =>
+                (Some(*current_root), vec![*current_root]),
+            Transition::Done { final_node, .. } =>
+                (*final_node, final_node.iter().copied().collect()),
+            Transition::ChildMatch { node, .. } =>
+                (Some(node.index), vec![node.index]),
+            Transition::ChildMismatch { node, .. } =>
+                (Some(node.index), vec![]),
+            Transition::CandidateMismatch { node, .. } =>
+                (Some(node.index), vec![]),
             // Insert-specific transitions — not expected in search
             _ => (None, vec![]),
         }
@@ -359,10 +395,18 @@ where
     /// This translates the metadata captured during `compare_leaf_tokens`
     /// into graph-op events so the visualization stays in sync with the
     /// algorithm.
-    fn emit_compare_events(&mut self, info: CompareInfo, parent_node: usize) {
-        use events::{EventContext, IntoTransitions};
+    fn emit_compare_events(
+        &mut self,
+        info: CompareInfo,
+        parent_node: usize,
+    ) {
+        use events::{
+            EventContext,
+            IntoTransitions,
+        };
 
-        let ctx = EventContext::new(parent_node, self.viz_path.end_path.is_empty());
+        let ctx =
+            EventContext::new(parent_node, self.viz_path.end_path.is_empty());
         for (transition, description) in info.into_transitions(&ctx) {
             self.emit_graph_op(transition, description);
         }
@@ -372,10 +416,15 @@ where
     ///
     /// Creates an [`EventContext`] from the current visualization state and
     /// emits all derived transitions.
-    fn emit_advance_events<T: events::IntoTransitions>(&mut self, data: T, parent_node: usize) {
+    fn emit_advance_events<T: events::IntoTransitions>(
+        &mut self,
+        data: T,
+        parent_node: usize,
+    ) {
         use events::EventContext;
 
-        let ctx = EventContext::new(parent_node, self.viz_path.end_path.is_empty());
+        let ctx =
+            EventContext::new(parent_node, self.viz_path.end_path.is_empty());
         for (transition, description) in data.into_transitions(&ctx) {
             self.emit_graph_op(transition, description);
         }
@@ -386,7 +435,10 @@ where
     /// If `root_idx` matches the last start_path entry (the candidate was
     /// pushed by VisitParent), use the entry below it. Otherwise use the
     /// start_path top or start_node as fallback.
-    fn compute_candidate_edge_from(&self, root_idx: usize) -> usize {
+    fn compute_candidate_edge_from(
+        &self,
+        root_idx: usize,
+    ) -> usize {
         let sp = &self.viz_path;
         if sp.start_path.last().map(|n| n.index) == Some(root_idx) {
             if sp.start_path.len() >= 2 {
@@ -395,10 +447,9 @@ where
                 sp.start_node.map(|n| n.index).unwrap_or(self.start_node)
             }
         } else {
-            sp.start_path
-                .last()
-                .map(|n| n.index)
-                .unwrap_or(sp.start_node.map(|n| n.index).unwrap_or(self.start_node))
+            sp.start_path.last().map(|n| n.index).unwrap_or(
+                sp.start_node.map(|n| n.index).unwrap_or(self.start_node),
+            )
         }
     }
 
@@ -409,11 +460,17 @@ where
     /// [`VizPathGraph`], so this transition is informational for parent
     /// candidates. For non-parent candidates (where no `VisitParent` was
     /// emitted), `CandidateMatch` still sets the root as a fallback.
-    fn emit_candidate_match(&mut self, node_index: usize) {
+    fn emit_candidate_match(
+        &mut self,
+        node_index: usize,
+    ) {
         let edge_from = self.compute_candidate_edge_from(node_index);
         self.emit_graph_op(
             Transition::CandidateMatch {
-                root: PathNode { index: node_index, width: 1 }, // TODO: get real width
+                root: PathNode {
+                    index: node_index,
+                    width: 1,
+                }, // TODO: get real width
                 edge: EdgeRef {
                     from: edge_from,
                     to: node_index,
@@ -432,7 +489,10 @@ where
         let start_width = *self.query.path_root()[0].width();
         self.emit_graph_op(
             Transition::StartNode {
-                node: PathNode { index: self.start_node, width: start_width },
+                node: PathNode {
+                    index: self.start_node,
+                    width: start_width,
+                },
             },
             "Search started — initial queue populated",
         );
@@ -445,7 +505,10 @@ where
                     current_root: self.start_node,
                     parent_candidates: initial_candidates,
                 },
-                format!("Start node {} exploring parent candidates", self.start_node),
+                format!(
+                    "Start node {} exploring parent candidates",
+                    self.start_node
+                ),
             );
         }
 
@@ -568,8 +631,10 @@ where
 
                     // Extract child info and emit events via IntoTransitions
                     let trav = &self.matches.trace_ctx.trav;
-                    let child_state = &next_match.state.child.current().child_state;
-                    let child_token = child_state.path.role_rooted_leaf_token::<End, _>(trav);
+                    let child_state =
+                        &next_match.state.child.current().child_state;
+                    let child_token =
+                        child_state.path.role_rooted_leaf_token::<End, _>(trav);
                     let event_data = events::MatchAdvanceData::new(
                         adv_root,
                         child_token.index.0,
@@ -583,7 +648,6 @@ where
                     last_match = next_match.state;
                 },
                 RootAdvanceResult::Finished(end_result) => {
-
                     // Reached an end condition
                     match end_result {
                         RootEndResult::Conclusive(conclusive) => {
@@ -596,22 +660,42 @@ where
                                     );
                                     // Extract token info and emit mismatch events via IntoTransitions
                                     let trav = &self.matches.trace_ctx.trav;
-                                    let child_state = &candidate_cursor.state.child.candidate().child_state;
-                                    let child_token = child_state.path.role_rooted_leaf_token::<End, _>(trav);
-                                    let adv_root = child_state.root_parent().index.0;
-                                    let query_token = candidate_cursor.state.query.candidate().path.role_rooted_leaf_token::<End, _>(trav);
-                                    let cursor_pos = *candidate_cursor.state.query.candidate().atom_position.as_ref();
+                                    let child_state = &candidate_cursor
+                                        .state
+                                        .child
+                                        .candidate()
+                                        .child_state;
+                                    let child_token = child_state
+                                        .path
+                                        .role_rooted_leaf_token::<End, _>(trav);
+                                    let adv_root =
+                                        child_state.root_parent().index.0;
+                                    let query_token = candidate_cursor
+                                        .state
+                                        .query
+                                        .candidate()
+                                        .path
+                                        .role_rooted_leaf_token::<End, _>(trav);
+                                    let cursor_pos = *candidate_cursor
+                                        .state
+                                        .query
+                                        .candidate()
+                                        .atom_position
+                                        .as_ref();
 
-                                    let event_data = events::MismatchAdvanceData::new(
-                                        adv_root,
-                                        child_token.index.0,
-                                        child_token.width.0,
-                                        query_token.index.0,
-                                        query_token.width.0,
-                                        child_state.root_child_index(),
-                                        cursor_pos,
+                                    let event_data =
+                                        events::MismatchAdvanceData::new(
+                                            adv_root,
+                                            child_token.index.0,
+                                            child_token.width.0,
+                                            query_token.index.0,
+                                            query_token.width.0,
+                                            child_state.root_child_index(),
+                                            cursor_pos,
+                                        );
+                                    self.emit_advance_events(
+                                        event_data, adv_root,
                                     );
-                                    self.emit_advance_events(event_data, adv_root);
                                     // Continue searching from queue (no parent exploration for mismatch)
                                 },
                                 ConclusiveEnd::Exhausted => {
@@ -654,7 +738,8 @@ where
                                 },
                             }
 
-                            let parent_candidates = self.queue_candidates().0.clone();
+                            let parent_candidates =
+                                self.queue_candidates().0.clone();
                             self.emit_graph_op(
                                 Transition::ParentExplore { 
                                     current_root: checkpoint_root_idx,
@@ -750,9 +835,21 @@ where
 
             // Extract node_index and is_parent from all non-Empty variants
             let (node_index, is_parent) = match &step_result {
-                BfsStepResult::Expanded { node_index, is_parent, .. } |
-                BfsStepResult::FoundMatch { node_index, is_parent, .. } |
-                BfsStepResult::Skipped { node_index, is_parent, .. } => (*node_index, *is_parent),
+                BfsStepResult::Expanded {
+                    node_index,
+                    is_parent,
+                    ..
+                }
+                | BfsStepResult::FoundMatch {
+                    node_index,
+                    is_parent,
+                    ..
+                }
+                | BfsStepResult::Skipped {
+                    node_index,
+                    is_parent,
+                    ..
+                } => (*node_index, *is_parent),
                 BfsStepResult::Empty => {
                     trace!("no more matches found");
                     return None;
@@ -762,16 +859,20 @@ where
             // Emit VisitParent BEFORE processing so the visualization shows
             // navigation to the candidate before any child comparison.
             if is_parent {
-                let push_from = if let Some(current_root_node) = self.viz_path.root {
-                    current_root_node.index
-                } else if let Some(top) = self.viz_path.start_path.last() {
-                    // After CandidateMismatch clears root, the top of
-                    // start_path is the last confirmed ancestor — use it
-                    // so the edge connects correctly (e.g. ab → abc).
-                    top.index
-                } else {
-                    self.viz_path.start_node.map(|n| n.index).unwrap_or(self.start_node)
-                };
+                let push_from =
+                    if let Some(current_root_node) = self.viz_path.root {
+                        current_root_node.index
+                    } else if let Some(top) = self.viz_path.start_path.last() {
+                        // After CandidateMismatch clears root, the top of
+                        // start_path is the last confirmed ancestor — use it
+                        // so the edge connects correctly (e.g. ab → abc).
+                        top.index
+                    } else {
+                        self.viz_path
+                            .start_node
+                            .map(|n| n.index)
+                            .unwrap_or(self.start_node)
+                    };
                 self.emit_graph_op(
                     Transition::VisitParent {
                         from: PathNode { index: push_from, width: 1 }, // TODO: get real width
@@ -789,7 +890,11 @@ where
             }
 
             match step_result {
-                BfsStepResult::Expanded { info, node_index, is_parent } => {
+                BfsStepResult::Expanded {
+                    info,
+                    node_index,
+                    is_parent,
+                } => {
                     // Clear transient end_path from any previous comparison
                     // before starting a new comparison for this candidate.
                     self.viz_path.end_path.clear();
@@ -803,7 +908,8 @@ where
                     self.emit_compare_events(info, node_index);
 
                     if is_parent {
-                        let candidate_parents = self.queue_candidates().0.clone();
+                        let candidate_parents =
+                            self.queue_candidates().0.clone();
                         self.emit_graph_op(
                             Transition::ParentExplore {
                                 current_root: node_index,
@@ -824,7 +930,12 @@ where
                     }
                     continue;
                 },
-                BfsStepResult::FoundMatch { state, info, node_index, .. } => {
+                BfsStepResult::FoundMatch {
+                    state,
+                    info,
+                    node_index,
+                    ..
+                } => {
                     // Clear transient end_path from any previous comparison.
                     self.viz_path.end_path.clear();
                     self.viz_path.end_edges.clear();
@@ -856,7 +967,11 @@ where
                     );
                     break state;
                 },
-                BfsStepResult::Skipped { info, node_index, is_parent } => {
+                BfsStepResult::Skipped {
+                    info,
+                    node_index,
+                    is_parent,
+                } => {
                     // Clear transient end_path from any previous comparison.
                     self.viz_path.end_path.clear();
                     self.viz_path.end_edges.clear();
@@ -869,7 +984,10 @@ where
 
                     self.emit_graph_op(
                         Transition::CandidateMismatch {
-                            node: PathNode { index: node_index, width: 1 }, // TODO: get real width
+                            node: PathNode {
+                                index: node_index,
+                                width: 1,
+                            }, // TODO: get real width
                             queue_remaining: self.matches.queue.nodes.len(),
                             is_parent,
                         },
@@ -886,8 +1004,7 @@ where
         };
 
         let matched_result = self.finish_root_cursor(matched_state);
-        let checkpoint_pos =
-            *matched_result.cursor().atom_position.as_ref();
+        let checkpoint_pos = *matched_result.cursor().atom_position.as_ref();
 
         trace!(
             query_exhausted = matched_result.query_exhausted(),

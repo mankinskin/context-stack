@@ -22,8 +22,8 @@ use std::{
 };
 
 use context_trace::graph::{
-    kind::BaseGraphKind,
     Hypergraph,
+    kind::BaseGraphKind,
 };
 use fs2::FileExt;
 

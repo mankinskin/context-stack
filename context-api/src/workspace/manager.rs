@@ -193,11 +193,7 @@ impl WorkspaceManager {
             }
         });
 
-        let parse_result = parse_corpus(
-            corpus,
-            status,
-            Arc::clone(&cancelled),
-        );
+        let parse_result = parse_corpus(corpus, status, Arc::clone(&cancelled));
 
         done.store(true, Ordering::SeqCst);
         let _ = watchdog.join();

@@ -8,7 +8,10 @@ use ciborium::{
     de::Error as DeError,
     ser::Error as SerError,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{
+    de::DeserializeOwned,
+    Serialize,
+};
 use std::io;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -37,13 +40,19 @@ pub(crate) enum StorageError {
 }
 
 impl std::fmt::Display for StorageError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
         match self {
             StorageError::Io(e) => write!(f, "IO error: {}", e),
-            StorageError::Serialize(e) => write!(f, "Serialization error: {}", e),
-            StorageError::Deserialize(e) => write!(f, "Deserialization error: {}", e),
+            StorageError::Serialize(e) =>
+                write!(f, "Serialization error: {}", e),
+            StorageError::Deserialize(e) =>
+                write!(f, "Deserialization error: {}", e),
             StorageError::NotFound(key) => write!(f, "Not found: {}", key),
-            StorageError::Unavailable(msg) => write!(f, "Storage unavailable: {}", msg),
+            StorageError::Unavailable(msg) =>
+                write!(f, "Storage unavailable: {}", msg),
         }
     }
 }
@@ -71,16 +80,29 @@ impl<T: std::fmt::Debug> From<DeError<T>> for StorageError {
 /// Trait for storage operations
 pub(crate) trait Storage {
     /// Store serializable data at the given key
-    fn store<T: Serialize>(&self, key: &str, data: &T) -> Result<(), StorageError>;
+    fn store<T: Serialize>(
+        &self,
+        key: &str,
+        data: &T,
+    ) -> Result<(), StorageError>;
 
     /// Load deserializable data from the given key
-    fn load<T: DeserializeOwned>(&self, key: &str) -> Result<T, StorageError>;
+    fn load<T: DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Result<T, StorageError>;
 
     /// Check if a key exists
-    fn exists(&self, key: &str) -> bool;
+    fn exists(
+        &self,
+        key: &str,
+    ) -> bool;
 
     /// Remove data at the given key
-    fn remove(&self, key: &str) -> Result<(), StorageError>;
+    fn remove(
+        &self,
+        key: &str,
+    ) -> Result<(), StorageError>;
 }
 
 /// Get the default storage implementation for the current platform
@@ -89,7 +111,10 @@ pub(crate) fn get_storage() -> PlatformStorage {
 }
 
 /// Convenience function to store data
-pub(crate) fn store<T: Serialize>(key: &str, data: &T) -> Result<(), StorageError> {
+pub(crate) fn store<T: Serialize>(
+    key: &str,
+    data: &T,
+) -> Result<(), StorageError> {
     get_storage().store(key, data)
 }
 

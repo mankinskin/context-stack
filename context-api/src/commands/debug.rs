@@ -13,8 +13,8 @@ use context_trace::{
 
 use crate::{
     ascii_graph::{
-        AsciiRenderMode,
         AsciiOwnedRule,
+        AsciiRenderMode,
         render_layered_ascii_owned_with_mode,
     },
     error::ApiError,

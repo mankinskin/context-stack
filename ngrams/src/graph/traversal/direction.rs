@@ -13,12 +13,10 @@ use context_trace::graph::vertex::{
     VertexIndex,
 };
 
-
 pub(crate) struct BottomUp;
 pub(crate) struct TopDown;
 
-pub(crate) trait TraversalDirection
-{
+pub(crate) trait TraversalDirection {
     type Next;
     fn starting_nodes(vocab: &Vocabulary) -> VecDeque<NGramId>;
     fn next_nodes(entry: &VertexCtx<'_>) -> Vec<Self::Next>;
@@ -27,22 +25,18 @@ pub(crate) trait TraversalDirection
         next: T,
     ) -> (T, T);
 }
-impl TraversalDirection for BottomUp
-{
+impl TraversalDirection for BottomUp {
     type Next = NGramId;
-    fn starting_nodes(vocab: &Vocabulary) -> VecDeque<NGramId>
-    {
+    fn starting_nodes(vocab: &Vocabulary) -> VecDeque<NGramId> {
         FromIterator::from_iter(vocab.leaves.iter().cloned())
     }
     fn order_top_bottom<T>(
         prev: T,
         next: T,
-    ) -> (T, T)
-    {
+    ) -> (T, T) {
         (next, prev)
     }
-    fn next_nodes(entry: &VertexCtx<'_>) -> Vec<Self::Next>
-    {
+    fn next_nodes(entry: &VertexCtx<'_>) -> Vec<Self::Next> {
         entry
             .data
             .parents()
@@ -57,22 +51,18 @@ impl TraversalDirection for BottomUp
             .collect_vec()
     }
 }
-impl TraversalDirection for TopDown
-{
+impl TraversalDirection for TopDown {
     type Next = (usize, NGramId); // (off, id)
-    fn starting_nodes(vocab: &Vocabulary) -> VecDeque<NGramId>
-    {
+    fn starting_nodes(vocab: &Vocabulary) -> VecDeque<NGramId> {
         FromIterator::from_iter(vocab.roots.iter().cloned())
     }
     fn order_top_bottom<T>(
         prev: T,
         next: T,
-    ) -> (T, T)
-    {
+    ) -> (T, T) {
         (prev, next)
     }
-    fn next_nodes(entry: &VertexCtx<'_>) -> Vec<Self::Next>
-    {
+    fn next_nodes(entry: &VertexCtx<'_>) -> Vec<Self::Next> {
         entry
             .data
             .top_down_containment_nodes()
@@ -88,6 +78,5 @@ impl TraversalDirection for TopDown
                 )
             })
             .collect()
-
     }
 }

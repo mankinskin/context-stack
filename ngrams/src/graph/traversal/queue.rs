@@ -1,12 +1,15 @@
-use std::{collections::VecDeque};
+use std::collections::VecDeque;
 
 use itertools::Itertools;
 
-use crate::graph::{utils::cover::frequency::FrequencyCover, vocabulary::{
-    entry::VertexCtx,
-    NGramId,
-    Vocabulary,
-}};
+use crate::graph::{
+    utils::cover::frequency::FrequencyCover,
+    vocabulary::{
+        entry::VertexCtx,
+        NGramId,
+        Vocabulary,
+    },
+};
 use context_trace::graph::vertex::{
     token::Token,
     wide::Wide,
@@ -15,15 +18,20 @@ use context_trace::graph::vertex::{
 
 use crate::graph::{
     labelling::frequency::FrequencyCtx,
-    traversal::pass::TraversalPass
+    traversal::pass::TraversalPass,
 };
 use derive_more::{
     Deref,
     DerefMut,
 };
 
-pub(crate) trait Queue<P: TraversalPass>: FromIterator<P::NextNode> {
-    fn extend_layer(&mut self, iter: impl IntoIterator<Item = <P as TraversalPass>::NextNode>);
+pub(crate) trait Queue<P: TraversalPass>:
+    FromIterator<P::NextNode>
+{
+    fn extend_layer(
+        &mut self,
+        iter: impl IntoIterator<Item = <P as TraversalPass>::NextNode>,
+    );
     fn finish_layer(&mut self);
     fn pop_front(&mut self) -> Option<P::NextNode>;
     fn is_empty(&self) -> bool;
@@ -44,13 +52,14 @@ impl<P: TraversalPass> FromIterator<P::NextNode> for LayeredQueue<P> {
     }
 }
 impl<P: TraversalPass> Queue<P> for LayeredQueue<P> {
-    fn extend_layer(&mut self, iter: impl IntoIterator<Item = <P as TraversalPass>::NextNode>) {
+    fn extend_layer(
+        &mut self,
+        iter: impl IntoIterator<Item = <P as TraversalPass>::NextNode>,
+    ) {
         self.layer.extend(iter)
     }
     fn finish_layer(&mut self) {
-        self.queue.extend(
-            self.layer.drain(..),
-        )
+        self.queue.extend(self.layer.drain(..))
     }
     fn pop_front(&mut self) -> Option<P::NextNode> {
         self.queue.pop_front()
@@ -67,16 +76,18 @@ pub(crate) struct LinearQueue<P: TraversalPass> {
 impl<P: TraversalPass> FromIterator<P::NextNode> for LinearQueue<P> {
     fn from_iter<T: IntoIterator<Item = P::NextNode>>(iter: T) -> Self {
         Self {
-            queue: FromIterator::from_iter(iter)
+            queue: FromIterator::from_iter(iter),
         }
     }
 }
 impl<P: TraversalPass> Queue<P> for LinearQueue<P> {
-    fn extend_layer(&mut self, iter: impl IntoIterator<Item = <P as TraversalPass>::NextNode>) {
+    fn extend_layer(
+        &mut self,
+        iter: impl IntoIterator<Item = <P as TraversalPass>::NextNode>,
+    ) {
         self.queue.extend(iter)
     }
-    fn finish_layer(&mut self) {
-    }
+    fn finish_layer(&mut self) {}
     fn pop_front(&mut self) -> Option<P::NextNode> {
         self.queue.pop_front()
     }
@@ -99,13 +110,11 @@ impl FromIterator<NGramId> for SortedQueue {
     }
 }
 
-impl Queue<FrequencyCtx<'_>> for SortedQueue
-{
+impl Queue<FrequencyCtx<'_>> for SortedQueue {
     fn extend_layer(
         &mut self,
         iter: impl IntoIterator<Item = NGramId>,
-    )
-    {
+    ) {
         self.queue.extend(iter);
         self.queue = self
             .queue
@@ -114,8 +123,7 @@ impl Queue<FrequencyCtx<'_>> for SortedQueue
             .dedup()
             .collect();
     }
-    fn finish_layer(&mut self) {
-    }
+    fn finish_layer(&mut self) {}
     fn pop_front(&mut self) -> Option<NGramId> {
         self.queue.pop_front()
     }

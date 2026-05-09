@@ -3,8 +3,8 @@ use crate::{
     cursor::Matched,
     policy::SearchKind,
     r#match::{
-        CompareInfo,
         root_cursor::CompareParentBatch,
+        CompareInfo,
         NodeConsumer,
         NodeResult::{
             self,
@@ -102,12 +102,7 @@ where
         let is_parent = node.is_parent();
         let queue_remaining = self.queue.nodes.len();
 
-        debug!(
-            node_index,
-            is_parent,
-            queue_remaining,
-            "popped search node"
-        );
+        debug!(node_index, is_parent, queue_remaining, "popped search node");
 
         match NodeConsumer::<'_, K>::new(node, &self.trace_ctx.trav).consume() {
             Some(QueueMore(next, info)) => {
@@ -118,10 +113,15 @@ where
                     "node expanded — queuing new candidates"
                 );
                 self.queue.nodes.extend(next);
-                BfsStepResult::Expanded { info, node_index, is_parent }
+                BfsStepResult::Expanded {
+                    info,
+                    node_index,
+                    is_parent,
+                }
             },
             Some(NodeResult::FoundMatch(matched_state, info)) => {
-                let root = matched_state.child.current().child_state.root_parent();
+                let root =
+                    matched_state.child.current().child_state.root_parent();
                 debug!(
                     node_index,
                     %root,
@@ -136,7 +136,11 @@ where
             },
             Some(Skip(info)) => {
                 debug!(node_index, is_parent, "node skipped (mismatch)");
-                BfsStepResult::Skipped { info, node_index, is_parent }
+                BfsStepResult::Skipped {
+                    info,
+                    node_index,
+                    is_parent,
+                }
             },
             None => {
                 debug!(node_index, "node consumed with no result");

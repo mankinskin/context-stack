@@ -162,7 +162,12 @@ impl Vocabulary {
         &mut self,
         ctx: &CorpusCtx<'_>,
     ) -> Result<(), super::traversal::pass::CancelReason> {
-        let N: usize = ctx.corpus.iter().map(|t| t.len()).max().ok_or(super::traversal::pass::CancelReason::EmptyVocabulary)?;
+        let N: usize = ctx
+            .corpus
+            .iter()
+            .map(|t| t.len())
+            .max()
+            .ok_or(super::traversal::pass::CancelReason::EmptyVocabulary)?;
         if N == 0 {
             return Err(super::traversal::pass::CancelReason::EmptyVocabulary);
         }

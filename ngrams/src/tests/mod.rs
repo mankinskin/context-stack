@@ -2,19 +2,22 @@ pub(crate) mod count;
 
 use std::path::Path;
 
-use crate::graph::{
-    labelling::{
-        frequency,
-        LabellingCtx,
-        LabellingImage,
+use crate::{
+    cancellation::Cancellation,
+    graph::{
+        labelling::{
+            frequency,
+            LabellingCtx,
+            LabellingImage,
+        },
+        vocabulary::{
+            entry::HasVertexEntries,
+            ProcessStatus,
+            Vocabulary,
+        },
+        Corpus,
+        StatusHandle,
     },
-    vocabulary::{
-        entry::HasVertexEntries,
-        ProcessStatus,
-        Vocabulary,
-    },
-    Corpus,
-    StatusHandle,
 };
 use context_trace::{
     graph::vertex::key::VertexKey,
@@ -28,7 +31,6 @@ use derive_new::new;
 use itertools::Itertools;
 use ngram::NGram;
 use pretty_assertions::assert_eq;
-use crate::cancellation::Cancellation;
 
 pub(crate) const OTTOS_MOPS_CORPUS: [&str; 4] = [
     "ottos mops trotzt",
@@ -296,7 +298,8 @@ pub(crate) fn test_graph1() {
         ctx: LabellingCtx::from_corpus(
             Corpus::new("abab_corpus".to_owned(), texts),
             Cancellation::None,
-        ).unwrap(),
+        )
+        .unwrap(),
         labels: test_labels! {
             [
                 "ab",
@@ -320,7 +323,8 @@ pub(crate) fn test_graph2() {
         ctx: LabellingCtx::from_corpus(
             Corpus::new("ottos_mops".to_owned(), texts),
             Cancellation::None,
-        ).unwrap(),
+        )
+        .unwrap(),
         labels: test_labels! {
             [
                 "ot",
@@ -645,8 +649,8 @@ pub(crate) fn test_parse_corpus_empty_result() {
 pub(crate) fn test_parse_corpus_empty_texts() {
     use crate::graph::{
         parse_corpus,
-        Status,
         traversal::pass::CancelReason,
+        Status,
     };
 
     // Empty corpus (no texts)
@@ -662,7 +666,7 @@ pub(crate) fn test_parse_corpus_empty_texts() {
     );
 
     assert!(result.is_err(), "parse_corpus should fail for empty corpus");
-    
+
     if let Err(CancelReason::EmptyVocabulary) = result {
         // Expected error
     } else {
@@ -674,8 +678,8 @@ pub(crate) fn test_parse_corpus_empty_texts() {
 pub(crate) fn test_parse_corpus_only_empty_strings() {
     use crate::graph::{
         parse_corpus,
-        Status,
         traversal::pass::CancelReason,
+        Status,
     };
 
     // Corpus with only empty strings
@@ -689,8 +693,11 @@ pub(crate) fn test_parse_corpus_only_empty_strings() {
         Cancellation::None,
     );
 
-    assert!(result.is_err(), "parse_corpus should fail for corpus with only empty strings");
-    
+    assert!(
+        result.is_err(),
+        "parse_corpus should fail for corpus with only empty strings"
+    );
+
     if let Err(CancelReason::EmptyVocabulary) = result {
         // Expected error
     } else {

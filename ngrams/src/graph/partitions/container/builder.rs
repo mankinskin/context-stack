@@ -5,19 +5,19 @@ use crate::graph::{
     },
     vocabulary::NGramId,
 };
-use context_trace::graph::{
-    vertex::{
-        token::Token,
+use context_trace::{
+    graph::vertex::{
+        data::VertexData,
         has_vertex_index::HasVertexIndex,
         has_vertex_key::HasVertexKey,
-        wide::Wide,
-        VertexIndex,
-        data::VertexData,
         pattern::Pattern,
+        token::Token,
+        wide::Wide,
         ChildPatterns,
+        VertexIndex,
     },
+    VertexSet,
 };
-use context_trace::VertexSet;
 use derive_more::{
     Deref,
     DerefMut,
@@ -69,12 +69,17 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
     ) {
         let end_pos = self.end_pos();
         // Get the root data to use its token for get_vertex_subrange
-        let root_data = self.ctx.vocab().containment.expect_vertex_data(self.ctx.root.vertex_key());
+        let root_data = self
+            .ctx
+            .vocab()
+            .containment
+            .expect_vertex_data(self.ctx.root.vertex_key());
         let root_token = root_data.to_token();
-        let index = self.ctx.vocab().containment.get_vertex_subrange(
-            root_token,
-            end_pos..(end_pos + offset.get()),
-        );
+        let index = self
+            .ctx
+            .vocab()
+            .containment
+            .get_vertex_subrange(root_token, end_pos..(end_pos + offset.get()));
         self.push_cell(index);
     }
     pub(crate) fn append_after_offset(
@@ -182,7 +187,9 @@ impl<'a, 'b> PartitionBuilder<'a, 'b> {
     ) -> &mut PartitionLineBuilder<'a, 'b> {
         self.wall.get_mut(index).expect("Invalid PartitionCursor")
     }
-    pub(crate) fn get_current_line(&mut self) -> &mut PartitionLineBuilder<'a, 'b> {
+    pub(crate) fn get_current_line(
+        &mut self
+    ) -> &mut PartitionLineBuilder<'a, 'b> {
         self.get_line_mut(self.cursor.line)
     }
     pub(crate) fn append_at_line(

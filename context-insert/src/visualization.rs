@@ -14,8 +14,10 @@ use context_trace::graph::{
         Transition,
     },
 };
-use std::cell::Cell;
-use std::cell::RefCell;
+use std::cell::{
+    Cell,
+    RefCell,
+};
 
 thread_local! {
     /// Step counter for insert operations.
@@ -71,7 +73,13 @@ pub(crate) fn emit_insert_event_with_delta(
     query: QueryInfo,
     delta: GraphMutation,
 ) {
-    emit_insert_event_inner(transition, description, location, query, Some(delta))
+    emit_insert_event_inner(
+        transition,
+        description,
+        location,
+        query,
+        Some(delta),
+    )
 }
 
 /// Inner implementation for emitting insert events.

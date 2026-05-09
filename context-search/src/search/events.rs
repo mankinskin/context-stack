@@ -4,9 +4,16 @@
 //! for converting algorithm result types (like [`CompareInfo`]) into visualization
 //! events ([`Transition`]).
 
-use crate::r#match::{CompareInfo, CompareOutcome, PrefixChildInfo};
+use crate::r#match::{
+    CompareInfo,
+    CompareOutcome,
+    PrefixChildInfo,
+};
 use context_trace::graph::{
-    search_path::{EdgeRef, PathNode},
+    search_path::{
+        EdgeRef,
+        PathNode,
+    },
     visualization::Transition,
 };
 
@@ -24,13 +31,22 @@ pub(crate) struct EventContext {
 
 impl EventContext {
     /// Create a new event context.
-    pub fn new(parent_node: usize, end_path_empty: bool) -> Self {
-        Self { parent_node, end_path_empty }
+    pub fn new(
+        parent_node: usize,
+        end_path_empty: bool,
+    ) -> Self {
+        Self {
+            parent_node,
+            end_path_empty,
+        }
     }
 
     /// Create a PathNode for the parent with placeholder width.
     pub fn parent_path_node(&self) -> PathNode {
-        PathNode { index: self.parent_node, width: 1 } // TODO: get real width
+        PathNode {
+            index: self.parent_node,
+            width: 1,
+        } // TODO: get real width
     }
 
     /// Whether VisitChild should use replace=true.
@@ -45,7 +61,10 @@ impl EventContext {
 /// can be emitted via the event system.
 pub(crate) trait IntoTransitions {
     /// Convert this value into visualization transitions.
-    fn into_transitions(self, ctx: &EventContext) -> Vec<(Transition, String)>;
+    fn into_transitions(
+        self,
+        ctx: &EventContext,
+    ) -> Vec<(Transition, String)>;
 }
 
 // ── RootCursor advance event data ────────────────────────────────────────────
@@ -75,8 +94,14 @@ impl MatchAdvanceData {
         cursor_pos: usize,
     ) -> Self {
         Self {
-            parent_node: PathNode { index: parent_idx, width: 1 }, // TODO: real parent width
-            child_node: PathNode { index: child_idx, width: child_width },
+            parent_node: PathNode {
+                index: parent_idx,
+                width: 1,
+            }, // TODO: real parent width
+            child_node: PathNode {
+                index: child_idx,
+                width: child_width,
+            },
             sub_index,
             cursor_pos,
         }
@@ -84,7 +109,10 @@ impl MatchAdvanceData {
 }
 
 impl IntoTransitions for MatchAdvanceData {
-    fn into_transitions(self, ctx: &EventContext) -> Vec<(Transition, String)> {
+    fn into_transitions(
+        self,
+        ctx: &EventContext,
+    ) -> Vec<(Transition, String)> {
         vec![
             (
                 Transition::VisitChild {
@@ -99,7 +127,10 @@ impl IntoTransitions for MatchAdvanceData {
                     },
                     replace: ctx.should_replace(),
                 },
-                format!("Visiting child {} from root {}", self.child_node.index, self.parent_node.index),
+                format!(
+                    "Visiting child {} from root {}",
+                    self.child_node.index, self.parent_node.index
+                ),
             ),
             (
                 Transition::ChildMatch {
@@ -142,9 +173,18 @@ impl MismatchAdvanceData {
         cursor_pos: usize,
     ) -> Self {
         Self {
-            parent_node: PathNode { index: parent_idx, width: 1 }, // TODO: real parent width
-            actual_node: PathNode { index: actual_idx, width: actual_width },
-            expected_node: PathNode { index: expected_idx, width: expected_width },
+            parent_node: PathNode {
+                index: parent_idx,
+                width: 1,
+            }, // TODO: real parent width
+            actual_node: PathNode {
+                index: actual_idx,
+                width: actual_width,
+            },
+            expected_node: PathNode {
+                index: expected_idx,
+                width: expected_width,
+            },
             sub_index,
             cursor_pos,
         }
@@ -152,7 +192,10 @@ impl MismatchAdvanceData {
 }
 
 impl IntoTransitions for MismatchAdvanceData {
-    fn into_transitions(self, ctx: &EventContext) -> Vec<(Transition, String)> {
+    fn into_transitions(
+        self,
+        ctx: &EventContext,
+    ) -> Vec<(Transition, String)> {
         vec![
             (
                 Transition::VisitChild {
@@ -167,7 +210,10 @@ impl IntoTransitions for MismatchAdvanceData {
                     },
                     replace: ctx.should_replace(),
                 },
-                format!("Visiting child {} from root {}", self.actual_node.index, self.parent_node.index),
+                format!(
+                    "Visiting child {} from root {}",
+                    self.actual_node.index, self.parent_node.index
+                ),
             ),
             (
                 Transition::ChildMismatch {
@@ -178,7 +224,9 @@ impl IntoTransitions for MismatchAdvanceData {
                 },
                 format!(
                     "Child mismatch at node {} (expected {}, got {})",
-                    self.actual_node.index, self.expected_node.index, self.actual_node.index
+                    self.actual_node.index,
+                    self.expected_node.index,
+                    self.actual_node.index
                 ),
             ),
         ]
@@ -188,7 +236,10 @@ impl IntoTransitions for MismatchAdvanceData {
 // ── CompareInfo implementation ───────────────────────────────────────────────
 
 impl IntoTransitions for CompareInfo {
-    fn into_transitions(self, ctx: &EventContext) -> Vec<(Transition, String)> {
+    fn into_transitions(
+        self,
+        ctx: &EventContext,
+    ) -> Vec<(Transition, String)> {
         let parent_path_node = ctx.parent_path_node();
         let parent_node = ctx.parent_node;
 
@@ -253,12 +304,10 @@ impl IntoTransitions for CompareInfo {
                     ),
                 ]
             },
-            CompareOutcome::Prefixes(children) => {
-                children
-                    .into_iter()
-                    .map(|child| prefix_child_transition(ctx, child))
-                    .collect()
-            },
+            CompareOutcome::Prefixes(children) => children
+                .into_iter()
+                .map(|child| prefix_child_transition(ctx, child))
+                .collect(),
         }
     }
 }
@@ -295,7 +344,10 @@ mod tests {
     fn compare_info_match_produces_two_events() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 1 },
-            query_token: PathNode { index: 10, width: 1 },
+            query_token: PathNode {
+                index: 10,
+                width: 1,
+            },
             cursor_pos: 3,
             sub_index: 2,
             outcome: CompareOutcome::Match,
@@ -312,11 +364,17 @@ mod tests {
     fn compare_info_mismatch_produces_two_events() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 1 },
-            query_token: PathNode { index: 10, width: 1 },
+            query_token: PathNode {
+                index: 10,
+                width: 1,
+            },
             cursor_pos: 3,
             sub_index: 2,
             outcome: CompareOutcome::Mismatch {
-                expected: PathNode { index: 10, width: 1 },
+                expected: PathNode {
+                    index: 10,
+                    width: 1,
+                },
                 actual: PathNode { index: 5, width: 1 },
             },
         };
@@ -332,12 +390,21 @@ mod tests {
     fn compare_info_prefixes_produces_one_event_per_child() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 3 },
-            query_token: PathNode { index: 10, width: 1 },
+            query_token: PathNode {
+                index: 10,
+                width: 1,
+            },
             cursor_pos: 3,
             sub_index: 0,
             outcome: CompareOutcome::Prefixes(vec![
-                PrefixChildInfo { token: PathNode { index: 6, width: 1 }, sub_index: 0 },
-                PrefixChildInfo { token: PathNode { index: 7, width: 1 }, sub_index: 1 },
+                PrefixChildInfo {
+                    token: PathNode { index: 6, width: 1 },
+                    sub_index: 0,
+                },
+                PrefixChildInfo {
+                    token: PathNode { index: 7, width: 1 },
+                    sub_index: 1,
+                },
             ]),
         };
         let ctx = EventContext::new(5, true);
@@ -352,7 +419,10 @@ mod tests {
     fn replace_flag_depends_on_end_path_empty() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 1 },
-            query_token: PathNode { index: 10, width: 1 },
+            query_token: PathNode {
+                index: 10,
+                width: 1,
+            },
             cursor_pos: 3,
             sub_index: 2,
             outcome: CompareOutcome::Match,

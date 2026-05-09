@@ -28,7 +28,9 @@ pub enum AsciiRenderMode {
     Dag,
 }
 
-pub fn render_layered_ascii(rules: &[AsciiRule<'_>]) -> Result<String, AsciiRenderError> {
+pub fn render_layered_ascii(
+    rules: &[AsciiRule<'_>]
+) -> Result<String, AsciiRenderError> {
     let owned_rules: Vec<AsciiOwnedRule> = rules
         .iter()
         .map(|r| AsciiOwnedRule {
@@ -44,7 +46,7 @@ pub fn render_layered_ascii(rules: &[AsciiRule<'_>]) -> Result<String, AsciiRend
 }
 
 pub fn render_layered_ascii_owned(
-    rules: &[AsciiOwnedRule],
+    rules: &[AsciiOwnedRule]
 ) -> Result<String, AsciiRenderError> {
     render_layered_ascii_owned_with_mode(rules, AsciiRenderMode::Grammar)
 }
@@ -101,10 +103,8 @@ pub fn render_layered_ascii_owned_with_mode(
                     .extend(rule.patterns.clone());
             }
 
-            let mut labels: Vec<String> = patterns_by_parent
-                .keys()
-                .cloned()
-                .collect();
+            let mut labels: Vec<String> =
+                patterns_by_parent.keys().cloned().collect();
             labels.sort_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
 
             let mut leaf_labels: Vec<String> = id_by_label
@@ -145,8 +145,7 @@ pub fn render_layered_ascii_owned_with_mode(
                         out.push_str(&format!(
                             "{:<token_width$} -> {}\n",
                             format!("({})", label),
-                            rendered_patterns[0]
-                            ,
+                            rendered_patterns[0],
                             token_width = token_width
                         ));
                     } else {

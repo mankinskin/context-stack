@@ -28,7 +28,10 @@ use super::{
         VisitorCollection,
     },
 };
-pub(crate) trait PassNode: Eq + PartialEq + Debug + Clone + Hash {}
+pub(crate) trait PassNode:
+    Eq + PartialEq + Debug + Clone + Hash
+{
+}
 impl<N: Eq + PartialEq + Debug + Clone + Hash> PassNode for N {}
 #[derive(Debug)]
 pub enum CancelReason {

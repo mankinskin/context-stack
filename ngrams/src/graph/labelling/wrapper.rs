@@ -39,7 +39,7 @@ use crate::graph::{
         Vocabulary,
     },
     HasVertexEntries,
-};  
+};
 use context_trace::{
     graph::vertex::{
         has_vertex_index::HasVertexIndex,
@@ -49,7 +49,8 @@ use context_trace::{
         VertexIndex,
     },
     HashSet,
-};#[derive(Debug, Deref, new, DerefMut)]
+};
+#[derive(Debug, Deref, new, DerefMut)]
 pub(crate) struct WrapperCtx<'b> {
     #[deref]
     #[deref_mut]

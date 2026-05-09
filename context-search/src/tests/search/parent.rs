@@ -70,15 +70,18 @@ fn find_parent1() {
     }
 
     // Exact expected event sequence for b_c (7 events)
-    assert_events(&response.events, &[
-        start(b),                                         // 0
-        explore(b, &[bc, ab, bcd, abab]),                 // 1
-        up(b, bc),                                        // 2
-        down(bc, c, false),                               // 3
-        matched(c, 2),                                    // 4
-        root_match(bc),                                   // 5
-        done_ok(bc),                                      // 6
-    ]);
+    assert_events(
+        &response.events,
+        &[
+            start(b),                         // 0
+            explore(b, &[bc, ab, bcd, abab]), // 1
+            up(b, bc),                        // 2
+            down(bc, c, false),               // 3
+            matched(c, 2),                    // 4
+            root_match(bc),                   // 5
+            done_ok(bc),                      // 6
+        ],
+    );
 
     let query = ab_c_pattern;
     let response = graph.find_parent(query).unwrap();
@@ -91,19 +94,35 @@ fn find_parent1() {
     }
 
     // Exact expected event sequence for ab_c (11 events)
-    assert_events(&response.events, &[
-        start(ab),                                                                         // 0
-        explore(ab, &[aba, abc, abab, abab, ababcd, abcdef, ababab, ababab, ababcdefghi]), // 1
-        up(ab, aba),                                                                       // 2
-        down(aba, a, false),                                                               // 3
-        mismatched(a, 3, c, a),                                                            // 4
-        skip(aba, 8, true),                                                                // 5
-        up(ab, abc),                                                                       // 6
-        down(abc, c, false),                                                               // 7
-        matched(c, 3),                                                                     // 8
-        root_match(abc),                                                                   // 9
-        done_ok(abc),                                                                      // 10
-    ]);
+    assert_events(
+        &response.events,
+        &[
+            start(ab), // 0
+            explore(
+                ab,
+                &[
+                    aba,
+                    abc,
+                    abab,
+                    abab,
+                    ababcd,
+                    abcdef,
+                    ababab,
+                    ababab,
+                    ababcdefghi,
+                ],
+            ), // 1
+            up(ab, aba), // 2
+            down(aba, a, false), // 3
+            mismatched(a, 3, c, a), // 4
+            skip(aba, 8, true), // 5
+            up(ab, abc), // 6
+            down(abc, c, false), // 7
+            matched(c, 3), // 8
+            root_match(abc), // 9
+            done_ok(abc), // 10
+        ],
+    );
     // enable when bfs for parent-token batches is implemented
     //let query = a_bc_pattern;
     //assert_matches!(
