@@ -1,8 +1,12 @@
 #[cfg(feature = "stable_graph")]
 #[cfg(test)]
 use petgraph::{
-    graph::{NodeIndex, UnGraph},
-    Graph, Undirected,
+    graph::{
+        NodeIndex,
+        UnGraph,
+    },
+    Graph,
+    Undirected,
 };
 
 #[cfg(feature = "stable_graph")]
@@ -361,9 +365,18 @@ fn example_kou_paper() -> (UnGraph<(), usize>, Vec<NodeIndex>) {
 #[cfg(feature = "stable_graph")]
 #[cfg(test)]
 mod test {
-    use crate::{b01_example, b07_example, example_kou_paper};
-    use petgraph::algo::{connected_components, steiner_tree};
-    use petgraph::graph::UnGraph;
+    use crate::{
+        b01_example,
+        b07_example,
+        example_kou_paper,
+    };
+    use petgraph::{
+        algo::{
+            connected_components,
+            steiner_tree,
+        },
+        graph::UnGraph,
+    };
 
     #[test]
     fn b01_vienna_test() {

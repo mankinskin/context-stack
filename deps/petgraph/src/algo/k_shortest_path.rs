@@ -1,11 +1,23 @@
-use alloc::{collections::BinaryHeap, vec, vec::Vec};
+use alloc::{
+    collections::BinaryHeap,
+    vec,
+    vec::Vec,
+};
 use core::hash::Hash;
 
 use hashbrown::HashMap;
 
-use crate::algo::Measure;
-use crate::scored::MinScored;
-use crate::visit::{EdgeRef, IntoEdges, NodeCount, NodeIndexable, Visitable};
+use crate::{
+    algo::Measure,
+    scored::MinScored,
+    visit::{
+        EdgeRef,
+        IntoEdges,
+        NodeCount,
+        NodeIndexable,
+        Visitable,
+    },
+};
 
 /// k'th shortest path algorithm.
 ///
@@ -119,7 +131,8 @@ where
         }
 
         for edge in graph.edges(node) {
-            visit_next.push(MinScored(node_score + edge_cost(edge), edge.target()));
+            visit_next
+                .push(MinScored(node_score + edge_cost(edge), edge.target()));
         }
     }
     scores

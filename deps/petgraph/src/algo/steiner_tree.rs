@@ -1,17 +1,44 @@
 use alloc::vec::Vec;
-use core::{fmt::Debug, hash::Hash};
-
-use hashbrown::{HashMap, HashSet};
-
-use crate::algo::floyd_warshall::floyd_warshall_path;
-use crate::algo::{dijkstra, min_spanning_tree, BoundedMeasure, Measure};
-use crate::data::FromElements;
-use crate::graph::{IndexType, NodeIndex, UnGraph};
-use crate::visit::{
-    Data, EdgeRef, GraphBase, GraphProp, IntoEdgeReferences, IntoEdges, IntoNeighbors,
-    IntoNodeIdentifiers, IntoNodeReferences, NodeCompactIndexable, NodeIndexable, Visitable,
+use core::{
+    fmt::Debug,
+    hash::Hash,
 };
-use crate::Undirected;
+
+use hashbrown::{
+    HashMap,
+    HashSet,
+};
+
+use crate::{
+    algo::{
+        dijkstra,
+        floyd_warshall::floyd_warshall_path,
+        min_spanning_tree,
+        BoundedMeasure,
+        Measure,
+    },
+    data::FromElements,
+    graph::{
+        IndexType,
+        NodeIndex,
+        UnGraph,
+    },
+    visit::{
+        Data,
+        EdgeRef,
+        GraphBase,
+        GraphProp,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoNeighbors,
+        IntoNodeIdentifiers,
+        IntoNodeReferences,
+        NodeCompactIndexable,
+        NodeIndexable,
+        Visitable,
+    },
+    Undirected,
+};
 
 #[cfg(feature = "stable_graph")]
 use crate::stable_graph::StableGraph;
@@ -19,7 +46,11 @@ use crate::stable_graph::StableGraph;
 type Edge<G> = (<G as GraphBase>::NodeId, <G as GraphBase>::NodeId);
 type Subgraph<G> = HashSet<<G as GraphBase>::NodeId>;
 
-fn compute_shortest_path_length<G>(graph: G, source: G::NodeId, target: G::NodeId) -> G::EdgeWeight
+fn compute_shortest_path_length<G>(
+    graph: G,
+    source: G::NodeId,
+    target: G::NodeId,
+) -> G::EdgeWeight
 where
     G: Visitable + IntoEdges,
     G::NodeId: Eq + Hash,
@@ -77,7 +108,10 @@ where
             if let Some(prev_node) = prev[source][current] {
                 retained_nodes.insert(graph.from_index(prev_node));
                 retained_nodes.insert(graph.from_index(current));
-                retained_edges.push((graph.from_index(prev_node), graph.from_index(current)));
+                retained_edges.push((
+                    graph.from_index(prev_node),
+                    graph.from_index(current),
+                ));
                 current = prev_node;
             }
         }
@@ -86,7 +120,10 @@ where
     (retained_edges, retained_nodes)
 }
 
-fn non_terminal_leaves<G>(graph: G, terminals: &[G::NodeId]) -> HashSet<G::NodeId>
+fn non_terminal_leaves<G>(
+    graph: G,
+    terminals: &[G::NodeId],
+) -> HashSet<G::NodeId>
 where
     G: GraphBase + IntoNodeReferences + IntoNodeIdentifiers + IntoNeighbors,
     G::NodeId: Hash + Eq + Debug,
@@ -192,7 +229,8 @@ where
             .map(|((node1, node2), &weight)| (*node1, *node2, weight)),
     );
 
-    let minimum_spanning = UnGraph::from_elements(min_spanning_tree(&metric_closure_graph));
+    let minimum_spanning =
+        UnGraph::from_elements(min_spanning_tree(&metric_closure_graph));
 
     let (subgraph_edges, subgraph_nodes) =
         subgraph_edges_from_metric_closure(graph, &minimum_spanning);
@@ -200,7 +238,8 @@ where
     let mut graph = StableGraph::from(graph.clone());
     graph.retain_edges(|graph, e| {
         let edge = graph.edge_endpoints(e).unwrap();
-        subgraph_edges.contains(&(edge.0, edge.1)) || subgraph_edges.contains(&(edge.1, edge.0))
+        subgraph_edges.contains(&(edge.0, edge.1))
+            || subgraph_edges.contains(&(edge.1, edge.0))
     });
     graph.retain_nodes(|_, n| subgraph_nodes.contains(&n));
 
@@ -214,14 +253,26 @@ where
 mod test {
     use alloc::vec;
 
-    use hashbrown::{HashMap, HashSet};
+    use hashbrown::{
+        HashMap,
+        HashSet,
+    };
 
-    use super::{compute_metric_closure, non_terminal_leaves, subgraph_edges_from_metric_closure};
-    use crate::graph::NodeIndex;
+    use super::{
+        compute_metric_closure,
+        non_terminal_leaves,
+        subgraph_edges_from_metric_closure,
+    };
     use crate::{
-        algo::{min_spanning_tree, EdgeRef, UnGraph},
+        algo::{
+            min_spanning_tree,
+            EdgeRef,
+            UnGraph,
+        },
         data::FromElements,
-        Graph, Undirected,
+        graph::NodeIndex,
+        Graph,
+        Undirected,
     };
 
     #[test]
@@ -269,7 +320,10 @@ mod test {
                 *metric_closure_graph
                     .edge_weight(
                         metric_closure_graph
-                            .find_edge(NodeIndex::new(node1), NodeIndex::new(node2))
+                            .find_edge(
+                                NodeIndex::new(node1),
+                                NodeIndex::new(node2)
+                            )
                             .unwrap()
                     )
                     .unwrap(),
@@ -304,12 +358,13 @@ mod test {
         let metric_closure = compute_metric_closure(&graph, &terminals);
 
         let metric_closure_graph: UnGraph<(), _, _> = UnGraph::from_edges(
-            metric_closure
-                .iter()
-                .map(|((node1, node2), &weight)| (*node1 as u32, *node2 as u32, weight)),
+            metric_closure.iter().map(|((node1, node2), &weight)| {
+                (*node1 as u32, *node2 as u32, weight)
+            }),
         );
 
-        let minimum_spanning = UnGraph::from_elements(min_spanning_tree(&metric_closure_graph));
+        let minimum_spanning =
+            UnGraph::from_elements(min_spanning_tree(&metric_closure_graph));
 
         let (subgraph_edges, _subgraph_nodes) =
             subgraph_edges_from_metric_closure(&graph, &minimum_spanning);
@@ -339,7 +394,10 @@ mod test {
                 .find_edge_undirected(ref_edge.source(), ref_edge.target())
                 .unwrap();
             let edge_endpoints = graph.edge_endpoints(edge_index).unwrap();
-            assert_eq!(graph.edge_weight(edge_index).unwrap(), ref_edge.weight());
+            assert_eq!(
+                graph.edge_weight(edge_index).unwrap(),
+                ref_edge.weight()
+            );
             assert_eq!(edge_endpoints.0, ref_edge.source());
             assert_eq!(edge_endpoints.1, ref_edge.target());
         }
@@ -355,7 +413,13 @@ mod test {
         let d = graph.add_node(());
         let e = graph.add_node(());
         let f = graph.add_node(());
-        graph.extend_with_edges([(a, b, 7), (b, c, 6), (c, d, 1), (d, e, 5), (e, f, 1)]);
+        graph.extend_with_edges([
+            (a, b, 7),
+            (b, c, 6),
+            (c, d, 1),
+            (d, e, 5),
+            (e, f, 1),
+        ]);
 
         let terminals = vec![a, c];
         let non_terminal_nodes = non_terminal_leaves(&graph, &terminals);

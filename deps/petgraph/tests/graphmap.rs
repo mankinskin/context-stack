@@ -4,12 +4,17 @@ extern crate petgraph;
 use core::fmt;
 use std::collections::HashSet;
 
-use petgraph::prelude::*;
-use petgraph::visit::Walker;
+use petgraph::{
+    prelude::*,
+    visit::Walker,
+};
 
 use petgraph::algo::dijkstra;
 
-use petgraph::dot::{Config, Dot};
+use petgraph::dot::{
+    Config,
+    Dot,
+};
 
 #[test]
 fn simple() {
@@ -199,7 +204,8 @@ fn edge_iterator() {
     gr.add_edge(i, j, 3);
     gr.add_edge(i, k, 4);
 
-    let real_edges: HashSet<_> = gr.all_edges().map(|(a, b, &w)| (a, b, w)).collect();
+    let real_edges: HashSet<_> =
+        gr.all_edges().map(|(a, b, &w)| (a, b, w)).collect();
     let expected_edges: HashSet<_> =
         vec![("H", "I", 1), ("H", "J", 2), ("I", "J", 3), ("I", "K", 4)]
             .into_iter()
@@ -210,8 +216,11 @@ fn edge_iterator() {
 
 #[test]
 fn from_edges() {
-    let gr =
-        GraphMap::<_, _, Undirected>::from_edges(&[("a", "b", 1), ("a", "c", 2), ("c", "d", 3)]);
+    let gr = GraphMap::<_, _, Undirected>::from_edges(&[
+        ("a", "b", 1),
+        ("a", "c", 2),
+        ("c", "d", 3),
+    ]);
     assert_eq!(gr.node_count(), 4);
     assert_eq!(gr.edge_count(), 3);
     assert_eq!(gr[("a", "c")], 2);
@@ -257,8 +266,10 @@ fn graphmap_directed() {
     println!("{gr:#?}");
 }
 
-fn assert_sccs_eq<N>(mut res: Vec<Vec<N>>, mut answer: Vec<Vec<N>>)
-where
+fn assert_sccs_eq<N>(
+    mut res: Vec<Vec<N>>,
+    mut answer: Vec<Vec<N>>,
+) where
     N: Ord + fmt::Debug,
 {
     // normalize the result and compare with the answer.
@@ -431,7 +442,8 @@ fn test_parallel_iterator() {
 
 #[test]
 fn test_alternative_hasher() {
-    let mut gr: GraphMap<&str, u32, Directed, fxhash::FxBuildHasher> = GraphMap::new();
+    let mut gr: GraphMap<&str, u32, Directed, fxhash::FxBuildHasher> =
+        GraphMap::new();
     gr.add_node("abc");
     gr.add_node("def");
     gr.add_node("ghi");

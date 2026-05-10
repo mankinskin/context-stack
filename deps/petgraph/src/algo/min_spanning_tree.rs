@@ -2,14 +2,25 @@
 
 use alloc::collections::BinaryHeap;
 
-use hashbrown::{HashMap, HashSet};
+use hashbrown::{
+    HashMap,
+    HashSet,
+};
 
-use crate::data::Element;
-use crate::prelude::*;
-use crate::scored::MinScored;
-use crate::unionfind::UnionFind;
-use crate::visit::{Data, IntoEdges, IntoNodeReferences, NodeRef};
-use crate::visit::{IntoEdgeReferences, NodeIndexable};
+use crate::{
+    data::Element,
+    prelude::*,
+    scored::MinScored,
+    unionfind::UnionFind,
+    visit::{
+        Data,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoNodeReferences,
+        NodeIndexable,
+        NodeRef,
+    },
+};
 
 /// Compute a *minimum spanning tree* of a graph.
 ///
@@ -167,11 +178,13 @@ where
             // check if the edge would connect two disjoint parts
             let (a_index, b_index) = (g.to_index(a), g.to_index(b));
             if self.subgraphs.union(a_index, b_index) {
-                let (&a_order, &b_order) =
-                    match (self.node_map.get(&a_index), self.node_map.get(&b_index)) {
-                        (Some(a_id), Some(b_id)) => (a_id, b_id),
-                        _ => panic!("Edge references unknown node"),
-                    };
+                let (&a_order, &b_order) = match (
+                    self.node_map.get(&a_index),
+                    self.node_map.get(&b_index),
+                ) {
+                    (Some(a_id), Some(b_id)) => (a_id, b_id),
+                    _ => panic!("Edge references unknown node"),
+                };
                 return Some(Element::Edge {
                     source: a_order,
                     target: b_order,
@@ -264,7 +277,8 @@ where
     G::EdgeWeight: PartialOrd,
     G: IntoNodeReferences + IntoEdgeReferences,
 {
-    let sort_edges = BinaryHeap::with_capacity(g.edge_references().size_hint().0);
+    let sort_edges =
+        BinaryHeap::with_capacity(g.edge_references().size_hint().0);
     let nodes_taken = HashSet::with_capacity(g.node_references().size_hint().0);
     let initial_node = g.node_references().next();
 
@@ -342,8 +356,11 @@ where
 
         // Prim's algorithm:
         // Iterate through Edge elements, adding an edge to the MST iff some of it's nodes are not part of MST yet.
-        while let Some(MinScored(score, (source, target))) = self.sort_edges.pop() {
-            let (source_index, target_index) = (g.to_index(source), g.to_index(target));
+        while let Some(MinScored(score, (source, target))) =
+            self.sort_edges.pop()
+        {
+            let (source_index, target_index) =
+                (g.to_index(source), g.to_index(target));
 
             if self.nodes_taken.contains(&target_index) {
                 continue;
@@ -361,7 +378,8 @@ where
                 self.node_map.get(&source_index),
                 self.node_map.get(&target_index),
             ) {
-                (Some(source_order), Some(target_order)) => (source_order, target_order),
+                (Some(source_order), Some(target_order)) =>
+                    (source_order, target_order),
                 _ => panic!("Edge references unknown node"),
             };
 

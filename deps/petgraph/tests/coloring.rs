@@ -1,5 +1,8 @@
-use petgraph::algo::dsatur_coloring;
-use petgraph::{Graph, Undirected};
+use petgraph::{
+    algo::dsatur_coloring,
+    Graph,
+    Undirected,
+};
 
 #[test]
 fn dsatur_coloring_cycle6() {

@@ -7,15 +7,21 @@ mod common;
 
 use common::ungraph;
 use hashbrown::HashSet;
-use petgraph::algo::{all_simple_paths, all_simple_paths_multi};
-use petgraph::prelude::*;
+use petgraph::{
+    algo::{
+        all_simple_paths,
+        all_simple_paths_multi,
+    },
+    prelude::*,
+};
 use test::Bencher;
 
 #[bench]
 fn complete_graph_single_bench(bench: &mut Bencher) {
     static NODE_COUNT: usize = 6;
     let mut g = Graph::new_undirected();
-    let nodes: Vec<NodeIndex> = (0..NODE_COUNT).map(|_| g.add_node(())).collect();
+    let nodes: Vec<NodeIndex> =
+        (0..NODE_COUNT).map(|_| g.add_node(())).collect();
 
     // Create a complete undirected graph - every pair of nodes has an edge
     for i in 0..NODE_COUNT {
@@ -30,7 +36,9 @@ fn complete_graph_single_bench(bench: &mut Bencher) {
     bench.iter(|| {
         let mut total_paths = 0;
         for &to in &targets {
-            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, to, 0, None);
+            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(
+                &g, from, to, 0, None,
+            );
             total_paths += paths.count();
         }
         total_paths
@@ -41,7 +49,8 @@ fn complete_graph_single_bench(bench: &mut Bencher) {
 fn complete_graph_multi_bench(bench: &mut Bencher) {
     static NODE_COUNT: usize = 6;
     let mut g = Graph::new_undirected();
-    let nodes: Vec<NodeIndex> = (0..NODE_COUNT).map(|_| g.add_node(())).collect();
+    let nodes: Vec<NodeIndex> =
+        (0..NODE_COUNT).map(|_| g.add_node(())).collect();
 
     // Create a complete undirected graph - every pair of nodes has an edge
     for i in 0..NODE_COUNT {
@@ -51,11 +60,13 @@ fn complete_graph_multi_bench(bench: &mut Bencher) {
     }
 
     let from = nodes[0];
-    let to: HashSet<_, fxhash::FxBuildHasher> = (1..NODE_COUNT).map(|i| nodes[i]).collect();
+    let to: HashSet<_, fxhash::FxBuildHasher> =
+        (1..NODE_COUNT).map(|i| nodes[i]).collect();
 
     bench.iter(|| {
-        let paths =
-            all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, &to, 0, None);
+        let paths = all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(
+            &g, from, &to, 0, None,
+        );
         paths.count()
     });
 }
@@ -69,7 +80,9 @@ fn petersen_single_bench(bench: &mut Bencher) {
     bench.iter(|| {
         let mut total_paths = 0;
         for &to in &targets {
-            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, to, 0, None);
+            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(
+                &g, from, to, 0, None,
+            );
             total_paths += paths.count();
         }
         total_paths
@@ -80,11 +93,13 @@ fn petersen_single_bench(bench: &mut Bencher) {
 fn petersen_multi_bench(bench: &mut Bencher) {
     let g = ungraph().petersen_a();
     let from = NodeIndex::new(0);
-    let to: HashSet<_, fxhash::FxBuildHasher> = (1..g.node_count()).map(NodeIndex::new).collect();
+    let to: HashSet<_, fxhash::FxBuildHasher> =
+        (1..g.node_count()).map(NodeIndex::new).collect();
 
     bench.iter(|| {
-        let paths =
-            all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, &to, 0, None);
+        let paths = all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(
+            &g, from, &to, 0, None,
+        );
         paths.count()
     });
 }
@@ -98,7 +113,9 @@ fn bipartite_single_bench(bench: &mut Bencher) {
     bench.iter(|| {
         let mut total_paths = 0;
         for &to in &targets {
-            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, to, 0, None);
+            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(
+                &g, from, to, 0, None,
+            );
             total_paths += paths.count();
         }
         total_paths
@@ -109,11 +126,13 @@ fn bipartite_single_bench(bench: &mut Bencher) {
 fn bipartite_multi_bench(bench: &mut Bencher) {
     let g = ungraph().bipartite();
     let from = NodeIndex::new(0);
-    let to: HashSet<_, fxhash::FxBuildHasher> = (1..g.node_count()).map(NodeIndex::new).collect();
+    let to: HashSet<_, fxhash::FxBuildHasher> =
+        (1..g.node_count()).map(NodeIndex::new).collect();
 
     bench.iter(|| {
-        let paths =
-            all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, &to, 0, None);
+        let paths = all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(
+            &g, from, &to, 0, None,
+        );
         paths.count()
     });
 }
@@ -127,7 +146,9 @@ fn full_single_bench(bench: &mut Bencher) {
     bench.iter(|| {
         let mut total_paths = 0;
         for &to in &targets {
-            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, to, 0, None);
+            let paths = all_simple_paths::<Vec<_>, _, fxhash::FxBuildHasher>(
+                &g, from, to, 0, None,
+            );
             total_paths += paths.count();
         }
         total_paths
@@ -138,11 +159,13 @@ fn full_single_bench(bench: &mut Bencher) {
 fn full_multi_bench(bench: &mut Bencher) {
     let g = ungraph().full_a();
     let from = NodeIndex::new(0);
-    let to: HashSet<_, fxhash::FxBuildHasher> = (1..g.node_count()).map(NodeIndex::new).collect();
+    let to: HashSet<_, fxhash::FxBuildHasher> =
+        (1..g.node_count()).map(NodeIndex::new).collect();
 
     bench.iter(|| {
-        let paths =
-            all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(&g, from, &to, 0, None);
+        let paths = all_simple_paths_multi::<Vec<_>, _, fxhash::FxBuildHasher>(
+            &g, from, &to, 0, None,
+        );
         paths.count()
     });
 }

@@ -30,7 +30,7 @@ fn test_nodes() -> Vec<MyStruct> {
 }
 
 fn test_graph<H: BuildHasher + Default>(
-    data: &[MyStruct],
+    data: &[MyStruct]
 ) -> GraphMap<&MyStruct, usize, Directed, H> {
     let mut gr = GraphMap::new();
 
@@ -56,7 +56,8 @@ macro_rules! test_case_with_hasher {
             bench.iter(|| {
                 let mut sources = vec![];
                 for n in gr.nodes() {
-                    for (src, _, e) in gr.edges_directed(n, Direction::Outgoing) {
+                    for (src, _, e) in gr.edges_directed(n, Direction::Outgoing)
+                    {
                         if *e == 500 {
                             sources.push(src.clone());
                         }

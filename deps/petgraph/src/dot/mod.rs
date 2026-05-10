@@ -1,10 +1,19 @@
 //! Simple graphviz dot file format output.
 
 use alloc::string::String;
-use core::fmt::{self, Display, Write};
+use core::fmt::{
+    self,
+    Display,
+    Write,
+};
 
 use crate::visit::{
-    EdgeRef, GraphProp, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef,
+    EdgeRef,
+    GraphProp,
+    IntoEdgeReferences,
+    IntoNodeReferences,
+    NodeIndexable,
+    NodeRef,
 };
 
 /// `Dot` implements output to graphviz .dot format for a graph.
@@ -74,8 +83,16 @@ where
 
     /// Create a `Dot` formatting wrapper with custom configuration.
     #[inline]
-    pub fn with_config(graph: G, config: &'a [Config]) -> Self {
-        Self::with_attr_getters(graph, config, &|_, _| String::new(), &|_, _| String::new())
+    pub fn with_config(
+        graph: G,
+        config: &'a [Config],
+    ) -> Self {
+        Self::with_attr_getters(
+            graph,
+            config,
+            &|_, _| String::new(),
+            &|_, _| String::new(),
+        )
     }
 
     /// Create a `Dot` that uses the given functions to generate edge and node attributes.
@@ -292,7 +309,10 @@ where
     G::EdgeWeight: fmt::Display,
     G::NodeWeight: fmt::Display,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         self.graph_fmt(f, fmt::Display::fmt, fmt::Display::fmt)
     }
 }
@@ -303,7 +323,10 @@ where
     G::EdgeWeight: fmt::LowerHex,
     G::NodeWeight: fmt::LowerHex,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         self.graph_fmt(f, fmt::LowerHex::fmt, fmt::LowerHex::fmt)
     }
 }
@@ -314,7 +337,10 @@ where
     G::EdgeWeight: fmt::UpperHex,
     G::NodeWeight: fmt::UpperHex,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         self.graph_fmt(f, fmt::UpperHex::fmt, fmt::UpperHex::fmt)
     }
 }
@@ -325,7 +351,10 @@ where
     G::EdgeWeight: fmt::Debug,
     G::NodeWeight: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         self.graph_fmt(f, fmt::Debug::fmt, fmt::Debug::fmt)
     }
 }
@@ -337,19 +366,25 @@ impl<W> fmt::Write for Escaper<W>
 where
     W: fmt::Write,
 {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
+    fn write_str(
+        &mut self,
+        s: &str,
+    ) -> fmt::Result {
         for c in s.chars() {
             self.write_char(c)?;
         }
         Ok(())
     }
 
-    fn write_char(&mut self, c: char) -> fmt::Result {
+    fn write_char(
+        &mut self,
+        c: char,
+    ) -> fmt::Result {
         match c {
             '"' | '\\' => self.0.write_char('\\')?,
             // \l is for left justified linebreak
             '\n' => return self.0.write_str("\\l"),
-            _ => {}
+            _ => {},
         }
         self.0.write_char(c)
     }
@@ -362,7 +397,10 @@ impl<T> fmt::Display for Escaped<T>
 where
     T: fmt::Display,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         if f.alternate() {
             writeln!(&mut Escaper(f), "{:#}", &self.0)
         } else {
@@ -378,7 +416,10 @@ impl<'a, T, F> fmt::Display for FnFmt<'a, T, F>
 where
     F: Fn(&'a T, &mut fmt::Formatter<'_>) -> fmt::Result,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         self.1(self.0, f)
     }
 }
@@ -389,12 +430,22 @@ pub mod dot_parser;
 
 #[cfg(test)]
 mod test {
-    use alloc::{format, string::String};
+    use alloc::{
+        format,
+        string::String,
+    };
     use core::fmt::Write;
 
-    use super::{Config, Dot, Escaper, RankDir};
-    use crate::prelude::Graph;
-    use crate::visit::NodeRef;
+    use super::{
+        Config,
+        Dot,
+        Escaper,
+        RankDir,
+    };
+    use crate::{
+        prelude::Graph,
+        visit::NodeRef,
+    };
 
     #[test]
     fn test_escape() {
@@ -417,28 +468,36 @@ mod test {
     #[test]
     fn test_nodeindexlable_option() {
         let graph = simple_graph();
-        let dot = format!("{:?}", Dot::with_config(&graph, &[Config::NodeIndexLabel]));
+        let dot = format!(
+            "{:?}",
+            Dot::with_config(&graph, &[Config::NodeIndexLabel])
+        );
         assert_eq!(dot, "digraph {\n    0 [ label = \"0\" ]\n    1 [ label = \"1\" ]\n    0 -> 1 [ label = \"\\\"edge_label\\\"\" ]\n}\n");
     }
 
     #[test]
     fn test_edgeindexlable_option() {
         let graph = simple_graph();
-        let dot = format!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
+        let dot = format!(
+            "{:?}",
+            Dot::with_config(&graph, &[Config::EdgeIndexLabel])
+        );
         assert_eq!(dot, "digraph {\n    0 [ label = \"\\\"A\\\"\" ]\n    1 [ label = \"\\\"B\\\"\" ]\n    0 -> 1 [ label = \"0\" ]\n}\n");
     }
 
     #[test]
     fn test_edgenolable_option() {
         let graph = simple_graph();
-        let dot = format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
+        let dot =
+            format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
         assert_eq!(dot, "digraph {\n    0 [ label = \"\\\"A\\\"\" ]\n    1 [ label = \"\\\"B\\\"\" ]\n    0 -> 1 [ ]\n}\n");
     }
 
     #[test]
     fn test_nodenolable_option() {
         let graph = simple_graph();
-        let dot = format!("{:?}", Dot::with_config(&graph, &[Config::NodeNoLabel]));
+        let dot =
+            format!("{:?}", Dot::with_config(&graph, &[Config::NodeNoLabel]));
         assert_eq!(
             dot,
             "digraph {\n    0 [ ]\n    1 [ ]\n    0 -> 1 [ label = \"\\\"edge_label\\\"\" ]\n}\n"

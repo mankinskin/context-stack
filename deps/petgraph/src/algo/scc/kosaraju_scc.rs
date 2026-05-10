@@ -2,7 +2,12 @@ use crate::visit::VisitMap;
 use alloc::vec::Vec;
 
 use crate::visit::{
-    Dfs, DfsPostOrder, IntoNeighborsDirected, IntoNodeIdentifiers, Reversed, Visitable,
+    Dfs,
+    DfsPostOrder,
+    IntoNeighborsDirected,
+    IntoNodeIdentifiers,
+    Reversed,
+    Visitable,
 };
 
 /// Renamed to `kosaraju_scc`.

@@ -1,7 +1,13 @@
 use petgraph::{
     csr::Csr,
-    graph6::{from_graph6_representation, get_graph6_representation, FromGraph6, ToGraph6},
-    Graph, Undirected,
+    graph6::{
+        from_graph6_representation,
+        get_graph6_representation,
+        FromGraph6,
+        ToGraph6,
+    },
+    Graph,
+    Undirected,
 };
 
 #[cfg(feature = "graphmap")]
@@ -20,7 +26,11 @@ fn generic_graph6_encoder_test_cases() {
     }
 }
 
-fn test_generic_graph6_encoder(expected_graph6_str: &str, order: usize, edges: Vec<(u16, u16)>) {
+fn test_generic_graph6_encoder(
+    expected_graph6_str: &str,
+    order: usize,
+    edges: Vec<(u16, u16)>,
+) {
     type G = Graph<(), (), Undirected, u16>;
 
     // Assert encoded graph6 string is as expected
@@ -48,7 +58,8 @@ fn test_graph6_generic_decoder(
 ) {
     type G = (usize, Vec<(u16, u16)>);
 
-    let (order, mut edges): G = from_graph6_representation(graph6_str.to_string());
+    let (order, mut edges): G =
+        from_graph6_representation(graph6_str.to_string());
     assert_eq!(order, expected_order, "order should be the same");
 
     edges.sort();
@@ -63,7 +74,11 @@ fn graph6_for_graph_test_cases() {
     }
 }
 
-fn test_graph6_for_graph(graph6_str: &str, order: usize, edges: Vec<(u16, u16)>) {
+fn test_graph6_for_graph(
+    graph6_str: &str,
+    order: usize,
+    edges: Vec<(u16, u16)>,
+) {
     type G = Graph<(), (), Undirected, u16>;
     let size = edges.len();
 
@@ -96,7 +111,11 @@ fn graph6_for_stable_graph_test_cases() {
 }
 
 #[cfg(feature = "stable_graph")]
-fn test_graph6_for_stable_graph(graph6_str: &str, order: usize, edges: Vec<(u16, u16)>) {
+fn test_graph6_for_stable_graph(
+    graph6_str: &str,
+    order: usize,
+    edges: Vec<(u16, u16)>,
+) {
     type G = StableGraph<(), (), Undirected, u16>;
     let size = edges.len();
 
@@ -129,7 +148,11 @@ fn graph6_for_graph_map_test_cases() {
 }
 
 #[cfg(feature = "graphmap")]
-fn test_graph6_for_graph_map(graph6_str: &str, order: usize, edges: Vec<(u16, u16)>) {
+fn test_graph6_for_graph_map(
+    graph6_str: &str,
+    order: usize,
+    edges: Vec<(u16, u16)>,
+) {
     type G = GraphMap<u16, (), Undirected>;
     let size = edges.len();
 
@@ -164,7 +187,11 @@ fn graph6_for_matrix_graph_test_cases() {
 }
 
 #[cfg(feature = "matrix_graph")]
-fn test_graph6_for_matrix_graph(graph6_str: &str, order: usize, edges: Vec<(u16, u16)>) {
+fn test_graph6_for_matrix_graph(
+    graph6_str: &str,
+    order: usize,
+    edges: Vec<(u16, u16)>,
+) {
     type G = UnMatrix<(), ()>;
     let size = edges.len();
 
@@ -195,7 +222,11 @@ fn graph6_for_csr_test_cases() {
     }
 }
 
-fn test_graph6_for_csr(graph6_str: &str, order: usize, edges: Vec<(u16, u16)>) {
+fn test_graph6_for_csr(
+    graph6_str: &str,
+    order: usize,
+    edges: Vec<(u16, u16)>,
+) {
     type G = Csr<(), (), Undirected, u16>;
     let size = edges.len();
 

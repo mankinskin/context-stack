@@ -1,7 +1,13 @@
-use crate::visit::{GetAdjacencyMatrix, IntoNeighbors, IntoNodeIdentifiers};
+use crate::visit::{
+    GetAdjacencyMatrix,
+    IntoNeighbors,
+    IntoNodeIdentifiers,
+};
 use alloc::vec::Vec;
-use core::hash::Hash;
-use core::iter::FromIterator;
+use core::{
+    hash::Hash,
+    iter::FromIterator,
+};
 use hashbrown::HashSet;
 
 /// Finds maximal cliques containing all the vertices in r, some of the
@@ -35,7 +41,11 @@ where
     let u = p.iter().max_by_key(|&v| g.neighbors(*v).count()).unwrap();
     let mut todo = p
         .iter()
-        .filter(|&v| *u == *v || !g.is_adjacent(adj_mat, *u, *v) || !g.is_adjacent(adj_mat, *v, *u)) //skip neighbors of pivot
+        .filter(|&v| {
+            *u == *v
+                || !g.is_adjacent(adj_mat, *u, *v)
+                || !g.is_adjacent(adj_mat, *v, *u)
+        }) //skip neighbors of pivot
         .cloned()
         .collect::<Vec<G::NodeId>>();
     while let Some(v) = todo.pop() {

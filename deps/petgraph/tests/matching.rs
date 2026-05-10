@@ -2,8 +2,13 @@ use core::hash::Hash;
 
 use hashbrown::HashSet;
 
-use petgraph::algo::{greedy_matching, maximum_matching};
-use petgraph::prelude::*;
+use petgraph::{
+    algo::{
+        greedy_matching,
+        maximum_matching,
+    },
+    prelude::*,
+};
 
 macro_rules! assert_one_of {
     ($actual:expr, [$($expected:expr),+]) => {
@@ -41,7 +46,9 @@ macro_rules! set {
 }
 
 // So we don't have to type `.collect::<HashSet<_>>`.
-fn collect<'a, T: Copy + Eq + Hash + 'a>(iter: impl Iterator<Item = T>) -> HashSet<T> {
+fn collect<'a, T: Copy + Eq + Hash + 'a>(
+    iter: impl Iterator<Item = T>
+) -> HashSet<T> {
     iter.collect()
 }
 
@@ -107,8 +114,15 @@ fn maximum_odd_path() {
 #[cfg(feature = "stable_graph")]
 #[test]
 fn maximum_in_stable_graph() {
-    let mut g: StableUnGraph<(), ()> =
-        StableUnGraph::from_edges([(0, 1), (0, 2), (1, 2), (1, 3), (2, 4), (3, 4), (3, 5)]);
+    let mut g: StableUnGraph<(), ()> = StableUnGraph::from_edges([
+        (0, 1),
+        (0, 2),
+        (1, 2),
+        (1, 3),
+        (2, 4),
+        (3, 4),
+        (3, 5),
+    ]);
 
     // Create a hole by removing node that would otherwise belong to the maximum
     // matching.
@@ -132,7 +146,8 @@ fn maximum_in_stable_graph() {
 #[cfg(feature = "stable_graph")]
 #[test]
 fn is_perfect_in_stable_graph() {
-    let mut g: StableUnGraph<(), ()> = StableUnGraph::from_edges([(0, 1), (1, 2), (2, 3)]);
+    let mut g: StableUnGraph<(), ()> =
+        StableUnGraph::from_edges([(0, 1), (1, 2), (2, 3)]);
     g.remove_node(NodeIndex::new(0));
     g.remove_node(NodeIndex::new(1));
 

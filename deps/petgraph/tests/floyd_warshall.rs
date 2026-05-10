@@ -1,5 +1,10 @@
-use petgraph::algo::floyd_warshall;
-use petgraph::{prelude::*, Directed, Graph, Undirected};
+use petgraph::{
+    algo::floyd_warshall,
+    prelude::*,
+    Directed,
+    Graph,
+    Undirected,
+};
 use std::collections::HashMap;
 
 #[test]

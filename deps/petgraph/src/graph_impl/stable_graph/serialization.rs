@@ -1,25 +1,48 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{
+    de::Error,
+    Deserialize,
+    Deserializer,
+    Serialize,
+    Serializer,
+};
 
 use super::super::serialization::{
-    invalid_hole_err, invalid_length_err, invalid_node_err, EdgeProperty,
+    invalid_hole_err,
+    invalid_length_err,
+    invalid_node_err,
+    EdgeProperty,
 };
-use crate::graph::{Edge, IndexType, Node};
-use crate::prelude::*;
-use crate::serde_utils::{
-    CollectSeqWithLength, FromDeserialized, IntoSerializable, MappedSequenceVisitor,
+use crate::{
+    graph::{
+        Edge,
+        IndexType,
+        Node,
+    },
+    prelude::*,
+    serde_utils::{
+        CollectSeqWithLength,
+        FromDeserialized,
+        IntoSerializable,
+        MappedSequenceVisitor,
+    },
+    stable_graph::StableGraph,
+    visit::{
+        EdgeIndexable,
+        NodeIndexable,
+    },
+    EdgeType,
 };
-use crate::stable_graph::StableGraph;
-use crate::visit::{EdgeIndexable, NodeIndexable};
-use crate::EdgeType;
 
 // Serialization representation for StableGraph
 // Keep in sync with deserialization and Graph
 #[derive(Serialize)]
 #[serde(rename = "Graph")]
-#[serde(bound(serialize = "N: Serialize, E: Serialize, Ix: IndexType + Serialize"))]
+#[serde(bound(
+    serialize = "N: Serialize, E: Serialize, Ix: IndexType + Serialize"
+))]
 pub struct SerStableGraph<'a, N: 'a, E: 'a, Ix: 'a + IndexType> {
     nodes: Somes<&'a [Node<Option<N>, Ix>]>,
     node_holes: Holes<&'a [Node<Option<N>, Ix>]>,
@@ -52,7 +75,10 @@ impl<N, Ix> Serialize for Somes<&[Node<Option<N>, Ix>]>
 where
     N: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -70,7 +96,10 @@ impl<N, Ix> Serialize for Holes<&[Node<Option<N>, Ix>]>
 where
     Ix: Serialize + IndexType,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -104,7 +133,7 @@ where
 }
 
 fn deser_stable_graph_nodes<'de, D, N, Ix>(
-    deserializer: D,
+    deserializer: D
 ) -> Result<Vec<Node<Option<N>, Ix>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -120,7 +149,7 @@ where
 }
 
 fn deser_stable_graph_edges<'de, D, N, Ix>(
-    deserializer: D,
+    deserializer: D
 ) -> Result<Vec<Edge<Option<N>, Ix>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -176,7 +205,10 @@ where
     N: Serialize,
     E: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -262,8 +294,10 @@ fn test_from_deserialized_with_holes() {
     use itertools::assert_equal;
     use serde::de::value::Error as SerdeError;
 
-    use crate::graph::node_index;
-    use crate::stable_graph::StableUnGraph;
+    use crate::{
+        graph::node_index,
+        stable_graph::StableUnGraph,
+    };
 
     let input = DeserStableGraph::<_, (), u32> {
         nodes: vec![
@@ -280,7 +314,12 @@ fn test_from_deserialized_with_holes() {
                 next: [EdgeIndex::end(); 2],
             },
         ],
-        node_holes: vec![node_index(0), node_index(2), node_index(3), node_index(6)],
+        node_holes: vec![
+            node_index(0),
+            node_index(2),
+            node_index(3),
+            node_index(6),
+        ],
         edges: vec![],
         edge_property: EdgeProperty::Undirected,
     };

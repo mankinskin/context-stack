@@ -29,44 +29,80 @@ pub mod spfa;
 pub mod steiner_tree;
 pub mod tred;
 
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 
 use crate::prelude::*;
 
-use super::graph::IndexType;
-use super::unionfind::UnionFind;
-use super::visit::{
-    GraphBase, GraphRef, IntoEdgeReferences, IntoNeighbors, IntoNeighborsDirected,
-    IntoNodeIdentifiers, NodeCompactIndexable, NodeIndexable, Reversed, VisitMap, Visitable,
+use super::{
+    graph::IndexType,
+    unionfind::UnionFind,
+    visit::{
+        GraphBase,
+        GraphRef,
+        IntoEdgeReferences,
+        IntoNeighbors,
+        IntoNeighborsDirected,
+        IntoNodeIdentifiers,
+        NodeCompactIndexable,
+        NodeIndexable,
+        Reversed,
+        VisitMap,
+        Visitable,
+    },
+    EdgeType,
 };
-use super::EdgeType;
 use crate::visit::Walker;
 
 pub use astar::astar;
-pub use bellman_ford::{bellman_ford, find_negative_cycle};
+pub use bellman_ford::{
+    bellman_ford,
+    find_negative_cycle,
+};
 pub use bridges::bridges;
 pub use coloring::dsatur_coloring;
 pub use dijkstra::dijkstra;
 pub use feedback_arc_set::greedy_feedback_arc_set;
 pub use floyd_warshall::floyd_warshall;
 pub use isomorphism::{
-    is_isomorphic, is_isomorphic_matching, is_isomorphic_subgraph, is_isomorphic_subgraph_matching,
+    is_isomorphic,
+    is_isomorphic_matching,
+    is_isomorphic_subgraph,
+    is_isomorphic_subgraph_matching,
     subgraph_isomorphisms_iter,
 };
 pub use johnson::johnson;
 pub use k_shortest_path::k_shortest_path;
-pub use matching::{greedy_matching, maximum_matching, Matching};
+pub use matching::{
+    greedy_matching,
+    maximum_matching,
+    Matching,
+};
 pub use maximal_cliques::maximal_cliques;
-pub use maximum_flow::{dinics, ford_fulkerson};
-pub use min_spanning_tree::{min_spanning_tree, min_spanning_tree_prim};
+pub use maximum_flow::{
+    dinics,
+    ford_fulkerson,
+};
+pub use min_spanning_tree::{
+    min_spanning_tree,
+    min_spanning_tree_prim,
+};
 pub use page_rank::page_rank;
 #[allow(deprecated)]
 pub use scc::scc;
 pub use scc::{
     kosaraju_scc::kosaraju_scc,
-    tarjan_scc::{tarjan_scc, TarjanScc},
+    tarjan_scc::{
+        tarjan_scc,
+        TarjanScc,
+    },
 };
-pub use simple_paths::{all_simple_paths, all_simple_paths_multi};
+pub use simple_paths::{
+    all_simple_paths,
+    all_simple_paths_multi,
+};
 pub use spfa::spfa;
 #[cfg(feature = "stable_graph")]
 pub use steiner_tree::steiner_tree;
@@ -278,7 +314,10 @@ pub fn is_cyclic_directed<G>(g: G) -> bool
 where
     G: IntoNodeIdentifiers + IntoNeighbors + Visitable,
 {
-    use crate::visit::{depth_first_search, DfsEvent};
+    use crate::visit::{
+        depth_first_search,
+        DfsEvent,
+    };
 
     depth_first_search(g, g.node_identifiers(), |event| match event {
         DfsEvent::BackEdge(_, _) => Err(()),
@@ -287,7 +326,8 @@ where
     .is_err()
 }
 
-type DfsSpaceType<G> = DfsSpace<<G as GraphBase>::NodeId, <G as Visitable>::Map>;
+type DfsSpaceType<G> =
+    DfsSpace<<G as GraphBase>::NodeId, <G as Visitable>::Map>;
 
 /// Workspace for a graph traversal.
 #[derive(Clone, Debug)]
@@ -323,7 +363,11 @@ where
 }
 
 /// Create a Dfs if it's needed
-fn with_dfs<G, F, R>(g: G, space: Option<&mut DfsSpaceType<G>>, f: F) -> R
+fn with_dfs<G, F, R>(
+    g: G,
+    space: Option<&mut DfsSpaceType<G>>,
+    f: F,
+) -> R
 where
     G: GraphRef + Visitable,
     F: FnOnce(&mut Dfs<G::NodeId, G::Map>) -> R,
@@ -476,7 +520,8 @@ where
     Ix: IndexType,
 {
     let sccs = kosaraju_scc(&g);
-    let mut condensed: Graph<Vec<N>, E, Ty, Ix> = Graph::with_capacity(sccs.len(), g.edge_count());
+    let mut condensed: Graph<Vec<N>, E, Ty, Ix> =
+        Graph::with_capacity(sccs.len(), g.edge_count());
 
     // Build a map from old indices to new ones.
     let mut node_map = vec![NodeIndex::end(); g.node_count()];
@@ -547,7 +592,10 @@ pub struct NegativeCycle(pub ());
 /// * Auxiliary space: **O(|V|)**.
 ///
 /// where **|V|** is the number of nodes and **|E|** is the number of edges.
-pub fn is_bipartite_undirected<G, N, VM>(g: G, start: N) -> bool
+pub fn is_bipartite_undirected<G, N, VM>(
+    g: G,
+    start: N,
+) -> bool
 where
     G: GraphRef + Visitable<NodeId = N, Map = VM> + IntoNeighbors<NodeId = N>,
     N: Copy + PartialEq + core::fmt::Debug,
@@ -580,13 +628,13 @@ where
                 match (is_red, is_blue) {
                     (true, false) => {
                         blue.visit(neighbour);
-                    }
+                    },
                     (false, true) => {
                         red.visit(neighbour);
-                    }
+                    },
                     (_, _) => {
                         panic!("Invariant doesn't hold");
-                    }
+                    },
                 }
 
                 stack.push_back(neighbour);
@@ -597,13 +645,21 @@ where
     true
 }
 
-use core::fmt::Debug;
-use core::ops::Add;
+use core::{
+    fmt::Debug,
+    ops::Add,
+};
 
 /// Associated data that can be used for measures (such as length).
-pub trait Measure: Debug + PartialOrd + Add<Self, Output = Self> + Default + Clone {}
+pub trait Measure:
+    Debug + PartialOrd + Add<Self, Output = Self> + Default + Clone
+{
+}
 
-impl<M> Measure for M where M: Debug + PartialOrd + Add<M, Output = M> + Default + Clone {}
+impl<M> Measure for M where
+    M: Debug + PartialOrd + Add<M, Output = M> + Default + Clone
+{
+}
 
 /// A floating-point measure.
 pub trait FloatMeasure: Measure + Copy {
@@ -643,10 +699,15 @@ impl FloatMeasure for f64 {
     }
 }
 
-pub trait BoundedMeasure: Measure + core::ops::Sub<Self, Output = Self> {
+pub trait BoundedMeasure:
+    Measure + core::ops::Sub<Self, Output = Self>
+{
     fn min() -> Self;
     fn max() -> Self;
-    fn overflowing_add(self, rhs: Self) -> (Self, bool);
+    fn overflowing_add(
+        self,
+        rhs: Self,
+    ) -> (Self, bool);
     fn from_f32(val: f32) -> Self;
     fn from_f64(val: f64) -> Self;
 }
@@ -679,7 +740,9 @@ macro_rules! impl_bounded_measure_integer(
     };
 );
 
-impl_bounded_measure_integer!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
+impl_bounded_measure_integer!(
+    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
+);
 
 macro_rules! impl_bounded_measure_float(
     ( $( $t:ident ),* ) => {

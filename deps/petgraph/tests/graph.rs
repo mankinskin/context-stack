@@ -3,23 +3,43 @@ extern crate petgraph;
 use core::hash::Hash;
 use std::collections::HashSet;
 
-use petgraph::prelude::*;
-use petgraph::EdgeType;
+use petgraph::{
+    prelude::*,
+    EdgeType,
+};
 
 use petgraph as pg;
 
 use petgraph::algo::{
-    dominators, has_path_connecting, is_bipartite_undirected, is_cyclic_undirected,
+    dominators,
+    has_path_connecting,
+    is_bipartite_undirected,
+    is_cyclic_undirected,
     is_isomorphic_matching,
 };
 
-use petgraph::graph::node_index as n;
-use petgraph::graph::{GraphError, IndexType};
+use petgraph::graph::{
+    node_index as n,
+    GraphError,
+    IndexType,
+};
 
-use petgraph::algo::{astar, dijkstra, DfsSpace};
-use petgraph::visit::{
-    IntoEdges, IntoEdgesDirected, IntoNodeIdentifiers, NodeFiltered, Reversed, Topo, VisitMap,
-    Walker,
+use petgraph::{
+    algo::{
+        astar,
+        dijkstra,
+        DfsSpace,
+    },
+    visit::{
+        IntoEdges,
+        IntoEdgesDirected,
+        IntoNodeIdentifiers,
+        NodeFiltered,
+        Reversed,
+        Topo,
+        VisitMap,
+        Walker,
+    },
 };
 
 use petgraph::dot::Dot;
@@ -446,7 +466,8 @@ fn dijk() {
     }
 
     let scores = dijkstra(&g, a, None, |e| *e.weight());
-    let mut scores: Vec<_> = scores.into_iter().map(|(n, s)| (g[n], s)).collect();
+    let mut scores: Vec<_> =
+        scores.into_iter().map(|(n, s)| (g[n], s)).collect();
     scores.sort();
     assert_eq!(
         scores,
@@ -601,7 +622,8 @@ fn test_astar_admissible_inconsistent() {
         &_ => 0,
     };
 
-    let optimal = astar(&g, a, |n| n == d, |e| *e.weight(), admissible_inconsistent);
+    let optimal =
+        astar(&g, a, |n| n == d, |e| *e.weight(), admissible_inconsistent);
     assert_eq!(optimal, Some((9, vec![a, b, c, d])));
 }
 
@@ -703,7 +725,10 @@ fn without() {
     assert_eq!(term, vec![b, c, d]);
 }
 
-fn assert_is_topo_order<N, E>(gr: &Graph<N, E, Directed>, order: &[NodeIndex]) {
+fn assert_is_topo_order<N, E>(
+    gr: &Graph<N, E, Directed>,
+    order: &[NodeIndex],
+) {
     assert_eq!(gr.node_count(), order.len());
     // check all the edges of the graph
     for edge in gr.raw_edges() {
@@ -1326,7 +1351,10 @@ fn test_edge_iterators_directed() {
     println!("{gr:#?}");
     for i in gr.node_indices() {
         // Compare against reversed graphs two different ways: using .reverse() and Reversed.
-        itertools::assert_equal(gr.edges_directed(i, Incoming), reversed_gr.edges(i));
+        itertools::assert_equal(
+            gr.edges_directed(i, Incoming),
+            reversed_gr.edges(i),
+        );
 
         // Reversed reverses edges, so target and source need to be reversed once more.
         itertools::assert_equal(
@@ -1358,7 +1386,10 @@ fn test_edge_iterators_directed() {
 fn test_edge_filtered_iterators_directed() {
     use petgraph::{
         graph::EdgeReference,
-        visit::{EdgeFiltered, IntoEdgesDirected},
+        visit::{
+            EdgeFiltered,
+            IntoEdgesDirected,
+        },
     };
 
     let gr = make_edge_iterator_graph::<Directed>();
@@ -1381,7 +1412,10 @@ fn test_edge_filtered_iterators_directed() {
 fn test_node_filtered_iterators_directed() {
     use petgraph::{
         graph::NodeIndex,
-        visit::{IntoEdgesDirected, NodeFiltered},
+        visit::{
+            IntoEdgesDirected,
+            NodeFiltered,
+        },
     };
 
     let gr = make_edge_iterator_graph::<Directed>();
@@ -1623,7 +1657,8 @@ fn test_map_owned() {
     let bc = g.add_edge(b, c, 14);
     let ca = g.add_edge(c, a, 9);
 
-    let g2 = g.map_owned(|_, name| format!("map-{name}"), |_, weight| weight * 2);
+    let g2 =
+        g.map_owned(|_, name| format!("map-{name}"), |_, weight| weight * 2);
     assert_eq!(g2.node_count(), 3);
     assert_eq!(g2.node_weight(a).map(|s| &**s), Some("map-A"));
     assert_eq!(g2.node_weight(b).map(|s| &**s), Some("map-B"));
@@ -1755,8 +1790,14 @@ fn test_filter_map_owned() {
 #[test]
 fn from_edges() {
     let n = NodeIndex::new;
-    let gr =
-        Graph::<(), (), Undirected>::from_edges([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]);
+    let gr = Graph::<(), (), Undirected>::from_edges([
+        (0, 1),
+        (0, 2),
+        (0, 3),
+        (1, 2),
+        (1, 3),
+        (2, 3),
+    ]);
     assert_eq!(gr.node_count(), 4);
     assert_eq!(gr.edge_count(), 6);
     assert_eq!(gr.neighbors(n(0)).count(), 3);
@@ -1895,7 +1936,10 @@ fn neighbors_selfloops() {
 
 #[cfg(feature = "stable_graph")]
 #[cfg(test)]
-fn degree<G>(g: G, node: G::NodeId) -> usize
+fn degree<G>(
+    g: G,
+    node: G::NodeId,
+) -> usize
 where
     G: IntoNeighbors,
     G::NodeId: PartialEq,
@@ -1942,7 +1986,8 @@ fn degree_sequence() {
         (3, 5),
     ]);
     gr.add_node(6); // add isolated node
-    let mut degree_sequence = gr.nodes().map(|i| degree(&gr, i)).collect::<Vec<_>>();
+    let mut degree_sequence =
+        gr.nodes().map(|i| degree(&gr, i)).collect::<Vec<_>>();
 
     degree_sequence.sort_by(|x, y| Ord::cmp(y, x));
     assert_eq!(&degree_sequence, &[5, 3, 3, 2, 2, 1, 0]);
@@ -2168,10 +2213,14 @@ fn filtered_edge_reverse() {
 
 #[test]
 fn dfs_visit() {
-    use petgraph::visit::Control;
-    use petgraph::visit::DfsEvent::*;
-    use petgraph::visit::{depth_first_search, Time};
-    use petgraph::visit::{VisitMap, Visitable};
+    use petgraph::visit::{
+        depth_first_search,
+        Control,
+        DfsEvent::*,
+        Time,
+        VisitMap,
+        Visitable,
+    };
     let gr: Graph<(), ()> = Graph::from_edges([
         (0, 5),
         (0, 2),
@@ -2201,16 +2250,16 @@ fn dfs_visit() {
                 assert!(discover_time[u.index()] != invalid_time);
                 assert!(finish_time[u.index()] == invalid_time);
                 edges.insert((u, v));
-            }
+            },
             BackEdge(u, v) => {
                 // u is an ancestor of v
                 assert!(discover_time[v.index()] != invalid_time);
                 assert!(finish_time[v.index()] == invalid_time);
                 edges.insert((u, v));
-            }
+            },
             CrossForwardEdge(u, v) => {
                 edges.insert((u, v));
-            }
+            },
         }
     });
     assert!(discover_time.iter().all(|x| *x != invalid_time));
@@ -2273,8 +2322,15 @@ fn dfs_visit() {
 fn filtered_post_order() {
     use petgraph::visit::NodeFiltered;
 
-    let mut gr: Graph<(), ()> =
-        Graph::from_edges([(0, 2), (1, 2), (0, 3), (1, 4), (2, 4), (4, 5), (3, 5)]);
+    let mut gr: Graph<(), ()> = Graph::from_edges([
+        (0, 2),
+        (1, 2),
+        (0, 3),
+        (1, 4),
+        (2, 4),
+        (4, 5),
+        (3, 5),
+    ]);
     // map reachable nodes
     let mut dfs = Dfs::new(&gr, n(0));
     while dfs.next(&gr).is_some() {}
@@ -2292,9 +2348,14 @@ fn filtered_post_order() {
 
 #[test]
 fn filter_elements() {
-    use petgraph::data::Element::{Edge, Node};
-    use petgraph::data::ElementIterator;
-    use petgraph::data::FromElements;
+    use petgraph::data::{
+        Element::{
+            Edge,
+            Node,
+        },
+        ElementIterator,
+        FromElements,
+    };
     let elements = vec![
         Node { weight: "A" },
         Node { weight: "B" },
@@ -2352,10 +2413,9 @@ fn filter_elements() {
     println!("{g:#?}");
     assert!(g.contains_edge(n(1), n(5)));
     let g2 = DiGraph::<_, _>::from_elements(
-        elements
-            .iter()
-            .cloned()
-            .filter_elements(|elt| !matches!(elt, Node { ref weight } if **weight == "B")),
+        elements.iter().cloned().filter_elements(
+            |elt| !matches!(elt, Node { ref weight } if **weight == "B"),
+        ),
     );
     println!("{g2:#?}");
     g.remove_node(n(1));
@@ -2369,9 +2429,13 @@ fn filter_elements() {
 
 #[test]
 fn test_edge_filtered() {
-    use petgraph::algo::connected_components;
-    use petgraph::visit::EdgeFiltered;
-    use petgraph::visit::IntoEdgeReferences;
+    use petgraph::{
+        algo::connected_components,
+        visit::{
+            EdgeFiltered,
+            IntoEdgeReferences,
+        },
+    };
 
     let gr = UnGraph::<(), _>::from_edges([
         // cycle

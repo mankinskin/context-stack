@@ -4,9 +4,15 @@ extern crate petgraph;
 extern crate test;
 
 use core::cmp::max;
-use petgraph::algo::{toposort, DfsSpace};
-use petgraph::prelude::*;
-use petgraph::{acyclic::Acyclic, data::Build};
+use petgraph::{
+    acyclic::Acyclic,
+    algo::{
+        toposort,
+        DfsSpace,
+    },
+    data::Build,
+    prelude::*,
+};
 use test::Bencher;
 
 /// Dynamic toposort using Acyclic<G>
@@ -15,7 +21,8 @@ use test::Bencher;
 fn acyclic_bench(bench: &mut Bencher) {
     static NODE_COUNT: usize = 100;
     let mut g = Acyclic::<DiGraph<usize, ()>>::new();
-    let nodes: Vec<NodeIndex<_>> = (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
+    let nodes: Vec<NodeIndex<_>> =
+        (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
 
     bench.iter(|| {
         let mut g = g.clone();
@@ -38,7 +45,8 @@ fn acyclic_bench(bench: &mut Bencher) {
 fn toposort_baseline_bench(bench: &mut Bencher) {
     static NODE_COUNT: usize = 100;
     let mut g = DiGraph::<usize, ()>::new();
-    let nodes: Vec<NodeIndex<_>> = (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
+    let nodes: Vec<NodeIndex<_>> =
+        (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
 
     bench.iter(|| {
         let mut g = g.clone();

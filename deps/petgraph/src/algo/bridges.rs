@@ -1,8 +1,15 @@
 use crate::visit::{
-    EdgeRef, IntoEdgeReferences, IntoNeighbors, IntoNodeIdentifiers, NodeIndexable,
+    EdgeRef,
+    IntoEdgeReferences,
+    IntoNeighbors,
+    IntoNodeIdentifiers,
+    NodeIndexable,
 };
 
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 
 /// Find all [bridges](https://en.wikipedia.org/wiki/Bridge_(graph_theory)) in a simple undirected graph.
 ///
@@ -70,9 +77,12 @@ where
 
             // Perform a DFS starting at start
             let start = graph.from_index(start);
-            let mut stack: Vec<(G::NodeId, G::Neighbors)> = vec![(start, graph.neighbors(start))];
+            let mut stack: Vec<(G::NodeId, G::Neighbors)> =
+                vec![(start, graph.neighbors(start))];
 
-            while let Some((stack_frame, rest_of_stack)) = stack.split_last_mut() {
+            while let Some((stack_frame, rest_of_stack)) =
+                stack.split_last_mut()
+            {
                 let &mut (node, ref mut neighbors) = stack_frame;
                 let parent = rest_of_stack.last().map(|&(n, _)| n);
 
@@ -84,7 +94,8 @@ where
                         let child_index = graph.to_index(token);
 
                         if let Some(time) = visit_time[child_index] {
-                            earliest_backedge[node_index] = earliest_backedge[node_index].min(time);
+                            earliest_backedge[node_index] =
+                                earliest_backedge[node_index].min(time);
                         } else {
                             visit_time[child_index] = Some(clock);
                             clock += 1;
@@ -95,8 +106,9 @@ where
                     // Post-order DFS
                     if let Some(parent) = parent {
                         let parent_index = graph.to_index(parent);
-                        earliest_backedge[parent_index] =
-                            earliest_backedge[parent_index].min(earliest_backedge[node_index]);
+                        earliest_backedge[parent_index] = earliest_backedge
+                            [parent_index]
+                            .min(earliest_backedge[node_index]);
                     }
                     stack.pop();
                 }
@@ -110,12 +122,13 @@ where
 
         // All nodes have been visited by the time we return, so unwraps are safe.
         // The node with the lower visit time is the "parent" in the dfs-forest created above.
-        let (parent, node) =
-            if visit_time[source_index].unwrap() < visit_time[target_index].unwrap() {
-                (source_index, target_index)
-            } else {
-                (target_index, source_index)
-            };
+        let (parent, node) = if visit_time[source_index].unwrap()
+            < visit_time[target_index].unwrap()
+        {
+            (source_index, target_index)
+        } else {
+            (target_index, source_index)
+        };
 
         // If there's no back-edge to before parent, then this the only way from parent to here
         // is directly from parent, so it's a bridge edge.
@@ -126,9 +139,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::EdgeReference;
-    use crate::graph::UnGraph;
-    use crate::visit::EdgeRef;
+    use crate::{
+        graph::{
+            EdgeReference,
+            UnGraph,
+        },
+        visit::EdgeRef,
+    };
 
     #[test]
     fn test_bridges() {

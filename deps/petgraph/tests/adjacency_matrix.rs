@@ -1,8 +1,17 @@
 use petgraph::{
     adj::List,
     csr::Csr,
-    visit::{EdgeRef, GetAdjacencyMatrix, GraphProp, IntoEdgeReferences, IntoNodeIdentifiers},
-    Directed, EdgeType, Graph, Undirected,
+    visit::{
+        EdgeRef,
+        GetAdjacencyMatrix,
+        GraphProp,
+        IntoEdgeReferences,
+        IntoNodeIdentifiers,
+    },
+    Directed,
+    EdgeType,
+    Graph,
+    Undirected,
 };
 
 #[cfg(feature = "graphmap")]
@@ -16,7 +25,10 @@ use petgraph::stable_graph::StableGraph;
 
 fn test_adjacency_matrix<G>(g: G)
 where
-    G: GetAdjacencyMatrix + IntoNodeIdentifiers + IntoEdgeReferences + GraphProp,
+    G: GetAdjacencyMatrix
+        + IntoNodeIdentifiers
+        + IntoEdgeReferences
+        + GraphProp,
 {
     let matrix = g.adjacency_matrix();
     let node_ids: Vec<G::NodeId> = g.node_identifiers().collect();
@@ -27,7 +39,9 @@ where
 
     for &a in &node_ids {
         for &b in &node_ids {
-            if edges.contains(&(a, b)) || (!g.is_directed() && edges.contains(&(b, a))) {
+            if edges.contains(&(a, b))
+                || (!g.is_directed() && edges.contains(&(b, a)))
+            {
                 assert!(g.is_adjacent(&matrix, a, b));
             } else {
                 assert!(!g.is_adjacent(&matrix, a, b));
@@ -38,7 +52,8 @@ where
 
 fn test_adjacency_matrix_for_graph<Ty: EdgeType>() {
     for (order, edges) in TEST_CASES {
-        let mut g: Graph<(), (), Ty, u16> = Graph::with_capacity(order, edges.len());
+        let mut g: Graph<(), (), Ty, u16> =
+            Graph::with_capacity(order, edges.len());
 
         for _ in 0..order {
             g.add_node(());
@@ -62,7 +77,8 @@ fn test_adjacency_matrix_for_graph_undirected() {
 #[cfg(feature = "stable_graph")]
 fn test_adjacency_matrix_for_stable_graph<Ty: EdgeType>() {
     for (order, edges) in TEST_CASES {
-        let mut g: StableGraph<(), (), Ty, u16> = StableGraph::with_capacity(order, edges.len());
+        let mut g: StableGraph<(), (), Ty, u16> =
+            StableGraph::with_capacity(order, edges.len());
 
         for _ in 0..order {
             g.add_node(());
@@ -88,7 +104,8 @@ fn test_adjacency_matrix_for_stable_graph_undirected() {
 #[cfg(feature = "graphmap")]
 fn test_adjacency_matrix_for_graph_map<Ty: EdgeType>() {
     for (order, edges) in TEST_CASES {
-        let mut g: GraphMap<u16, (), Ty> = GraphMap::with_capacity(order, edges.len());
+        let mut g: GraphMap<u16, (), Ty> =
+            GraphMap::with_capacity(order, edges.len());
 
         for i in 0..order {
             g.add_node(i as u16);
@@ -116,8 +133,12 @@ fn test_adjacency_matrix_for_graph_map_undirected() {
 #[cfg(feature = "matrix_graph")]
 fn test_adjacency_matrix_for_matrix_graph<Ty: EdgeType>() {
     for (order, edges) in TEST_CASES {
-        let mut g: MatrixGraph<(), (), std::collections::hash_map::RandomState, Ty> =
-            MatrixGraph::with_capacity(order);
+        let mut g: MatrixGraph<
+            (),
+            (),
+            std::collections::hash_map::RandomState,
+            Ty,
+        > = MatrixGraph::with_capacity(order);
 
         for _ in 0..order {
             g.add_node(());

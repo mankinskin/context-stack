@@ -7,12 +7,25 @@ use test::Bencher;
 
 #[allow(dead_code)]
 mod common;
-use common::{digraph, ungraph};
+use common::{
+    digraph,
+    ungraph,
+};
 
 use petgraph::{
-    algo::{min_spanning_tree, min_spanning_tree_prim},
-    visit::{Data, IntoEdgeReferences, IntoEdges, IntoNodeReferences, NodeIndexable},
-    Graph, Undirected,
+    algo::{
+        min_spanning_tree,
+        min_spanning_tree_prim,
+    },
+    visit::{
+        Data,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoNodeReferences,
+        NodeIndexable,
+    },
+    Graph,
+    Undirected,
 };
 
 #[bench]
@@ -89,7 +102,11 @@ fn min_spanning_tree_prim_petersen_undir_bench(bench: &mut Bencher) {
 
 fn iterate_mst_kruskal<G>(g: G)
 where
-    G: Data + IntoEdges + IntoNodeReferences + IntoEdgeReferences + NodeIndexable,
+    G: Data
+        + IntoEdges
+        + IntoNodeReferences
+        + IntoEdgeReferences
+        + NodeIndexable,
     G::NodeWeight: Clone,
     G::EdgeWeight: Clone + PartialOrd,
 {
@@ -99,7 +116,11 @@ where
 }
 fn iterate_mst_prim<G>(g: G)
 where
-    G: Data + IntoEdges + IntoNodeReferences + IntoEdgeReferences + NodeIndexable,
+    G: Data
+        + IntoEdges
+        + IntoNodeReferences
+        + IntoEdgeReferences
+        + NodeIndexable,
     G::NodeWeight: Clone,
     G::EdgeWeight: Clone + PartialOrd,
 {

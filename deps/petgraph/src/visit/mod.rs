@@ -62,19 +62,26 @@
 
 // filter, reversed have their `mod` lines at the end,
 // so that they can use the trait template macros
-pub use self::filter::*;
-pub use self::reversed::*;
-pub use self::undirected_adaptor::*;
+pub use self::{
+    filter::*,
+    reversed::*,
+    undirected_adaptor::*,
+};
 
 #[macro_use]
 mod macros;
 
 mod dfsvisit;
 mod traversal;
-pub use self::dfsvisit::*;
-pub use self::traversal::*;
+pub use self::{
+    dfsvisit::*,
+    traversal::*,
+};
 
-use core::hash::{BuildHasher, Hash};
+use core::hash::{
+    BuildHasher,
+    Hash,
+};
 
 use fixedbitset::FixedBitSet;
 use hashbrown::HashSet;
@@ -400,29 +407,47 @@ pub trait VisitMap<N> {
     /// Mark `a` as visited.
     ///
     /// Return **true** if this is the first visit, false otherwise.
-    fn visit(&mut self, a: N) -> bool;
+    fn visit(
+        &mut self,
+        a: N,
+    ) -> bool;
 
     /// Return whether `a` has been visited before.
-    fn is_visited(&self, a: &N) -> bool;
+    fn is_visited(
+        &self,
+        a: &N,
+    ) -> bool;
 
     /// Mark `a` as unvisited.
     ///
     /// Return **true** if this vertex was marked as visited at the time of unsetting it, false otherwise.
-    fn unvisit(&mut self, _a: N) -> bool;
+    fn unvisit(
+        &mut self,
+        _a: N,
+    ) -> bool;
 }
 
 impl<Ix> VisitMap<Ix> for FixedBitSet
 where
     Ix: IndexType,
 {
-    fn visit(&mut self, x: Ix) -> bool {
+    fn visit(
+        &mut self,
+        x: Ix,
+    ) -> bool {
         !self.put(x.index())
     }
-    fn is_visited(&self, x: &Ix) -> bool {
+    fn is_visited(
+        &self,
+        x: &Ix,
+    ) -> bool {
         self.contains(x.index())
     }
 
-    fn unvisit(&mut self, x: Ix) -> bool {
+    fn unvisit(
+        &mut self,
+        x: Ix,
+    ) -> bool {
         if self.is_visited(&x) {
             self.toggle(x.index());
             return true;
@@ -436,14 +461,23 @@ where
     N: Hash + Eq,
     S: BuildHasher,
 {
-    fn visit(&mut self, x: N) -> bool {
+    fn visit(
+        &mut self,
+        x: N,
+    ) -> bool {
         self.insert(x)
     }
-    fn is_visited(&self, x: &N) -> bool {
+    fn is_visited(
+        &self,
+        x: &N,
+    ) -> bool {
         self.contains(x)
     }
 
-    fn unvisit(&mut self, x: N) -> bool {
+    fn unvisit(
+        &mut self,
+        x: N,
+    ) -> bool {
         self.remove(&x)
     }
 }
@@ -454,14 +488,23 @@ where
     N: Hash + Eq,
     S: BuildHasher,
 {
-    fn visit(&mut self, x: N) -> bool {
+    fn visit(
+        &mut self,
+        x: N,
+    ) -> bool {
         self.insert(x)
     }
-    fn is_visited(&self, x: &N) -> bool {
+    fn is_visited(
+        &self,
+        x: &N,
+    ) -> bool {
         self.contains(x)
     }
 
-    fn unvisit(&mut self, x: N) -> bool {
+    fn unvisit(
+        &mut self,
+        x: N,
+    ) -> bool {
         self.remove(&x)
     }
 }

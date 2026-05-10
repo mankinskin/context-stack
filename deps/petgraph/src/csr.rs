@@ -1,26 +1,58 @@
 //! Compressed Sparse Row (CSR) is a sparse adjacency matrix graph.
 
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 use core::{
-    cmp::{max, Ordering},
+    cmp::{
+        max,
+        Ordering,
+    },
     fmt,
-    iter::zip,
-    iter::{Enumerate, Zip},
+    iter::{
+        zip,
+        Enumerate,
+        Zip,
+    },
     marker::PhantomData,
-    ops::{Index, IndexMut, Range},
+    ops::{
+        Index,
+        IndexMut,
+        Range,
+    },
     slice::Windows,
 };
 
 use crate::visit::{
-    Data, EdgeCount, EdgeRef, GetAdjacencyMatrix, GraphBase, GraphProp, IntoEdgeReferences,
-    IntoEdges, IntoNeighbors, IntoNodeIdentifiers, IntoNodeReferences, NodeCompactIndexable,
-    NodeCount, NodeIndexable, Visitable,
+    Data,
+    EdgeCount,
+    EdgeRef,
+    GetAdjacencyMatrix,
+    GraphBase,
+    GraphProp,
+    IntoEdgeReferences,
+    IntoEdges,
+    IntoNeighbors,
+    IntoNodeIdentifiers,
+    IntoNodeReferences,
+    NodeCompactIndexable,
+    NodeCount,
+    NodeIndexable,
+    Visitable,
 };
 
 #[doc(no_inline)]
-pub use crate::graph::{DefaultIx, IndexType};
+pub use crate::graph::{
+    DefaultIx,
+    IndexType,
+};
 
-use crate::{Directed, EdgeType, IntoWeightedEdge};
+use crate::{
+    Directed,
+    EdgeType,
+    IntoWeightedEdge,
+};
 
 /// Csr node index type, a plain integer.
 pub type NodeIndex<Ix = DefaultIx> = Ix;
@@ -43,11 +75,14 @@ impl std::error::Error for CsrError {}
 impl core::error::Error for CsrError {}
 
 impl fmt::Display for CsrError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         match self {
             CsrError::IndicesOutBounds(a, b) => {
                 write!(f, "Both node indices {a} and {b} is out of Csr bounds")
-            }
+            },
         }
     }
 }
@@ -189,7 +224,9 @@ where
     ///                     (3, 1),
     /// ]);
     /// ```
-    pub fn from_sorted_edges<Edge>(edges: &[Edge]) -> Result<Self, EdgesNotSorted>
+    pub fn from_sorted_edges<Edge>(
+        edges: &[Edge]
+    ) -> Result<Self, EdgesNotSorted>
     where
         Edge: Clone + IntoWeightedEdge<E, NodeId = NodeIndex<Ix>>,
         N: Default,
@@ -293,7 +330,10 @@ where
     }
 
     /// Adds a new node with the given weight, returning the corresponding node index.
-    pub fn add_node(&mut self, weight: N) -> NodeIndex<Ix> {
+    pub fn add_node(
+        &mut self,
+        weight: N,
+    ) -> NodeIndex<Ix> {
         let i = self.row.len() - 1;
         self.row.insert(i, self.column.len());
         self.node_weights.insert(i, weight);
@@ -310,7 +350,12 @@ where
     ///
     /// **Panics** if `a` or `b` are out of bounds.
     #[track_caller]
-    pub fn add_edge(&mut self, a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E) -> bool
+    pub fn add_edge(
+        &mut self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+        weight: E,
+    ) -> bool
     where
         E: Clone,
     {
@@ -373,14 +418,18 @@ where
         Ok(true)
     }
 
-    fn find_edge_pos(&self, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> Result<usize, usize> {
+    fn find_edge_pos(
+        &self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> Result<usize, usize> {
         let (index, neighbors) = self.neighbors_of(a);
         if neighbors.len() < BINARY_SEARCH_CUTOFF {
             for (i, elt) in neighbors.iter().enumerate() {
                 match elt.cmp(&b) {
                     Ordering::Equal => return Ok(i + index),
                     Ordering::Greater => return Err(i + index),
-                    Ordering::Less => {}
+                    Ordering::Less => {},
                 }
             }
             Err(neighbors.len() + index)
@@ -396,11 +445,18 @@ where
     ///
     /// **Panics** if the node `a` does not exist.
     #[track_caller]
-    pub fn contains_edge(&self, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> bool {
+    pub fn contains_edge(
+        &self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> bool {
         self.find_edge_pos(a, b).is_ok()
     }
 
-    fn neighbors_range(&self, a: NodeIndex<Ix>) -> Range<usize> {
+    fn neighbors_range(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> Range<usize> {
         let index = self.row[a.index()];
         let end = self
             .row
@@ -410,7 +466,10 @@ where
         index..end
     }
 
-    fn neighbors_of(&self, a: NodeIndex<Ix>) -> (usize, &[Ix]) {
+    fn neighbors_of(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> (usize, &[Ix]) {
         let r = self.neighbors_range(a);
         (r.start, &self.column[r])
     }
@@ -419,7 +478,10 @@ where
     ///
     /// **Panics** if the node `a` does not exist.
     #[track_caller]
-    pub fn out_degree(&self, a: NodeIndex<Ix>) -> usize {
+    pub fn out_degree(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> usize {
         let r = self.neighbors_range(a);
         r.end - r.start
     }
@@ -428,7 +490,10 @@ where
     ///
     /// **Panics** if the node `a` does not exist.
     #[track_caller]
-    pub fn neighbors_slice(&self, a: NodeIndex<Ix>) -> &[NodeIndex<Ix>] {
+    pub fn neighbors_slice(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> &[NodeIndex<Ix>] {
         self.neighbors_of(a).1
     }
 
@@ -436,7 +501,10 @@ where
     ///
     /// **Panics** if the node `a` does not exist.
     #[track_caller]
-    pub fn edges_slice(&self, a: NodeIndex<Ix>) -> &[E] {
+    pub fn edges_slice(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> &[E] {
         &self.edges[self.neighbors_range(a)]
     }
 
@@ -448,7 +516,10 @@ where
     /// **Panics** if the node `a` does not exist.<br>
     /// Iterator element type is `EdgeReference<E, Ty, Ix>`.
     #[track_caller]
-    pub fn edges(&self, a: NodeIndex<Ix>) -> Edges<'_, E, Ty, Ix> {
+    pub fn edges(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> Edges<'_, E, Ty, Ix> {
         let r = self.neighbors_range(a);
         Edges {
             index: r.start,
@@ -621,7 +692,10 @@ where
     Ix: IndexType,
 {
     type Edges = Edges<'a, E, Ty, Ix>;
-    fn edges(self, a: Self::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        a: Self::NodeId,
+    ) -> Self::Edges {
         self.edges(a)
     }
 }
@@ -646,7 +720,10 @@ where
     fn visit_map(&self) -> FixedBitSet {
         FixedBitSet::with_capacity(self.node_count())
     }
-    fn reset_map(&self, map: &mut Self::Map) {
+    fn reset_map(
+        &self,
+        map: &mut Self::Map,
+    ) {
         map.clear();
         map.grow(self.node_count());
     }
@@ -689,7 +766,10 @@ where
     /// **Panics** if the node `a` does not exist.<br>
     /// Iterator element type is `NodeIndex<Ix>`.
     #[track_caller]
-    fn neighbors(self, a: Self::NodeId) -> Self::Neighbors {
+    fn neighbors(
+        self,
+        a: Self::NodeId,
+    ) -> Self::Neighbors {
         Neighbors {
             iter: self.neighbors_slice(a).iter(),
         }
@@ -704,10 +784,16 @@ where
     fn node_bound(&self) -> usize {
         self.node_count()
     }
-    fn to_index(&self, a: Self::NodeId) -> usize {
+    fn to_index(
+        &self,
+        a: Self::NodeId,
+    ) -> usize {
         a.index()
     }
-    fn from_index(&self, ix: usize) -> Self::NodeId {
+    fn from_index(
+        &self,
+        ix: usize,
+    ) -> Self::NodeId {
         Ix::new(ix)
     }
 }
@@ -726,7 +812,10 @@ where
 {
     type Output = N;
 
-    fn index(&self, ix: NodeIndex<Ix>) -> &N {
+    fn index(
+        &self,
+        ix: NodeIndex<Ix>,
+    ) -> &N {
         &self.node_weights[ix.index()]
     }
 }
@@ -736,7 +825,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn index_mut(&mut self, ix: NodeIndex<Ix>) -> &mut N {
+    fn index_mut(
+        &mut self,
+        ix: NodeIndex<Ix>,
+    ) -> &mut N {
         &mut self.node_weights[ix.index()]
     }
 }
@@ -879,7 +971,12 @@ where
         matrix
     }
 
-    fn is_adjacent(&self, matrix: &FixedBitSet, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> bool {
+    fn is_adjacent(
+        &self,
+        matrix: &FixedBitSet,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> bool {
         let n = self.node_count();
         let index = n * a.index() + b.index();
         matrix.contains(index)
@@ -906,12 +1003,18 @@ mod tests {
     use std::println;
 
     use super::Csr;
-    use crate::algo::bellman_ford;
-    use crate::algo::find_negative_cycle;
-    use crate::algo::tarjan_scc;
-    use crate::visit::Dfs;
-    use crate::visit::VisitMap;
-    use crate::Undirected;
+    use crate::{
+        algo::{
+            bellman_ford,
+            find_negative_cycle,
+            tarjan_scc,
+        },
+        visit::{
+            Dfs,
+            VisitMap,
+        },
+        Undirected,
+    };
 
     #[test]
     fn csr1() {
@@ -968,14 +1071,22 @@ mod tests {
     #[test]
     fn csr_from_error_2() {
         // not sorted in target
-        let m: Csr = Csr::from_sorted_edges(&[(0, 1), (1, 0), (1, 2), (1, 1)]).unwrap();
+        let m: Csr =
+            Csr::from_sorted_edges(&[(0, 1), (1, 0), (1, 2), (1, 1)]).unwrap();
         println!("{m:?}");
     }
 
     #[test]
     fn csr_from() {
-        let m: Csr =
-            Csr::from_sorted_edges(&[(0, 1), (0, 2), (1, 0), (1, 1), (2, 2), (2, 4)]).unwrap();
+        let m: Csr = Csr::from_sorted_edges(&[
+            (0, 1),
+            (0, 2),
+            (1, 0),
+            (1, 1),
+            (2, 2),
+            (2, 4),
+        ])
+        .unwrap();
         println!("{m:?}");
         assert_eq!(m.neighbors_slice(0), &[1, 2]);
         assert_eq!(m.neighbors_slice(1), &[0, 1]);
@@ -1154,8 +1265,10 @@ mod tests {
 
     #[test]
     fn test_edge_references() {
-        use crate::visit::EdgeRef;
-        use crate::visit::IntoEdgeReferences;
+        use crate::visit::{
+            EdgeRef,
+            IntoEdgeReferences,
+        };
         let m: Csr<(), _> = Csr::from_sorted_edges(&[
             (0, 1, 0.5),
             (0, 2, 2.),

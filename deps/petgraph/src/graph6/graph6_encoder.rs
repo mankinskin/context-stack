@@ -1,7 +1,10 @@
 //! [graph6 format](https://users.cecs.anu.edu.au/~bdm/data/formats.txt) encoder for undirected graphs.
 
 use alloc::{
-    string::{String, ToString},
+    string::{
+        String,
+        ToString,
+    },
     vec,
     vec::Vec,
 };
@@ -9,18 +12,28 @@ use alloc::{
 use crate::{
     csr::Csr,
     graph::IndexType,
-    visit::{GetAdjacencyMatrix, IntoNodeIdentifiers},
-    Graph, Undirected,
+    visit::{
+        GetAdjacencyMatrix,
+        IntoNodeIdentifiers,
+    },
+    Graph,
+    Undirected,
 };
 
 #[cfg(feature = "graphmap")]
-use crate::graphmap::{GraphMap, NodeTrait};
+use crate::graphmap::{
+    GraphMap,
+    NodeTrait,
+};
 
 #[cfg(feature = "graphmap")]
 use core::hash::BuildHasher;
 
 #[cfg(feature = "matrix_graph")]
-use crate::matrix_graph::{MatrixGraph, Nullable};
+use crate::matrix_graph::{
+    MatrixGraph,
+    Nullable,
+};
 
 #[cfg(feature = "stable_graph")]
 use crate::stable_graph::StableGraph;
@@ -38,7 +51,8 @@ pub fn get_graph6_representation<G>(graph: G) -> String
 where
     G: GetAdjacencyMatrix + IntoNodeIdentifiers,
 {
-    let (graph_order, mut upper_diagonal_as_bits) = get_adj_matrix_upper_diagonal_as_bits(graph);
+    let (graph_order, mut upper_diagonal_as_bits) =
+        get_adj_matrix_upper_diagonal_as_bits(graph);
     let mut graph_order_as_bits = get_graph_order_as_bits(graph_order);
 
     let mut graph_as_bits = vec![];
@@ -66,8 +80,11 @@ where
         node_ids_vec.push(node_id);
 
         for i in 1..=n {
-            let is_adjacent: bool =
-                graph.is_adjacent(&adj_matrix, node_ids_vec[i - 1], node_ids_vec[n]);
+            let is_adjacent: bool = graph.is_adjacent(
+                &adj_matrix,
+                node_ids_vec[i - 1],
+                node_ids_vec[n],
+            );
             bits.push(if is_adjacent { 1 } else { 0 });
         }
 
@@ -94,7 +111,10 @@ fn get_graph_order_as_bits(order: usize) -> Vec<usize> {
 }
 
 // Get binary representation of `n` as a vector of bits with `bits_length` length.
-fn get_number_as_bits(n: usize, bits_length: usize) -> Vec<usize> {
+fn get_number_as_bits(
+    n: usize,
+    bits_length: usize,
+) -> Vec<usize> {
     let mut bits = Vec::new();
     for i in (0..bits_length).rev() {
         bits.push((n >> i) & 1);
@@ -135,7 +155,9 @@ impl<N, E, Ix: IndexType> ToGraph6 for StableGraph<N, E, Undirected, Ix> {
 }
 
 #[cfg(feature = "graphmap")]
-impl<N: NodeTrait, E, S: BuildHasher> ToGraph6 for GraphMap<N, E, Undirected, S> {
+impl<N: NodeTrait, E, S: BuildHasher> ToGraph6
+    for GraphMap<N, E, Undirected, S>
+{
     fn graph6_string(&self) -> String {
         get_graph6_representation(self)
     }

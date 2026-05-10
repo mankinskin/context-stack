@@ -10,7 +10,10 @@ use petgraph::algo::greedy_feedback_arc_set;
 #[allow(dead_code)]
 mod common;
 
-use common::{directed_fan, tournament};
+use common::{
+    directed_fan,
+    tournament,
+};
 
 #[bench]
 fn greedy_fas_tournament_10_bench(bench: &mut Bencher) {

@@ -1,8 +1,21 @@
 //! Shortest Path Faster Algorithm.
-use super::{bellman_ford::Paths, BoundedMeasure, NegativeCycle};
-use crate::prelude::*;
-use crate::visit::{IntoEdges, IntoNodeIdentifiers, NodeIndexable};
-use alloc::{vec, vec::Vec};
+use super::{
+    bellman_ford::Paths,
+    BoundedMeasure,
+    NegativeCycle,
+};
+use crate::{
+    prelude::*,
+    visit::{
+        IntoEdges,
+        IntoNodeIdentifiers,
+        NodeIndexable,
+    },
+};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 
 /// Compute shortest paths from node `source` to all other.
 ///
@@ -99,7 +112,8 @@ where
     queue.push(source);
     in_queue[ix(source)] = true;
 
-    let (distances, predecessors) = spfa_loop(graph, dist, Some(pred), queue, in_queue, edge_cost)?;
+    let (distances, predecessors) =
+        spfa_loop(graph, dist, Some(pred), queue, in_queue, edge_cost)?;
 
     Ok(Paths {
         distances,

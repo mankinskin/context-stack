@@ -1,12 +1,27 @@
-use alloc::{collections::VecDeque, vec, vec::Vec};
+use alloc::{
+    collections::VecDeque,
+    vec,
+    vec::Vec,
+};
 use core::ops::Sub;
 
 use crate::{
-    algo::{EdgeRef, PositiveMeasure},
+    algo::{
+        EdgeRef,
+        PositiveMeasure,
+    },
     prelude::Direction,
     visit::{
-        Data, EdgeCount, EdgeIndexable, IntoEdgeReferences, IntoEdges, IntoEdgesDirected,
-        NodeCount, NodeIndexable, VisitMap, Visitable,
+        Data,
+        EdgeCount,
+        EdgeIndexable,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoEdgesDirected,
+        NodeCount,
+        NodeIndexable,
+        VisitMap,
+        Visitable,
     },
 };
 
@@ -76,7 +91,12 @@ pub fn dinics<G>(
     destination: G::NodeId,
 ) -> (G::EdgeWeight, Vec<G::EdgeWeight>)
 where
-    G: NodeCount + EdgeCount + IntoEdgesDirected + EdgeIndexable + NodeIndexable + Visitable,
+    G: NodeCount
+        + EdgeCount
+        + IntoEdgesDirected
+        + EdgeIndexable
+        + NodeIndexable
+        + Visitable,
     G::EdgeWeight: Sub<Output = G::EdgeWeight> + PositiveMeasure,
 {
     let mut max_flow = G::EdgeWeight::zero();
@@ -85,7 +105,14 @@ where
     let mut level_edges = vec![Default::default(); network.node_bound()];
 
     let dest_index = NodeIndexable::to_index(&network, destination);
-    while build_level_graph(&network, source, destination, &flows, &mut level_edges)[dest_index] > 0
+    while build_level_graph(
+        &network,
+        source,
+        destination,
+        &flows,
+        &mut level_edges,
+    )[dest_index]
+        > 0
     {
         let flow_increase = find_blocking_flow(
             network,
@@ -135,18 +162,26 @@ where
         for edge in out_edges.chain(in_edges) {
             let next_vertex = other_endpoint(&network, edge, vertex);
             let edge_index = EdgeIndexable::to_index(&network, edge.id());
-            let residual_cap = residual_capacity(&network, edge, next_vertex, flows[edge_index]);
+            let residual_cap = residual_capacity(
+                &network,
+                edge,
+                next_vertex,
+                flows[edge_index],
+            );
             if residual_cap == G::EdgeWeight::zero() {
                 continue;
             }
-            let next_vertex_index = NodeIndexable::to_index(&network, next_vertex);
+            let next_vertex_index =
+                NodeIndexable::to_index(&network, next_vertex);
             if level_graph[next_vertex_index] == 0 {
                 level_graph[next_vertex_index] = level_graph[vertex_index] + 1;
                 level_edges[vertex_index].push(edge);
                 if next_vertex != destination {
                     bfs_queue.push_back(next_vertex);
                 }
-            } else if level_graph[next_vertex_index] == level_graph[vertex_index] + 1 {
+            } else if level_graph[next_vertex_index]
+                == level_graph[vertex_index] + 1
+            {
                 level_edges[vertex_index].push(edge);
             }
         }
@@ -187,19 +222,29 @@ where
 
         // Find the bottleneck capacity of the path
         let mut vertex = destination;
-        while let Some(edge) = edge_to[NodeIndexable::to_index(&network, vertex)] {
+        while let Some(edge) =
+            edge_to[NodeIndexable::to_index(&network, vertex)]
+        {
             let edge_index = EdgeIndexable::to_index(&network, edge.id());
-            let residual_capacity = residual_capacity(&network, edge, vertex, flows[edge_index]);
+            let residual_capacity =
+                residual_capacity(&network, edge, vertex, flows[edge_index]);
             path_flow = min::<G>(path_flow, residual_capacity);
             vertex = other_endpoint(&network, edge, vertex);
         }
 
         // Update the flow of each edge along the discovered path
         let mut vertex = destination;
-        while let Some(edge) = edge_to[NodeIndexable::to_index(&network, vertex)] {
+        while let Some(edge) =
+            edge_to[NodeIndexable::to_index(&network, vertex)]
+        {
             let edge_index = EdgeIndexable::to_index(&network, edge.id());
-            flows[edge_index] =
-                adjusted_residual_flow(&network, edge, vertex, flows[edge_index], path_flow);
+            flows[edge_index] = adjusted_residual_flow(
+                &network,
+                edge,
+                vertex,
+                flows[edge_index],
+                path_flow,
+            );
             vertex = other_endpoint(&network, edge, vertex);
         }
         flow_increase = flow_increase + path_flow;
@@ -239,15 +284,22 @@ where
             let edge = level_edges[vertex_index][curr_level_edges_i];
             let next_vertex = other_endpoint(&network, edge, vertex);
 
-            let edge_index: usize = EdgeIndexable::to_index(&network, edge.id());
-            let residual_cap = residual_capacity(&network, edge, next_vertex, flows[edge_index]);
+            let edge_index: usize =
+                EdgeIndexable::to_index(&network, edge.id());
+            let residual_cap = residual_capacity(
+                &network,
+                edge,
+                next_vertex,
+                flows[edge_index],
+            );
             if residual_cap == G::EdgeWeight::zero() {
                 level_edges[vertex_index].swap_remove(curr_level_edges_i);
                 continue;
             }
 
             if !visited.is_visited(&next_vertex) {
-                let next_vertex_index = NodeIndexable::to_index(&network, next_vertex);
+                let next_vertex_index =
+                    NodeIndexable::to_index(&network, next_vertex);
                 edge_to[next_vertex_index] = Some(edge);
                 if destination == next_vertex {
                     return true;
@@ -316,7 +368,10 @@ where
 /// Returns the minimum value between given `a` and `b`.
 /// Will panic if it tries to compare two elements that aren't comparable
 /// (i.e., given two elements `a` and `b`, neither `a >= b` nor `a < b`).
-fn min<G>(a: G::EdgeWeight, b: G::EdgeWeight) -> G::EdgeWeight
+fn min<G>(
+    a: G::EdgeWeight,
+    b: G::EdgeWeight,
+) -> G::EdgeWeight
 where
     G: Data,
     G::EdgeWeight: PartialOrd,
@@ -331,7 +386,11 @@ where
 }
 
 /// Gets the other endpoint of graph edge, if any, otherwise panics.
-fn other_endpoint<G>(network: G, edge: G::EdgeRef, vertex: G::NodeId) -> G::NodeId
+fn other_endpoint<G>(
+    network: G,
+    edge: G::EdgeRef,
+    vertex: G::NodeId,
+) -> G::NodeId
 where
     G: NodeIndexable + IntoEdgeReferences,
 {

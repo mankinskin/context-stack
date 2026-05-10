@@ -2,12 +2,19 @@ use fixedbitset::FixedBitSet;
 
 use super::EdgeType;
 
-use super::graph::{Graph, IndexType, NodeIndex};
+use super::graph::{
+    Graph,
+    IndexType,
+    NodeIndex,
+};
 #[cfg(feature = "stable_graph")]
 use crate::stable_graph::StableGraph;
 use crate::visit::EdgeRef;
 #[cfg(feature = "stable_graph")]
-use crate::visit::{IntoEdgeReferences, NodeIndexable};
+use crate::visit::{
+    IntoEdgeReferences,
+    NodeIndexable,
+};
 
 use super::visit::GetAdjacencyMatrix;
 
@@ -34,7 +41,12 @@ where
         matrix
     }
 
-    fn is_adjacent(&self, matrix: &FixedBitSet, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> bool {
+    fn is_adjacent(
+        &self,
+        matrix: &FixedBitSet,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> bool {
         let n = self.node_count();
         let index = n * a.index() + b.index();
         matrix.contains(index)
@@ -65,7 +77,12 @@ where
         matrix
     }
 
-    fn is_adjacent(&self, matrix: &FixedBitSet, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> bool {
+    fn is_adjacent(
+        &self,
+        matrix: &FixedBitSet,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> bool {
         let n = self.node_count();
         let index = n * a.index() + b.index();
         matrix.contains(index)

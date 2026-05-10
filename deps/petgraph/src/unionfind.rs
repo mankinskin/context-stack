@@ -1,7 +1,11 @@
 //! `UnionFind<K>` is a disjoint-set data structure.
 
 use super::graph::IndexType;
-use alloc::{collections::TryReserveError, vec, vec::Vec};
+use alloc::{
+    collections::TryReserveError,
+    vec,
+    vec::Vec,
+};
 use core::cmp::Ordering;
 
 /// `UnionFind<K>` is a disjoint-set data structure. It tracks set membership of *n* elements
@@ -37,13 +41,19 @@ impl<K> Default for UnionFind<K> {
 }
 
 #[inline]
-unsafe fn get_unchecked<K>(xs: &[K], index: usize) -> &K {
+unsafe fn get_unchecked<K>(
+    xs: &[K],
+    index: usize,
+) -> &K {
     debug_assert!(index < xs.len());
     xs.get_unchecked(index)
 }
 
 #[inline]
-unsafe fn get_unchecked_mut<K>(xs: &mut [K], index: usize) -> &mut K {
+unsafe fn get_unchecked_mut<K>(
+    xs: &mut [K],
+    index: usize,
+) -> &mut K {
     debug_assert!(index < xs.len());
     xs.get_unchecked_mut(index)
 }
@@ -96,12 +106,18 @@ where
     ///
     /// **Panics** if `x` is out of bounds.
     #[track_caller]
-    pub fn find(&self, x: K) -> K {
+    pub fn find(
+        &self,
+        x: K,
+    ) -> K {
         self.try_find(x).expect("The index is out of bounds")
     }
 
     /// Return the representative for `x` or `None` if `x` is out of bounds.
-    pub fn try_find(&self, mut x: K) -> Option<K> {
+    pub fn try_find(
+        &self,
+        mut x: K,
+    ) -> Option<K> {
         if x.index() >= self.len() {
             return None;
         }
@@ -125,7 +141,10 @@ where
     ///
     /// **Panics** if `x` is out of bounds.
     #[track_caller]
-    pub fn find_mut(&mut self, x: K) -> K {
+    pub fn find_mut(
+        &mut self,
+        x: K,
+    ) -> K {
         assert!(x.index() < self.len());
         unsafe { self.find_mut_recursive(x) }
     }
@@ -134,14 +153,20 @@ where
     ///
     /// Write back the found representative, flattening the internal
     /// datastructure in the process and quicken future lookups.
-    pub fn try_find_mut(&mut self, x: K) -> Option<K> {
+    pub fn try_find_mut(
+        &mut self,
+        x: K,
+    ) -> Option<K> {
         if x.index() >= self.len() {
             return None;
         }
         Some(unsafe { self.find_mut_recursive(x) })
     }
 
-    unsafe fn find_mut_recursive(&mut self, mut x: K) -> K {
+    unsafe fn find_mut_recursive(
+        &mut self,
+        mut x: K,
+    ) -> K {
         let mut parent = *get_unchecked(&self.parent, x.index());
         while parent != x {
             let grandparent = *get_unchecked(&self.parent, parent.index());
@@ -157,7 +182,11 @@ where
     ///
     /// **Panics** if `x` or `y` is out of bounds.
     #[track_caller]
-    pub fn equiv(&self, x: K, y: K) -> bool {
+    pub fn equiv(
+        &self,
+        x: K,
+        y: K,
+    ) -> bool {
         self.find(x) == self.find(y)
     }
 
@@ -165,7 +194,11 @@ where
     /// `Ok(false)` otherwise.
     ///
     /// If `x` or `y` are out of bounds, it returns `Err` with the first bad index found.
-    pub fn try_equiv(&self, x: K, y: K) -> Result<bool, K> {
+    pub fn try_equiv(
+        &self,
+        x: K,
+        y: K,
+    ) -> Result<bool, K> {
         let xrep = self.try_find(x).ok_or(x)?;
         let yrep = self.try_find(y).ok_or(y)?;
         Ok(xrep == yrep)
@@ -177,7 +210,11 @@ where
     ///
     /// **Panics** if `x` or `y` is out of bounds.
     #[track_caller]
-    pub fn union(&mut self, x: K, y: K) -> bool {
+    pub fn union(
+        &mut self,
+        x: K,
+        y: K,
+    ) -> bool {
         self.try_union(x, y).unwrap()
     }
 
@@ -187,7 +224,11 @@ where
     ///
     /// If `x` or `y` are out of bounds, it returns `Err` with first found bad index.
     /// But if `x == y`, the result will be `Ok(false)` even if the indexes go out of bounds.
-    pub fn try_union(&mut self, x: K, y: K) -> Result<bool, K> {
+    pub fn try_union(
+        &mut self,
+        x: K,
+        y: K,
+    ) -> Result<bool, K> {
         if x == y {
             return Ok(false);
         }
@@ -211,7 +252,7 @@ where
             Ordering::Equal => {
                 self.parent[yrepu] = xrep;
                 self.rank[xrepu] += 1;
-            }
+            },
         }
         Ok(true)
     }
@@ -277,7 +318,10 @@ impl<K> UnionFind<K> {
     /// assert!(uf.capacity() >= 13);
     /// ```
     #[inline]
-    pub fn reserve(&mut self, additional: usize) {
+    pub fn reserve(
+        &mut self,
+        additional: usize,
+    ) {
         self.parent.reserve(additional);
         self.rank.reserve(additional);
     }
@@ -309,7 +353,10 @@ impl<K> UnionFind<K> {
     /// assert!(uf.capacity() >= 10);
     /// ```
     #[inline]
-    pub fn reserve_exact(&mut self, additional: usize) {
+    pub fn reserve_exact(
+        &mut self,
+        additional: usize,
+    ) {
         self.parent.reserve_exact(additional);
         self.rank.reserve_exact(additional);
     }
@@ -326,7 +373,10 @@ impl<K> UnionFind<K> {
     /// If the capacity overflows, or the allocator reports a failure, then an error
     /// is returned.
     #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
+    pub fn try_reserve(
+        &mut self,
+        additional: usize,
+    ) -> Result<(), TryReserveError> {
         self.parent
             .try_reserve(additional)
             .and_then(|_| self.rank.try_reserve(additional))
@@ -350,7 +400,10 @@ impl<K> UnionFind<K> {
     /// If the capacity overflows, or the allocator reports a failure, then an error
     /// is returned.
     #[inline]
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), TryReserveError> {
+    pub fn try_reserve_exact(
+        &mut self,
+        additional: usize,
+    ) -> Result<(), TryReserveError> {
         self.parent
             .try_reserve_exact(additional)
             .and_then(|_| self.rank.try_reserve_exact(additional))
@@ -410,7 +463,10 @@ impl<K> UnionFind<K> {
     /// assert!(uf.capacity() >= 3);
     /// ```
     #[inline]
-    pub fn shrink_to(&mut self, min_capacity: usize) {
+    pub fn shrink_to(
+        &mut self,
+        min_capacity: usize,
+    ) {
         self.parent.shrink_to(min_capacity);
         self.rank.shrink_to(min_capacity);
     }

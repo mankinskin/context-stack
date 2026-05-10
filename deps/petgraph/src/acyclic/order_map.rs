@@ -3,12 +3,28 @@
 //!
 //! This data structure is an implementation detail and is not exposed in the
 //! public API.
-use alloc::{collections::BTreeMap, vec, vec::Vec};
-use core::{fmt, ops::RangeBounds};
+use alloc::{
+    collections::BTreeMap,
+    vec,
+    vec::Vec,
+};
+use core::{
+    fmt,
+    ops::RangeBounds,
+};
 
 use crate::{
-    algo::{toposort, Cycle},
-    visit::{GraphBase, IntoNeighborsDirected, IntoNodeIdentifiers, NodeIndexable, Visitable},
+    algo::{
+        toposort,
+        Cycle,
+    },
+    visit::{
+        GraphBase,
+        IntoNeighborsDirected,
+        IntoNodeIdentifiers,
+        NodeIndexable,
+        Visitable,
+    },
 };
 
 /// A position in the topological order of the graph.
@@ -47,7 +63,10 @@ impl<N> Default for OrderMap<N> {
 }
 
 impl<N: fmt::Debug> fmt::Debug for OrderMap<N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         f.debug_struct("OrderMap")
             .field("order", &self.pos_to_node)
             .finish()
@@ -57,14 +76,18 @@ impl<N: fmt::Debug> fmt::Debug for OrderMap<N> {
 impl<N: Copy> OrderMap<N> {
     pub(super) fn try_from_graph<G>(graph: G) -> Result<Self, Cycle<G::NodeId>>
     where
-        G: NodeIndexable<NodeId = N> + IntoNeighborsDirected + IntoNodeIdentifiers + Visitable,
+        G: NodeIndexable<NodeId = N>
+            + IntoNeighborsDirected
+            + IntoNodeIdentifiers
+            + Visitable,
     {
         // Compute the topological order.
         let topo_vec = toposort(graph, None)?;
 
         // Create the two map directions.
         let mut pos_to_node = BTreeMap::new();
-        let mut node_to_pos = vec![TopologicalPosition::default(); graph.node_bound()];
+        let mut node_to_pos =
+            vec![TopologicalPosition::default(); graph.node_bound()];
 
         // Populate the maps.
         for (i, &id) in topo_vec.iter().enumerate() {
@@ -101,7 +124,10 @@ impl<N: Copy> OrderMap<N> {
     }
 
     /// Map a position in the topological order to a node, if it exists.
-    pub(super) fn at_position(&self, pos: TopologicalPosition) -> Option<N> {
+    pub(super) fn at_position(
+        &self,
+        pos: TopologicalPosition,
+    ) -> Option<N> {
         self.pos_to_node.get(&pos).copied()
     }
 
@@ -152,7 +178,11 @@ impl<N: Copy> OrderMap<N> {
     ///
     /// Panics if the node index is out of bounds.
     #[track_caller]
-    pub(super) fn remove_node(&mut self, id: N, graph: impl NodeIndexable<NodeId = N>) {
+    pub(super) fn remove_node(
+        &mut self,
+        id: N,
+        graph: impl NodeIndexable<NodeId = N>,
+    ) {
         let idx = graph.to_index(id);
         assert!(idx < self.node_to_pos.len());
 
@@ -184,7 +214,10 @@ impl<G: Visitable> super::Acyclic<G> {
     ///
     /// Panics if the node index is out of bounds.
     #[track_caller]
-    pub fn get_position<'a>(&'a self, id: G::NodeId) -> TopologicalPosition
+    pub fn get_position<'a>(
+        &'a self,
+        id: G::NodeId,
+    ) -> TopologicalPosition
     where
         &'a G: NodeIndexable + GraphBase<NodeId = G::NodeId>,
     {
@@ -192,7 +225,10 @@ impl<G: Visitable> super::Acyclic<G> {
     }
 
     /// Get the node at a given position in the topological sort, if it exists.
-    pub fn at_position(&self, pos: TopologicalPosition) -> Option<G::NodeId> {
+    pub fn at_position(
+        &self,
+        pos: TopologicalPosition,
+    ) -> Option<G::NodeId> {
         self.order_map.at_position(pos)
     }
 }

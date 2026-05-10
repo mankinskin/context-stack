@@ -1,10 +1,24 @@
-use alloc::{collections::BinaryHeap, vec};
+use alloc::{
+    collections::BinaryHeap,
+    vec,
+};
 use core::hash::Hash;
 
-use hashbrown::{HashMap, HashSet};
+use hashbrown::{
+    HashMap,
+    HashSet,
+};
 
-use crate::scored::MaxScored;
-use crate::visit::{IntoEdges, IntoNodeIdentifiers, NodeIndexable, VisitMap, Visitable};
+use crate::{
+    scored::MaxScored,
+    visit::{
+        IntoEdges,
+        IntoNodeIdentifiers,
+        NodeIndexable,
+        VisitMap,
+        Visitable,
+    },
+};
 
 /// [DStatur algorithm][1] to properly color a non weighted undirected graph.
 ///
@@ -99,7 +113,10 @@ where
         for nbor in graph.neighbors(node) {
             if let Some(adj_color) = adj_color_map.get_mut(ix(nbor)) {
                 adj_color.insert(color);
-                queue.push(MaxScored((adj_color.len(), degree_map[ix(nbor)]), nbor));
+                queue.push(MaxScored(
+                    (adj_color.len(), degree_map[ix(nbor)]),
+                    nbor,
+                ));
             }
         }
     }

@@ -1,6 +1,13 @@
 use core::ops::Deref;
-use petgraph::{graph::DiGraph, graphmap::NodeTrait};
-use quickcheck::{Arbitrary, Gen, StdGen};
+use petgraph::{
+    graph::DiGraph,
+    graphmap::NodeTrait,
+};
+use quickcheck::{
+    Arbitrary,
+    Gen,
+    StdGen,
+};
 
 #[derive(Copy, Clone, Debug)]
 /// quickcheck Arbitrary adaptor - half the size of `T` on average
@@ -55,7 +62,8 @@ where
                 if i >= j {
                     continue;
                 }
-                let (source, target) = if bool::arbitrary(g) { (i, j) } else { (j, i) };
+                let (source, target) =
+                    if bool::arbitrary(g) { (i, j) } else { (j, i) };
                 gr.add_edge(source, target, E::arbitrary(g));
             }
         }

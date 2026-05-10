@@ -1,7 +1,15 @@
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 
 use super::UnitMeasure;
-use crate::visit::{EdgeRef, IntoEdges, NodeCount, NodeIndexable};
+use crate::visit::{
+    EdgeRef,
+    IntoEdges,
+    NodeCount,
+    NodeIndexable,
+};
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -60,7 +68,11 @@ use rayon::prelude::*;
 /// assert_eq!(expected_ranks, output_ranks);
 /// ```
 #[track_caller]
-pub fn page_rank<G, D>(graph: G, damping_factor: D, nb_iter: usize) -> Vec<D>
+pub fn page_rank<G, D>(
+    graph: G,
+    damping_factor: D,
+    nb_iter: usize,
+) -> Vec<D>
 where
     G: NodeCount + IntoEdges + NodeIndexable,
     D: UnitMeasure + Copy,
@@ -107,7 +119,11 @@ where
 }
 
 #[allow(dead_code)]
-fn out_edges_info<G, D>(graph: G, index_w: usize, index_v: usize) -> (D, bool)
+fn out_edges_info<G, D>(
+    graph: G,
+    index_w: usize,
+    index_v: usize,
+) -> (D, bool)
 where
     G: NodeCount + IntoEdges + NodeIndexable + core::marker::Sync,
     D: UnitMeasure + Copy + core::marker::Send + core::marker::Sync,
@@ -166,7 +182,8 @@ where
                     .iter()
                     .enumerate()
                     .map(|(w, r)| {
-                        let (out_deg, w_points_to_v) = out_edges_info(graph, w, v);
+                        let (out_deg, w_points_to_v) =
+                            out_edges_info(graph, w, v);
                         if w_points_to_v {
                             damping_factor * *r / out_deg
                         } else if out_deg == D::zero() {

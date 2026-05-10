@@ -7,9 +7,22 @@ use crate::{
     data::DataMap,
     prelude::*,
     visit::{
-        Data, EdgeIndexable, GraphBase, GraphProp, IntoEdgeReferences, IntoEdges,
-        IntoEdgesDirected, IntoNeighbors, IntoNeighborsDirected, IntoNodeIdentifiers,
-        IntoNodeReferences, NodeCompactIndexable, NodeCount, NodeIndexable, NodeRef, VisitMap,
+        Data,
+        EdgeIndexable,
+        GraphBase,
+        GraphProp,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoEdgesDirected,
+        IntoNeighbors,
+        IntoNeighborsDirected,
+        IntoNodeIdentifiers,
+        IntoNodeReferences,
+        NodeCompactIndexable,
+        NodeCount,
+        NodeIndexable,
+        NodeRef,
+        VisitMap,
         Visitable,
     },
 };
@@ -17,14 +30,20 @@ use crate::{
 /// A graph filter for nodes.
 pub trait FilterNode<N> {
     /// Return true to have the node be part of the graph
-    fn include_node(&self, node: N) -> bool;
+    fn include_node(
+        &self,
+        node: N,
+    ) -> bool;
 }
 
 impl<F, N> FilterNode<N> for F
 where
     F: Fn(N) -> bool,
 {
-    fn include_node(&self, n: N) -> bool {
+    fn include_node(
+        &self,
+        n: N,
+    ) -> bool {
         (*self)(n)
     }
 }
@@ -34,7 +53,10 @@ impl<N> FilterNode<N> for FixedBitSet
 where
     FixedBitSet: VisitMap<N>,
 {
-    fn include_node(&self, n: N) -> bool {
+    fn include_node(
+        &self,
+        n: N,
+    ) -> bool {
         self.is_visited(&n)
     }
 }
@@ -44,7 +66,10 @@ impl<N, S> FilterNode<N> for HashSet<N, S>
 where
     HashSet<N, S>: VisitMap<N>,
 {
-    fn include_node(&self, n: N) -> bool {
+    fn include_node(
+        &self,
+        n: N,
+    ) -> bool {
         self.is_visited(&n)
     }
 }
@@ -55,7 +80,10 @@ impl<N> FilterNode<N> for &FixedBitSet
 where
     FixedBitSet: VisitMap<N>,
 {
-    fn include_node(&self, n: N) -> bool {
+    fn include_node(
+        &self,
+        n: N,
+    ) -> bool {
         self.is_visited(&n)
     }
 }
@@ -64,7 +92,10 @@ impl<N, S> FilterNode<N> for &HashSet<N, S>
 where
     HashSet<N, S>: VisitMap<N>,
 {
-    fn include_node(&self, n: N) -> bool {
+    fn include_node(
+        &self,
+        n: N,
+    ) -> bool {
         self.is_visited(&n)
     }
 }
@@ -79,7 +110,10 @@ where
     F: Fn(G::NodeId) -> bool,
 {
     /// Create an `NodeFiltered` adaptor from the closure `filter`.
-    pub fn from_fn(graph: G, filter: F) -> Self {
+    pub fn from_fn(
+        graph: G,
+        filter: F,
+    ) -> Self {
         NodeFiltered(graph, filter)
     }
 }
@@ -98,7 +132,10 @@ where
     F: FilterNode<G::NodeId>,
 {
     type Neighbors = NodeFilteredNeighbors<'a, G::Neighbors, F>;
-    fn neighbors(self, n: G::NodeId) -> Self::Neighbors {
+    fn neighbors(
+        self,
+        n: G::NodeId,
+    ) -> Self::Neighbors {
         NodeFilteredNeighbors {
             include_source: self.1.include_node(n),
             iter: self.0.neighbors(n),
@@ -142,7 +179,11 @@ where
     F: FilterNode<G::NodeId>,
 {
     type NeighborsDirected = NodeFilteredNeighbors<'a, G::NeighborsDirected, F>;
-    fn neighbors_directed(self, n: G::NodeId, dir: Direction) -> Self::NeighborsDirected {
+    fn neighbors_directed(
+        self,
+        n: G::NodeId,
+        dir: Direction,
+    ) -> Self::NeighborsDirected {
         NodeFilteredNeighbors {
             include_source: self.1.include_node(n),
             iter: self.0.neighbors_directed(n, dir),
@@ -217,7 +258,8 @@ where
     F: FilterNode<G::NodeId>,
 {
     type EdgeRef = G::EdgeRef;
-    type EdgeReferences = NodeFilteredEdgeReferences<'a, G, G::EdgeReferences, F>;
+    type EdgeReferences =
+        NodeFilteredEdgeReferences<'a, G, G::EdgeReferences, F>;
     fn edge_references(self) -> Self::EdgeReferences {
         NodeFilteredEdgeReferences {
             graph: PhantomData,
@@ -244,8 +286,9 @@ where
     type Item = I::Item;
     fn next(&mut self) -> Option<Self::Item> {
         let f = self.f;
-        self.iter
-            .find(move |&edge| f.include_node(edge.source()) && f.include_node(edge.target()))
+        self.iter.find(move |&edge| {
+            f.include_node(edge.source()) && f.include_node(edge.target())
+        })
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (_, upper) = self.iter.size_hint();
@@ -259,7 +302,10 @@ where
     F: FilterNode<G::NodeId>,
 {
     type Edges = NodeFilteredEdges<'a, G, G::Edges, F>;
-    fn edges(self, a: G::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        a: G::NodeId,
+    ) -> Self::Edges {
         NodeFilteredEdges {
             graph: PhantomData,
             include_source: self.1.include_node(a),
@@ -276,7 +322,11 @@ where
     F: FilterNode<G::NodeId>,
 {
     type EdgesDirected = NodeFilteredEdges<'a, G, G::EdgesDirected, F>;
-    fn edges_directed(self, a: G::NodeId, dir: Direction) -> Self::EdgesDirected {
+    fn edges_directed(
+        self,
+        a: G::NodeId,
+        dir: Direction,
+    ) -> Self::EdgesDirected {
         NodeFilteredEdges {
             graph: PhantomData,
             include_source: self.1.include_node(a),
@@ -329,7 +379,10 @@ where
     G: DataMap,
     F: FilterNode<G::NodeId>,
 {
-    fn node_weight(&self, id: Self::NodeId) -> Option<&Self::NodeWeight> {
+    fn node_weight(
+        &self,
+        id: Self::NodeId,
+    ) -> Option<&Self::NodeWeight> {
         if self.1.include_node(id) {
             self.0.node_weight(id)
         } else {
@@ -337,7 +390,10 @@ where
         }
     }
 
-    fn edge_weight(&self, id: Self::EdgeId) -> Option<&Self::EdgeWeight> {
+    fn edge_weight(
+        &self,
+        id: Self::EdgeId,
+    ) -> Option<&Self::EdgeWeight> {
         self.0.edge_weight(id)
     }
 }
@@ -357,14 +413,20 @@ Visitable! {delegate_impl [[G, F], G, NodeFiltered<G, F>, access0]}
 /// A graph filter for edges
 pub trait FilterEdge<Edge> {
     /// Return true to have the edge be part of the graph
-    fn include_edge(&self, edge: Edge) -> bool;
+    fn include_edge(
+        &self,
+        edge: Edge,
+    ) -> bool;
 }
 
 impl<F, N> FilterEdge<N> for F
 where
     F: Fn(N) -> bool,
 {
-    fn include_edge(&self, n: N) -> bool {
+    fn include_edge(
+        &self,
+        n: N,
+    ) -> bool {
         (*self)(n)
     }
 }
@@ -386,7 +448,10 @@ where
     F: Fn(G::EdgeRef) -> bool,
 {
     /// Create an `EdgeFiltered` adaptor from the closure `filter`.
-    pub fn from_fn(graph: G, filter: F) -> Self {
+    pub fn from_fn(
+        graph: G,
+        filter: F,
+    ) -> Self {
         EdgeFiltered(graph, filter)
     }
 }
@@ -405,7 +470,10 @@ where
     F: FilterEdge<G::EdgeRef>,
 {
     type Neighbors = EdgeFilteredNeighbors<'a, G, F>;
-    fn neighbors(self, n: G::NodeId) -> Self::Neighbors {
+    fn neighbors(
+        self,
+        n: G::NodeId,
+    ) -> Self::Neighbors {
         EdgeFilteredNeighbors {
             iter: self.0.edges(n),
             f: &self.1,
@@ -419,7 +487,11 @@ where
     F: FilterEdge<G::EdgeRef>,
 {
     type NeighborsDirected = EdgeFilteredNeighborsDirected<'a, G, F>;
-    fn neighbors_directed(self, n: G::NodeId, dir: Direction) -> Self::NeighborsDirected {
+    fn neighbors_directed(
+        self,
+        n: G::NodeId,
+        dir: Direction,
+    ) -> Self::NeighborsDirected {
         EdgeFilteredNeighborsDirected {
             iter: self.0.edges_directed(n, dir),
             f: &self.1,
@@ -484,7 +556,10 @@ where
     F: FilterEdge<G::EdgeRef>,
 {
     type Edges = EdgeFilteredEdges<'a, G, G::Edges, F>;
-    fn edges(self, n: G::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        n: G::NodeId,
+    ) -> Self::Edges {
         EdgeFilteredEdges {
             graph: PhantomData,
             iter: self.0.edges(n),
@@ -500,7 +575,11 @@ where
 {
     type EdgesDirected = EdgeFilteredEdges<'a, G, G::EdgesDirected, F>;
 
-    fn edges_directed(self, n: G::NodeId, dir: Direction) -> Self::EdgesDirected {
+    fn edges_directed(
+        self,
+        n: G::NodeId,
+        dir: Direction,
+    ) -> Self::EdgesDirected {
         EdgeFilteredEdges {
             graph: PhantomData,
             iter: self.0.edges_directed(n, dir),

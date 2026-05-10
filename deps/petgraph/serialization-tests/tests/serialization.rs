@@ -8,27 +8,42 @@ extern crate serde_json;
 #[macro_use]
 extern crate defmac;
 
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::iter::FromIterator;
+use std::{
+    collections::HashSet,
+    fmt::Debug,
+    iter::FromIterator,
+};
 
-use itertools::assert_equal;
-use itertools::{repeat_n, Itertools};
+use itertools::{
+    assert_equal,
+    repeat_n,
+    Itertools,
+};
 
-use petgraph::graph::{edge_index, node_index, IndexType};
-use petgraph::prelude::*;
-use petgraph::visit::EdgeRef;
-use petgraph::visit::IntoEdgeReferences;
-use petgraph::visit::NodeIndexable;
-use petgraph::EdgeType;
+use petgraph::{
+    graph::{
+        edge_index,
+        node_index,
+        IndexType,
+    },
+    prelude::*,
+    visit::{
+        EdgeRef,
+        IntoEdgeReferences,
+        NodeIndexable,
+    },
+    EdgeType,
+};
 
 // graphs are the equal, down to graph indices
 // this is a strict notion of graph equivalence:
 //
 // * Requires equal node and edge indices, equal weights
 // * Does not require: edge for node order
-pub fn assert_graph_eq<N, N2, E, Ty, Ix>(g: &Graph<N, E, Ty, Ix>, h: &Graph<N2, E, Ty, Ix>)
-where
+pub fn assert_graph_eq<N, N2, E, Ty, Ix>(
+    g: &Graph<N, E, Ty, Ix>,
+    h: &Graph<N2, E, Ty, Ix>,
+) where
     N: PartialEq<N2> + Debug,
     N2: PartialEq<N2> + Debug,
     E: PartialEq + Debug,
@@ -60,8 +75,10 @@ where
         let outgoing1 = <HashSet<_>>::from_iter(g.neighbors(index));
         let outgoing2 = <HashSet<_>>::from_iter(h.neighbors(index));
         assert_eq!(outgoing1, outgoing2);
-        let incoming1 = <HashSet<_>>::from_iter(g.neighbors_directed(index, Incoming));
-        let incoming2 = <HashSet<_>>::from_iter(h.neighbors_directed(index, Incoming));
+        let incoming1 =
+            <HashSet<_>>::from_iter(g.neighbors_directed(index, Incoming));
+        let incoming2 =
+            <HashSet<_>>::from_iter(h.neighbors_directed(index, Incoming));
         assert_eq!(incoming1, incoming2);
     }
 }
@@ -71,8 +88,10 @@ where
 //
 // * Requires equal node and edge indices, equal weights
 // * Does not require: edge for node order
-pub fn assert_stable_graph_eq<N, E>(g: &StableGraph<N, E>, h: &StableGraph<N, E>)
-where
+pub fn assert_stable_graph_eq<N, E>(
+    g: &StableGraph<N, E>,
+    h: &StableGraph<N, E>,
+) where
     N: PartialEq + Debug,
     E: PartialEq + Debug,
 {
@@ -109,8 +128,10 @@ where
         let outgoing1 = <HashSet<_>>::from_iter(g.neighbors(index));
         let outgoing2 = <HashSet<_>>::from_iter(h.neighbors(index));
         assert_eq!(outgoing1, outgoing2);
-        let incoming1 = <HashSet<_>>::from_iter(g.neighbors_directed(index, Incoming));
-        let incoming2 = <HashSet<_>>::from_iter(h.neighbors_directed(index, Incoming));
+        let incoming1 =
+            <HashSet<_>>::from_iter(g.neighbors_directed(index, Incoming));
+        let incoming2 =
+            <HashSet<_>>::from_iter(h.neighbors_directed(index, Incoming));
         assert_eq!(incoming1, incoming2);
     }
 }
@@ -149,9 +170,12 @@ where
     Ix: IndexType,
 {
     let mut g = StableGraph::default();
-    let indices: Vec<_> = (0..1024).map(|i| g.add_node(format!("{}", i))).collect();
+    let indices: Vec<_> =
+        (0..1024).map(|i| g.add_node(format!("{}", i))).collect();
     for i in 1..256 {
-        g.extend_with_edges((0..1024).map(|j| (indices[j], indices[(j + i) % 1024], i as i32)));
+        g.extend_with_edges(
+            (0..1024).map(|j| (indices[j], indices[(j + i) % 1024], i as i32)),
+        );
     }
     // Remove nodes to make the structure a bit more interesting
     for i in (0..1024).step_by(10) {
@@ -531,30 +555,44 @@ fn json_graphmap_integer() {
 
 #[test]
 fn json_graphmap_struct() {
-    use serde_derive::{Deserialize, Serialize};
+    use serde_derive::{
+        Deserialize,
+        Serialize,
+    };
 
-    #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    #[derive(
+        Clone,
+        Copy,
+        Hash,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        Serialize,
+        Deserialize,
+    )]
     struct TestingNode {
         pub a: u32,
         pub b: i32,
     }
-    let mut gr: GraphMap<TestingNode, (u8, f32), Undirected> = GraphMap::from_edges(&[
-        (
-            TestingNode { a: 42, b: -1 },
-            TestingNode { a: 12, b: -2 },
-            (1, 2.),
-        ),
-        (
-            TestingNode { a: 12, b: -2 },
-            TestingNode { a: 13, b: -3 },
-            (99, 99.),
-        ),
-        (
-            TestingNode { a: 13, b: -3 },
-            TestingNode { a: 42, b: -1 },
-            (99, 98.),
-        ),
-    ]);
+    let mut gr: GraphMap<TestingNode, (u8, f32), Undirected> =
+        GraphMap::from_edges(&[
+            (
+                TestingNode { a: 42, b: -1 },
+                TestingNode { a: 12, b: -2 },
+                (1, 2.),
+            ),
+            (
+                TestingNode { a: 12, b: -2 },
+                TestingNode { a: 13, b: -3 },
+                (99, 99.),
+            ),
+            (
+                TestingNode { a: 13, b: -3 },
+                TestingNode { a: 42, b: -1 },
+                (99, 98.),
+            ),
+        ]);
     gr.add_node(TestingNode { a: 0, b: 0 });
 
     let gr_deser: GraphMap<TestingNode, (u8, f32), Undirected> = rejson!(&gr);

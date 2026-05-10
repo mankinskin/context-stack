@@ -1,15 +1,25 @@
 extern crate petgraph;
 
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::prelude::*;
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::prelude::*,
+};
 
-use petgraph::graph::{edge_index, node_index};
-use petgraph::prelude::*;
-use petgraph::EdgeType;
+use petgraph::{
+    graph::{
+        edge_index,
+        node_index,
+    },
+    prelude::*,
+    EdgeType,
+};
 
 use petgraph::algo::{
-    is_isomorphic, is_isomorphic_matching, is_isomorphic_subgraph, subgraph_isomorphisms_iter,
+    is_isomorphic,
+    is_isomorphic_matching,
+    is_isomorphic_subgraph,
+    subgraph_isomorphisms_iter,
 };
 
 /// Petersen A and B are isomorphic
@@ -208,7 +218,8 @@ fn parse_graph<Ty: EdgeType>(s: &str) -> Graph<(), (), Ty> {
     let s = s.trim();
     let lines = s.lines().filter(|l| !l.is_empty());
     for (row, line) in lines.enumerate() {
-        for (col, word) in line.split(' ').filter(|s| !s.is_empty()).enumerate() {
+        for (col, word) in line.split(' ').filter(|s| !s.is_empty()).enumerate()
+        {
             let has_edge = word.parse::<i32>().unwrap();
             assert!(has_edge == 0 || has_edge == 1);
             if has_edge == 0 {
@@ -445,7 +456,12 @@ fn iso2() {
 
 #[test]
 fn iso_matching() {
-    let g0 = Graph::<(), _>::from_edges([(0, 0, 1), (0, 1, 2), (0, 2, 3), (1, 2, 4)]);
+    let g0 = Graph::<(), _>::from_edges([
+        (0, 0, 1),
+        (0, 1, 2),
+        (0, 2, 3),
+        (1, 2, 4),
+    ]);
 
     let mut g1 = g0.clone();
     g1[edge_index(0)] = 0;
@@ -485,9 +501,23 @@ fn iso_large() {
 #[should_panic]
 #[test]
 fn iso_multigraph_failure() {
-    let g0 = Graph::<(), ()>::from_edges([(0, 0), (0, 0), (0, 1), (1, 1), (1, 1), (1, 0)]);
+    let g0 = Graph::<(), ()>::from_edges([
+        (0, 0),
+        (0, 0),
+        (0, 1),
+        (1, 1),
+        (1, 1),
+        (1, 0),
+    ]);
 
-    let g1 = Graph::<(), ()>::from_edges([(0, 0), (0, 1), (0, 1), (1, 1), (1, 0), (1, 0)]);
+    let g1 = Graph::<(), ()>::from_edges([
+        (0, 0),
+        (0, 1),
+        (0, 1),
+        (1, 1),
+        (1, 0),
+        (1, 0),
+    ]);
     assert!(!is_isomorphic(&g0, &g1));
 }
 
@@ -495,7 +525,8 @@ fn iso_multigraph_failure() {
 #[cfg_attr(miri, ignore = "Takes too long to run in Miri")]
 fn iso_subgraph() {
     let g0 = Graph::<(), ()>::from_edges([(0, 1), (1, 2), (2, 0)]);
-    let g1 = Graph::<(), ()>::from_edges([(0, 1), (1, 2), (2, 0), (2, 3), (0, 4)]);
+    let g1 =
+        Graph::<(), ()>::from_edges([(0, 1), (1, 2), (2, 0), (2, 3), (0, 4)]);
     assert!(!is_isomorphic(&g0, &g1));
     assert!(is_isomorphic_subgraph(&g0, &g1));
 }
@@ -509,8 +540,13 @@ fn iter_subgraph_empty() {
     let b_ref = &b;
     let mut node_match = { |x: &(), y: &()| x == y };
     let mut edge_match = { |x: &(), y: &()| x == y };
-    let mut mappings =
-        subgraph_isomorphisms_iter(&a_ref, &b_ref, &mut node_match, &mut edge_match).unwrap();
+    let mut mappings = subgraph_isomorphisms_iter(
+        &a_ref,
+        &b_ref,
+        &mut node_match,
+        &mut edge_match,
+    )
+    .unwrap();
     assert_eq!(mappings.next(), Some(vec![]));
     assert_eq!(mappings.next(), None);
 }
@@ -519,17 +555,24 @@ fn iter_subgraph_empty() {
 #[cfg_attr(miri, ignore = "Takes too long to run in Miri")]
 fn iter_subgraph() {
     let a = Graph::<(), ()>::from_edges([(0, 1), (1, 2), (2, 0)]);
-    let b = Graph::<(), ()>::from_edges([(0, 1), (1, 2), (2, 0), (2, 3), (0, 4)]);
+    let b =
+        Graph::<(), ()>::from_edges([(0, 1), (1, 2), (2, 0), (2, 3), (0, 4)]);
     let a_ref = &a;
     let b_ref = &b;
     let mut node_match = { |x: &(), y: &()| x == y };
     let mut edge_match = { |x: &(), y: &()| x == y };
 
-    let mappings =
-        subgraph_isomorphisms_iter(&a_ref, &b_ref, &mut node_match, &mut edge_match).unwrap();
+    let mappings = subgraph_isomorphisms_iter(
+        &a_ref,
+        &b_ref,
+        &mut node_match,
+        &mut edge_match,
+    )
+    .unwrap();
 
     // Verify the iterator returns the expected mappings
-    let expected_mappings: Vec<Vec<usize>> = vec![vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]];
+    let expected_mappings: Vec<Vec<usize>> =
+        vec![vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]];
     for mapping in mappings {
         assert!(expected_mappings.contains(&mapping))
     }
@@ -541,11 +584,14 @@ fn iter_subgraph() {
     let b_ref = &b;
 
     let mut unique = HashSet::new();
-    assert!(
-        subgraph_isomorphisms_iter(&a_ref, &b_ref, &mut node_match, &mut edge_match)
-            .unwrap()
-            .all(|x| unique.insert(x))
-    );
+    assert!(subgraph_isomorphisms_iter(
+        &a_ref,
+        &b_ref,
+        &mut node_match,
+        &mut edge_match
+    )
+    .unwrap()
+    .all(|x| unique.insert(x)));
 
     // The iterator should return None for graphs that are not isomorphic
     let a = str_to_digraph(G8_1);
@@ -553,12 +599,15 @@ fn iter_subgraph() {
     let a_ref = &a;
     let b_ref = &b;
 
-    assert!(
-        subgraph_isomorphisms_iter(&a_ref, &b_ref, &mut node_match, &mut edge_match)
-            .unwrap()
-            .next()
-            .is_none()
-    );
+    assert!(subgraph_isomorphisms_iter(
+        &a_ref,
+        &b_ref,
+        &mut node_match,
+        &mut edge_match
+    )
+    .unwrap()
+    .next()
+    .is_none());
 
     // https://github.com/petgraph/petgraph/issues/534
     let mut g = Graph::<String, ()>::new();
@@ -578,9 +627,14 @@ fn iter_subgraph() {
     let mut node_match = { |x: &String, y: &String| x == y };
     let mut edge_match = { |x: &(), y: &()| x == y };
     assert_eq!(
-        subgraph_isomorphisms_iter(&&sub, &&g, &mut node_match, &mut edge_match)
-            .unwrap()
-            .collect::<Vec<_>>(),
+        subgraph_isomorphisms_iter(
+            &&sub,
+            &&g,
+            &mut node_match,
+            &mut edge_match
+        )
+        .unwrap()
+        .collect::<Vec<_>>(),
         vec![vec![2, 3]]
     );
 }

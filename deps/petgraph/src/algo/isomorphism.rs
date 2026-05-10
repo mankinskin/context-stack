@@ -1,21 +1,33 @@
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 use core::convert::TryFrom;
 
-use crate::data::DataMap;
-use crate::visit::EdgeCount;
-use crate::visit::EdgeRef;
-use crate::visit::GetAdjacencyMatrix;
-use crate::visit::GraphBase;
-use crate::visit::GraphProp;
-use crate::visit::IntoEdgesDirected;
-use crate::visit::IntoNeighborsDirected;
-use crate::visit::NodeCompactIndexable;
-use crate::{Incoming, Outgoing};
+use crate::{
+    data::DataMap,
+    visit::{
+        EdgeCount,
+        EdgeRef,
+        GetAdjacencyMatrix,
+        GraphBase,
+        GraphProp,
+        IntoEdgesDirected,
+        IntoNeighborsDirected,
+        NodeCompactIndexable,
+    },
+    Incoming,
+    Outgoing,
+};
 
-use self::semantic::EdgeMatcher;
-use self::semantic::NoSemanticMatch;
-use self::semantic::NodeMatcher;
-use self::state::Vf2State;
+use self::{
+    semantic::{
+        EdgeMatcher,
+        NoSemanticMatch,
+        NodeMatcher,
+    },
+    state::Vf2State,
+};
 
 mod state {
     use super::*;
@@ -45,7 +57,10 @@ mod state {
 
     impl<'a, G> Vf2State<'a, G>
     where
-        G: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
+        G: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
     {
         pub fn new(g: &'a G) -> Self {
             let c0 = g.node_count();
@@ -67,7 +82,11 @@ mod state {
         }
 
         /// Add mapping **from** <-> **to** to the state.
-        pub fn push_mapping(&mut self, from: G::NodeId, to: usize) {
+        pub fn push_mapping(
+            &mut self,
+            from: G::NodeId,
+            to: usize,
+        ) {
             self.generation += 1;
             self.mapping[self.graph.to_index(from)] = to;
             // update T0 & T1 ins/outs
@@ -90,7 +109,10 @@ mod state {
         }
 
         /// Restore the state to before the last added mapping
-        pub fn pop_mapping(&mut self, from: G::NodeId) {
+        pub fn pop_mapping(
+            &mut self,
+            from: G::NodeId,
+        ) {
             // undo (n, m) mapping
             self.mapping[self.graph.to_index(from)] = usize::MAX;
 
@@ -114,7 +136,10 @@ mod state {
         }
 
         /// Find the next (least) node in the Tout set.
-        pub fn next_out_index(&self, from_index: usize) -> Option<usize> {
+        pub fn next_out_index(
+            &self,
+            from_index: usize,
+        ) -> Option<usize> {
             self.out[from_index..]
                 .iter()
                 .enumerate()
@@ -125,7 +150,10 @@ mod state {
         }
 
         /// Find the next (least) node in the Tin set.
-        pub fn next_in_index(&self, from_index: usize) -> Option<usize> {
+        pub fn next_in_index(
+            &self,
+            from_index: usize,
+        ) -> Option<usize> {
             if !self.graph.is_directed() {
                 return None;
             }
@@ -139,7 +167,10 @@ mod state {
         }
 
         /// Find the next (least) node in the N - M set.
-        pub fn next_rest_index(&self, from_index: usize) -> Option<usize> {
+        pub fn next_rest_index(
+            &self,
+            from_index: usize,
+        ) -> Option<usize> {
             self.mapping[from_index..]
                 .iter()
                 .enumerate()
@@ -156,7 +187,13 @@ mod semantic {
 
     pub trait NodeMatcher<G0: GraphBase, G1: GraphBase> {
         fn enabled() -> bool;
-        fn eq(&mut self, _g0: &G0, _g1: &G1, _n0: G0::NodeId, _n1: G1::NodeId) -> bool;
+        fn eq(
+            &mut self,
+            _g0: &G0,
+            _g1: &G1,
+            _n0: G0::NodeId,
+            _n1: G1::NodeId,
+        ) -> bool;
     }
 
     impl<G0: GraphBase, G1: GraphBase> NodeMatcher<G0, G1> for NoSemanticMatch {
@@ -165,7 +202,13 @@ mod semantic {
             false
         }
         #[inline]
-        fn eq(&mut self, _g0: &G0, _g1: &G1, _n0: G0::NodeId, _n1: G1::NodeId) -> bool {
+        fn eq(
+            &mut self,
+            _g0: &G0,
+            _g1: &G1,
+            _n0: G0::NodeId,
+            _n1: G1::NodeId,
+        ) -> bool {
             true
         }
     }
@@ -181,8 +224,15 @@ mod semantic {
             true
         }
         #[inline]
-        fn eq(&mut self, g0: &G0, g1: &G1, n0: G0::NodeId, n1: G1::NodeId) -> bool {
-            if let (Some(x), Some(y)) = (g0.node_weight(n0), g1.node_weight(n1)) {
+        fn eq(
+            &mut self,
+            g0: &G0,
+            g1: &G1,
+            n0: G0::NodeId,
+            n1: G1::NodeId,
+        ) -> bool {
+            if let (Some(x), Some(y)) = (g0.node_weight(n0), g1.node_weight(n1))
+            {
                 self(x, y)
             } else {
                 false
@@ -287,8 +337,14 @@ mod matching {
         edge_match: &mut EM,
     ) -> bool
     where
-        G0: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
-        G1: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
+        G0: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
+        G1: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
         NM: NodeMatcher<G0, G1>,
         EM: EdgeMatcher<G0, G1>,
     {
@@ -317,7 +373,8 @@ mod matching {
                     succ_count += 1;
                     // handle the self loop case; it's not in the mapping (yet)
                     let m_neigh = if field!(nodes, $j) != n_neigh {
-                        field!(st, $j).mapping[field!(st, $j).graph.to_index(n_neigh)]
+                        field!(st, $j).mapping
+                            [field!(st, $j).graph.to_index(n_neigh)]
                     } else {
                         field!(st, 1 - $j).graph.to_index(field!(nodes, 1 - $j))
                     };
@@ -346,7 +403,8 @@ mod matching {
                 {
                     pred_count += 1;
                     // the self loop case is handled in outgoing
-                    let m_neigh = field!(st, $j).mapping[field!(st, $j).graph.to_index(n_neigh)];
+                    let m_neigh = field!(st, $j).mapping
+                        [field!(st, $j).graph.to_index(n_neigh)];
                     if m_neigh == usize::MAX {
                         continue;
                     }
@@ -389,7 +447,9 @@ mod matching {
         }
 
         // // semantic feasibility: compare associated data for nodes
-        if NM::enabled() && !node_match.eq(st.0.graph, st.1.graph, nodes.0, nodes.1) {
+        if NM::enabled()
+            && !node_match.eq(st.0.graph, st.1.graph, nodes.0, nodes.1)
+        {
             return false;
         }
         // semantic feasibility: compare associated data for edges
@@ -401,9 +461,12 @@ mod matching {
                         .neighbors_directed(field!(nodes, $j), Outgoing)
                     {
                         let m_neigh = if field!(nodes, $j) != n_neigh {
-                            field!(st, $j).mapping[field!(st, $j).graph.to_index(n_neigh)]
+                            field!(st, $j).mapping
+                                [field!(st, $j).graph.to_index(n_neigh)]
                         } else {
-                            field!(st, 1 - $j).graph.to_index(field!(nodes, 1 - $j))
+                            field!(st, 1 - $j)
+                                .graph
+                                .to_index(field!(nodes, 1 - $j))
                         };
                         if m_neigh == usize::MAX {
                             continue;
@@ -430,8 +493,8 @@ mod matching {
                             .neighbors_directed(field!(nodes, $j), Incoming)
                         {
                             // the self loop case is handled in outgoing
-                            let m_neigh =
-                                field!(st, $j).mapping[field!(st, $j).graph.to_index(n_neigh)];
+                            let m_neigh = field!(st, $j).mapping
+                                [field!(st, $j).graph.to_index(n_neigh)];
                             if m_neigh == usize::MAX {
                                 continue;
                             }
@@ -462,11 +525,17 @@ mod matching {
     }
 
     fn next_candidate<G0, G1>(
-        st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
+        st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>)
     ) -> Option<(G0::NodeId, G1::NodeId, OpenList)>
     where
-        G0: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
-        G1: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
+        G0: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
+        G1: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
     {
         let mut from_index = None;
         let mut open_list = OpenList::Out;
@@ -511,8 +580,14 @@ mod matching {
         open_list: OpenList,
     ) -> Option<G1::NodeId>
     where
-        G0: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
-        G1: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
+        G0: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
+        G1: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
     {
         // Find the next node index to try on the `to` side of the mapping
         let start = st.1.graph.to_index(nx) + 1;
@@ -527,7 +602,7 @@ mod matching {
             Some(ix) => {
                 debug_assert!(ix >= start);
                 Some(st.1.graph.from_index(ix))
-            }
+            },
         }
     }
 
@@ -535,8 +610,14 @@ mod matching {
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         nodes: (G0::NodeId, G1::NodeId),
     ) where
-        G0: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
-        G1: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
+        G0: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
+        G1: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
     {
         st.0.pop_mapping(nodes.0);
         st.1.pop_mapping(nodes.1);
@@ -546,8 +627,14 @@ mod matching {
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         nodes: (G0::NodeId, G1::NodeId),
     ) where
-        G0: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
-        G1: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
+        G0: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
+        G1: GetAdjacencyMatrix
+            + GraphProp
+            + NodeCompactIndexable
+            + IntoNeighborsDirected,
     {
         st.0.push_mapping(nodes.0, st.1.graph.to_index(nodes.1));
         st.1.push_mapping(nodes.1, st.0.graph.to_index(nodes.0));
@@ -592,9 +679,9 @@ mod matching {
                                 open_list,
                             };
                             stack.push(f);
-                        }
+                        },
                     }
-                }
+                },
                 Frame::Outer => match next_candidate(st) {
                     None => continue,
                     Some((nx, mx, open_list)) => {
@@ -603,7 +690,7 @@ mod matching {
                             open_list,
                         };
                         stack.push(f);
-                    }
+                    },
                 },
                 Frame::Inner { nodes, open_list } => {
                     if is_feasible(st, nodes, node_match, edge_match) {
@@ -634,9 +721,9 @@ mod matching {
                                 open_list,
                             };
                             stack.push(f);
-                        }
+                        },
                     }
-                }
+                },
             }
             if result.is_some() {
                 return result;
@@ -798,22 +885,36 @@ mod matching {
 ///   *A (Sub)Graph Isomorphism Algorithm for Matching Large Graphs*
 ///
 /// [multigraphs]: https://en.wikipedia.org/wiki/Multigraph
-pub fn is_isomorphic<G0, G1>(g0: G0, g1: G1) -> bool
+pub fn is_isomorphic<G0, G1>(
+    g0: G0,
+    g1: G1,
+) -> bool
 where
-    G0: NodeCompactIndexable + EdgeCount + GetAdjacencyMatrix + GraphProp + IntoNeighborsDirected,
+    G0: NodeCompactIndexable
+        + EdgeCount
+        + GetAdjacencyMatrix
+        + GraphProp
+        + IntoNeighborsDirected,
     G1: NodeCompactIndexable
         + EdgeCount
         + GetAdjacencyMatrix
         + GraphProp<EdgeType = G0::EdgeType>
         + IntoNeighborsDirected,
 {
-    if g0.node_count() != g1.node_count() || g0.edge_count() != g1.edge_count() {
+    if g0.node_count() != g1.node_count() || g0.edge_count() != g1.edge_count()
+    {
         return false;
     }
 
-    self::matching::GraphMatcher::new(&g0, &g1, &mut NoSemanticMatch, &mut NoSemanticMatch, false)
-        .next()
-        .is_some()
+    self::matching::GraphMatcher::new(
+        &g0,
+        &g1,
+        &mut NoSemanticMatch,
+        &mut NoSemanticMatch,
+        false,
+    )
+    .next()
+    .is_some()
 }
 
 /// Return `true` if the graphs `g0` and `g1` are isomorphic.
@@ -846,13 +947,20 @@ where
     NM: FnMut(&G0::NodeWeight, &G1::NodeWeight) -> bool,
     EM: FnMut(&G0::EdgeWeight, &G1::EdgeWeight) -> bool,
 {
-    if g0.node_count() != g1.node_count() || g0.edge_count() != g1.edge_count() {
+    if g0.node_count() != g1.node_count() || g0.edge_count() != g1.edge_count()
+    {
         return false;
     }
 
-    self::matching::GraphMatcher::new(&g0, &g1, &mut node_match, &mut edge_match, false)
-        .next()
-        .is_some()
+    self::matching::GraphMatcher::new(
+        &g0,
+        &g1,
+        &mut node_match,
+        &mut edge_match,
+        false,
+    )
+    .next()
+    .is_some()
 }
 
 /// Return `true` if `g0` is isomorphic to a subgraph of `g1`.
@@ -891,9 +999,16 @@ where
 ///
 /// [networkx_vf2]: https://networkx.github.io/documentation/stable/reference/algorithms/isomorphism.vf2.html
 /// [multigraphs]: https://en.wikipedia.org/wiki/Multigraph
-pub fn is_isomorphic_subgraph<G0, G1>(g0: G0, g1: G1) -> bool
+pub fn is_isomorphic_subgraph<G0, G1>(
+    g0: G0,
+    g1: G1,
+) -> bool
 where
-    G0: NodeCompactIndexable + EdgeCount + GetAdjacencyMatrix + GraphProp + IntoNeighborsDirected,
+    G0: NodeCompactIndexable
+        + EdgeCount
+        + GetAdjacencyMatrix
+        + GraphProp
+        + IntoNeighborsDirected,
     G1: NodeCompactIndexable
         + EdgeCount
         + GetAdjacencyMatrix
@@ -904,9 +1019,15 @@ where
         return false;
     }
 
-    self::matching::GraphMatcher::new(&g0, &g1, &mut NoSemanticMatch, &mut NoSemanticMatch, true)
-        .next()
-        .is_some()
+    self::matching::GraphMatcher::new(
+        &g0,
+        &g1,
+        &mut NoSemanticMatch,
+        &mut NoSemanticMatch,
+        true,
+    )
+    .next()
+    .is_some()
 }
 
 /// Return `true` if `g0` is isomorphic to a subgraph of `g1`.
@@ -943,9 +1064,15 @@ where
         return false;
     }
 
-    self::matching::GraphMatcher::new(&g0, &g1, &mut node_match, &mut edge_match, true)
-        .next()
-        .is_some()
+    self::matching::GraphMatcher::new(
+        &g0,
+        &g1,
+        &mut node_match,
+        &mut edge_match,
+        true,
+    )
+    .next()
+    .is_some()
 }
 
 /// Using the VF2 algorithm, examine both syntactic and semantic graph

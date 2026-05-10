@@ -1,6 +1,8 @@
-use petgraph::operator::complement;
-use petgraph::prelude::*;
-use petgraph::Graph;
+use petgraph::{
+    operator::complement,
+    prelude::*,
+    Graph,
+};
 
 #[test]
 fn test_complement() {
@@ -34,7 +36,10 @@ fn test_complement() {
 
     for x in graph.node_indices() {
         for y in graph.node_indices() {
-            assert_eq!(output.contains_edge(x, y), expected_res.contains_edge(x, y));
+            assert_eq!(
+                output.contains_edge(x, y),
+                expected_res.contains_edge(x, y)
+            );
         }
     }
 }

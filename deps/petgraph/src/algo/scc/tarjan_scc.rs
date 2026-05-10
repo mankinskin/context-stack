@@ -1,7 +1,11 @@
 use alloc::vec::Vec;
 use core::num::NonZeroUsize;
 
-use crate::visit::{IntoNeighbors, IntoNodeIdentifiers, NodeIndexable};
+use crate::visit::{
+    IntoNeighbors,
+    IntoNodeIdentifiers,
+    NodeIndexable,
+};
 
 #[derive(Copy, Clone, Debug)]
 struct NodeData {
@@ -29,7 +33,7 @@ impl<N> TarjanScc<N> {
     /// Creates a new `TarjanScc`
     pub fn new() -> Self {
         TarjanScc {
-            index: 1,                   // Invariant: index < componentcount at all times.
+            index: 1, // Invariant: index < componentcount at all times.
             componentcount: usize::MAX, // Will hold if componentcount is initialized to number of nodes - 1 or higher.
             nodes: Vec::new(),
             stack: Vec::new(),
@@ -51,9 +55,14 @@ impl<N> TarjanScc<N> {
     /// For an undirected graph, the sccs are simply the connected components.
     ///
     /// This implementation is recursive and does one pass over the nodes.
-    pub fn run<G, F>(&mut self, g: G, mut f: F)
-    where
-        G: IntoNodeIdentifiers<NodeId = N> + IntoNeighbors<NodeId = N> + NodeIndexable<NodeId = N>,
+    pub fn run<G, F>(
+        &mut self,
+        g: G,
+        mut f: F,
+    ) where
+        G: IntoNodeIdentifiers<NodeId = N>
+            + IntoNeighbors<NodeId = N>
+            + NodeIndexable<NodeId = N>,
         F: FnMut(&[N]),
         N: Copy + PartialEq,
     {
@@ -71,8 +80,12 @@ impl<N> TarjanScc<N> {
         debug_assert!(self.stack.is_empty());
     }
 
-    fn visit<G, F>(&mut self, v: G::NodeId, g: G, f: &mut F)
-    where
+    fn visit<G, F>(
+        &mut self,
+        v: G::NodeId,
+        g: G,
+        f: &mut F,
+    ) where
         G: IntoNeighbors<NodeId = N> + NodeIndexable<NodeId = N>,
         F: FnMut(&[N]),
         N: Copy + PartialEq,
@@ -110,7 +123,9 @@ impl<N> TarjanScc<N> {
                 .stack
                 .iter()
                 .rposition(|&w| {
-                    if nodes[g.to_index(v)].rootindex > nodes[g.to_index(w)].rootindex {
+                    if nodes[g.to_index(v)].rootindex
+                        > nodes[g.to_index(w)].rootindex
+                    {
                         true
                     } else {
                         nodes[g.to_index(w)].rootindex = c;
@@ -132,7 +147,11 @@ impl<N> TarjanScc<N> {
     }
 
     /// Returns the index of the component in which v has been assigned. Allows for using self as a lookup table for an scc decomposition produced by self.run().
-    pub fn node_component_index<G>(&self, g: G, v: N) -> usize
+    pub fn node_component_index<G>(
+        &self,
+        g: G,
+        v: N,
+    ) -> usize
     where
         G: IntoNeighbors<NodeId = N> + NodeIndexable<NodeId = N>,
         N: Copy + PartialEq,

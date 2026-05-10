@@ -1,11 +1,23 @@
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 use core::hash::Hash;
 
 use hashbrown::HashMap;
 
-use crate::algo::{BoundedMeasure, NegativeCycle};
-use crate::visit::{
-    EdgeRef, GraphProp, IntoEdgeReferences, IntoNodeIdentifiers, NodeCompactIndexable,
+use crate::{
+    algo::{
+        BoundedMeasure,
+        NegativeCycle,
+    },
+    visit::{
+        EdgeRef,
+        GraphProp,
+        IntoEdgeReferences,
+        IntoNodeIdentifiers,
+        NodeCompactIndexable,
+    },
 };
 
 #[allow(clippy::type_complexity, clippy::needless_range_loop)]
@@ -93,7 +105,10 @@ pub fn floyd_warshall<G, F, K>(
     edge_cost: F,
 ) -> Result<HashMap<(G::NodeId, G::NodeId), K>, NegativeCycle>
 where
-    G: NodeCompactIndexable + IntoEdgeReferences + IntoNodeIdentifiers + GraphProp,
+    G: NodeCompactIndexable
+        + IntoEdgeReferences
+        + IntoNodeIdentifiers
+        + GraphProp,
     G::NodeId: Eq + Hash,
     F: FnMut(G::EdgeRef) -> K,
     K: BoundedMeasure + Copy,
@@ -111,7 +126,10 @@ where
     if let Some(dist) = m_dist {
         for i in 0..num_of_nodes {
             for j in 0..num_of_nodes {
-                distance_map.insert((graph.from_index(i), graph.from_index(j)), dist[i][j]);
+                distance_map.insert(
+                    (graph.from_index(i), graph.from_index(j)),
+                    dist[i][j],
+                );
             }
         }
     }
@@ -201,9 +219,15 @@ where
 pub fn floyd_warshall_path<G, F, K>(
     graph: G,
     edge_cost: F,
-) -> Result<(HashMap<(G::NodeId, G::NodeId), K>, Vec<Vec<Option<usize>>>), NegativeCycle>
+) -> Result<
+    (HashMap<(G::NodeId, G::NodeId), K>, Vec<Vec<Option<usize>>>),
+    NegativeCycle,
+>
 where
-    G: NodeCompactIndexable + IntoEdgeReferences + IntoNodeIdentifiers + GraphProp,
+    G: NodeCompactIndexable
+        + IntoEdgeReferences
+        + IntoNodeIdentifiers
+        + GraphProp,
     G::NodeId: Eq + Hash,
     F: FnMut(G::EdgeRef) -> K,
     K: BoundedMeasure + Copy,
@@ -222,7 +246,10 @@ where
     if let Some(dist) = m_dist {
         for i in 0..num_of_nodes {
             for j in 0..num_of_nodes {
-                distance_map.insert((graph.from_index(i), graph.from_index(j)), dist[i][j]);
+                distance_map.insert(
+                    (graph.from_index(i), graph.from_index(j)),
+                    dist[i][j],
+                );
             }
         }
     }
@@ -231,7 +258,12 @@ where
 }
 
 /// Helper function to copy a value to a 2D array
-fn set_object<K: Clone>(m_dist: &mut Option<Vec<Vec<K>>>, i: usize, j: usize, value: K) {
+fn set_object<K: Clone>(
+    m_dist: &mut Option<Vec<Vec<K>>>,
+    i: usize,
+    j: usize,
+    value: K,
+) {
     if let Some(dist) = m_dist {
         dist[i][j] = value;
     }
@@ -258,7 +290,10 @@ fn _floyd_warshall_path<G, F, K>(
     m_prev: &mut Option<Vec<Vec<Option<usize>>>>,
 ) -> Result<(), NegativeCycle>
 where
-    G: NodeCompactIndexable + IntoEdgeReferences + IntoNodeIdentifiers + GraphProp,
+    G: NodeCompactIndexable
+        + IntoEdgeReferences
+        + IntoNodeIdentifiers
+        + GraphProp,
     G::NodeId: Eq + Hash,
     F: FnMut(G::EdgeRef) -> K,
     K: BoundedMeasure + Copy,
@@ -293,7 +328,8 @@ where
         for i in 0..num_of_nodes {
             for j in 0..num_of_nodes {
                 if let Some(dist) = m_dist {
-                    let (result, overflow) = dist[i][k].overflowing_add(dist[k][j]);
+                    let (result, overflow) =
+                        dist[i][k].overflowing_add(dist[k][j]);
                     if !overflow && dist[i][j] > result {
                         dist[i][j] = result;
                         if let Some(prev) = m_prev {

@@ -16,42 +16,96 @@ mod maximal_cliques;
 mod utils;
 
 use odds::prelude::*;
-use utils::{Small, Tournament};
+use utils::{
+    Small,
+    Tournament,
+};
 
 use alloc::collections::BTreeSet;
 use core::hash::Hash;
 
-use hashbrown::{HashMap, HashSet};
-use itertools::assert_equal;
-use itertools::cloned;
-use quickcheck::{Arbitrary, Gen};
+use hashbrown::{
+    HashMap,
+    HashSet,
+};
+use itertools::{
+    assert_equal,
+    cloned,
+};
+use quickcheck::{
+    Arbitrary,
+    Gen,
+};
 use rand::Rng;
 
 #[cfg(feature = "stable_graph")]
 use petgraph::algo::steiner_tree;
-use petgraph::algo::{
-    bellman_ford, bridges, condensation, connected_components, dijkstra, dsatur_coloring,
-    find_negative_cycle, floyd_warshall, ford_fulkerson, greedy_feedback_arc_set, greedy_matching,
-    is_cyclic_directed, is_cyclic_undirected, is_isomorphic, is_isomorphic_matching, johnson,
-    k_shortest_path, kosaraju_scc, maximal_cliques as maximal_cliques_algo, maximum_matching,
-    min_spanning_tree, page_rank, spfa, tarjan_scc, toposort, Matching,
+use petgraph::{
+    algo::{
+        bellman_ford,
+        bridges,
+        condensation,
+        connected_components,
+        dijkstra,
+        dsatur_coloring,
+        find_negative_cycle,
+        floyd_warshall,
+        ford_fulkerson,
+        greedy_feedback_arc_set,
+        greedy_matching,
+        is_cyclic_directed,
+        is_cyclic_undirected,
+        is_isomorphic,
+        is_isomorphic_matching,
+        johnson,
+        k_shortest_path,
+        kosaraju_scc,
+        maximal_cliques as maximal_cliques_algo,
+        maximum_matching,
+        min_spanning_tree,
+        page_rank,
+        spfa,
+        tarjan_scc,
+        toposort,
+        Matching,
+    },
+    data::FromElements,
+    dot::{
+        Config,
+        Dot,
+    },
+    graph::{
+        edge_index,
+        node_index,
+        IndexType,
+    },
+    graphmap::NodeTrait,
+    operator::complement,
+    prelude::*,
+    visit::{
+        EdgeFiltered,
+        EdgeIndexable,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoNeighbors,
+        IntoNodeIdentifiers,
+        IntoNodeReferences,
+        NodeCount,
+        NodeIndexable,
+        Reversed,
+        Topo,
+        VisitMap,
+        Visitable,
+    },
+    EdgeType,
 };
-use petgraph::data::FromElements;
-use petgraph::dot::{Config, Dot};
-use petgraph::graph::{edge_index, node_index, IndexType};
-use petgraph::graphmap::NodeTrait;
-use petgraph::operator::complement;
-use petgraph::prelude::*;
-use petgraph::visit::{
-    EdgeFiltered, EdgeIndexable, IntoEdgeReferences, IntoEdges, IntoNeighbors, IntoNodeIdentifiers,
-    IntoNodeReferences, NodeCount, NodeIndexable, Reversed, Topo, VisitMap, Visitable,
-};
-use petgraph::EdgeType;
 
 #[cfg(feature = "rayon")]
 use petgraph::algo::parallel_johnson;
 
-fn mst_graph<N, E, Ty, Ix>(g: &Graph<N, E, Ty, Ix>) -> Graph<N, E, Undirected, Ix>
+fn mst_graph<N, E, Ty, Ix>(
+    g: &Graph<N, E, Ty, Ix>
+) -> Graph<N, E, Undirected, Ix>
 where
     Ty: EdgeType,
     Ix: IndexType,
@@ -165,8 +219,10 @@ fn graph_retain_nodes() {
             }
             keep
         });
-        let num_negs_post = g.raw_nodes().iter().filter(|n| n.weight < 0).count();
-        let num_pos_post = g.raw_nodes().iter().filter(|n| n.weight >= 0).count();
+        let num_negs_post =
+            g.raw_nodes().iter().filter(|n| n.weight < 0).count();
+        let num_pos_post =
+            g.raw_nodes().iter().filter(|n| n.weight >= 0).count();
         assert_eq!(num_negs_post, 0);
         assert_eq!(removed, num_negs);
         assert_eq!(num_negs + g.node_count(), nodes);
@@ -210,8 +266,10 @@ fn graph_retain_edges() {
             }
             keep
         });
-        let num_negs_post = g.raw_edges().iter().filter(|n| n.weight < 0).count();
-        let num_pos_post = g.raw_edges().iter().filter(|n| n.weight >= 0).count();
+        let num_negs_post =
+            g.raw_edges().iter().filter(|n| n.weight < 0).count();
+        let num_pos_post =
+            g.raw_edges().iter().filter(|n| n.weight >= 0).count();
         assert_eq!(num_negs_post, 0);
         assert_eq!(removed, num_negs);
         assert_eq!(num_negs + g.edge_count(), edges);
@@ -246,8 +304,10 @@ fn stable_graph_retain_edges() {
             }
             keep
         });
-        let num_negs_post = g.edge_references().filter(|n| *n.weight() < 0).count();
-        let num_pos_post = g.edge_references().filter(|n| *n.weight() >= 0).count();
+        let num_negs_post =
+            g.edge_references().filter(|n| *n.weight() < 0).count();
+        let num_pos_post =
+            g.edge_references().filter(|n| *n.weight() >= 0).count();
         assert_eq!(num_negs_post, 0);
         assert_eq!(removed, num_negs);
         assert_eq!(num_negs + g.edge_count(), edges);
@@ -274,7 +334,8 @@ fn isomorphism_1() {
         // several trials of different isomorphisms of the same graph
         // mapping of node indices
         let mut map = g.node_indices().collect::<Vec<_>>();
-        let mut ng = Graph::<_, _, Ty>::with_capacity(g.node_count(), g.edge_count());
+        let mut ng =
+            Graph::<_, _, Ty>::with_capacity(g.node_count(), g.edge_count());
         for _ in 0..1 {
             rng.shuffle(&mut map);
             ng.clear();
@@ -310,7 +371,11 @@ fn isomorphism_1() {
 #[test]
 fn isomorphism_modify() {
     // using small weights so that duplicates are likely
-    fn prop<Ty: EdgeType>(g: Small<Graph<i16, i8, Ty>>, node: u8, edge: u8) -> bool {
+    fn prop<Ty: EdgeType>(
+        g: Small<Graph<i16, i8, Ty>>,
+        node: u8,
+        edge: u8,
+    ) -> bool {
         println!("graph {g:#?}");
         let mut ng = (*g).clone();
         let i = node_index(node as usize);
@@ -344,7 +409,11 @@ fn isomorphism_modify() {
 
 #[test]
 fn graph_remove_edge() {
-    fn prop<Ty: EdgeType>(mut g: Graph<(), (), Ty>, a: u8, b: u8) -> bool {
+    fn prop<Ty: EdgeType>(
+        mut g: Graph<(), (), Ty>,
+        a: u8,
+        b: u8,
+    ) -> bool {
         let a = node_index(a as usize);
         let b = node_index(b as usize);
         let edge = g.find_edge(a, b);
@@ -369,7 +438,11 @@ fn graph_remove_edge() {
 #[cfg(feature = "stable_graph")]
 #[test]
 fn stable_graph_remove_edge() {
-    fn prop<Ty: EdgeType>(mut g: StableGraph<(), (), Ty>, a: u8, b: u8) -> bool {
+    fn prop<Ty: EdgeType>(
+        mut g: StableGraph<(), (), Ty>,
+        a: u8,
+        b: u8,
+    ) -> bool {
         let a = node_index(a as usize);
         let b = node_index(b as usize);
         let edge = g.find_edge(a, b);
@@ -388,14 +461,21 @@ fn stable_graph_remove_edge() {
         }
         true
     }
-    quickcheck::quickcheck(prop as fn(StableGraph<_, _, Undirected>, _, _) -> bool);
-    quickcheck::quickcheck(prop as fn(StableGraph<_, _, Directed>, _, _) -> bool);
+    quickcheck::quickcheck(
+        prop as fn(StableGraph<_, _, Undirected>, _, _) -> bool,
+    );
+    quickcheck::quickcheck(
+        prop as fn(StableGraph<_, _, Directed>, _, _) -> bool,
+    );
 }
 
 #[cfg(feature = "stable_graph")]
 #[test]
 fn stable_graph_add_remove_edges() {
-    fn prop<Ty: EdgeType>(mut g: StableGraph<(), (), Ty>, edges: Vec<(u8, u8)>) -> bool {
+    fn prop<Ty: EdgeType>(
+        mut g: StableGraph<(), (), Ty>,
+        edges: Vec<(u8, u8)>,
+    ) -> bool {
         for &(a, b) in &edges {
             let a = node_index(a as usize);
             let b = node_index(b as usize);
@@ -427,7 +507,9 @@ fn stable_graph_add_remove_edges() {
         }
         true
     }
-    quickcheck::quickcheck(prop as fn(StableGraph<_, _, Undirected>, _) -> bool);
+    quickcheck::quickcheck(
+        prop as fn(StableGraph<_, _, Undirected>, _) -> bool,
+    );
     quickcheck::quickcheck(prop as fn(StableGraph<_, _, Directed>, _) -> bool);
 }
 
@@ -457,7 +539,11 @@ where
 
 #[test]
 fn graphmap_remove() {
-    fn prop<Ty: EdgeType>(mut g: GraphMap<i8, (), Ty>, a: i8, b: i8) -> bool {
+    fn prop<Ty: EdgeType>(
+        mut g: GraphMap<i8, (), Ty>,
+        a: i8,
+        b: i8,
+    ) -> bool {
         //if g.edge_count() > 20 { return true; }
         assert_graphmap_consistent(&g);
         let contains = g.contains_edge(a, b);
@@ -477,10 +563,16 @@ fn graphmap_remove() {
 
 #[test]
 fn graphmap_add_remove() {
-    fn prop(mut g: UnGraphMap<i8, ()>, a: i8, b: i8) -> bool {
+    fn prop(
+        mut g: UnGraphMap<i8, ()>,
+        a: i8,
+        b: i8,
+    ) -> bool {
         assert_eq!(g.contains_edge(a, b), g.add_edge(a, b, ()).is_some());
         g.remove_edge(a, b);
-        !g.contains_edge(a, b) && !g.neighbors(a).any(|x| x == b) && !g.neighbors(b).any(|x| x == a)
+        !g.contains_edge(a, b)
+            && !g.neighbors(a).any(|x| x == b)
+            && !g.neighbors(b).any(|x| x == a)
     }
     quickcheck::quickcheck(prop as fn(_, _, _) -> bool);
 }
@@ -586,7 +678,8 @@ impl<N: Default + Clone + Send + 'static> Arbitrary for Dag<N> {
         let tall = (max_width as f64 * split) as usize;
         let fat = max_width - tall;
 
-        let edge_prob = 1. - (1. - g.gen_range(0., 1.)) * (1. - g.gen_range(0., 1.));
+        let edge_prob =
+            1. - (1. - g.gen_range(0., 1.)) * (1. - g.gen_range(0., 1.));
         let edges = ((nodes as f64).powi(2) * edge_prob) as usize;
         let mut gr = Graph::with_capacity(nodes, edges);
         let mut nodes = 0;
@@ -598,7 +691,11 @@ impl<N: Default + Clone + Send + 'static> Arbitrary for Dag<N> {
             for j in 0..nodes {
                 for k in 0..cur_nodes {
                     if g.gen_range(0., 1.) < edge_prob {
-                        gr.add_edge(NodeIndex::new(j), NodeIndex::new(k + nodes), ());
+                        gr.add_edge(
+                            NodeIndex::new(j),
+                            NodeIndex::new(k + nodes),
+                            (),
+                        );
                     }
                 }
             }
@@ -632,7 +729,10 @@ impl<N: Default + Clone + Send + 'static> Arbitrary for Dag<N> {
     }
 }
 
-fn is_topo_order<N>(gr: &Graph<N, (), Directed>, order: &[NodeIndex]) -> bool {
+fn is_topo_order<N>(
+    gr: &Graph<N, (), Directed>,
+    order: &[NodeIndex],
+) -> bool {
     if gr.node_count() != order.len() {
         println!(
             "Graph ({}) and count ({}) had different amount of nodes.",
@@ -655,7 +755,10 @@ fn is_topo_order<N>(gr: &Graph<N, (), Directed>, order: &[NodeIndex]) -> bool {
     true
 }
 
-fn subset_is_topo_order<N>(gr: &Graph<N, (), Directed>, order: &[NodeIndex]) -> bool {
+fn subset_is_topo_order<N>(
+    gr: &Graph<N, (), Directed>,
+    order: &[NodeIndex],
+) -> bool {
     if gr.node_count() < order.len() {
         println!(
             "Graph (len={}) had less nodes than order (len={})",
@@ -1101,8 +1204,10 @@ quickcheck! {
     }
 }
 
-fn naive_closure_foreach<G, F>(g: G, mut f: F)
-where
+fn naive_closure_foreach<G, F>(
+    g: G,
+    mut f: F,
+) where
     G: Visitable + IntoNeighbors + IntoNodeIdentifiers,
     F: FnMut(G::NodeId, G::NodeId),
 {
@@ -1244,7 +1349,9 @@ fn is_valid_matching<G: NodeIndexable>(m: &Matching<G>) -> bool {
     true
 }
 
-fn is_maximum_matching<G: NodeIndexable + IntoEdges + IntoNodeIdentifiers + Visitable>(
+fn is_maximum_matching<
+    G: NodeIndexable + IntoEdges + IntoNodeIdentifiers + Visitable,
+>(
     g: G,
     m: &Matching<G>,
 ) -> bool {
@@ -1271,12 +1378,17 @@ fn is_maximum_matching<G: NodeIndexable + IntoEdges + IntoNodeIdentifiers + Visi
 
                     let is_matched = m.contains_edge(e.source(), e.target());
 
-                    if do_matched_edges && is_matched || !do_matched_edges && !is_matched {
+                    if do_matched_edges && is_matched
+                        || !do_matched_edges && !is_matched
+                    {
                         stack.push((e.target(), !do_matched_edges));
 
                         // Found another free node (other than the starting one)
                         // that is unmatched - an augmenting path.
-                        if !is_matched && !m.contains_node(e.target()) && e.target() != unmatched {
+                        if !is_matched
+                            && !m.contains_node(e.target())
+                            && e.target() != unmatched
+                        {
                             return false;
                         }
                     }
@@ -1288,7 +1400,10 @@ fn is_maximum_matching<G: NodeIndexable + IntoEdges + IntoNodeIdentifiers + Visi
     true
 }
 
-fn is_perfect_matching<G: NodeCount + NodeIndexable>(g: G, m: &Matching<G>) -> bool {
+fn is_perfect_matching<G: NodeCount + NodeIndexable>(
+    g: G,
+    m: &Matching<G>,
+) -> bool {
     // By definition.
     g.node_count() % 2 == 0 && m.edges().count() == g.node_count() / 2
 }
@@ -1463,7 +1578,10 @@ quickcheck! {
     }
 }
 
-fn is_proper_coloring<G>(g: G, coloring: &HashMap<G::NodeId, usize>) -> bool
+fn is_proper_coloring<G>(
+    g: G,
+    coloring: &HashMap<G::NodeId, usize>,
+) -> bool
 where
     G: IntoNodeIdentifiers + IntoEdges,
     G::NodeId: Eq + Hash,
@@ -1546,7 +1664,9 @@ fn steiner_tree_spans_terminals() {
                     },
                     |edge_index, edge_weight| {
                         let edge = g.edge_endpoints(edge_index).unwrap();
-                        if component.contains(&(edge.0)) && component.contains(&(edge.1)) {
+                        if component.contains(&(edge.0))
+                            && component.contains(&(edge.1))
+                        {
                             Some(*edge_weight)
                         } else {
                             None
@@ -1557,9 +1677,11 @@ fn steiner_tree_spans_terminals() {
                 let terminals = g.node_indices().take(5).collect::<Vec<_>>();
                 let m_steiner_tree = steiner_tree(&g, &terminals);
 
-                let steiner_tree_nodes: Vec<NodeIndex> = m_steiner_tree.node_indices().collect();
+                let steiner_tree_nodes: Vec<NodeIndex> =
+                    m_steiner_tree.node_indices().collect();
 
-                let spans_terminals = terminals.iter().all(|&t| steiner_tree_nodes.contains(&t));
+                let spans_terminals =
+                    terminals.iter().all(|&t| steiner_tree_nodes.contains(&t));
 
                 if !spans_terminals {
                     return false; // The steiner tree does not span all terminals
@@ -1587,7 +1709,8 @@ fn maximal_cliques_matches_ref_impl() {
             g.filter_map(
                 |_, _| Some(()),
                 |edge_index, _| {
-                    let (source, target) = g.edge_endpoints(edge_index).unwrap();
+                    let (source, target) =
+                        g.edge_endpoints(edge_index).unwrap();
                     if g.contains_edge(target, source) {
                         Some(())
                     } else {

@@ -12,12 +12,28 @@
 //! strictly dominates **B** and there does not exist any node **C** where **A**
 //! dominates **C** and **C** dominates **B**.
 
-use alloc::{vec, vec::Vec};
-use core::{cmp::Ordering, hash::Hash};
+use alloc::{
+    vec,
+    vec::Vec,
+};
+use core::{
+    cmp::Ordering,
+    hash::Hash,
+};
 
-use hashbrown::{hash_map::Iter, HashMap, HashSet};
+use hashbrown::{
+    hash_map::Iter,
+    HashMap,
+    HashSet,
+};
 
-use crate::visit::{DfsPostOrder, GraphBase, IntoNeighbors, Visitable, Walker};
+use crate::visit::{
+    DfsPostOrder,
+    GraphBase,
+    IntoNeighbors,
+    Visitable,
+    Walker,
+};
 
 /// The dominance relation for some graph and root.
 #[derive(Debug, Clone)]
@@ -42,7 +58,10 @@ where
     ///
     /// Returns `None` for any node that is not reachable from the root, and for
     /// the root itself.
-    pub fn immediate_dominator(&self, node: N) -> Option<N> {
+    pub fn immediate_dominator(
+        &self,
+        node: N,
+    ) -> Option<N> {
         if node == self.root {
             None
         } else {
@@ -54,7 +73,10 @@ where
     ///
     /// If the given node is not reachable from the root, then `None` is
     /// returned.
-    pub fn strict_dominators(&self, node: N) -> Option<DominatorsIter<'_, N>> {
+    pub fn strict_dominators(
+        &self,
+        node: N,
+    ) -> Option<DominatorsIter<'_, N>> {
         if self.dominators.contains_key(&node) {
             Some(DominatorsIter {
                 dominators: self,
@@ -70,7 +92,10 @@ where
     ///
     /// If the given node is not reachable from the root, then `None` is
     /// returned.
-    pub fn dominators(&self, node: N) -> Option<DominatorsIter<'_, N>> {
+    pub fn dominators(
+        &self,
+        node: N,
+    ) -> Option<DominatorsIter<'_, N>> {
         if self.dominators.contains_key(&node) {
             Some(DominatorsIter {
                 dominators: self,
@@ -83,7 +108,10 @@ where
 
     /// Iterate over all nodes immediately dominated by the given node (not
     /// including the given node itself).
-    pub fn immediately_dominated_by(&self, node: N) -> DominatedByIter<'_, N> {
+    pub fn immediately_dominated_by(
+        &self,
+        node: N,
+    ) -> DominatedByIter<'_, N> {
         DominatedByIter {
             iter: self.dominators.iter(),
             node,
@@ -175,7 +203,10 @@ const UNDEFINED: usize = usize::MAX;
 /// where **|V|** is the number of nodes and **|E|** is the number of edges.
 ///
 /// [0]: http://www.hipersoft.rice.edu/grads/publications/dom14.pdf
-pub fn simple_fast<G>(graph: G, root: G::NodeId) -> Dominators<G::NodeId>
+pub fn simple_fast<G>(
+    graph: G,
+    root: G::NodeId,
+) -> Dominators<G::NodeId>
 where
     G: IntoNeighbors + Visitable,
     <G as GraphBase>::NodeId: Eq + Hash,
@@ -199,8 +230,11 @@ where
 
     // Maps a node's `post_order` index to its set of predecessors's indices
     // into `post_order` (as a vec).
-    let idx_to_predecessor_vec =
-        predecessor_sets_to_idx_vecs(&post_order, &node_to_post_order_idx, predecessor_sets);
+    let idx_to_predecessor_vec = predecessor_sets_to_idx_vecs(
+        &post_order,
+        &node_to_post_order_idx,
+        predecessor_sets,
+    );
 
     let mut dominators = vec![UNDEFINED; length];
     dominators[length - 1] = length - 1;
@@ -227,9 +261,12 @@ where
                      first node in every path, there must exist a predecessor to this \
                      node that also has a dominator",
                 );
-                predecessors.fold(*new_idom_idx, |new_idom_idx, &predecessor_idx| {
-                    intersect(&dominators, new_idom_idx, predecessor_idx)
-                })
+                predecessors.fold(
+                    *new_idom_idx,
+                    |new_idom_idx, &predecessor_idx| {
+                        intersect(&dominators, new_idom_idx, predecessor_idx)
+                    },
+                )
             };
 
             debug_assert!(new_idom_idx < length);
@@ -254,7 +291,11 @@ where
     }
 }
 
-fn intersect(dominators: &[usize], mut finger1: usize, mut finger2: usize) -> usize {
+fn intersect(
+    dominators: &[usize],
+    mut finger1: usize,
+    mut finger2: usize,
+) -> usize {
     loop {
         match finger1.cmp(&finger2) {
             Ordering::Less => finger1 = dominators[finger1],

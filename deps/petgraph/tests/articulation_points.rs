@@ -1,6 +1,9 @@
 use petgraph::{
     algo::articulation_points::articulation_points,
-    graph::{NodeIndex, UnGraph},
+    graph::{
+        NodeIndex,
+        UnGraph,
+    },
 };
 
 use hashbrown::HashSet;

@@ -3,7 +3,10 @@
 extern crate petgraph;
 extern crate test;
 
-use core::cmp::{max, min};
+use core::cmp::{
+    max,
+    min,
+};
 use petgraph::prelude::*;
 use test::Bencher;
 
@@ -13,7 +16,8 @@ use petgraph::algo::spfa;
 fn spfa_bench(bench: &mut Bencher) {
     static NODE_COUNT: usize = 100;
     let mut g = Graph::new();
-    let nodes: Vec<NodeIndex<_>> = (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
+    let nodes: Vec<NodeIndex<_>> =
+        (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
     for i in 0..NODE_COUNT {
         let n1 = nodes[i];
         let neighbour_count = i % 8 + 3;

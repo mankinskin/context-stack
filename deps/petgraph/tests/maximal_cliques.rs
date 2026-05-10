@@ -1,11 +1,18 @@
 extern crate petgraph;
 use core::hash::Hash;
 use hashbrown::HashSet;
-use petgraph::graph::{DiGraph, UnGraph};
 use petgraph::{
     algo::maximal_cliques,
-    graph::Graph,
-    visit::{GetAdjacencyMatrix, IntoNeighbors, IntoNodeIdentifiers},
+    graph::{
+        DiGraph,
+        Graph,
+        UnGraph,
+    },
+    visit::{
+        GetAdjacencyMatrix,
+        IntoNeighbors,
+        IntoNodeIdentifiers,
+    },
     Undirected,
 };
 
@@ -206,7 +213,15 @@ fn test_maximal_cliques_undirected() {
     let d = g.add_node(3);
     let e = g.add_node(4);
     let f = g.add_node(5);
-    g.extend_with_edges([(a, b), (a, e), (b, e), (b, c), (c, d), (d, e), (e, f)]);
+    g.extend_with_edges([
+        (a, b),
+        (a, e),
+        (b, e),
+        (b, c),
+        (c, d),
+        (d, e),
+        (e, f),
+    ]);
 
     let cliques = maximal_cliques(&g);
     println!("{:?}", &cliques);
@@ -237,7 +252,15 @@ fn test_maximal_cliques_ref_undirected() {
     let d = g.add_node(3);
     let e = g.add_node(4);
     let f = g.add_node(5);
-    g.extend_with_edges([(a, b), (a, e), (b, e), (b, c), (c, d), (d, e), (e, f)]);
+    g.extend_with_edges([
+        (a, b),
+        (a, e),
+        (b, e),
+        (b, c),
+        (c, d),
+        (d, e),
+        (e, f),
+    ]);
 
     let cliques = maximal_cliques_ref(&g);
     println!("{:?}", &cliques);

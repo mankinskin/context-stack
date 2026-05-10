@@ -1,15 +1,31 @@
-use alloc::{collections::VecDeque, vec::Vec};
-use core::ops::{Index, IndexMut};
+use alloc::{
+    collections::VecDeque,
+    vec::Vec,
+};
+use core::ops::{
+    Index,
+    IndexMut,
+};
 
 use hashbrown::HashMap;
 
 use crate::{
-    graph::{GraphIndex, NodeIndex},
-    visit::{EdgeRef, GraphProp, IntoEdgeReferences},
+    graph::{
+        GraphIndex,
+        NodeIndex,
+    },
+    visit::{
+        EdgeRef,
+        GraphProp,
+        IntoEdgeReferences,
+    },
     Directed,
 };
 
-use self::linked_list::{LinkedList, LinkedListEntry};
+use self::linked_list::{
+    LinkedList,
+    LinkedListEntry,
+};
 
 /// Finds a [feedback arc set]: a set of edges in the given directed graph, which when
 /// removed, make the graph acyclic.
@@ -83,12 +99,13 @@ where
         )
     }));
 
-    g.edge_references()
-        .filter(move |e| node_seq[&e.source().index()] >= node_seq[&e.target().index()])
+    g.edge_references().filter(move |e| {
+        node_seq[&e.source().index()] >= node_seq[&e.target().index()]
+    })
 }
 
 fn good_node_sequence(
-    edge_refs: impl Iterator<Item = (NodeIndex<usize>, NodeIndex<usize>)>,
+    edge_refs: impl Iterator<Item = (NodeIndex<usize>, NodeIndex<usize>)>
 ) -> HashMap<usize, usize> {
     let mut nodes = FasNodeContainer { nodes: Vec::new() };
     let mut buckets = Buckets {
@@ -119,7 +136,7 @@ fn good_node_sequence(
                     graph_ix_lookup.insert(g_ix, fas_ix);
 
                     fas_ix
-                }
+                },
             }
         };
 
@@ -151,7 +168,8 @@ fn good_node_sequence(
     loop {
         let mut some_moved = false;
 
-        while let Some(sink_fas_ix) = buckets.sinks_or_isolated.pop(&mut nodes) {
+        while let Some(sink_fas_ix) = buckets.sinks_or_isolated.pop(&mut nodes)
+        {
             some_moved = true;
             buckets.update_neighbour_node_buckets(sink_fas_ix, &mut nodes);
             s_2.push_front(nodes[sink_fas_ix].data().graph_ix);
@@ -172,7 +190,8 @@ fn good_node_sequence(
         {
             let highest_dd_fas_ix = list.pop(&mut nodes).unwrap();
             some_moved = true;
-            buckets.update_neighbour_node_buckets(highest_dd_fas_ix, &mut nodes);
+            buckets
+                .update_neighbour_node_buckets(highest_dd_fas_ix, &mut nodes);
             s_1.push_back(nodes[highest_dd_fas_ix].data().graph_ix);
 
             Buckets::trim_bucket_list(&mut buckets.bidirectional_pve_dd);
@@ -201,13 +220,19 @@ struct FasNodeContainer {
 impl Index<FasNodeIndex> for FasNodeContainer {
     type Output = LinkedListEntry<FasNode, FasNodeIndex>;
 
-    fn index(&self, index: FasNodeIndex) -> &Self::Output {
+    fn index(
+        &self,
+        index: FasNodeIndex,
+    ) -> &Self::Output {
         &self.nodes[index.0]
     }
 }
 
 impl IndexMut<FasNodeIndex> for FasNodeContainer {
-    fn index_mut(&mut self, index: FasNodeIndex) -> &mut Self::Output {
+    fn index_mut(
+        &mut self,
+        index: FasNodeIndex,
+    ) -> &mut Self::Output {
         &mut self.nodes[index.0]
     }
 }
@@ -259,7 +284,8 @@ impl Buckets {
         } else if node.in_degree == 0 {
             &mut self.sources
         } else {
-            let delta_degree = node.out_degree as isize - node.in_degree as isize;
+            let delta_degree =
+                node.out_degree as isize - node.in_degree as isize;
 
             if delta_degree >= 0 {
                 let bucket_ix = delta_degree as usize;
@@ -283,7 +309,11 @@ impl Buckets {
         }
     }
 
-    fn update_neighbour_node_buckets(&mut self, ix: FasNodeIndex, nodes: &mut FasNodeContainer) {
+    fn update_neighbour_node_buckets(
+        &mut self,
+        ix: FasNodeIndex,
+        nodes: &mut FasNodeContainer,
+    ) {
         for i in 0..nodes[ix].data().out_edges.len() {
             let out_ix = nodes[ix].data().out_edges[i];
 
@@ -341,7 +371,10 @@ impl Buckets {
 
 mod linked_list {
     use alloc::vec::Vec;
-    use core::{marker::PhantomData, ops::IndexMut};
+    use core::{
+        marker::PhantomData,
+        ops::IndexMut,
+    };
 
     #[derive(PartialEq, Debug)]
     pub struct LinkedList<Data, Container, Ix> {
@@ -393,7 +426,11 @@ mod linked_list {
             }
         }
 
-        pub fn push_front(&mut self, push_ix: Ix, container: &mut Container) {
+        pub fn push_front(
+            &mut self,
+            push_ix: Ix,
+            container: &mut Container,
+        ) {
             if let Some(start_ix) = self.start {
                 let entry = &mut container[start_ix];
                 entry.pos_mut().prev = Some(push_ix);
@@ -408,7 +445,10 @@ mod linked_list {
             self.start = Some(push_ix);
         }
 
-        pub fn pop(&mut self, container: &mut Container) -> Option<Ix> {
+        pub fn pop(
+            &mut self,
+            container: &mut Container,
+        ) -> Option<Ix> {
             if let Some(remove_ix) = self.start {
                 self.remove(remove_ix, container);
                 Some(remove_ix)
@@ -418,7 +458,11 @@ mod linked_list {
         }
 
         /// `remove_ix` **must** be a member of the list headed by `self`
-        pub fn remove(&mut self, remove_ix: Ix, container: &mut Container) {
+        pub fn remove(
+            &mut self,
+            remove_ix: Ix,
+            container: &mut Container,
+        ) {
             debug_assert!(
                 self.to_vec(container).contains(&remove_ix),
                 "node to remove should be member of current linked list"
@@ -444,7 +488,10 @@ mod linked_list {
         }
 
         /// For debug purposes
-        fn to_vec(&self, container: &mut Container) -> Vec<Ix> {
+        fn to_vec(
+            &self,
+            container: &mut Container,
+        ) -> Vec<Ix> {
             let mut ixs = Vec::new();
 
             let mut node_ix = self.start;

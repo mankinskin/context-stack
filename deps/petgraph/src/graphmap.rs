@@ -5,24 +5,49 @@ use alloc::vec::Vec;
 use core::{
     cmp::Ordering,
     fmt,
-    hash::{self, BuildHasher, Hash},
-    iter::{Copied, FromIterator},
+    hash::{
+        self,
+        BuildHasher,
+        Hash,
+    },
+    iter::{
+        Copied,
+        FromIterator,
+    },
     marker::PhantomData,
     mem,
-    ops::{Deref, Index, IndexMut},
+    ops::{
+        Deref,
+        Index,
+        IndexMut,
+    },
     slice::Iter,
 };
 
 use hashbrown::HashSet;
 use indexmap::{
-    map::{Iter as IndexMapIter, IterMut as IndexMapIterMut, Keys},
+    map::{
+        Iter as IndexMapIter,
+        IterMut as IndexMapIterMut,
+        Keys,
+    },
     IndexMap,
 };
 
 use crate::{
     data,
-    graph::{node_index, Graph},
-    visit, Directed, Direction, EdgeType, Incoming, IntoWeightedEdge, Outgoing, Undirected,
+    graph::{
+        node_index,
+        Graph,
+    },
+    visit,
+    Directed,
+    Direction,
+    EdgeType,
+    Incoming,
+    IntoWeightedEdge,
+    Outgoing,
+    Undirected,
 };
 
 #[cfg(feature = "std")]
@@ -30,7 +55,11 @@ use std::collections::hash_map::RandomState;
 
 #[cfg(feature = "rayon")]
 use {
-    indexmap::map::rayon::{ParIter, ParIterMut, ParKeys},
+    indexmap::map::rayon::{
+        ParIter,
+        ParIterMut,
+        ParKeys,
+    },
     rayon::prelude::*,
 };
 
@@ -38,14 +67,22 @@ use {
 ///
 /// For example, an edge between *1* and *2* is equivalent to an edge between
 /// *2* and *1*.
-pub type UnGraphMap<N, E, #[cfg(not(feature = "std"))] S, #[cfg(feature = "std")] S = RandomState> =
-    GraphMap<N, E, Undirected, S>;
+pub type UnGraphMap<
+    N,
+    E,
+    #[cfg(not(feature = "std"))] S,
+    #[cfg(feature = "std")] S = RandomState,
+> = GraphMap<N, E, Undirected, S>;
 /// A `GraphMap` with directed edges.
 ///
 /// For example, an edge from *1* to *2* is distinct from an edge from *2* to
 /// *1*.
-pub type DiGraphMap<N, E, #[cfg(not(feature = "std"))] S, #[cfg(feature = "std")] S = RandomState> =
-    GraphMap<N, E, Directed, S>;
+pub type DiGraphMap<
+    N,
+    E,
+    #[cfg(not(feature = "std"))] S,
+    #[cfg(feature = "std")] S = RandomState,
+> = GraphMap<N, E, Directed, S>;
 
 /// `GraphMap<N, E, Ty>` is a graph datastructure using an associative array
 /// of its node weights `N`.
@@ -87,10 +124,17 @@ pub struct GraphMap<
     ty: PhantomData<Ty>,
 }
 
-impl<N: Eq + Hash + fmt::Debug, E: fmt::Debug, Ty: EdgeType, S: BuildHasher> fmt::Debug
-    for GraphMap<N, E, Ty, S>
+impl<
+        N: Eq + Hash + fmt::Debug,
+        E: fmt::Debug,
+        Ty: EdgeType,
+        S: BuildHasher,
+    > fmt::Debug for GraphMap<N, E, Ty, S>
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         self.nodes.fmt(f)
     }
 }
@@ -136,7 +180,10 @@ impl From<CompactDirection> for Direction {
 }
 
 impl PartialEq<Direction> for CompactDirection {
-    fn eq(&self, rhs: &Direction) -> bool {
+    fn eq(
+        &self,
+        rhs: &Direction,
+    ) -> bool {
         (*self as usize) == (*rhs as usize)
     }
 }
@@ -154,7 +201,10 @@ where
     /// `Graph`. Needs feature `serde-1`.
     ///
     /// Note: the graph has to be `Clone` for this to work.
-    fn serialize<Ser>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error>
+    fn serialize<Ser>(
+        &self,
+        serializer: Ser,
+    ) -> Result<Ser::Ok, Ser::Error>
     where
         Ser: serde::Serializer,
     {
@@ -183,7 +233,8 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        let equivalent_graph: Graph<N, E, Ty, u32> = Graph::deserialize(deserializer)?;
+        let equivalent_graph: Graph<N, E, Ty, u32> =
+            Graph::deserialize(deserializer)?;
         Ok(GraphMap::from_graph(equivalent_graph))
     }
 }
@@ -201,7 +252,10 @@ where
     }
 
     /// Create a new `GraphMap` with estimated capacity.
-    pub fn with_capacity(nodes: usize, edges: usize) -> Self
+    pub fn with_capacity(
+        nodes: usize,
+        edges: usize,
+    ) -> Self
     where
         S: Default,
     {
@@ -213,7 +267,11 @@ where
     }
 
     /// Create a new `GraphMap` with estimated capacity, and specified hasher.
-    pub fn with_capacity_and_hasher(nodes: usize, edges: usize, hasher: S) -> Self
+    pub fn with_capacity_and_hasher(
+        nodes: usize,
+        edges: usize,
+        hasher: S,
+    ) -> Self
     where
         S: Clone,
     {
@@ -238,7 +296,10 @@ where
 
     /// Use their natural order to map the node pair (a, b) to a canonical edge id.
     #[inline]
-    fn edge_key(a: N, b: N) -> (N, N) {
+    fn edge_key(
+        a: N,
+        b: N,
+    ) -> (N, N) {
         if Ty::is_directed() || a <= b {
             (a, b)
         } else {
@@ -296,7 +357,10 @@ where
     }
 
     /// Add node `n` to the graph.
-    pub fn add_node(&mut self, n: N) -> N {
+    pub fn add_node(
+        &mut self,
+        n: N,
+    ) -> N {
         self.nodes.entry(n).or_default();
         n
     }
@@ -306,7 +370,10 @@ where
     /// Return `true` if it did exist.
     ///
     /// Computes in **O(V)** time, due to the removal of edges with other nodes.
-    pub fn remove_node(&mut self, n: N) -> bool {
+    pub fn remove_node(
+        &mut self,
+        n: N,
+    ) -> bool {
         let links = match self.nodes.swap_remove(&n) {
             None => return false,
             Some(sus) => sus,
@@ -326,7 +393,10 @@ where
     }
 
     /// Return `true` if the node is contained in the graph.
-    pub fn contains_node(&self, n: N) -> bool {
+    pub fn contains_node(
+        &self,
+        n: N,
+    ) -> bool {
         self.nodes.contains_key(&n)
     }
 
@@ -351,7 +421,12 @@ where
     /// assert!(g.contains_edge("x", "y"));
     /// assert!(!g.contains_edge("y", "x"));
     /// ```
-    pub fn add_edge(&mut self, a: N, b: N, weight: E) -> Option<E> {
+    pub fn add_edge(
+        &mut self,
+        a: N,
+        b: N,
+        weight: E,
+    ) -> Option<E> {
         if let old @ Some(_) = self.edges.insert(Self::edge_key(a, b), weight) {
             old
         } else {
@@ -374,16 +449,21 @@ where
     /// Remove edge relation from a to b
     ///
     /// Return `true` if it did exist.
-    fn remove_single_edge(&mut self, a: &N, b: &N, dir: CompactDirection) -> bool {
+    fn remove_single_edge(
+        &mut self,
+        a: &N,
+        b: &N,
+        dir: CompactDirection,
+    ) -> bool {
         match self.nodes.get_mut(a) {
             None => false,
-            Some(sus) => {
+            Some(sus) =>
                 if Ty::is_directed() {
                     match sus.iter().position(|elt| elt == &(*b, dir)) {
                         Some(index) => {
                             sus.swap_remove(index);
                             true
-                        }
+                        },
                         None => false,
                     }
                 } else {
@@ -391,11 +471,10 @@ where
                         Some(index) => {
                             sus.swap_remove(index);
                             true
-                        }
+                        },
                         None => false,
                     }
-                }
-            }
+                },
         }
     }
 
@@ -414,8 +493,13 @@ where
     /// assert_eq!(edge_data, Some(-1));
     /// assert_eq!(g.edge_count(), 0);
     /// ```
-    pub fn remove_edge(&mut self, a: N, b: N) -> Option<E> {
-        let exist1 = self.remove_single_edge(&a, &b, CompactDirection::Outgoing);
+    pub fn remove_edge(
+        &mut self,
+        a: N,
+        b: N,
+    ) -> Option<E> {
+        let exist1 =
+            self.remove_single_edge(&a, &b, CompactDirection::Outgoing);
         let exist2 = if a != b {
             self.remove_single_edge(&b, &a, CompactDirection::Incoming)
         } else {
@@ -427,7 +511,11 @@ where
     }
 
     /// Return `true` if the edge connecting `a` with `b` is contained in the graph.
-    pub fn contains_edge(&self, a: N, b: N) -> bool {
+    pub fn contains_edge(
+        &self,
+        a: N,
+        b: N,
+    ) -> bool {
         self.edges.contains_key(&Self::edge_key(a, b))
     }
 
@@ -460,7 +548,10 @@ where
     ///
     /// Produces an empty iterator if the node doesn't exist.<br>
     /// Iterator element type is `N`.
-    pub fn neighbors(&self, a: N) -> Neighbors<'_, N, Ty> {
+    pub fn neighbors(
+        &self,
+        a: N,
+    ) -> Neighbors<'_, N, Ty> {
         Neighbors {
             iter: match self.nodes.get(&a) {
                 Some(neigh) => neigh.iter(),
@@ -480,7 +571,11 @@ where
     ///
     /// Produces an empty iterator if the node doesn't exist.<br>
     /// Iterator element type is `N`.
-    pub fn neighbors_directed(&self, a: N, dir: Direction) -> NeighborsDirected<'_, N, Ty> {
+    pub fn neighbors_directed(
+        &self,
+        a: N,
+        dir: Direction,
+    ) -> NeighborsDirected<'_, N, Ty> {
         NeighborsDirected {
             iter: match self.nodes.get(&a) {
                 Some(neigh) => neigh.iter(),
@@ -500,7 +595,10 @@ where
     ///
     /// Produces an empty iterator if the node doesn't exist.<br>
     /// Iterator element type is `(N, N, &E)`.
-    pub fn edges(&self, a: N) -> Edges<'_, N, E, Ty, S> {
+    pub fn edges(
+        &self,
+        a: N,
+    ) -> Edges<'_, N, E, Ty, S> {
         Edges {
             from: a,
             iter: self.neighbors(a),
@@ -520,7 +618,11 @@ where
     ///
     /// Produces an empty iterator if the node doesn't exist.<br>
     /// Iterator element type is `(N, N, &E)`.
-    pub fn edges_directed(&self, a: N, dir: Direction) -> EdgesDirected<'_, N, E, Ty, S> {
+    pub fn edges_directed(
+        &self,
+        a: N,
+        dir: Direction,
+    ) -> EdgesDirected<'_, N, E, Ty, S> {
         EdgesDirected {
             from: a,
             iter: self.neighbors_directed(a, dir),
@@ -531,13 +633,21 @@ where
 
     /// Return a reference to the edge weight connecting `a` with `b`, or
     /// `None` if the edge does not exist in the graph.
-    pub fn edge_weight(&self, a: N, b: N) -> Option<&E> {
+    pub fn edge_weight(
+        &self,
+        a: N,
+        b: N,
+    ) -> Option<&E> {
         self.edges.get(&Self::edge_key(a, b))
     }
 
     /// Return a mutable reference to the edge weight connecting `a` with `b`, or
     /// `None` if the edge does not exist in the graph.
-    pub fn edge_weight_mut(&mut self, a: N, b: N) -> Option<&mut E> {
+    pub fn edge_weight_mut(
+        &mut self,
+        a: N,
+        b: N,
+    ) -> Option<&mut E> {
         self.edges.get_mut(&Self::edge_key(a, b))
     }
 
@@ -686,8 +796,10 @@ where
     Ty: EdgeType,
     S: BuildHasher,
 {
-    fn extend<I>(&mut self, iterable: I)
-    where
+    fn extend<I>(
+        &mut self,
+        iterable: I,
+    ) where
         I: IntoIterator<Item = Item>,
     {
         let iter = iterable.into_iter();
@@ -728,7 +840,9 @@ where
     fn next(&mut self) -> Option<N> {
         if Ty::is_directed() {
             (&mut self.iter)
-                .filter_map(|&(n, dir)| if dir == Outgoing { Some(n) } else { None })
+                .filter_map(
+                    |&(n, dir)| if dir == Outgoing { Some(n) } else { None },
+                )
                 .next()
         } else {
             self.iter.next().map(|&(n, _)| n)
@@ -901,7 +1015,10 @@ where
         self.inner.count()
     }
 
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+    fn nth(
+        &mut self,
+        n: usize,
+    ) -> Option<Self::Item> {
         self.inner
             .nth(n)
             .map(|(&(n1, n2), weight)| (n1, n2, weight))
@@ -956,7 +1073,10 @@ where
         self.inner.count()
     }
 
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+    fn nth(
+        &mut self,
+        n: usize,
+    ) -> Option<Self::Item> {
         self.inner
             .nth(n)
             .map(|(&(n1, n2), weight)| (n1, n2, weight))
@@ -990,7 +1110,10 @@ where
     S: BuildHasher,
 {
     type Output = E;
-    fn index(&self, index: (N, N)) -> &E {
+    fn index(
+        &self,
+        index: (N, N),
+    ) -> &E {
         let index = Self::edge_key(index.0, index.1);
         self.edge_weight(index.0, index.1)
             .expect("GraphMap::index: no such edge")
@@ -1004,7 +1127,10 @@ where
     Ty: EdgeType,
     S: BuildHasher,
 {
-    fn index_mut(&mut self, index: (N, N)) -> &mut E {
+    fn index_mut(
+        &mut self,
+        index: (N, N),
+    ) -> &mut E {
         let index = Self::edge_key(index.0, index.1);
         self.edge_weight_mut(index.0, index.1)
             .expect("GraphMap::index: no such edge")
@@ -1036,26 +1162,38 @@ impl<T> Clone for Ptr<'_, T> {
     }
 }
 
-fn ptr_eq<T>(a: *const T, b: *const T) -> bool {
+fn ptr_eq<T>(
+    a: *const T,
+    b: *const T,
+) -> bool {
     a == b
 }
 
 impl<'b, T> PartialEq for Ptr<'b, T> {
     /// Ptr compares by pointer equality, i.e if they point to the same value
-    fn eq(&self, other: &Ptr<'b, T>) -> bool {
+    fn eq(
+        &self,
+        other: &Ptr<'b, T>,
+    ) -> bool {
         ptr_eq(self.0, other.0)
     }
 }
 
 impl<'b, T> PartialOrd for Ptr<'b, T> {
-    fn partial_cmp(&self, other: &Ptr<'b, T>) -> Option<Ordering> {
+    fn partial_cmp(
+        &self,
+        other: &Ptr<'b, T>,
+    ) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<'b, T> Ord for Ptr<'b, T> {
     /// Ptr is ordered by pointer value, i.e. an arbitrary but stable and total order.
-    fn cmp(&self, other: &Ptr<'b, T>) -> Ordering {
+    fn cmp(
+        &self,
+        other: &Ptr<'b, T>,
+    ) -> Ordering {
         let a: *const T = self.0;
         let b: *const T = other.0;
         a.cmp(&b)
@@ -1072,14 +1210,20 @@ impl<T> Deref for Ptr<'_, T> {
 impl<T> Eq for Ptr<'_, T> {}
 
 impl<T> Hash for Ptr<'_, T> {
-    fn hash<H: hash::Hasher>(&self, st: &mut H) {
+    fn hash<H: hash::Hasher>(
+        &self,
+        st: &mut H,
+    ) {
         let ptr = (self.0) as *const T;
         ptr.hash(st)
     }
 }
 
 impl<T: fmt::Debug> fmt::Debug for Ptr<'_, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         self.0.fmt(f)
     }
 }
@@ -1163,7 +1307,10 @@ where
     fn visit_map(&self) -> HashSet<N> {
         HashSet::with_capacity(self.node_count())
     }
-    fn reset_map(&self, map: &mut Self::Map) {
+    fn reset_map(
+        &self,
+        map: &mut Self::Map,
+    ) {
         map.clear();
     }
 }
@@ -1194,7 +1341,8 @@ where
     }
 }
 
-impl<'a, N, E: 'a, Ty, S> visit::IntoNodeIdentifiers for &'a GraphMap<N, E, Ty, S>
+impl<'a, N, E: 'a, Ty, S> visit::IntoNodeIdentifiers
+    for &'a GraphMap<N, E, Ty, S>
 where
     N: NodeTrait,
     Ty: EdgeType,
@@ -1231,10 +1379,16 @@ where
     fn node_bound(&self) -> usize {
         self.node_count()
     }
-    fn to_index(&self, ix: Self::NodeId) -> usize {
+    fn to_index(
+        &self,
+        ix: Self::NodeId,
+    ) -> usize {
         self.nodes.get_index_of(&ix).expect("node not found")
     }
-    fn from_index(&self, ix: usize) -> Self::NodeId {
+    fn from_index(
+        &self,
+        ix: usize,
+    ) -> Self::NodeId {
         assert!(
             ix < self.nodes.len(),
             "The requested index {ix} is out-of-bounds."
@@ -1259,19 +1413,27 @@ where
     S: BuildHasher,
 {
     type Neighbors = Neighbors<'a, N, Ty>;
-    fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
+    fn neighbors(
+        self,
+        n: Self::NodeId,
+    ) -> Self::Neighbors {
         self.neighbors(n)
     }
 }
 
-impl<'a, N: 'a, E, Ty, S> visit::IntoNeighborsDirected for &'a GraphMap<N, E, Ty, S>
+impl<'a, N: 'a, E, Ty, S> visit::IntoNeighborsDirected
+    for &'a GraphMap<N, E, Ty, S>
 where
     N: Copy + Ord + Hash,
     Ty: EdgeType,
     S: BuildHasher,
 {
     type NeighborsDirected = NeighborsDirected<'a, N, Ty>;
-    fn neighbors_directed(self, n: N, dir: Direction) -> Self::NeighborsDirected {
+    fn neighbors_directed(
+        self,
+        n: N,
+        dir: Direction,
+    ) -> Self::NeighborsDirected {
         self.neighbors_directed(n, dir)
     }
 }
@@ -1286,11 +1448,17 @@ where
         self.edge_count()
     }
 
-    fn to_index(&self, ix: Self::EdgeId) -> usize {
+    fn to_index(
+        &self,
+        ix: Self::EdgeId,
+    ) -> usize {
         self.edges.get_index_of(&ix).expect("edge not found")
     }
 
-    fn from_index(&self, ix: usize) -> Self::EdgeId {
+    fn from_index(
+        &self,
+        ix: usize,
+    ) -> Self::EdgeId {
         assert!(
             ix < self.edges.len(),
             "The requested index {ix} is out-of-bounds."
@@ -1307,24 +1475,33 @@ where
     S: BuildHasher,
 {
     type Edges = Edges<'a, N, E, Ty, S>;
-    fn edges(self, a: Self::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        a: Self::NodeId,
+    ) -> Self::Edges {
         self.edges(a)
     }
 }
 
-impl<'a, N: 'a, E: 'a, Ty, S> visit::IntoEdgesDirected for &'a GraphMap<N, E, Ty, S>
+impl<'a, N: 'a, E: 'a, Ty, S> visit::IntoEdgesDirected
+    for &'a GraphMap<N, E, Ty, S>
 where
     N: NodeTrait,
     Ty: EdgeType,
     S: BuildHasher,
 {
     type EdgesDirected = EdgesDirected<'a, N, E, Ty, S>;
-    fn edges_directed(self, a: Self::NodeId, dir: Direction) -> Self::EdgesDirected {
+    fn edges_directed(
+        self,
+        a: Self::NodeId,
+        dir: Direction,
+    ) -> Self::EdgesDirected {
         self.edges_directed(a, dir)
     }
 }
 
-impl<'a, N: 'a, E: 'a, Ty, S> visit::IntoEdgeReferences for &'a GraphMap<N, E, Ty, S>
+impl<'a, N: 'a, E: 'a, Ty, S> visit::IntoEdgeReferences
+    for &'a GraphMap<N, E, Ty, S>
 where
     N: NodeTrait,
     Ty: EdgeType,
@@ -1360,7 +1537,12 @@ where
     #[inline]
     fn adjacency_matrix(&self) {}
     #[inline]
-    fn is_adjacent(&self, _: &(), a: N, b: N) -> bool {
+    fn is_adjacent(
+        &self,
+        _: &(),
+        a: N,
+        b: N,
+    ) -> bool {
         self.contains_edge(a, b)
     }
 }
@@ -1371,11 +1553,17 @@ where
     Ty: EdgeType,
     S: BuildHasher,
 {
-    fn edge_weight(&self, id: Self::EdgeId) -> Option<&Self::EdgeWeight> {
+    fn edge_weight(
+        &self,
+        id: Self::EdgeId,
+    ) -> Option<&Self::EdgeWeight> {
         self.edge_weight(id.0, id.1)
     }
 
-    fn node_weight(&self, id: Self::NodeId) -> Option<&Self::NodeWeight> {
+    fn node_weight(
+        &self,
+        id: Self::NodeId,
+    ) -> Option<&Self::NodeWeight> {
         // Technically `id` is already the weight for `GraphMap`, but since we need to return a reference, this is a O(1) borrowing alternative:
         self.nodes.get_key_value(&id).map(|(k, _)| k)
     }
@@ -1397,7 +1585,10 @@ where
 {
     type Item = N;
 
-    fn drive_unindexed<C>(self, consumer: C) -> C::Result
+    fn drive_unindexed<C>(
+        self,
+        consumer: C,
+    ) -> C::Result
     where
         C: rayon::iter::plumbing::UnindexedConsumer<Self::Item>,
     {
@@ -1414,7 +1605,10 @@ impl<N> IndexedParallelIterator for ParNodes<'_, N>
 where
     N: NodeTrait + Send + Sync,
 {
-    fn drive<C>(self, consumer: C) -> C::Result
+    fn drive<C>(
+        self,
+        consumer: C,
+    ) -> C::Result
     where
         C: rayon::iter::plumbing::Consumer<Self::Item>,
     {
@@ -1425,7 +1619,10 @@ where
         self.iter.len()
     }
 
-    fn with_producer<CB>(self, callback: CB) -> CB::Output
+    fn with_producer<CB>(
+        self,
+        callback: CB,
+    ) -> CB::Output
     where
         CB: rayon::iter::plumbing::ProducerCallback<Self::Item>,
     {
@@ -1452,7 +1649,10 @@ where
 {
     type Item = (N, N, &'a E);
 
-    fn drive_unindexed<C>(self, c: C) -> C::Result
+    fn drive_unindexed<C>(
+        self,
+        c: C,
+    ) -> C::Result
     where
         C: rayon::iter::plumbing::UnindexedConsumer<Self::Item>,
     {
@@ -1470,7 +1670,10 @@ where
     N: NodeTrait + Send + Sync,
     E: Sync,
 {
-    fn drive<C>(self, consumer: C) -> C::Result
+    fn drive<C>(
+        self,
+        consumer: C,
+    ) -> C::Result
     where
         C: rayon::iter::plumbing::Consumer<Self::Item>,
     {
@@ -1481,7 +1684,10 @@ where
         self.inner.len()
     }
 
-    fn with_producer<CB>(self, callback: CB) -> CB::Output
+    fn with_producer<CB>(
+        self,
+        callback: CB,
+    ) -> CB::Output
     where
         CB: rayon::iter::plumbing::ProducerCallback<Self::Item>,
     {
@@ -1510,7 +1716,10 @@ where
 {
     type Item = (N, N, &'a mut E);
 
-    fn drive_unindexed<C>(self, c: C) -> C::Result
+    fn drive_unindexed<C>(
+        self,
+        c: C,
+    ) -> C::Result
     where
         C: rayon::iter::plumbing::UnindexedConsumer<Self::Item>,
     {
@@ -1528,7 +1737,10 @@ where
     N: NodeTrait + Send + Sync,
     E: Send,
 {
-    fn drive<C>(self, consumer: C) -> C::Result
+    fn drive<C>(
+        self,
+        consumer: C,
+    ) -> C::Result
     where
         C: rayon::iter::plumbing::Consumer<Self::Item>,
     {
@@ -1539,7 +1751,10 @@ where
         self.inner.len()
     }
 
-    fn with_producer<CB>(self, callback: CB) -> CB::Output
+    fn with_producer<CB>(
+        self,
+        callback: CB,
+    ) -> CB::Output
     where
         CB: rayon::iter::plumbing::ProducerCallback<Self::Item>,
     {

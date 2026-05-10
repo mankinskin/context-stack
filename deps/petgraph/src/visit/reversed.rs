@@ -1,9 +1,27 @@
-use crate::{Direction, Incoming};
+use crate::{
+    Direction,
+    Incoming,
+};
 
 use crate::visit::{
-    Data, EdgeCount, EdgeIndexable, EdgeRef, GetAdjacencyMatrix, GraphBase, GraphProp, GraphRef,
-    IntoEdgeReferences, IntoEdges, IntoEdgesDirected, IntoNeighbors, IntoNeighborsDirected,
-    IntoNodeIdentifiers, IntoNodeReferences, NodeCompactIndexable, NodeCount, NodeIndexable,
+    Data,
+    EdgeCount,
+    EdgeIndexable,
+    EdgeRef,
+    GetAdjacencyMatrix,
+    GraphBase,
+    GraphProp,
+    GraphRef,
+    IntoEdgeReferences,
+    IntoEdges,
+    IntoEdgesDirected,
+    IntoNeighbors,
+    IntoNeighborsDirected,
+    IntoNodeIdentifiers,
+    IntoNodeReferences,
+    NodeCompactIndexable,
+    NodeCount,
+    NodeIndexable,
     Visitable,
 };
 
@@ -27,7 +45,10 @@ where
     G: IntoNeighborsDirected,
 {
     type Neighbors = G::NeighborsDirected;
-    fn neighbors(self, n: G::NodeId) -> G::NeighborsDirected {
+    fn neighbors(
+        self,
+        n: G::NodeId,
+    ) -> G::NeighborsDirected {
         self.0.neighbors_directed(n, Incoming)
     }
 }
@@ -37,7 +58,11 @@ where
     G: IntoNeighborsDirected,
 {
     type NeighborsDirected = G::NeighborsDirected;
-    fn neighbors_directed(self, n: G::NodeId, d: Direction) -> G::NeighborsDirected {
+    fn neighbors_directed(
+        self,
+        n: G::NodeId,
+        d: Direction,
+    ) -> G::NeighborsDirected {
         self.0.neighbors_directed(n, d.opposite())
     }
 }
@@ -47,7 +72,10 @@ where
     G: IntoEdgesDirected,
 {
     type Edges = ReversedEdges<G::EdgesDirected>;
-    fn edges(self, a: Self::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        a: Self::NodeId,
+    ) -> Self::Edges {
         ReversedEdges {
             iter: self.0.edges_directed(a, Incoming),
         }
@@ -59,7 +87,11 @@ where
     G: IntoEdgesDirected,
 {
     type EdgesDirected = ReversedEdges<G::EdgesDirected>;
-    fn edges_directed(self, a: Self::NodeId, dir: Direction) -> Self::Edges {
+    fn edges_directed(
+        self,
+        a: Self::NodeId,
+        dir: Direction,
+    ) -> Self::Edges {
         ReversedEdges {
             iter: self.0.edges_directed(a, dir.opposite()),
         }
@@ -71,7 +103,10 @@ impl<G: Visitable> Visitable for Reversed<G> {
     fn visit_map(&self) -> G::Map {
         self.0.visit_map()
     }
-    fn reset_map(&self, map: &mut Self::Map) {
+    fn reset_map(
+        &self,
+        map: &mut Self::Map,
+    ) {
         self.0.reset_map(map);
     }
 }

@@ -1,8 +1,15 @@
 use petgraph::{
-    algo::{min_spanning_tree, min_spanning_tree_prim},
+    algo::{
+        min_spanning_tree,
+        min_spanning_tree_prim,
+    },
     dot::Dot,
-    graph::{NodeIndex, UnGraph},
-    Graph, Undirected,
+    graph::{
+        NodeIndex,
+        UnGraph,
+    },
+    Graph,
+    Undirected,
 };
 
 #[test]
@@ -146,7 +153,8 @@ fn mst_prim_graph_without_edges() {
     gr.add_node("F");
     gr.add_node("G");
 
-    let mst: Graph<&str, usize, Undirected> = UnGraph::from_elements(min_spanning_tree_prim(&gr));
+    let mst: Graph<&str, usize, Undirected> =
+        UnGraph::from_elements(min_spanning_tree_prim(&gr));
 
     assert!(mst.node_count() == gr.node_count());
     assert!(mst.edge_count() == 0);
@@ -158,7 +166,8 @@ fn mst_prim_empty_graph() {
 
     let gr = UnGraph::new_undirected();
 
-    let mst: Graph<&str, usize, Undirected> = UnGraph::from_elements(min_spanning_tree_prim(&gr));
+    let mst: Graph<&str, usize, Undirected> =
+        UnGraph::from_elements(min_spanning_tree_prim(&gr));
 
     assert!(mst.node_count() == 0);
     assert!(mst.edge_count() == 0);
@@ -172,7 +181,8 @@ fn mst_kruskal_test_cases() {
         let mut gr = UnGraph::new_undirected();
         gr.extend_with_edges(edges.to_vec());
 
-        let mst: Graph<(), u32, Undirected, u32> = UnGraph::from_elements(min_spanning_tree(&gr));
+        let mst: Graph<(), u32, Undirected, u32> =
+            UnGraph::from_elements(min_spanning_tree(&gr));
 
         assert!(mst.node_count() == gr.node_count());
         assert!(mst.edge_count() == expected_mst_edges.len());

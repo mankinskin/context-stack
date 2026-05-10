@@ -1,16 +1,42 @@
-use core::ops::{Deref, Index, IndexMut};
+use core::ops::{
+    Deref,
+    Index,
+    IndexMut,
+};
 
 use super::Frozen;
-use crate::data::{DataMap, DataMapMut};
-use crate::graph::Graph;
-use crate::graph::{GraphIndex, IndexType};
-use crate::visit::{
-    Data, EdgeCount, EdgeIndexable, GetAdjacencyMatrix, GraphBase, GraphProp, IntoEdges,
-    IntoEdgesDirected, IntoNeighborsDirected, IntoNodeIdentifiers, NodeCompactIndexable, NodeCount,
-    NodeIndexable,
+use crate::{
+    data::{
+        DataMap,
+        DataMapMut,
+    },
+    graph::{
+        Graph,
+        GraphIndex,
+        IndexType,
+    },
+    visit::{
+        Data,
+        EdgeCount,
+        EdgeIndexable,
+        GetAdjacencyMatrix,
+        GraphBase,
+        GraphProp,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoEdgesDirected,
+        IntoNeighbors,
+        IntoNeighborsDirected,
+        IntoNodeIdentifiers,
+        IntoNodeReferences,
+        NodeCompactIndexable,
+        NodeCount,
+        NodeIndexable,
+        Visitable,
+    },
+    Direction,
+    EdgeType,
 };
-use crate::visit::{IntoEdgeReferences, IntoNeighbors, IntoNodeReferences, Visitable};
-use crate::{Direction, EdgeType};
 
 impl<'a, G> Frozen<'a, G> {
     /// Create a new `Frozen` from a mutable reference to a graph.
@@ -33,7 +59,10 @@ where
     G: Index<I>,
 {
     type Output = G::Output;
-    fn index(&self, i: I) -> &G::Output {
+    fn index(
+        &self,
+        i: I,
+    ) -> &G::Output {
         self.0.index(i)
     }
 }
@@ -42,7 +71,10 @@ impl<G, I> IndexMut<I> for Frozen<'_, G>
 where
     G: IndexMut<I>,
 {
-    fn index_mut(&mut self, i: I) -> &mut G::Output {
+    fn index_mut(
+        &mut self,
+        i: I,
+    ) -> &mut G::Output {
         self.0.index_mut(i)
     }
 }

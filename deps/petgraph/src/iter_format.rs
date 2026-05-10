@@ -1,6 +1,9 @@
 //! Formatting utils
 
-use core::{cell::RefCell, fmt};
+use core::{
+    cell::RefCell,
+    fmt,
+};
 
 /// Format the iterator like a map
 pub struct DebugMap<F>(pub F);
@@ -12,7 +15,10 @@ where
     K: fmt::Debug,
     V: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         f.debug_map().entries((self.0)()).finish()
     }
 }
@@ -24,7 +30,10 @@ impl<T> fmt::Debug for NoPretty<T>
 where
     T: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         write!(f, "{:?}", self.0)
     }
 }
@@ -44,7 +53,10 @@ pub struct Format<'a, I> {
 }
 
 pub trait IterFormatExt: Iterator {
-    fn format(self, separator: &str) -> Format<'_, Self>
+    fn format(
+        self,
+        separator: &str,
+    ) -> Format<'_, Self>
     where
         Self: Sized,
     {
@@ -61,7 +73,11 @@ impl<I> Format<'_, I>
 where
     I: Iterator,
 {
-    fn format<F>(&self, f: &mut fmt::Formatter, mut cb: F) -> fmt::Result
+    fn format<F>(
+        &self,
+        f: &mut fmt::Formatter,
+        mut cb: F,
+    ) -> fmt::Result
     where
         F: FnMut(&I::Item, &mut fmt::Formatter) -> fmt::Result,
     {

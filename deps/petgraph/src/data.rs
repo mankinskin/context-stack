@@ -2,17 +2,27 @@
 
 use alloc::vec::Vec;
 
-use crate::graph::IndexType;
-use crate::visit::{Data, NodeCount, NodeIndexable, Reversed};
-use crate::EdgeType;
-use crate::Graph;
+use crate::{
+    graph::IndexType,
+    visit::{
+        Data,
+        NodeCount,
+        NodeIndexable,
+        Reversed,
+    },
+    EdgeType,
+    Graph,
+};
 
 #[cfg(feature = "stable_graph")]
 use crate::stable_graph::StableGraph;
 
 #[cfg(feature = "graphmap")]
 use {
-    crate::graphmap::{GraphMap, NodeTrait},
+    crate::graphmap::{
+        GraphMap,
+        NodeTrait,
+    },
     core::hash::BuildHasher,
 };
 
@@ -51,7 +61,10 @@ DataMapMut! {delegate_impl [[G], G, Reversed<G>, access0]}
 
 /// A graph that can be extended with further nodes and edges
 pub trait Build: Data + NodeCount {
-    fn add_node(&mut self, weight: Self::NodeWeight) -> Self::NodeId;
+    fn add_node(
+        &mut self,
+        weight: Self::NodeWeight,
+    ) -> Self::NodeId;
     /// Add a new edge. If parallel edges (duplicate) are not allowed and
     /// the edge already exists, return `None`.
     ///
@@ -80,7 +93,10 @@ pub trait Build: Data + NodeCount {
 
 /// A graph that can be created
 pub trait Create: Build + Default {
-    fn with_capacity(nodes: usize, edges: usize) -> Self;
+    fn with_capacity(
+        nodes: usize,
+        edges: usize,
+    ) -> Self;
 }
 
 impl<N, E, Ty, Ix> Data for Graph<N, E, Ty, Ix>
@@ -96,10 +112,16 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn node_weight(&self, id: Self::NodeId) -> Option<&Self::NodeWeight> {
+    fn node_weight(
+        &self,
+        id: Self::NodeId,
+    ) -> Option<&Self::NodeWeight> {
         self.node_weight(id)
     }
-    fn edge_weight(&self, id: Self::EdgeId) -> Option<&Self::EdgeWeight> {
+    fn edge_weight(
+        &self,
+        id: Self::EdgeId,
+    ) -> Option<&Self::EdgeWeight> {
         self.edge_weight(id)
     }
 }
@@ -109,10 +131,16 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn node_weight_mut(&mut self, id: Self::NodeId) -> Option<&mut Self::NodeWeight> {
+    fn node_weight_mut(
+        &mut self,
+        id: Self::NodeId,
+    ) -> Option<&mut Self::NodeWeight> {
         self.node_weight_mut(id)
     }
-    fn edge_weight_mut(&mut self, id: Self::EdgeId) -> Option<&mut Self::EdgeWeight> {
+    fn edge_weight_mut(
+        &mut self,
+        id: Self::EdgeId,
+    ) -> Option<&mut Self::EdgeWeight> {
         self.edge_weight_mut(id)
     }
 }
@@ -123,10 +151,16 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn node_weight(&self, id: Self::NodeId) -> Option<&Self::NodeWeight> {
+    fn node_weight(
+        &self,
+        id: Self::NodeId,
+    ) -> Option<&Self::NodeWeight> {
         self.node_weight(id)
     }
-    fn edge_weight(&self, id: Self::EdgeId) -> Option<&Self::EdgeWeight> {
+    fn edge_weight(
+        &self,
+        id: Self::EdgeId,
+    ) -> Option<&Self::EdgeWeight> {
         self.edge_weight(id)
     }
 }
@@ -137,10 +171,16 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn node_weight_mut(&mut self, id: Self::NodeId) -> Option<&mut Self::NodeWeight> {
+    fn node_weight_mut(
+        &mut self,
+        id: Self::NodeId,
+    ) -> Option<&mut Self::NodeWeight> {
         self.node_weight_mut(id)
     }
-    fn edge_weight_mut(&mut self, id: Self::EdgeId) -> Option<&mut Self::EdgeWeight> {
+    fn edge_weight_mut(
+        &mut self,
+        id: Self::EdgeId,
+    ) -> Option<&mut Self::EdgeWeight> {
         self.edge_weight_mut(id)
     }
 }
@@ -150,7 +190,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn add_node(&mut self, weight: Self::NodeWeight) -> Self::NodeId {
+    fn add_node(
+        &mut self,
+        weight: Self::NodeWeight,
+    ) -> Self::NodeId {
         self.add_node(weight)
     }
     fn add_edge(
@@ -177,7 +220,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn add_node(&mut self, weight: Self::NodeWeight) -> Self::NodeId {
+    fn add_node(
+        &mut self,
+        weight: Self::NodeWeight,
+    ) -> Self::NodeId {
         self.add_node(weight)
     }
     fn add_edge(
@@ -205,7 +251,10 @@ where
     N: NodeTrait,
     S: BuildHasher,
 {
-    fn add_node(&mut self, weight: Self::NodeWeight) -> Self::NodeId {
+    fn add_node(
+        &mut self,
+        weight: Self::NodeWeight,
+    ) -> Self::NodeId {
         self.add_node(weight)
     }
     fn add_edge(
@@ -238,7 +287,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn with_capacity(nodes: usize, edges: usize) -> Self {
+    fn with_capacity(
+        nodes: usize,
+        edges: usize,
+    ) -> Self {
         Self::with_capacity(nodes, edges)
     }
 }
@@ -249,7 +301,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn with_capacity(nodes: usize, edges: usize) -> Self {
+    fn with_capacity(
+        nodes: usize,
+        edges: usize,
+    ) -> Self {
         Self::with_capacity(nodes, edges)
     }
 }
@@ -261,7 +316,10 @@ where
     N: NodeTrait,
     S: BuildHasher + Default,
 {
-    fn with_capacity(nodes: usize, edges: usize) -> Self {
+    fn with_capacity(
+        nodes: usize,
+        edges: usize,
+    ) -> Self {
         Self::with_capacity(nodes, edges)
     }
 }
@@ -297,14 +355,14 @@ pub trait FromElements: Create {
             match element {
                 Element::Node { weight } => {
                     map.push(gr.add_node(weight));
-                }
+                },
                 Element::Edge {
                     source,
                     target,
                     weight,
                 } => {
                     gr.add_edge(map[source], map[target], weight);
-                }
+                },
             }
         }
         gr
@@ -322,7 +380,7 @@ where
         match element {
             Element::Node { weight } => {
                 gr.add_node(weight);
-            }
+            },
             Element::Edge {
                 source,
                 target,
@@ -331,7 +389,7 @@ where
                 let from = map(&gr, source);
                 let to = map(&gr, target);
                 gr.add_edge(from, to, weight);
-            }
+            },
         }
     }
     gr
@@ -393,7 +451,10 @@ pub trait ElementIterator<N, E>: Iterator<Item = Element<N, E>> {
     ///
     /// This filter adapts the edge source and target indices in the
     /// stream so that they are correct after the removals.
-    fn filter_elements<F>(self, f: F) -> FilterElements<Self, F>
+    fn filter_elements<F>(
+        self,
+        f: F,
+    ) -> FilterElements<Self, F>
     where
         Self: Sized,
         F: FnMut(Element<&mut N, &mut E>) -> bool,
@@ -407,7 +468,10 @@ pub trait ElementIterator<N, E>: Iterator<Item = Element<N, E>> {
     }
 }
 
-impl<N, E, I: ?Sized> ElementIterator<N, E> for I where I: Iterator<Item = Element<N, E>> {}
+impl<N, E, I: ?Sized> ElementIterator<N, E> for I where
+    I: Iterator<Item = Element<N, E>>
+{
+}
 
 /// An iterator that filters graph elements.
 ///
@@ -477,8 +541,8 @@ where
                         Ok(_) => continue,
                         Err(i) => *target -= i,
                     }
-                }
-                Element::Node { .. } => {}
+                },
+                Element::Node { .. } => {},
             }
             return Some(elt);
         }

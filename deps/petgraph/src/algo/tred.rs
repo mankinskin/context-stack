@@ -8,16 +8,28 @@
 //! closure of **Gr** is the same as that of **G**.
 //! The transitive reduction is well-defined for acyclic graphs only.
 
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 
 use fixedbitset::FixedBitSet;
 
-use crate::adj::{List, UnweightedList};
-use crate::graph::IndexType;
-use crate::visit::{
-    GraphBase, IntoNeighbors, IntoNeighborsDirected, NodeCompactIndexable, NodeCount,
+use crate::{
+    adj::{
+        List,
+        UnweightedList,
+    },
+    graph::IndexType,
+    visit::{
+        GraphBase,
+        IntoNeighbors,
+        IntoNeighborsDirected,
+        NodeCompactIndexable,
+        NodeCount,
+    },
+    Direction,
 };
-use crate::Direction;
 
 /// Creates a representation of the same graph respecting topological order for use in `tred::dag_transitive_reduction_closure`.
 ///
@@ -118,7 +130,7 @@ where
 ///
 /// where **|V|** is the number of nodes and **|E|** is the number of edges.
 pub fn dag_transitive_reduction_closure<E, Ix: IndexType>(
-    g: &List<E, Ix>,
+    g: &List<E, Ix>
 ) -> (UnweightedList<Ix>, UnweightedList<Ix>) {
     let mut tred = List::with_capacity(g.node_count());
     let mut tclos = List::with_capacity(g.node_count());

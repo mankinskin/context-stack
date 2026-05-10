@@ -1,14 +1,28 @@
-use alloc::{collections::BinaryHeap, vec, vec::Vec};
+use alloc::{
+    collections::BinaryHeap,
+    vec,
+    vec::Vec,
+};
 use core::hash::Hash;
 
 use hashbrown::hash_map::{
-    Entry::{Occupied, Vacant},
+    Entry::{
+        Occupied,
+        Vacant,
+    },
     HashMap,
 };
 
-use crate::algo::Measure;
-use crate::scored::MinScored;
-use crate::visit::{EdgeRef, GraphBase, IntoEdges, Visitable};
+use crate::{
+    algo::Measure,
+    scored::MinScored,
+    visit::{
+        EdgeRef,
+        GraphBase,
+        IntoEdges,
+        Visitable,
+    },
+};
 
 /// A* shortest path algorithm.
 ///
@@ -119,10 +133,10 @@ where
                     continue;
                 }
                 entry.insert(estimate_score);
-            }
+            },
             Vacant(entry) => {
                 entry.insert(estimate_score);
-            }
+            },
         }
 
         for edge in graph.edges(node) {
@@ -137,10 +151,10 @@ where
                         continue;
                     }
                     entry.insert(next_score);
-                }
+                },
                 Vacant(entry) => {
                     entry.insert(next_score);
-                }
+                },
             }
 
             path_tracker.set_predecessor(next, node);
@@ -171,11 +185,18 @@ where
         }
     }
 
-    fn set_predecessor(&mut self, node: G::NodeId, previous: G::NodeId) {
+    fn set_predecessor(
+        &mut self,
+        node: G::NodeId,
+        previous: G::NodeId,
+    ) {
         self.came_from.insert(node, previous);
     }
 
-    fn reconstruct_path_to(&self, last: G::NodeId) -> Vec<G::NodeId> {
+    fn reconstruct_path_to(
+        &self,
+        last: G::NodeId,
+    ) -> Vec<G::NodeId> {
         let mut path = vec![last];
 
         let mut current = last;

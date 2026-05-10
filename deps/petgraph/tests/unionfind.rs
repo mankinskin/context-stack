@@ -2,7 +2,12 @@ extern crate petgraph;
 extern crate rand;
 
 use petgraph::unionfind::UnionFind;
-use rand::{thread_rng, ChaChaRng, Rng, SeedableRng};
+use rand::{
+    thread_rng,
+    ChaChaRng,
+    Rng,
+    SeedableRng,
+};
 use std::collections::HashSet;
 
 #[test]

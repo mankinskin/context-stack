@@ -1,9 +1,21 @@
 use alloc::vec::Vec;
-use core::{fmt, marker::PhantomData};
+use core::{
+    fmt,
+    marker::PhantomData,
+};
 
 use serde::{
-    de::{Deserialize, Error, SeqAccess, Visitor},
-    ser::{Serialize, SerializeSeq, Serializer},
+    de::{
+        Deserialize,
+        Error,
+        SeqAccess,
+        Visitor,
+    },
+    ser::{
+        Serialize,
+        SerializeSeq,
+        Serializer,
+    },
 };
 
 /// Map to serializeable representation
@@ -50,10 +62,16 @@ where
 {
     type Value = Vec<R>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn expecting(
+        &self,
+        formatter: &mut fmt::Formatter,
+    ) -> fmt::Result {
         write!(formatter, "a sequence")
     }
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    fn visit_seq<A>(
+        self,
+        mut seq: A,
+    ) -> Result<Self::Value, A::Error>
     where
         A: SeqAccess<'de>,
     {
@@ -69,7 +87,11 @@ where
 }
 
 pub trait CollectSeqWithLength: Serializer {
-    fn collect_seq_with_length<I>(self, length: usize, iterable: I) -> Result<Self::Ok, Self::Error>
+    fn collect_seq_with_length<I>(
+        self,
+        length: usize,
+        iterable: I,
+    ) -> Result<Self::Ok, Self::Error>
     where
         I: IntoIterator,
         I::Item: Serialize,
@@ -80,11 +102,17 @@ pub trait CollectSeqWithLength: Serializer {
             seq.serialize_element(&element)?;
             count += 1;
         }
-        debug_assert_eq!(length, count, "collect_seq_with_length: length mismatch!");
+        debug_assert_eq!(
+            length, count,
+            "collect_seq_with_length: length mismatch!"
+        );
         seq.end()
     }
 
-    fn collect_seq_exact<I>(self, iterable: I) -> Result<Self::Ok, Self::Error>
+    fn collect_seq_exact<I>(
+        self,
+        iterable: I,
+    ) -> Result<Self::Ok, Self::Error>
     where
         I: IntoIterator,
         I::Item: Serialize,

@@ -1,17 +1,38 @@
 //! Simple adjacency list.
-use alloc::{boxed::Box, vec::Vec};
-use core::{fmt, ops::Range};
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
+use core::{
+    fmt,
+    ops::Range,
+};
 
 use fixedbitset::FixedBitSet;
 
-use crate::data::{Build, DataMap, DataMapMut};
-use crate::iter_format::NoPretty;
-use crate::visit::{
-    self, EdgeCount, EdgeRef, GetAdjacencyMatrix, IntoEdgeReferences, IntoNeighbors, NodeCount,
+use crate::{
+    data::{
+        Build,
+        DataMap,
+        DataMapMut,
+    },
+    iter_format::NoPretty,
+    visit::{
+        self,
+        EdgeCount,
+        EdgeRef,
+        GetAdjacencyMatrix,
+        IntoEdgeReferences,
+        IntoNeighbors,
+        NodeCount,
+    },
 };
 
 #[doc(no_inline)]
-pub use crate::graph::{DefaultIx, IndexType};
+pub use crate::graph::{
+    DefaultIx,
+    IndexType,
+};
 
 /// Adjacency list node index type, a plain integer.
 pub type NodeIndex<Ix = DefaultIx> = Ix;
@@ -120,7 +141,7 @@ impl<E, Ix: IndexType> Iterator for EdgeIndices<'_, E, Ix> {
                         self.row_index = index;
                         self.cur = 0;
                         self.row_len = row.len();
-                    }
+                    },
                     None => return None,
                 }
             }
@@ -196,7 +217,10 @@ impl<E, Ix: IndexType> List<E, Ix> {
 
     /// Adds a new node to the list. This allocates a new `Vec` and then should
     /// run in amortized **O(1)** time.
-    pub fn add_node_with_capacity(&mut self, successors: usize) -> NodeIndex<Ix> {
+    pub fn add_node_with_capacity(
+        &mut self,
+        successors: usize,
+    ) -> NodeIndex<Ix> {
         let i = self.suc.len();
         self.suc.push(Vec::with_capacity(successors));
         Ix::new(i)
@@ -226,7 +250,12 @@ impl<E, Ix: IndexType> List<E, Ix> {
     /// **Note:** `List` allows adding parallel (“duplicate”) edges. If you want
     /// to avoid this, use [`.update_edge(a, b, weight)`](#method.update_edge) instead.
     #[track_caller]
-    pub fn add_edge(&mut self, a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E) -> EdgeIndex<Ix> {
+    pub fn add_edge(
+        &mut self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+        weight: E,
+    ) -> EdgeIndex<Ix> {
         if b.index() >= self.suc.len() {
             panic!(
                 "{} is not a valid node index for a {} nodes adjacency list",
@@ -243,13 +272,19 @@ impl<E, Ix: IndexType> List<E, Ix> {
         }
     }
 
-    fn get_edge(&self, e: EdgeIndex<Ix>) -> Option<&WSuc<E, Ix>> {
+    fn get_edge(
+        &self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<&WSuc<E, Ix>> {
         self.suc
             .get(e.from.index())
             .and_then(|row| row.get(e.successor_index))
     }
 
-    fn get_edge_mut(&mut self, e: EdgeIndex<Ix>) -> Option<&mut WSuc<E, Ix>> {
+    fn get_edge_mut(
+        &mut self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<&mut WSuc<E, Ix>> {
         self.suc
             .get_mut(e.from.index())
             .and_then(|row| row.get_mut(e.successor_index))
@@ -258,11 +293,17 @@ impl<E, Ix: IndexType> List<E, Ix> {
     /// Accesses the source and target of edge `e`
     ///
     /// Computes in **O(1)**
-    pub fn edge_endpoints(&self, e: EdgeIndex<Ix>) -> Option<(NodeIndex<Ix>, NodeIndex<Ix>)> {
+    pub fn edge_endpoints(
+        &self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<(NodeIndex<Ix>, NodeIndex<Ix>)> {
         self.get_edge(e).map(|x| (e.from, x.suc))
     }
 
-    pub fn edge_indices_from(&self, a: NodeIndex<Ix>) -> OutgoingEdgeIndices<Ix> {
+    pub fn edge_indices_from(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> OutgoingEdgeIndices<Ix> {
         let proj: fn((usize, NodeIndex<Ix>)) -> EdgeIndex<Ix> =
             |(successor_index, from)| EdgeIndex {
                 from,
@@ -277,7 +318,11 @@ impl<E, Ix: IndexType> List<E, Ix> {
     /// Lookups whether there is an edge from `a` to `b`.
     ///
     /// Computes in **O(e')** time, where **e'** is the number of successors of `a`.
-    pub fn contains_edge(&self, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> bool {
+    pub fn contains_edge(
+        &self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> bool {
         match self.suc.get(a.index()) {
             None => false,
             Some(row) => row.iter().any(|x| x.suc == b),
@@ -287,7 +332,11 @@ impl<E, Ix: IndexType> List<E, Ix> {
     /// Lookups whether there is an edge from `a` to `b`.
     ///
     /// Computes in **O(e')** time, where **e'** is the number of successors of `a`.
-    pub fn find_edge(&self, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> Option<EdgeIndex<Ix>> {
+    pub fn find_edge(
+        &self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> Option<EdgeIndex<Ix>> {
         self.suc.get(a.index()).and_then(|row| {
             row.iter()
                 .enumerate()
@@ -327,7 +376,10 @@ pub type UnweightedList<Ix> = List<(), Ix>;
 impl<E, Ix: IndexType> Build for List<E, Ix> {
     /// Adds a new node to the list. This allocates a new `Vec` and then should
     /// run in amortized **O(1)** time.
-    fn add_node(&mut self, _weight: ()) -> NodeIndex<Ix> {
+    fn add_node(
+        &mut self,
+        _weight: (),
+    ) -> NodeIndex<Ix> {
         self.add_node()
     }
 
@@ -342,7 +394,12 @@ impl<E, Ix: IndexType> Build for List<E, Ix> {
     ///
     /// **Note:** `List` allows adding parallel (“duplicate”) edges. If you want
     /// to avoid this, use [`.update_edge(a, b, weight)`](#method.update_edge) instead.
-    fn add_edge(&mut self, a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E) -> Option<EdgeIndex<Ix>> {
+    fn add_edge(
+        &mut self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+        weight: E,
+    ) -> Option<EdgeIndex<Ix>> {
         Some(self.add_edge(a, b, weight))
     }
 
@@ -354,7 +411,12 @@ impl<E, Ix: IndexType> Build for List<E, Ix> {
     /// Computes in **O(e')** time, where **e'** is the number of successors of `a`.
     ///
     /// **Panics** if the source node does not exist.<br>
-    fn update_edge(&mut self, a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E) -> EdgeIndex<Ix> {
+    fn update_edge(
+        &mut self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+        weight: E,
+    ) -> EdgeIndex<Ix> {
         let row = &mut self.suc[a.index()];
         for (i, info) in row.iter_mut().enumerate() {
             if info.suc == b {
@@ -379,7 +441,10 @@ where
     E: fmt::Debug,
     Ix: IndexType,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         let mut edge_list = f.debug_list();
         let iter: Self = self.clone();
         for e in iter {
@@ -389,7 +454,8 @@ where
                     e.weight(),
                 ));
             } else {
-                edge_list.entry(&NoPretty((e.source().index(), e.target().index())));
+                edge_list
+                    .entry(&NoPretty((e.source().index(), e.target().index())));
             }
         }
         edge_list.finish()
@@ -401,7 +467,10 @@ where
     E: fmt::Debug,
     Ix: IndexType,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         let mut fmt_struct = f.debug_struct("adj::List");
         fmt_struct.field("node_count", &self.node_count());
         fmt_struct.field("edge_count", &self.edge_count());
@@ -428,7 +497,10 @@ where
     fn visit_map(&self) -> FixedBitSet {
         FixedBitSet::with_capacity(self.node_count())
     }
-    fn reset_map(&self, map: &mut Self::Map) {
+    fn reset_map(
+        &self,
+        map: &mut Self::Map,
+    ) {
         map.clear();
         map.grow(self.node_count());
     }
@@ -472,7 +544,10 @@ impl<'a, E, Ix: IndexType> IntoNeighbors for &'a List<E, Ix> {
     /// Use [`List::edge_indices_from`] instead if you do not want to borrow the adjacency list while
     /// iterating.
     #[track_caller]
-    fn neighbors(self, a: NodeIndex<Ix>) -> Self::Neighbors {
+    fn neighbors(
+        self,
+        a: NodeIndex<Ix>,
+    ) -> Self::Neighbors {
         let proj: fn(&WSuc<E, Ix>) -> NodeIndex<Ix> = |x| x.suc;
         let iter = self.suc[a.index()].iter().map(proj);
         Neighbors { iter }
@@ -480,7 +555,10 @@ impl<'a, E, Ix: IndexType> IntoNeighbors for &'a List<E, Ix> {
 }
 
 type SomeIter<'a, E, Ix> = core::iter::Map<
-    core::iter::Zip<core::iter::Enumerate<RowIter<'a, E, Ix>>, core::iter::Repeat<Ix>>,
+    core::iter::Zip<
+        core::iter::Enumerate<RowIter<'a, E, Ix>>,
+        core::iter::Repeat<Ix>,
+    >,
     fn(((usize, &'a WSuc<E, Ix>), Ix)) -> EdgeReference<'a, E, Ix>,
 >;
 
@@ -509,7 +587,7 @@ impl<E, Ix: IndexType> Clone for EdgeReferences<'_, E, Ix> {
 }
 
 fn proj1<E, Ix: IndexType>(
-    ((successor_index, edge), from): ((usize, &WSuc<E, Ix>), Ix),
+    ((successor_index, edge), from): ((usize, &WSuc<E, Ix>), Ix)
 ) -> EdgeReference<'_, E, Ix> {
     let id = EdgeIndex {
         from,
@@ -517,7 +595,9 @@ fn proj1<E, Ix: IndexType>(
     };
     EdgeReference { id, edge }
 }
-fn proj2<E, Ix: IndexType>((row_index, row): (usize, &Vec<WSuc<E, Ix>>)) -> SomeIter<'_, E, Ix> {
+fn proj2<E, Ix: IndexType>(
+    (row_index, row): (usize, &Vec<WSuc<E, Ix>>)
+) -> SomeIter<'_, E, Ix> {
     row.iter()
         .enumerate()
         .zip(core::iter::repeat(Ix::new(row_index)))
@@ -544,7 +624,10 @@ iter: SomeIter<'a, E, Ix>,
 
 impl<'a, Ix: IndexType, E> visit::IntoEdges for &'a List<E, Ix> {
     type Edges = OutgoingEdgeReferences<'a, E, Ix>;
-    fn edges(self, a: Self::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        a: Self::NodeId,
+    ) -> Self::Edges {
         let iter = self.suc[a.index()]
             .iter()
             .enumerate()
@@ -584,11 +667,17 @@ impl<E, Ix: IndexType> visit::NodeIndexable for List<E, Ix> {
         self.node_count()
     }
     #[inline]
-    fn to_index(&self, a: Self::NodeId) -> usize {
+    fn to_index(
+        &self,
+        a: Self::NodeId,
+    ) -> usize {
         a.index()
     }
     #[inline]
-    fn from_index(&self, i: usize) -> Self::NodeId {
+    fn from_index(
+        &self,
+        i: usize,
+    ) -> Self::NodeId {
         Ix::new(i)
     }
 }
@@ -596,7 +685,10 @@ impl<E, Ix: IndexType> visit::NodeIndexable for List<E, Ix> {
 impl<E, Ix: IndexType> visit::NodeCompactIndexable for List<E, Ix> {}
 
 impl<E, Ix: IndexType> DataMap for List<E, Ix> {
-    fn node_weight(&self, n: Self::NodeId) -> Option<&()> {
+    fn node_weight(
+        &self,
+        n: Self::NodeId,
+    ) -> Option<&()> {
         if n.index() < self.suc.len() {
             Some(&())
         } else {
@@ -607,13 +699,19 @@ impl<E, Ix: IndexType> DataMap for List<E, Ix> {
     /// Accesses the weight of edge `e`
     ///
     /// Computes in **O(1)**
-    fn edge_weight(&self, e: EdgeIndex<Ix>) -> Option<&E> {
+    fn edge_weight(
+        &self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<&E> {
         self.get_edge(e).map(|x| &x.weight)
     }
 }
 
 impl<E, Ix: IndexType> DataMapMut for List<E, Ix> {
-    fn node_weight_mut(&mut self, n: Self::NodeId) -> Option<&mut ()> {
+    fn node_weight_mut(
+        &mut self,
+        n: Self::NodeId,
+    ) -> Option<&mut ()> {
         if n.index() < self.suc.len() {
             // A hack to produce a &'static mut ()
             // It does not actually allocate according to godbolt
@@ -626,7 +724,10 @@ impl<E, Ix: IndexType> DataMapMut for List<E, Ix> {
     /// Accesses the weight of edge `e`
     ///
     /// Computes in **O(1)**
-    fn edge_weight_mut(&mut self, e: EdgeIndex<Ix>) -> Option<&mut E> {
+    fn edge_weight_mut(
+        &mut self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<&mut E> {
         self.get_edge_mut(e).map(|x| &mut x.weight)
     }
 }
@@ -649,7 +750,12 @@ where
         matrix
     }
 
-    fn is_adjacent(&self, matrix: &FixedBitSet, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> bool {
+    fn is_adjacent(
+        &self,
+        matrix: &FixedBitSet,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> bool {
         let n = self.node_count();
         let index = n * a.index() + b.index();
         matrix.contains(index)

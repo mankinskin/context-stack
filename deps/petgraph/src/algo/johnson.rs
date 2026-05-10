@@ -1,16 +1,36 @@
 //! Johnson's algorithm implementation.
-use alloc::{vec, vec::Vec};
-use core::hash::Hash;
-use core::ops::Sub;
+use alloc::{
+    vec,
+    vec::Vec,
+};
+use core::{
+    hash::Hash,
+    ops::Sub,
+};
 
 use hashbrown::HashMap;
 
-use super::{dijkstra, spfa::spfa_loop};
-pub use super::{BoundedMeasure, NegativeCycle};
-use crate::visit::{EdgeRef, IntoEdges, IntoNodeIdentifiers, NodeIndexable, Visitable};
+use super::{
+    dijkstra,
+    spfa::spfa_loop,
+};
+pub use super::{
+    BoundedMeasure,
+    NegativeCycle,
+};
+use crate::visit::{
+    EdgeRef,
+    IntoEdges,
+    IntoNodeIdentifiers,
+    NodeIndexable,
+    Visitable,
+};
 
 #[cfg(feature = "rayon")]
-use core::marker::{Send, Sync};
+use core::marker::{
+    Send,
+    Sync,
+};
 
 /// [Johnson algorithm][johnson] for all pairs shortest path problem.
 ///
@@ -112,7 +132,8 @@ where
 
     // Reweight edges.
     let mut new_cost = |edge: G::EdgeRef| {
-        let (sum, _overflow) = edge_cost(edge).overflowing_add(reweight[ix(edge.source())]);
+        let (sum, _overflow) =
+            edge_cost(edge).overflowing_add(reweight[ix(edge.source())]);
         debug_assert!(!_overflow);
         sum - reweight[ix(edge.target())]
     };
@@ -211,7 +232,10 @@ where
     F: Fn(G::EdgeRef) -> K + Sync,
     K: BoundedMeasure + Copy + Sub<K, Output = K> + Send + Sync,
 {
-    use rayon::iter::{IntoParallelIterator, ParallelIterator};
+    use rayon::iter::{
+        IntoParallelIterator,
+        ParallelIterator,
+    };
 
     let reweight = johnson_reweight(graph, &mut edge_cost)?;
     let reweight = reweight.as_slice();
@@ -221,7 +245,8 @@ where
 
     // Reweight edges.
     let new_cost = |edge: G::EdgeRef| {
-        let (sum, _overflow) = edge_cost(edge).overflowing_add(reweight[ix(edge.source())]);
+        let (sum, _overflow) =
+            edge_cost(edge).overflowing_add(reweight[ix(edge.source())]);
         debug_assert!(!_overflow);
         sum - reweight[ix(edge.target())]
     };
@@ -232,14 +257,14 @@ where
         .flat_map_iter(|s| {
             let source = graph.from_index(s);
 
-            dijkstra(graph, source, None, new_cost)
-                .into_iter()
-                .map(move |(target, dist)| {
+            dijkstra(graph, source, None, new_cost).into_iter().map(
+                move |(target, dist)| {
                     (
                         (source, target),
                         dist + reweight[ix(target)] - reweight[ix(source)],
                     )
-                })
+                },
+            )
         })
         .collect::<HashMap<(G::NodeId, G::NodeId), K>>();
 
@@ -250,7 +275,10 @@ where
 /// to all other vertices, and then run SPFA from it.
 /// The found distances will be used to change the edge weights in Dijkstra's
 /// algorithm to make them non-negative.
-fn johnson_reweight<G, F, K>(graph: G, mut edge_cost: F) -> Result<Vec<K>, NegativeCycle>
+fn johnson_reweight<G, F, K>(
+    graph: G,
+    mut edge_cost: F,
+) -> Result<Vec<K>, NegativeCycle>
 where
     G: IntoEdges + IntoNodeIdentifiers + NodeIndexable + Visitable,
     G::NodeId: Eq + Hash,
@@ -268,5 +296,6 @@ where
     queue.extend(graph.node_identifiers());
     let in_queue = vec![true; node_bound];
 
-    spfa_loop(graph, reweight, None, queue, in_queue, &mut edge_cost).map(|(dists, _)| dists)
+    spfa_loop(graph, reweight, None, queue, in_queue, &mut edge_cost)
+        .map(|(dists, _)| dists)
 }

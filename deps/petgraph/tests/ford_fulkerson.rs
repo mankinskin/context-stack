@@ -1,8 +1,13 @@
-use petgraph::algo::ford_fulkerson;
-use petgraph::prelude::Graph;
 #[cfg(feature = "stable_graph")]
-use petgraph::prelude::{StableDiGraph, StableGraph};
-use petgraph::Directed;
+use petgraph::prelude::{
+    StableDiGraph,
+    StableGraph,
+};
+use petgraph::{
+    algo::ford_fulkerson,
+    prelude::Graph,
+    Directed,
+};
 
 #[test]
 fn test_ford_fulkerson() {
@@ -12,7 +17,13 @@ fn test_ford_fulkerson() {
     let _ = graph.add_node(1);
     let _ = graph.add_node(2);
     let destination = graph.add_node(3);
-    graph.extend_with_edges([(0, 1, 3), (0, 2, 2), (1, 2, 5), (1, 3, 2), (2, 3, 3)]);
+    graph.extend_with_edges([
+        (0, 1, 3),
+        (0, 2, 2),
+        (1, 2, 5),
+        (1, 3, 2),
+        (2, 3, 3),
+    ]);
     let (max_flow, _) = ford_fulkerson(&graph, source, destination);
     assert_eq!(5, max_flow);
 

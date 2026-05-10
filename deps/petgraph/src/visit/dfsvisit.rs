@@ -1,5 +1,8 @@
-use crate::visit::IntoNeighbors;
-use crate::visit::{VisitMap, Visitable};
+use crate::visit::{
+    IntoNeighbors,
+    VisitMap,
+    Visitable,
+};
 
 /// Strictly monotonically increasing event time for a depth first search.
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Default, Hash)]
@@ -30,15 +33,14 @@ macro_rules! try_control {
     };
     ($e:expr, $p:stmt, $q:stmt) => {
         match $e {
-            x => {
+            x =>
                 if x.should_break() {
                     return x;
                 } else if x.should_prune() {
                     $p
                 } else {
                     $q
-                }
-            }
+                },
         }
     };
 }
@@ -238,7 +240,11 @@ impl<B> Default for Control<B> {
 /// println!("back edge: {:?}", result);
 /// ```
 #[track_caller]
-pub fn depth_first_search<G, I, F, C>(graph: G, starts: I, mut visitor: F) -> C
+pub fn depth_first_search<G, I, F, C>(
+    graph: G,
+    starts: I,
+    mut visitor: F,
+) -> C
 where
     G: IntoNeighbors + Visitable,
     I: IntoIterator<Item = G::NodeId>,
@@ -288,7 +294,10 @@ where
             } else if !finished.is_visited(&v) {
                 try_control!(visitor(DfsEvent::BackEdge(u, v)), continue);
             } else {
-                try_control!(visitor(DfsEvent::CrossForwardEdge(u, v)), continue);
+                try_control!(
+                    visitor(DfsEvent::CrossForwardEdge(u, v)),
+                    continue
+                );
             }
         }
     );

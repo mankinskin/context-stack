@@ -3,8 +3,12 @@
 //! ***Unstable: API may change at any time.*** Depends on `feature = "generate"`.
 //!
 
-use crate::graph::NodeIndex;
-use crate::{Directed, EdgeType, Graph};
+use crate::{
+    graph::NodeIndex,
+    Directed,
+    EdgeType,
+    Graph,
+};
 
 // A DAG has the property that the adjacency matrix is lower triangular,
 // diagonal zero.
@@ -60,7 +64,10 @@ impl<Ty: EdgeType> Generator<Ty> {
     ///
     /// For a graph of *k* nodes there are *e = k²* possible edges and
     /// *2<sup>k<sup>2</sup></sup>* graphs.
-    pub fn all(nodes: usize, allow_selfloops: bool) -> Self {
+    pub fn all(
+        nodes: usize,
+        allow_selfloops: bool,
+    ) -> Self {
         let scale = if Ty::is_directed() { 1 } else { 2 };
         let nedges = if allow_selfloops {
             (nodes * nodes - nodes) / scale + nodes

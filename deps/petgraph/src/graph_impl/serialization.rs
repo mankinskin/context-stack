@@ -1,15 +1,33 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
-
-use super::{EdgeIndex, NodeIndex};
-use crate::graph::{Edge, IndexType, Node};
-use crate::prelude::*;
-use crate::serde_utils::{
-    CollectSeqWithLength, FromDeserialized, IntoSerializable, MappedSequenceVisitor,
+use serde::{
+    de::Error,
+    Deserialize,
+    Deserializer,
+    Serialize,
+    Serializer,
 };
-use crate::EdgeType;
+
+use super::{
+    EdgeIndex,
+    NodeIndex,
+};
+use crate::{
+    graph::{
+        Edge,
+        IndexType,
+        Node,
+    },
+    prelude::*,
+    serde_utils::{
+        CollectSeqWithLength,
+        FromDeserialized,
+        IntoSerializable,
+        MappedSequenceVisitor,
+    },
+    EdgeType,
+};
 
 /// Serialization representation for Graph
 /// Keep in sync with deserialization and StableGraph
@@ -36,7 +54,9 @@ use crate::EdgeType;
 /// binary formats, so the Ix parameter matters there.
 #[derive(Serialize)]
 #[serde(rename = "Graph")]
-#[serde(bound(serialize = "N: Serialize, E: Serialize, Ix: IndexType + Serialize"))]
+#[serde(bound(
+    serialize = "N: Serialize, E: Serialize, Ix: IndexType + Serialize"
+))]
 pub struct SerGraph<'a, N: 'a, E: 'a, Ix: 'a + IndexType> {
     #[serde(serialize_with = "ser_graph_nodes")]
     nodes: &'a [Node<N, Ix>],
@@ -69,7 +89,10 @@ impl<Ix> Serialize for NodeIndex<Ix>
 where
     Ix: IndexType + Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -93,7 +116,10 @@ impl<Ix> Serialize for EdgeIndex<Ix>
 where
     Ix: IndexType + Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -165,7 +191,10 @@ where
     }
 }
 
-fn ser_graph_nodes<S, N, Ix>(nodes: &&[Node<N, Ix>], serializer: S) -> Result<S::Ok, S::Error>
+fn ser_graph_nodes<S, N, Ix>(
+    nodes: &&[Node<N, Ix>],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
     N: Serialize,
@@ -174,7 +203,10 @@ where
     serializer.collect_seq_exact(nodes.iter().map(|node| &node.weight))
 }
 
-fn ser_graph_edges<S, E, Ix>(edges: &&[Edge<E, Ix>], serializer: S) -> Result<S::Ok, S::Error>
+fn ser_graph_edges<S, E, Ix>(
+    edges: &&[Edge<E, Ix>],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
     E: Serialize,
@@ -187,7 +219,9 @@ where
     )
 }
 
-fn deser_graph_nodes<'de, D, N, Ix>(deserializer: D) -> Result<Vec<Node<N, Ix>>, D::Error>
+fn deser_graph_nodes<'de, D, N, Ix>(
+    deserializer: D
+) -> Result<Vec<Node<N, Ix>>, D::Error>
 where
     D: Deserializer<'de>,
     N: Deserialize<'de>,
@@ -201,7 +235,9 @@ where
     }))
 }
 
-fn deser_graph_node_holes<'de, D, Ix>(deserializer: D) -> Result<Vec<NodeIndex<Ix>>, D::Error>
+fn deser_graph_node_holes<'de, D, Ix>(
+    deserializer: D
+) -> Result<Vec<NodeIndex<Ix>>, D::Error>
 where
     D: Deserializer<'de>,
     Ix: IndexType + Deserialize<'de>,
@@ -213,7 +249,9 @@ where
     )
 }
 
-fn deser_graph_edges<'de, D, N, Ix>(deserializer: D) -> Result<Vec<Edge<N, Ix>>, D::Error>
+fn deser_graph_edges<'de, D, N, Ix>(
+    deserializer: D
+) -> Result<Vec<Edge<N, Ix>>, D::Error>
 where
     D: Deserializer<'de>,
     N: Deserialize<'de>,
@@ -260,7 +298,10 @@ where
     N: Serialize,
     E: Serialize,
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -268,7 +309,10 @@ where
     }
 }
 
-pub fn invalid_node_err<E>(node_index: usize, len: usize) -> E
+pub fn invalid_node_err<E>(
+    node_index: usize,
+    len: usize,
+) -> E
 where
     E: Error,
 {
@@ -287,7 +331,10 @@ where
     ))
 }
 
-pub fn invalid_length_err<Ix, E>(node_or_edge: &str, len: usize) -> E
+pub fn invalid_length_err<Ix, E>(
+    node_or_edge: &str,
+    len: usize,
+) -> E
 where
     E: Error,
     Ix: IndexType,

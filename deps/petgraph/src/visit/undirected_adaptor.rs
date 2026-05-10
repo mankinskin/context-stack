@@ -1,9 +1,24 @@
-use crate::visit::{
-    Data, EdgeRef, GraphBase, GraphProp, GraphRef, IntoEdgeReferences, IntoEdges,
-    IntoEdgesDirected, IntoNeighbors, IntoNeighborsDirected, IntoNodeIdentifiers,
-    IntoNodeReferences, NodeCompactIndexable, NodeCount, NodeIndexable, Visitable,
+use crate::{
+    visit::{
+        Data,
+        EdgeRef,
+        GraphBase,
+        GraphProp,
+        GraphRef,
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoEdgesDirected,
+        IntoNeighbors,
+        IntoNeighborsDirected,
+        IntoNodeIdentifiers,
+        IntoNodeReferences,
+        NodeCompactIndexable,
+        NodeCount,
+        NodeIndexable,
+        Visitable,
+    },
+    Direction,
 };
-use crate::Direction;
 
 /// An edge direction removing graph adaptor.
 #[derive(Copy, Clone, Debug)]
@@ -15,8 +30,12 @@ impl<G> IntoNeighbors for UndirectedAdaptor<G>
 where
     G: IntoNeighborsDirected,
 {
-    type Neighbors = core::iter::Chain<G::NeighborsDirected, G::NeighborsDirected>;
-    fn neighbors(self, n: G::NodeId) -> Self::Neighbors {
+    type Neighbors =
+        core::iter::Chain<G::NeighborsDirected, G::NeighborsDirected>;
+    fn neighbors(
+        self,
+        n: G::NodeId,
+    ) -> Self::Neighbors {
         self.0
             .neighbors_directed(n, Direction::Incoming)
             .chain(self.0.neighbors_directed(n, Direction::Outgoing))
@@ -31,7 +50,10 @@ where
         MaybeReversedEdges<G::EdgesDirected>,
         MaybeReversedEdges<G::EdgesDirected>,
     >;
-    fn edges(self, a: Self::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        a: Self::NodeId,
+    ) -> Self::Edges {
         let incoming = MaybeReversedEdges {
             iter: self.0.edges_directed(a, Direction::Incoming),
             reversed: true,
@@ -173,11 +195,17 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::algo::astar::*;
-    use crate::graph::{DiGraph, Graph};
-    use crate::visit::Dfs;
+    use crate::{
+        algo::astar::*,
+        graph::{
+            DiGraph,
+            Graph,
+        },
+        visit::Dfs,
+    };
 
-    static LINEAR_EDGES: [(u32, u32); 5] = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)];
+    static LINEAR_EDGES: [(u32, u32); 5] =
+        [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)];
 
     #[test]
     pub fn test_is_reachable() {
@@ -192,7 +220,8 @@ mod tests {
         let graph = UndirectedAdaptor(&graph);
 
         use crate::visit::Walker;
-        let mut visited_nodes: Vec<_> = Dfs::new(&graph, nodes[2]).iter(&graph).collect();
+        let mut visited_nodes: Vec<_> =
+            Dfs::new(&graph, nodes[2]).iter(&graph).collect();
         visited_nodes.sort();
         assert_eq!(visited_nodes, nodes);
     }

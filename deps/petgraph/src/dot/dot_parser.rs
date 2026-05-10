@@ -1,13 +1,24 @@
 use crate::data::Create;
 use alloc::boxed::Box;
-use core::convert::TryFrom;
-use core::error::Error;
-use core::fmt::{Display, Formatter};
-use dot_parser::ast::AList;
-use dot_parser::ast::Graph as DotGraph;
-use dot_parser::ast::PestError as ParsingError;
-use dot_parser::canonical::Graph as CGraph;
-use dot_parser::canonical::Node;
+use core::{
+    convert::TryFrom,
+    error::Error,
+    fmt::{
+        Display,
+        Formatter,
+    },
+};
+use dot_parser::{
+    ast::{
+        AList,
+        Graph as DotGraph,
+        PestError as ParsingError,
+    },
+    canonical::{
+        Graph as CGraph,
+        Node,
+    },
+};
 
 pub type DotNodeWeight<'a> = Node<(&'a str, &'a str)>;
 pub type DotAttrList<'a> = AList<(&'a str, &'a str)>;
@@ -18,7 +29,10 @@ pub struct DotParsingError {
 }
 
 impl Display for DotParsingError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+    fn fmt(
+        &self,
+        f: &mut Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
         write!(f, "{}", self.error)
     }
 }
@@ -69,9 +83,9 @@ pub trait ParseFromDot<'a>:
 /// Statically imports a Graph from a valid DOT/Graphviz [&str].
 macro_rules! graph_from_str {
     ($s:tt) => {
-        $crate::dot::dot_parser::ParseFromDot::from_dot_graph(dot_parser_macros::from_dot_string!(
-            $s
-        ))
+        $crate::dot::dot_parser::ParseFromDot::from_dot_graph(
+            dot_parser_macros::from_dot_string!($s),
+        )
     };
 }
 
@@ -82,36 +96,49 @@ macro_rules! graph_from_str {
 /// can be removed at runtime.
 macro_rules! graph_from_file {
     ($s:tt) => {
-        $crate::dot::dot_parser::ParseFromDot::from_dot_graph(dot_parser_macros::from_dot_file!($s))
+        $crate::dot::dot_parser::ParseFromDot::from_dot_graph(
+            dot_parser_macros::from_dot_file!($s),
+        )
     };
 }
 
 pub use graph_from_file;
 pub use graph_from_str;
 
-impl<'a> ParseFromDot<'a> for crate::graph::Graph<DotNodeWeight<'a>, DotAttrList<'a>> {}
+impl<'a> ParseFromDot<'a>
+    for crate::graph::Graph<DotNodeWeight<'a>, DotAttrList<'a>>
+{
+}
 #[cfg(feature = "stable_graph")]
-impl<'a> ParseFromDot<'a> for crate::stable_graph::StableGraph<DotNodeWeight<'a>, DotAttrList<'a>> {}
+impl<'a> ParseFromDot<'a>
+    for crate::stable_graph::StableGraph<DotNodeWeight<'a>, DotAttrList<'a>>
+{
+}
 
 #[cfg(test)]
 mod test {
     #[test]
     fn test_dot_parsing_str() {
-        let _: crate::graph::Graph<_, _> = graph_from_str!("digraph { A -> B }");
+        let _: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { A -> B }");
         #[cfg(feature = "stable_graph")]
-        let _: crate::stable_graph::StableGraph<_, _> = graph_from_str!("digraph { A -> B }");
+        let _: crate::stable_graph::StableGraph<_, _> =
+            graph_from_str!("digraph { A -> B }");
     }
 
     #[test]
     fn test_ill_formed_str() {
-        let g_res: Result<crate::graph::Graph<_, _>, crate::dot::dot_parser::DotParsingError> =
-            crate::dot::dot_parser::ParseFromDot::try_from(":zcdza");
+        let g_res: Result<
+            crate::graph::Graph<_, _>,
+            crate::dot::dot_parser::DotParsingError,
+        > = crate::dot::dot_parser::ParseFromDot::try_from(":zcdza");
         assert!(g_res.is_err())
     }
 
     #[test]
     fn test_dot_parsing_file() {
-        let _: crate::graph::Graph<_, _> = graph_from_file!("assets/examples/graph-example.dot");
+        let _: crate::graph::Graph<_, _> =
+            graph_from_file!("assets/examples/graph-example.dot");
         #[cfg(feature = "stable_graph")]
         let _: crate::stable_graph::StableGraph<_, _> =
             graph_from_file!("assets/examples/graph-example.dot");
@@ -121,8 +148,10 @@ mod test {
     fn test_dot_parsing_isomorph() {
         use crate::algo::is_isomorphic;
 
-        let g1: crate::graph::Graph<_, _> = graph_from_str!("digraph { A -> { B C }}");
-        let g2: crate::graph::Graph<_, _> = graph_from_str!("digraph { D -> E; D -> F}");
+        let g1: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { A -> { B C }}");
+        let g2: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { D -> E; D -> F}");
         assert!(is_isomorphic(&g1, &g2));
     }
 
@@ -130,8 +159,10 @@ mod test {
     fn test_dot_parsing_not_isomorph() {
         use crate::algo::is_isomorphic;
 
-        let g1: crate::graph::Graph<_, _> = graph_from_str!("digraph { A -> { B C D }}");
-        let g2: crate::graph::Graph<_, _> = graph_from_str!("digraph { A -> B; A -> C}");
+        let g1: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { A -> { B C D }}");
+        let g2: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { A -> B; A -> C}");
         assert!(!is_isomorphic(&g1, &g2));
     }
 
@@ -139,8 +170,10 @@ mod test {
     fn test_dot_parsing_subgraph_isomorph() {
         use crate::algo::is_isomorphic_subgraph;
 
-        let g1: crate::graph::Graph<_, _> = graph_from_str!("digraph { A -> B; A -> C}");
-        let g2: crate::graph::Graph<_, _> = graph_from_str!("digraph { A -> { B C D }}");
+        let g1: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { A -> B; A -> C}");
+        let g2: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { A -> { B C D }}");
         assert!(is_isomorphic_subgraph(&g1, &g2));
     }
 
@@ -155,7 +188,8 @@ mod test {
     #[test]
     fn test_dot_parsing_not_cyclic() {
         use crate::algo::is_cyclic_directed;
-        let g: crate::graph::Graph<_, _> = graph_from_str!("digraph { A -> { B C } -> {D E F}}");
+        let g: crate::graph::Graph<_, _> =
+            graph_from_str!("digraph { A -> { B C } -> {D E F}}");
         assert!(!is_cyclic_directed(&g));
     }
 }

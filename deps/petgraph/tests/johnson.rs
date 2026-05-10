@@ -1,9 +1,16 @@
-use core::fmt::Debug;
-use core::hash::Hash;
+use core::{
+    fmt::Debug,
+    hash::Hash,
+};
 use hashbrown::HashMap;
-use petgraph::algo::johnson;
-use petgraph::visit::GraphBase;
-use petgraph::{prelude::*, Directed, Graph, Undirected};
+use petgraph::{
+    algo::johnson,
+    prelude::*,
+    visit::GraphBase,
+    Directed,
+    Graph,
+    Undirected,
+};
 
 #[cfg(feature = "rayon")]
 use petgraph::algo::parallel_johnson;
@@ -98,7 +105,11 @@ fn johnson_uniform_weight() {
     #[cfg(feature = "rayon")]
     {
         let res = parallel_johnson(&graph, |_| 1_i32).unwrap();
-        match_results::<Graph<(), i32, Directed>, i32>(res, &expected_res, &nodes);
+        match_results::<Graph<(), i32, Directed>, i32>(
+            res,
+            &expected_res,
+            &nodes,
+        );
     }
 }
 
@@ -143,7 +154,11 @@ fn johnson_weighted() {
     #[cfg(feature = "rayon")]
     {
         let res = parallel_johnson(&graph, |edge| *edge.weight()).unwrap();
-        match_results::<Graph<(), i32, Directed>, i32>(res, &expected_res, &nodes);
+        match_results::<Graph<(), i32, Directed>, i32>(
+            res,
+            &expected_res,
+            &nodes,
+        );
     }
 }
 
@@ -194,7 +209,11 @@ fn johnson_weighted_undirected() {
     #[cfg(feature = "rayon")]
     {
         let res = parallel_johnson(&graph, |edge| *edge.weight()).unwrap();
-        match_results::<Graph<(), i32, Directed>, i32>(res, &expected_res, &nodes);
+        match_results::<Graph<(), i32, Directed>, i32>(
+            res,
+            &expected_res,
+            &nodes,
+        );
     }
 }
 
@@ -262,7 +281,11 @@ fn johnson_multiple_edges() {
     #[cfg(feature = "rayon")]
     {
         let res = parallel_johnson(&graph, |edge| *edge.weight()).unwrap();
-        match_results::<Graph<(), i32, Directed>, i32>(res, &expected_res, &nodes);
+        match_results::<Graph<(), i32, Directed>, i32>(
+            res,
+            &expected_res,
+            &nodes,
+        );
     }
 }
 

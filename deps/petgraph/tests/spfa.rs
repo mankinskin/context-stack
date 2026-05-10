@@ -1,7 +1,12 @@
 use hashbrown::HashMap;
-use petgraph::algo::spfa;
-use petgraph::visit::NodeIndexable;
-use petgraph::{prelude::*, Directed, Graph, Undirected};
+use petgraph::{
+    algo::spfa,
+    prelude::*,
+    visit::NodeIndexable,
+    Directed,
+    Graph,
+    Undirected,
+};
 
 #[test]
 fn spfa_uniform_weight() {

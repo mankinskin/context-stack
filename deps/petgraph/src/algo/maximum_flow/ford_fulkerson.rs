@@ -1,4 +1,8 @@
-use alloc::{collections::VecDeque, vec, vec::Vec};
+use alloc::{
+    collections::VecDeque,
+    vec,
+    vec::Vec,
+};
 use core::ops::Sub;
 
 use crate::{
@@ -6,8 +10,15 @@ use crate::{
     data::DataMap,
     prelude::Direction,
     visit::{
-        EdgeCount, EdgeIndexable, EdgeRef, IntoEdges, IntoEdgesDirected, NodeCount, NodeIndexable,
-        VisitMap, Visitable,
+        EdgeCount,
+        EdgeIndexable,
+        EdgeRef,
+        IntoEdges,
+        IntoEdgesDirected,
+        NodeCount,
+        NodeIndexable,
+        VisitMap,
+        Visitable,
     },
 };
 
@@ -34,7 +45,11 @@ where
 }
 
 /// Gets the other endpoint of graph edge, if any, otherwise panics.
-fn other_endpoint<G>(network: G, edge: G::EdgeRef, vertex: G::NodeId) -> G::NodeId
+fn other_endpoint<G>(
+    network: G,
+    edge: G::EdgeRef,
+    vertex: G::NodeId,
+) -> G::NodeId
 where
     G: NodeIndexable + IntoEdges,
 {
@@ -57,7 +72,11 @@ fn has_augmented_path<G>(
     flows: &[G::EdgeWeight],
 ) -> bool
 where
-    G: NodeCount + IntoEdgesDirected + NodeIndexable + EdgeIndexable + Visitable,
+    G: NodeCount
+        + IntoEdgesDirected
+        + NodeIndexable
+        + EdgeIndexable
+        + Visitable,
     G::EdgeWeight: Sub<Output = G::EdgeWeight> + PositiveMeasure,
 {
     let mut visited = network.visit_map();
@@ -70,9 +89,13 @@ where
         let in_edges = network.edges_directed(vertex, Direction::Incoming);
         for edge in out_edges.chain(in_edges) {
             let next = other_endpoint(&network, edge, vertex);
-            let edge_index: usize = EdgeIndexable::to_index(&network, edge.id());
-            let residual_cap = residual_capacity(&network, edge, next, flows[edge_index]);
-            if !visited.is_visited(&next) && (residual_cap > G::EdgeWeight::zero()) {
+            let edge_index: usize =
+                EdgeIndexable::to_index(&network, edge.id());
+            let residual_cap =
+                residual_capacity(&network, edge, next, flows[edge_index]);
+            if !visited.is_visited(&next)
+                && (residual_cap > G::EdgeWeight::zero())
+            {
                 visited.visit(next);
                 edge_to[NodeIndexable::to_index(&network, next)] = Some(edge);
                 if destination == next {
@@ -179,7 +202,13 @@ where
     let mut edge_to = vec![None; network.node_count()];
     let mut flows = vec![G::EdgeWeight::zero(); network.edge_bound()];
     let mut max_flow = G::EdgeWeight::zero();
-    while has_augmented_path(&network, source, destination, &mut edge_to, &flows) {
+    while has_augmented_path(
+        &network,
+        source,
+        destination,
+        &mut edge_to,
+        &flows,
+    ) {
         let mut path_flow = G::EdgeWeight::max();
 
         // Find the bottleneck capacity of the path
@@ -187,7 +216,8 @@ where
         let mut vertex_index = NodeIndexable::to_index(&network, vertex);
         while let Some(edge) = edge_to[vertex_index] {
             let edge_index = EdgeIndexable::to_index(&network, edge.id());
-            let residual_capacity = residual_capacity(&network, edge, vertex, flows[edge_index]);
+            let residual_capacity =
+                residual_capacity(&network, edge, vertex, flows[edge_index]);
             // Minimum between the current path flow and the residual capacity.
             path_flow = if path_flow > residual_capacity {
                 residual_capacity
@@ -203,8 +233,13 @@ where
         let mut vertex_index = NodeIndexable::to_index(&network, vertex);
         while let Some(edge) = edge_to[vertex_index] {
             let edge_index = EdgeIndexable::to_index(&network, edge.id());
-            flows[edge_index] =
-                adjust_residual_flow(&network, edge, vertex, flows[edge_index], path_flow);
+            flows[edge_index] = adjust_residual_flow(
+                &network,
+                edge,
+                vertex,
+                flows[edge_index],
+                path_flow,
+            );
             vertex = other_endpoint(&network, edge, vertex);
             vertex_index = NodeIndexable::to_index(&network, vertex);
         }

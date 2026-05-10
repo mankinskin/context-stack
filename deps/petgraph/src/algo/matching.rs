@@ -1,9 +1,20 @@
-use alloc::{collections::VecDeque, vec, vec::Vec};
+use alloc::{
+    collections::VecDeque,
+    vec,
+    vec::Vec,
+};
 use core::hash::Hash;
 
 use crate::visit::{
-    EdgeRef, GraphBase, IntoEdges, IntoNeighbors, IntoNodeIdentifiers, NodeCount, NodeIndexable,
-    VisitMap, Visitable,
+    EdgeRef,
+    GraphBase,
+    IntoEdges,
+    IntoNeighbors,
+    IntoNodeIdentifiers,
+    NodeCount,
+    NodeIndexable,
+    VisitMap,
+    Visitable,
 };
 
 /// Computed
@@ -19,7 +30,11 @@ impl<G> Matching<G>
 where
     G: GraphBase,
 {
-    fn new(graph: G, mate: Vec<Option<G::NodeId>>, n_edges: usize) -> Self {
+    fn new(
+        graph: G,
+        mate: Vec<Option<G::NodeId>>,
+        n_edges: usize,
+    ) -> Self {
         Self {
             graph,
             mate,
@@ -35,7 +50,10 @@ where
     /// Gets the matched counterpart of given node, if there is any.
     ///
     /// Returns `None` if the node is not matched or does not exist.
-    pub fn mate(&self, node: G::NodeId) -> Option<G::NodeId> {
+    pub fn mate(
+        &self,
+        node: G::NodeId,
+    ) -> Option<G::NodeId> {
         self.mate.get(self.graph.to_index(node)).and_then(|&id| id)
     }
 
@@ -63,7 +81,11 @@ where
     /// Returns `true` if given edge is in the matching, or `false` otherwise.
     ///
     /// If any of the nodes does not exist, `false` is returned.
-    pub fn contains_edge(&self, a: G::NodeId, b: G::NodeId) -> bool {
+    pub fn contains_edge(
+        &self,
+        a: G::NodeId,
+        b: G::NodeId,
+    ) -> bool {
         match self.mate(a) {
             Some(mate) => mate == b,
             None => false,
@@ -73,7 +95,10 @@ where
     /// Returns `true` if given node is in the matching, or `false` otherwise.
     ///
     /// If the node does not exist, `false` is returned.
-    pub fn contains_node(&self, node: G::NodeId) -> bool {
+    pub fn contains_node(
+        &self,
+        node: G::NodeId,
+    ) -> bool {
         self.mate(node).is_some()
     }
 
@@ -106,7 +131,10 @@ where
 trait WithDummy: NodeIndexable {
     fn dummy_idx(&self) -> usize;
     /// Convert `i` to a node index, returns None for the dummy node
-    fn try_from_index(&self, i: usize) -> Option<Self::NodeId>;
+    fn try_from_index(
+        &self,
+        i: usize,
+    ) -> Option<Self::NodeId>;
 }
 
 impl<G: NodeIndexable> WithDummy for G {
@@ -117,7 +145,10 @@ impl<G: NodeIndexable> WithDummy for G {
         self.node_bound()
     }
 
-    fn try_from_index(&self, i: usize) -> Option<Self::NodeId> {
+    fn try_from_index(
+        &self,
+        i: usize,
+    ) -> Option<Self::NodeId> {
         if i != self.dummy_idx() {
             Some(self.from_index(i))
         } else {
@@ -247,8 +278,12 @@ where
     (mate, n_edges)
 }
 
-fn non_backtracking_dfs<G, F>(graph: &G, source: G::NodeId, visited: &mut G::Map, mut visitor: F)
-where
+fn non_backtracking_dfs<G, F>(
+    graph: &G,
+    source: G::NodeId,
+    visited: &mut G::Map,
+    mut visitor: F,
+) where
     G: Visitable + IntoNeighbors,
     F: FnMut(G::NodeId),
 {
@@ -298,13 +333,19 @@ impl<G: GraphBase> Label<G> {
         }
     }
 
-    fn is_flagged(&self, edge: G::EdgeId) -> bool {
+    fn is_flagged(
+        &self,
+        edge: G::EdgeId,
+    ) -> bool {
         matches!(self, Label::Flag(flag) if flag == &edge)
     }
 }
 
 impl<G: GraphBase> PartialEq for Label<G> {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
         match (self, other) {
             (Label::None, Label::None) => true,
             (Label::Start, Label::Start) => true,
@@ -435,7 +476,13 @@ where
                     // incident to two edges, which violates the matching
                     // property.
                     mate[other_idx] = Some(outer_vertex);
-                    augment_path(&graph, outer_vertex, other_vertex, &mut mate, &label);
+                    augment_path(
+                        &graph,
+                        outer_vertex,
+                        other_vertex,
+                        &mut mate,
+                        &label,
+                    );
                     n_edges += 1;
 
                     // The path is augmented, so the start is no longer free
@@ -460,7 +507,8 @@ where
                     );
                 } else {
                     let mate_vertex = mate[other_idx];
-                    let mate_idx = mate_vertex.map_or(graph.dummy_idx(), |id| graph.to_index(id));
+                    let mate_idx = mate_vertex
+                        .map_or(graph.dummy_idx(), |id| graph.to_index(id));
 
                     if label[mate_idx].is_inner() {
                         // Mate of `other` vertex is inner (no label has been
@@ -563,7 +611,8 @@ fn find_join<G, F>(
                 visitor(ix);
             }
 
-            label[inner] = Label::Edge(edge.id(), [edge.source(), edge.target()]);
+            label[inner] =
+                Label::Edge(edge.id(), [edge.source(), edge.target()]);
             first_inner[inner] = join;
             let inner_mate = graph.to_index(mate[inner].unwrap());
             let next_inner = label[inner_mate].to_vertex().unwrap();

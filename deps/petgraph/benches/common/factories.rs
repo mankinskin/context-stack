@@ -1,8 +1,10 @@
 use core::marker::PhantomData;
 
-use petgraph::data::Build;
-use petgraph::prelude::*;
-use petgraph::visit::NodeIndexable;
+use petgraph::{
+    data::Build,
+    prelude::*,
+    visit::NodeIndexable,
+};
 
 use petgraph::EdgeType;
 
@@ -185,7 +187,8 @@ where
     let s = s.trim();
     let lines = s.lines().filter(|l| !l.is_empty());
     for (row, line) in lines.enumerate() {
-        for (col, word) in line.split(' ').filter(|s| !s.is_empty()).enumerate() {
+        for (col, word) in line.split(' ').filter(|s| !s.is_empty()).enumerate()
+        {
             let has_edge = word.parse::<i32>().unwrap();
             assert!(has_edge == 0 || has_edge == 1);
             if has_edge == 0 {
@@ -264,15 +267,18 @@ pub fn digraph() -> GraphFactory<Directed, Graph<(), (), Directed>> {
     graph()
 }
 
-pub fn stable_graph<Ty: EdgeType>() -> GraphFactory<Ty, StableGraph<(), (), Ty>> {
+pub fn stable_graph<Ty: EdgeType>() -> GraphFactory<Ty, StableGraph<(), (), Ty>>
+{
     GraphFactory::new()
 }
 
-pub fn stable_ungraph() -> GraphFactory<Undirected, StableGraph<(), (), Undirected>> {
+pub fn stable_ungraph(
+) -> GraphFactory<Undirected, StableGraph<(), (), Undirected>> {
     stable_graph()
 }
 
-pub fn stable_digraph() -> GraphFactory<Directed, StableGraph<(), (), Directed>> {
+pub fn stable_digraph() -> GraphFactory<Directed, StableGraph<(), (), Directed>>
+{
     stable_graph()
 }
 
@@ -312,7 +318,8 @@ pub fn directed_fan(n: usize) -> DiGraph<(), ()> {
     let mut prev_ix = None;
 
     for ix in indices {
-        let (source, target) = if edge_forward { (ix_0, ix) } else { (ix, ix_0) };
+        let (source, target) =
+            if edge_forward { (ix_0, ix) } else { (ix, ix_0) };
 
         g.add_edge(source, target, ());
 
@@ -333,11 +340,18 @@ pub fn directed_fan(n: usize) -> DiGraph<(), ()> {
 }
 
 #[allow(clippy::needless_range_loop)]
-pub fn build_graph(node_count: usize, dense: bool) -> Graph<usize, i32, Undirected> {
-    use core::cmp::{max, min};
+pub fn build_graph(
+    node_count: usize,
+    dense: bool,
+) -> Graph<usize, i32, Undirected> {
+    use core::cmp::{
+        max,
+        min,
+    };
 
     let mut graph = Graph::new_undirected();
-    let nodes: Vec<NodeIndex<_>> = (0..node_count).map(|i| graph.add_node(i)).collect();
+    let nodes: Vec<NodeIndex<_>> =
+        (0..node_count).map(|i| graph.add_node(i)).collect();
     for i in 0..node_count {
         let n1 = nodes[i];
         let neighbour_count = if dense {

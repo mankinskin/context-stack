@@ -8,14 +8,27 @@ extern crate defmac;
 use std::collections::HashSet;
 
 use itertools::assert_equal;
-use petgraph::adj::IndexType;
-use petgraph::algo::{kosaraju_scc, min_spanning_tree, tarjan_scc};
-use petgraph::dot::Dot;
-use petgraph::prelude::*;
-use petgraph::stable_graph::edge_index as e;
-use petgraph::stable_graph::node_index as n;
-use petgraph::visit::{EdgeIndexable, IntoEdgeReferences, IntoNodeReferences, NodeIndexable};
-use petgraph::EdgeType;
+use petgraph::{
+    adj::IndexType,
+    algo::{
+        kosaraju_scc,
+        min_spanning_tree,
+        tarjan_scc,
+    },
+    dot::Dot,
+    prelude::*,
+    stable_graph::{
+        edge_index as e,
+        node_index as n,
+    },
+    visit::{
+        EdgeIndexable,
+        IntoEdgeReferences,
+        IntoNodeReferences,
+        NodeIndexable,
+    },
+    EdgeType,
+};
 
 fn assert_graph_consistent<N, E, Ty, Ix>(g: &StableGraph<N, E, Ty, Ix>)
 where
@@ -94,7 +107,10 @@ fn clear_edges() {
     assert!(gr.node_indices().all(|i| gr.neighbors(i).next().is_none()));
 }
 
-fn assert_sccs_eq(mut res: Vec<Vec<NodeIndex>>, normalized: Vec<Vec<NodeIndex>>) {
+fn assert_sccs_eq(
+    mut res: Vec<Vec<NodeIndex>>,
+    normalized: Vec<Vec<NodeIndex>>,
+) {
     // normalize the result and compare with the answer.
     for scc in &mut res {
         scc.sort();
@@ -307,7 +323,10 @@ fn add_edge_oob() {
 fn test_node_references() {
     let gr = scc_graph();
 
-    itertools::assert_equal(gr.node_references().map(|(i, _)| i), gr.node_indices());
+    itertools::assert_equal(
+        gr.node_references().map(|(i, _)| i),
+        gr.node_indices(),
+    );
 }
 
 #[test]
@@ -317,7 +336,13 @@ fn iterators_undir() {
     let b = g.add_node(1);
     let c = g.add_node(2);
     let d = g.add_node(3);
-    g.extend_with_edges([(a, b, 1), (a, c, 2), (b, c, 3), (c, c, 4), (a, d, 5)]);
+    g.extend_with_edges([
+        (a, b, 1),
+        (a, c, 2),
+        (b, c, 3),
+        (c, c, 4),
+        (a, d, 5),
+    ]);
     g.remove_node(b);
 
     itertools::assert_equal(g.neighbors(a), vec![d, c]);
@@ -460,8 +485,10 @@ fn from() {
     assert!(edges_eq!(&gr5, &ans));
 }
 
-use petgraph::data::FromElements;
-use petgraph::stable_graph::StableGraph;
+use petgraph::{
+    data::FromElements,
+    stable_graph::StableGraph,
+};
 
 #[test]
 fn from_min_spanning_tree() {
@@ -477,7 +504,9 @@ fn from_min_spanning_tree() {
     for &node in nodes.iter().take(3) {
         let _ = g.remove_node(node);
     }
-    let _ = StableGraph::<(), (), Undirected, usize>::from_elements(min_spanning_tree(&g));
+    let _ = StableGraph::<(), (), Undirected, usize>::from_elements(
+        min_spanning_tree(&g),
+    );
 }
 
 #[test]
@@ -543,7 +572,8 @@ fn test_map_owned() {
     let bc = g.add_edge(b, c, 14);
     let ca = g.add_edge(c, a, 9);
 
-    let g2 = g.map_owned(|_, name| format!("map-{name}"), |_, weight| weight * 2);
+    let g2 =
+        g.map_owned(|_, name| format!("map-{name}"), |_, weight| weight * 2);
     assert_eq!(g2.node_count(), 3);
     assert_eq!(g2.node_weight(a).map(|s| &**s), Some("map-A"));
     assert_eq!(g2.node_weight(b).map(|s| &**s), Some("map-B"));

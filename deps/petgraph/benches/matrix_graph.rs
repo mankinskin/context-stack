@@ -5,9 +5,17 @@ extern crate test;
 
 use test::Bencher;
 
-use petgraph::algo;
-use petgraph::matrix_graph::{node_index, MatrixGraph};
-use petgraph::{Directed, EdgeType, Incoming, Outgoing};
+use petgraph::{
+    algo,
+    matrix_graph::{
+        node_index,
+        MatrixGraph,
+    },
+    Directed,
+    EdgeType,
+    Incoming,
+    Outgoing,
+};
 
 #[bench]
 fn add_100_nodes(b: &mut test::Bencher) {
@@ -151,12 +159,15 @@ const BIGGER: &str = "
 ";
 
 /// Parse a text adjacency matrix format into a directed graph
-fn parse_matrix<Ty: EdgeType>(s: &str) -> MatrixGraph<(), (), std::hash::RandomState, Ty> {
+fn parse_matrix<Ty: EdgeType>(
+    s: &str
+) -> MatrixGraph<(), (), std::hash::RandomState, Ty> {
     let mut gr = MatrixGraph::default();
     let s = s.trim();
     let lines = s.lines().filter(|l| !l.is_empty());
     for (row, line) in lines.enumerate() {
-        for (col, word) in line.split(' ').filter(|s| !s.is_empty()).enumerate() {
+        for (col, word) in line.split(' ').filter(|s| !s.is_empty()).enumerate()
+        {
             let has_edge = word.parse::<i32>().unwrap();
             assert!(has_edge == 0 || has_edge == 1);
             if has_edge == 0 {

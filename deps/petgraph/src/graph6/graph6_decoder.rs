@@ -1,12 +1,20 @@
 //! [graph6 format](https://users.cecs.anu.edu.au/~bdm/data/formats.txt) decoder for undirected graphs.
 
 use alloc::{
-    string::{String, ToString},
+    string::{
+        String,
+        ToString,
+    },
     vec,
     vec::Vec,
 };
 
-use crate::{csr::Csr, graph::IndexType, Graph, Undirected};
+use crate::{
+    csr::Csr,
+    graph::IndexType,
+    Graph,
+    Undirected,
+};
 
 #[cfg(feature = "graphmap")]
 use crate::graphmap::GraphMap;
@@ -15,10 +23,16 @@ use crate::graphmap::GraphMap;
 use core::hash::BuildHasher;
 
 #[cfg(feature = "matrix_graph")]
-use crate::matrix_graph::{MatrixGraph, Nullable};
+use crate::matrix_graph::{
+    MatrixGraph,
+    Nullable,
+};
 
 #[cfg(feature = "stable_graph")]
-use crate::stable_graph::{StableGraph, StableUnGraph};
+use crate::stable_graph::{
+    StableGraph,
+    StableUnGraph,
+};
 
 const N: usize = 63;
 
@@ -29,7 +43,9 @@ pub trait FromGraph6 {
 
 /// Converts a graph6 format string into data can be used to construct an undirected graph.
 /// Returns a tuple containing the graph order and its edges.
-pub fn from_graph6_representation<Ix>(graph6_representation: String) -> (usize, Vec<(Ix, Ix)>)
+pub fn from_graph6_representation<Ix>(
+    graph6_representation: String
+) -> (usize, Vec<(Ix, Ix)>)
 where
     Ix: IndexType,
 {
@@ -47,7 +63,9 @@ where
 
 // Converts a graph6 format string into a vector of bytes, converted from ASCII characters,
 // split into two parts, the first representing the graph order, and the second its adjacency matrix.
-fn get_order_bytes_and_adj_matrix_bytes(graph6_representation: String) -> (Vec<usize>, Vec<usize>) {
+fn get_order_bytes_and_adj_matrix_bytes(
+    graph6_representation: String
+) -> (Vec<usize>, Vec<usize>) {
     let bytes: Vec<usize> = graph6_representation
         .chars()
         .map(|c| (c as usize) - N)
@@ -77,7 +95,10 @@ fn bytes_vector_to_bits_vector(bytes: Vec<usize>) -> Vec<u8> {
 }
 
 // Get binary representation of `n` as a vector of bits with `bits_length` length.
-fn get_number_as_bits(n: usize, bits_length: usize) -> Vec<u8> {
+fn get_number_as_bits(
+    n: usize,
+    bits_length: usize,
+) -> Vec<u8> {
     let mut bits = Vec::new();
     for i in (0..bits_length).rev() {
         bits.push(((n >> i) & 1) as u8);
@@ -97,7 +118,10 @@ fn get_bits_as_decimal(bits: Vec<u8>) -> usize {
 }
 
 // Get graph edges from its order and bits vector representation of its adjacency matrix.
-fn get_edges<Ix>(order: usize, adj_matrix_bits: Vec<u8>) -> Vec<(Ix, Ix)>
+fn get_edges<Ix>(
+    order: usize,
+    adj_matrix_bits: Vec<u8>,
+) -> Vec<(Ix, Ix)>
 where
     Ix: IndexType,
 {
@@ -121,9 +145,11 @@ where
 
 impl<Ix: IndexType> FromGraph6 for Graph<(), (), Undirected, Ix> {
     fn from_graph6_string(graph6_string: String) -> Self {
-        let (order, edges): (usize, Vec<(Ix, Ix)>) = from_graph6_representation(graph6_string);
+        let (order, edges): (usize, Vec<(Ix, Ix)>) =
+            from_graph6_representation(graph6_string);
 
-        let mut graph: Graph<(), (), Undirected, Ix> = Graph::with_capacity(order, edges.len());
+        let mut graph: Graph<(), (), Undirected, Ix> =
+            Graph::with_capacity(order, edges.len());
         for _ in 0..order {
             graph.add_node(());
         }
@@ -136,7 +162,8 @@ impl<Ix: IndexType> FromGraph6 for Graph<(), (), Undirected, Ix> {
 #[cfg(feature = "stable_graph")]
 impl<Ix: IndexType> FromGraph6 for StableGraph<(), (), Undirected, Ix> {
     fn from_graph6_string(graph6_string: String) -> Self {
-        let (order, edges): (usize, Vec<(Ix, Ix)>) = from_graph6_representation(graph6_string);
+        let (order, edges): (usize, Vec<(Ix, Ix)>) =
+            from_graph6_representation(graph6_string);
 
         let mut graph: StableGraph<(), (), Undirected, Ix> =
             StableUnGraph::with_capacity(order, edges.len());
@@ -150,9 +177,12 @@ impl<Ix: IndexType> FromGraph6 for StableGraph<(), (), Undirected, Ix> {
 }
 
 #[cfg(feature = "graphmap")]
-impl<Ix: IndexType, S: BuildHasher + Default> FromGraph6 for GraphMap<Ix, (), Undirected, S> {
+impl<Ix: IndexType, S: BuildHasher + Default> FromGraph6
+    for GraphMap<Ix, (), Undirected, S>
+{
     fn from_graph6_string(graph6_string: String) -> Self {
-        let (order, edges): (usize, Vec<(Ix, Ix)>) = from_graph6_representation(graph6_string);
+        let (order, edges): (usize, Vec<(Ix, Ix)>) =
+            from_graph6_representation(graph6_string);
 
         let mut graph: GraphMap<Ix, (), Undirected, S> =
             GraphMap::with_capacity(order, edges.len());
@@ -175,7 +205,8 @@ where
     S: BuildHasher + Default,
 {
     fn from_graph6_string(graph6_string: String) -> Self {
-        let (order, edges): (usize, Vec<(Ix, Ix)>) = from_graph6_representation(graph6_string);
+        let (order, edges): (usize, Vec<(Ix, Ix)>) =
+            from_graph6_representation(graph6_string);
 
         let mut graph: MatrixGraph<(), (), S, Undirected, Null, Ix> =
             MatrixGraph::with_capacity(order);
@@ -190,7 +221,8 @@ where
 
 impl<Ix: IndexType> FromGraph6 for Csr<(), (), Undirected, Ix> {
     fn from_graph6_string(graph6_string: String) -> Self {
-        let (order, edges): (usize, Vec<(Ix, Ix)>) = from_graph6_representation(graph6_string);
+        let (order, edges): (usize, Vec<(Ix, Ix)>) =
+            from_graph6_representation(graph6_string);
 
         let mut graph: Csr<(), (), Undirected, Ix> = Csr::new();
         let mut nodes = Vec::new();

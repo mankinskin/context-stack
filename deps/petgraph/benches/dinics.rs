@@ -2,15 +2,21 @@
 extern crate petgraph;
 extern crate test;
 
-use petgraph::algo::dinics;
-use petgraph::prelude::{Graph, NodeIndex};
+use petgraph::{
+    algo::dinics,
+    prelude::{
+        Graph,
+        NodeIndex,
+    },
+};
 use test::Bencher;
 
 #[bench]
 fn dinics_bench(bench: &mut Bencher) {
     static NODE_COUNT: usize = 1_000;
     let mut g: Graph<usize, usize> = Graph::new();
-    let nodes: Vec<NodeIndex<_>> = (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
+    let nodes: Vec<NodeIndex<_>> =
+        (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
     for i in 0..NODE_COUNT - 1 {
         g.add_edge(nodes[i], nodes[i + 1], 1);
     }
@@ -27,7 +33,8 @@ fn dinics_bench(bench: &mut Bencher) {
 fn dinics_bench_many_edges(bench: &mut Bencher) {
     static NODE_COUNT: usize = 1_001;
     let mut g: Graph<usize, usize> = Graph::new();
-    let nodes: Vec<NodeIndex<_>> = (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
+    let nodes: Vec<NodeIndex<_>> =
+        (0..NODE_COUNT).map(|i| g.add_node(i)).collect();
     for j in [1, 2, 4, 5, 10, 20, 25, 50] {
         for i in 0..(NODE_COUNT - 1) / j {
             g.add_edge(nodes[i], nodes[(i + 1) * j], 1);
@@ -128,7 +135,11 @@ fn dinics_bench_dense_middle_varying_weights(bench: &mut Bencher) {
     for i in 0..intermediates.len() {
         for j in (i + 1)..intermediates.len() {
             if (i + j) % 13 == 0 {
-                g.add_edge(intermediates[i], intermediates[j], (i + j) % 13 + 1);
+                g.add_edge(
+                    intermediates[i],
+                    intermediates[j],
+                    (i + j) % 13 + 1,
+                );
             }
         }
     }

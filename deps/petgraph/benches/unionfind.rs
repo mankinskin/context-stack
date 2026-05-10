@@ -9,7 +9,10 @@ use test::Bencher;
 mod common;
 use common::*;
 
-use petgraph::algo::{connected_components, is_cyclic_undirected};
+use petgraph::algo::{
+    connected_components,
+    is_cyclic_undirected,
+};
 
 #[bench]
 fn connected_components_praust_undir_bench(bench: &mut Bencher) {

@@ -3,15 +3,28 @@ extern crate petgraph;
 #[macro_use]
 extern crate defmac;
 
-use petgraph::adj::DefaultIx;
-use petgraph::adj::IndexType;
-use petgraph::adj::{List, UnweightedList};
-use petgraph::algo::tarjan_scc;
-use petgraph::data::{DataMap, DataMapMut};
-use petgraph::dot::Dot;
-use petgraph::prelude::*;
-use petgraph::visit::{
-    IntoEdgeReferences, IntoEdges, IntoNeighbors, IntoNodeReferences, NodeCount, NodeIndexable,
+use petgraph::{
+    adj::{
+        DefaultIx,
+        IndexType,
+        List,
+        UnweightedList,
+    },
+    algo::tarjan_scc,
+    data::{
+        DataMap,
+        DataMapMut,
+    },
+    dot::Dot,
+    prelude::*,
+    visit::{
+        IntoEdgeReferences,
+        IntoEdges,
+        IntoNeighbors,
+        IntoNodeReferences,
+        NodeCount,
+        NodeIndexable,
+    },
 };
 
 use itertools::assert_equal;
@@ -33,7 +46,10 @@ fn node_indices() {
     assert_eq!(iter.next(), None);
 }
 
-fn test_node_count<E>(g: &List<E>, n: usize) {
+fn test_node_count<E>(
+    g: &List<E>,
+    n: usize,
+) {
     assert_eq!(n, g.node_count());
     assert_eq!(g.node_bound(), n);
     assert_eq!(g.node_indices().count(), n);
@@ -54,7 +70,10 @@ fn node_bound() {
     test_node_count(&g, 0);
 }
 
-fn assert_sccs_eq<Ix: IndexType>(mut res: Vec<Vec<Ix>>, normalized: Vec<Vec<Ix>>) {
+fn assert_sccs_eq<Ix: IndexType>(
+    mut res: Vec<Vec<Ix>>,
+    normalized: Vec<Vec<Ix>>,
+) {
     // normalize the result and compare with the answer.
     for scc in &mut res {
         scc.sort();
@@ -156,10 +175,10 @@ fn test_edge_references() {
     for n in gr.node_indices() {
         for e in gr.edge_indices_from(n) {
             match gr.edge_weight_mut(e) {
-                None => {}
+                None => {},
                 Some(r) => {
                     *r = 1;
-                }
+                },
             }
         }
     }
@@ -227,7 +246,9 @@ fn iterators_undir() {
     let b = g.add_node();
     let c = g.add_node();
     let d = g.add_node();
-    for &(from, to, w) in &[(a, b, 1), (a, c, 2), (b, c, 3), (c, c, 4), (a, d, 5)] {
+    for &(from, to, w) in
+        &[(a, b, 1), (a, c, 2), (b, c, 3), (c, c, 4), (a, d, 5)]
+    {
         g.add_edge(n(from), n(to), w);
     }
 

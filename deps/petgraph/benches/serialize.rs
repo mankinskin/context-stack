@@ -14,7 +14,8 @@ mod serialize {
     const NUM_HOLES: usize = 1_000_000;
 
     fn make_stable_graph() -> StableGraph<u32, u32> {
-        let mut g = StableGraph::with_capacity(NUM_NODES + NUM_HOLES, NUM_EDGES);
+        let mut g =
+            StableGraph::with_capacity(NUM_NODES + NUM_HOLES, NUM_EDGES);
         let indices: Vec<_> = (0..NUM_NODES + NUM_HOLES)
             .map(|i| g.add_node(i as u32))
             .collect();
@@ -48,7 +49,8 @@ mod serialize {
         let graph = make_stable_graph();
         let data = bincode::serialize(&graph).unwrap();
         bench.iter(|| {
-            let graph2: StableGraph<u32, u32> = bincode::deserialize(&data).unwrap();
+            let graph2: StableGraph<u32, u32> =
+                bincode::deserialize(&data).unwrap();
             graph2
         });
     }

@@ -2,7 +2,10 @@
 pub trait IterUtilsExt: Iterator {
     /// Return the first element that maps to `Some(_)`, or None if the iterator
     /// was exhausted.
-    fn ex_find_map<F, R>(&mut self, mut f: F) -> Option<R>
+    fn ex_find_map<F, R>(
+        &mut self,
+        mut f: F,
+    ) -> Option<R>
     where
         F: FnMut(Self::Item) -> Option<R>,
     {
@@ -16,7 +19,10 @@ pub trait IterUtilsExt: Iterator {
 
     /// Return the last element from the back that maps to `Some(_)`, or
     /// None if the iterator was exhausted.
-    fn ex_rfind_map<F, R>(&mut self, mut f: F) -> Option<R>
+    fn ex_rfind_map<F, R>(
+        &mut self,
+        mut f: F,
+    ) -> Option<R>
     where
         F: FnMut(Self::Item) -> Option<R>,
         Self: DoubleEndedIterator,

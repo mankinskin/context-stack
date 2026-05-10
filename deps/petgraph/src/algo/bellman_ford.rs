@@ -1,12 +1,25 @@
 //! Bellman-Ford algorithms.
 
-use alloc::{vec, vec::Vec};
+use alloc::{
+    vec,
+    vec::Vec,
+};
 
 use crate::prelude::*;
 
-use crate::visit::{IntoEdges, IntoNodeIdentifiers, NodeCount, NodeIndexable, VisitMap, Visitable};
+use crate::visit::{
+    IntoEdges,
+    IntoNodeIdentifiers,
+    NodeCount,
+    NodeIndexable,
+    VisitMap,
+    Visitable,
+};
 
-use super::{FloatMeasure, NegativeCycle};
+use super::{
+    FloatMeasure,
+    NegativeCycle,
+};
 
 #[derive(Debug, Clone)]
 pub struct Paths<NodeId, EdgeWeight> {
@@ -167,7 +180,10 @@ where
 ///     Some([NodeIndex::new(1), NodeIndex::new(3), NodeIndex::new(2)].to_vec())
 /// );
 /// ```
-pub fn find_negative_cycle<G>(g: G, source: G::NodeId) -> Option<Vec<G::NodeId>>
+pub fn find_negative_cycle<G>(
+    g: G,
+    source: G::NodeId,
+) -> Option<Vec<G::NodeId>>
 where
     G: NodeCount + IntoNodeIdentifiers + IntoEdges + NodeIndexable + Visitable,
     G::EdgeWeight: FloatMeasure,

@@ -2,13 +2,23 @@ use alloc::collections::BinaryHeap;
 use core::hash::Hash;
 
 use hashbrown::hash_map::{
-    Entry::{Occupied, Vacant},
+    Entry::{
+        Occupied,
+        Vacant,
+    },
     HashMap,
 };
 
-use crate::algo::Measure;
-use crate::scored::MinScored;
-use crate::visit::{EdgeRef, IntoEdges, VisitMap, Visitable};
+use crate::{
+    algo::Measure,
+    scored::MinScored,
+    visit::{
+        EdgeRef,
+        IntoEdges,
+        VisitMap,
+        Visitable,
+    },
+};
 
 /// Dijkstra's shortest path algorithm.
 ///
@@ -97,7 +107,13 @@ where
     F: FnMut(G::EdgeRef) -> K,
     K: Measure + Copy,
 {
-    with_dynamic_goal(graph, start, |node| goal.as_ref() == Some(node), edge_cost).scores
+    with_dynamic_goal(
+        graph,
+        start,
+        |node| goal.as_ref() == Some(node),
+        edge_cost,
+    )
+    .scores
 }
 
 /// Return value of [`with_dynamic_goal`].
@@ -204,12 +220,12 @@ where
                         visit_next.push(MinScored(next_score, next));
                         //predecessor.insert(next.clone(), node.clone());
                     }
-                }
+                },
                 Vacant(ent) => {
                     ent.insert(next_score);
                     visit_next.push(MinScored(next_score, next));
                     //predecessor.insert(next.clone(), node.clone());
-                }
+                },
             }
         }
         visited.visit(node);

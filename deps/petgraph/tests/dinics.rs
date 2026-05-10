@@ -1,5 +1,7 @@
-use petgraph::algo::dinics;
-use petgraph::prelude::Graph;
+use petgraph::{
+    algo::dinics,
+    prelude::Graph,
+};
 
 #[test]
 fn test_dinics_a() {
@@ -10,7 +12,13 @@ fn test_dinics_a() {
     let _ = graph.add_node(1);
     let _ = graph.add_node(2);
     let sink = graph.add_node(3);
-    graph.extend_with_edges([(0, 1, 3), (0, 2, 2), (1, 2, 5), (1, 3, 2), (2, 3, 3)]);
+    graph.extend_with_edges([
+        (0, 1, 3),
+        (0, 2, 2),
+        (1, 2, 5),
+        (1, 3, 2),
+        (2, 3, 3),
+    ]);
     let (max_flow, _) = dinics(&graph, source, sink);
     assert_eq!(5, max_flow);
 }

@@ -5,27 +5,63 @@
 
 use alloc::vec;
 use core::{
-    cmp, fmt, iter,
+    cmp,
+    fmt,
+    iter,
     marker::PhantomData,
     mem::size_of,
-    ops::{Index, IndexMut},
+    ops::{
+        Index,
+        IndexMut,
+    },
     slice,
 };
 
 use fixedbitset::FixedBitSet;
 
-use super::{index_twice, Edge, Frozen, GraphError, Node, Pair, DIRECTIONS};
-use crate::iter_format::{DebugMap, IterFormatExt, NoPretty};
-use crate::iter_utils::IterUtilsExt;
-use crate::visit::{self, EdgeIndexable, EdgeRef, IntoEdgeReferences, NodeIndexable};
+use super::{
+    index_twice,
+    Edge,
+    Frozen,
+    GraphError,
+    Node,
+    Pair,
+    DIRECTIONS,
+};
 use crate::{
-    Directed, Direction, EdgeType, Graph, Incoming, IntoWeightedEdge, Outgoing, Undirected,
+    iter_format::{
+        DebugMap,
+        IterFormatExt,
+        NoPretty,
+    },
+    iter_utils::IterUtilsExt,
+    visit::{
+        self,
+        EdgeIndexable,
+        EdgeRef,
+        IntoEdgeReferences,
+        NodeIndexable,
+    },
+    Directed,
+    Direction,
+    EdgeType,
+    Graph,
+    Incoming,
+    IntoWeightedEdge,
+    Outgoing,
+    Undirected,
 };
 
 // reexport those things that are shared with Graph
 #[doc(no_inline)]
 pub use crate::graph::{
-    edge_index, node_index, DefaultIx, EdgeIndex, GraphIndex, IndexType, NodeIndex,
+    edge_index,
+    node_index,
+    DefaultIx,
+    EdgeIndex,
+    GraphIndex,
+    IndexType,
+    NodeIndex,
 };
 
 use crate::util::enumerate;
@@ -99,7 +135,8 @@ pub type StableDiGraph<N, E, Ix = DefaultIx> = StableGraph<N, E, Directed, Ix>;
 ///
 /// For example, an edge between *1* and *2* is equivalent to an edge between
 /// *2* and *1*.
-pub type StableUnGraph<N, E, Ix = DefaultIx> = StableGraph<N, E, Undirected, Ix>;
+pub type StableUnGraph<N, E, Ix = DefaultIx> =
+    StableGraph<N, E, Undirected, Ix>;
 
 impl<N, E, Ty, Ix> fmt::Debug for StableGraph<N, E, Ty, Ix>
 where
@@ -108,7 +145,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
         let etype = if self.is_directed() {
             "Directed"
         } else {
@@ -221,7 +261,10 @@ where
     Ix: IndexType,
 {
     /// Create a new `StableGraph` with estimated capacity.
-    pub fn with_capacity(nodes: usize, edges: usize) -> Self {
+    pub fn with_capacity(
+        nodes: usize,
+        edges: usize,
+    ) -> Self {
         StableGraph {
             g: Graph::with_capacity(nodes, edges),
             node_count: 0,
@@ -297,7 +340,10 @@ where
     ///
     /// Panics if the new capacity overflows usize.
     #[track_caller]
-    pub fn reserve_nodes(&mut self, additional: usize) {
+    pub fn reserve_nodes(
+        &mut self,
+        additional: usize,
+    ) {
         self.g.reserve_nodes(additional);
     }
 
@@ -306,7 +352,10 @@ where
     ///
     /// Panics if the new capacity overflows usize.
     #[track_caller]
-    pub fn reserve_edges(&mut self, additional: usize) {
+    pub fn reserve_edges(
+        &mut self,
+        additional: usize,
+    ) {
         self.g.reserve_edges(additional);
     }
 
@@ -318,7 +367,10 @@ where
     ///
     /// Panics if the new capacity overflows usize.
     #[track_caller]
-    pub fn reserve_exact_nodes(&mut self, additional: usize) {
+    pub fn reserve_exact_nodes(
+        &mut self,
+        additional: usize,
+    ) {
         self.g.reserve_exact_nodes(additional);
     }
 
@@ -330,7 +382,10 @@ where
     ///
     /// Panics if the new capacity overflows usize.
     #[track_caller]
-    pub fn reserve_exact_edges(&mut self, additional: usize) {
+    pub fn reserve_exact_edges(
+        &mut self,
+        additional: usize,
+    ) {
         self.g.reserve_exact_edges(additional);
     }
 
@@ -364,7 +419,10 @@ where
     /// **Panics** if the `StableGraph` is at the maximum number of nodes for
     /// its index type.
     #[track_caller]
-    pub fn add_node(&mut self, weight: N) -> NodeIndex<Ix> {
+    pub fn add_node(
+        &mut self,
+        weight: N,
+    ) -> NodeIndex<Ix> {
         self.try_add_node(weight).unwrap()
     }
 
@@ -375,7 +433,10 @@ where
     /// Return the index of the new node.
     ///
     /// Return [`GraphError::NodeIxLimit`] if the `StableGraph` is at the maximum number of nodes for its index.
-    pub fn try_add_node(&mut self, weight: N) -> Result<NodeIndex<Ix>, GraphError> {
+    pub fn try_add_node(
+        &mut self,
+        weight: N,
+    ) -> Result<NodeIndex<Ix>, GraphError> {
         if self.free_node != NodeIndex::end() {
             let node_idx = self.free_node;
             self.occupy_vacant_node(node_idx, weight);
@@ -387,7 +448,10 @@ where
     }
 
     /// free_node: Which free list to update for the vacancy
-    fn add_vacant_node(&mut self, free_node: &mut NodeIndex<Ix>) {
+    fn add_vacant_node(
+        &mut self,
+        free_node: &mut NodeIndex<Ix>,
+    ) {
         let node_idx = self.g.add_node(None);
         // link the free list
         let node_slot = &mut self.g.nodes[node_idx.index()];
@@ -408,7 +472,10 @@ where
     /// Computes in **O(e')** time, where **e'** is the number of affected
     /// edges, including *n* calls to `.remove_edge()` where *n* is the number
     /// of edges with an endpoint in `a`.
-    pub fn remove_node(&mut self, a: NodeIndex<Ix>) -> Option<N> {
+    pub fn remove_node(
+        &mut self,
+        a: NodeIndex<Ix>,
+    ) -> Option<N> {
         let node_weight = self.g.nodes.get_mut(a.index())?.weight.take()?;
         for d in &DIRECTIONS {
             let k = d.index();
@@ -438,12 +505,18 @@ where
         Some(node_weight)
     }
 
-    pub fn contains_node(&self, a: NodeIndex<Ix>) -> bool {
+    pub fn contains_node(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> bool {
         self.get_node(a).is_some()
     }
 
     // Return the Node if it is not vacant (non-None weight)
-    fn get_node(&self, a: NodeIndex<Ix>) -> Option<&Node<Option<N>, Ix>> {
+    fn get_node(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> Option<&Node<Option<N>, Ix>> {
         self.g
             .nodes
             .get(a.index())
@@ -463,7 +536,12 @@ where
     ///
     /// **Note:** `StableGraph` allows adding parallel (“duplicate”) edges.
     #[track_caller]
-    pub fn add_edge(&mut self, a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E) -> EdgeIndex<Ix> {
+    pub fn add_edge(
+        &mut self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+        weight: E,
+    ) -> EdgeIndex<Ix> {
         let res = self.try_add_edge(a, b, weight);
         if let Err(GraphError::NodeMissed(i)) = res {
             panic!(
@@ -507,7 +585,9 @@ where
                 edge.node = [a, b];
             } else {
                 edge_idx = EdgeIndex::new(self.g.edges.len());
-                if !(<Ix as IndexType>::max().index() == !0 || EdgeIndex::end() != edge_idx) {
+                if !(<Ix as IndexType>::max().index() == !0
+                    || EdgeIndex::end() != edge_idx)
+                {
                     return Err(GraphError::EdgeIxLimit);
                 }
                 new_edge = Some(Edge {
@@ -518,32 +598,32 @@ where
                 edge = new_edge.as_mut().unwrap();
             }
 
-            let wrong_index = match index_twice(&mut self.g.nodes, a.index(), b.index()) {
-                Pair::None => Some(cmp::max(a.index(), b.index())),
-                Pair::One(an) => {
-                    if an.weight.is_none() {
-                        Some(a.index())
-                    } else {
-                        edge.next = an.next;
-                        an.next[0] = edge_idx;
-                        an.next[1] = edge_idx;
-                        None
-                    }
-                }
-                Pair::Both(an, bn) => {
-                    // a and b are different indices
-                    if an.weight.is_none() {
-                        Some(a.index())
-                    } else if bn.weight.is_none() {
-                        Some(b.index())
-                    } else {
-                        edge.next = [an.next[0], bn.next[1]];
-                        an.next[0] = edge_idx;
-                        bn.next[1] = edge_idx;
-                        None
-                    }
-                }
-            };
+            let wrong_index =
+                match index_twice(&mut self.g.nodes, a.index(), b.index()) {
+                    Pair::None => Some(cmp::max(a.index(), b.index())),
+                    Pair::One(an) =>
+                        if an.weight.is_none() {
+                            Some(a.index())
+                        } else {
+                            edge.next = an.next;
+                            an.next[0] = edge_idx;
+                            an.next[1] = edge_idx;
+                            None
+                        },
+                    Pair::Both(an, bn) => {
+                        // a and b are different indices
+                        if an.weight.is_none() {
+                            Some(a.index())
+                        } else if bn.weight.is_none() {
+                            Some(b.index())
+                        } else {
+                            edge.next = [an.next[0], bn.next[1]];
+                            an.next[0] = edge_idx;
+                            bn.next[1] = edge_idx;
+                            None
+                        }
+                    },
+                };
             if let Some(i) = wrong_index {
                 return Err(GraphError::NodeMissed(i));
             }
@@ -556,7 +636,10 @@ where
     }
 
     /// free_edge: Which free list to update for the vacancy
-    fn add_vacant_edge(&mut self, free_edge: &mut EdgeIndex<Ix>) {
+    fn add_vacant_edge(
+        &mut self,
+        free_edge: &mut EdgeIndex<Ix>,
+    ) {
         let edge_idx = EdgeIndex::new(self.g.edges.len());
         debug_assert!(edge_idx != EdgeIndex::end());
         let mut edge = Edge {
@@ -580,7 +663,12 @@ where
     /// **Panics** if any of the nodes don't exist
     /// or the stable graph is at the maximum number of edges for its index (when adding new edge).
     #[track_caller]
-    pub fn update_edge(&mut self, a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E) -> EdgeIndex<Ix> {
+    pub fn update_edge(
+        &mut self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+        weight: E,
+    ) -> EdgeIndex<Ix> {
         self.try_update_edge(a, b, weight).unwrap()
     }
 
@@ -615,11 +703,15 @@ where
     ///
     /// Computes in **O(e')** time, where **e'** is the number of edges
     /// connected to the same endpoints as `e`.
-    pub fn remove_edge(&mut self, e: EdgeIndex<Ix>) -> Option<E> {
+    pub fn remove_edge(
+        &mut self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<E> {
         // every edge is part of two lists,
         // outgoing and incoming edges.
         // Remove it from both
-        let (is_edge, edge_node, edge_next) = match self.g.edges.get(e.index()) {
+        let (is_edge, edge_node, edge_next) = match self.g.edges.get(e.index())
+        {
             None => return None,
             Some(x) => (x.weight.is_some(), x.node, x.next),
         };
@@ -643,7 +735,10 @@ where
     /// Access the weight for node `a`.
     ///
     /// Also available with indexing syntax: `&graph[a]`.
-    pub fn node_weight(&self, a: NodeIndex<Ix>) -> Option<&N> {
+    pub fn node_weight(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> Option<&N> {
         match self.g.nodes.get(a.index()) {
             Some(no) => no.weight.as_ref(),
             None => None,
@@ -653,7 +748,10 @@ where
     /// Access the weight for node `a`, mutably.
     ///
     /// Also available with indexing syntax: `&mut graph[a]`.
-    pub fn node_weight_mut(&mut self, a: NodeIndex<Ix>) -> Option<&mut N> {
+    pub fn node_weight_mut(
+        &mut self,
+        a: NodeIndex<Ix>,
+    ) -> Option<&mut N> {
         match self.g.nodes.get_mut(a.index()) {
             Some(no) => no.weight.as_mut(),
             None => None,
@@ -689,7 +787,10 @@ where
     /// Access the weight for edge `e`.
     ///
     /// Also available with indexing syntax: `&graph[e]`.
-    pub fn edge_weight(&self, e: EdgeIndex<Ix>) -> Option<&E> {
+    pub fn edge_weight(
+        &self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<&E> {
         match self.g.edges.get(e.index()) {
             Some(ed) => ed.weight.as_ref(),
             None => None,
@@ -699,7 +800,10 @@ where
     /// Access the weight for edge `e`, mutably
     ///
     /// Also available with indexing syntax: `&mut graph[e]`.
-    pub fn edge_weight_mut(&mut self, e: EdgeIndex<Ix>) -> Option<&mut E> {
+    pub fn edge_weight_mut(
+        &mut self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<&mut E> {
         match self.g.edges.get_mut(e.index()) {
             Some(ed) => ed.weight.as_mut(),
             None => None,
@@ -726,7 +830,10 @@ where
     }
 
     /// Access the source and target nodes for `e`.
-    pub fn edge_endpoints(&self, e: EdgeIndex<Ix>) -> Option<(NodeIndex<Ix>, NodeIndex<Ix>)> {
+    pub fn edge_endpoints(
+        &self,
+        e: EdgeIndex<Ix>,
+    ) -> Option<(NodeIndex<Ix>, NodeIndex<Ix>)> {
         match self.g.edges.get(e.index()) {
             Some(ed) if ed.weight.is_some() => Some((ed.source(), ed.target())),
             _otherwise => None,
@@ -765,7 +872,11 @@ where
     ///
     /// Computes in **O(e')** time, where **e'** is the number of edges
     /// connected to `a` (and `b`, if the graph edges are undirected).
-    pub fn contains_edge(&self, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> bool {
+    pub fn contains_edge(
+        &self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> bool {
         self.find_edge(a, b).is_some()
     }
 
@@ -773,7 +884,11 @@ where
     ///
     /// Computes in **O(e')** time, where **e'** is the number of edges
     /// connected to `a` (and `b`, if the graph edges are undirected).
-    pub fn find_edge(&self, a: NodeIndex<Ix>, b: NodeIndex<Ix>) -> Option<EdgeIndex<Ix>> {
+    pub fn find_edge(
+        &self,
+        a: NodeIndex<Ix>,
+        b: NodeIndex<Ix>,
+    ) -> Option<EdgeIndex<Ix>> {
         if !self.is_directed() {
             self.find_edge_undirected(a, b).map(|(ix, _)| ix)
         } else {
@@ -814,7 +929,10 @@ where
     /// not borrow from the graph.
     ///
     /// [1]: struct.Neighbors.html#method.detach
-    pub fn neighbors(&self, a: NodeIndex<Ix>) -> Neighbors<'_, E, Ix> {
+    pub fn neighbors(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> Neighbors<'_, E, Ix> {
         self.neighbors_directed(a, Outgoing)
     }
 
@@ -833,7 +951,11 @@ where
     /// not borrow from the graph.
     ///
     /// [1]: struct.Neighbors.html#method.detach
-    pub fn neighbors_directed(&self, a: NodeIndex<Ix>, dir: Direction) -> Neighbors<'_, E, Ix> {
+    pub fn neighbors_directed(
+        &self,
+        a: NodeIndex<Ix>,
+        dir: Direction,
+    ) -> Neighbors<'_, E, Ix> {
         let mut iter = self.neighbors_undirected(a);
         if self.is_directed() {
             let k = dir.index();
@@ -856,7 +978,10 @@ where
     /// not borrow from the graph.
     ///
     /// [1]: struct.Neighbors.html#method.detach
-    pub fn neighbors_undirected(&self, a: NodeIndex<Ix>) -> Neighbors<'_, E, Ix> {
+    pub fn neighbors_undirected(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> Neighbors<'_, E, Ix> {
         Neighbors {
             skip_start: a,
             edges: &self.g.edges,
@@ -874,7 +999,10 @@ where
     ///
     /// Produces an empty iterator if the node doesn't exist.<br>
     /// Iterator element type is `EdgeReference<E, Ix>`.
-    pub fn edges(&self, a: NodeIndex<Ix>) -> Edges<'_, E, Ty, Ix> {
+    pub fn edges(
+        &self,
+        a: NodeIndex<Ix>,
+    ) -> Edges<'_, E, Ty, Ix> {
         self.edges_directed(a, Outgoing)
     }
 
@@ -889,7 +1017,11 @@ where
     ///
     /// Produces an empty iterator if the node `a` doesn't exist.<br>
     /// Iterator element type is `EdgeReference<E, Ix>`.
-    pub fn edges_directed(&self, a: NodeIndex<Ix>, dir: Direction) -> Edges<'_, E, Ty, Ix> {
+    pub fn edges_directed(
+        &self,
+        a: NodeIndex<Ix>,
+        dir: Direction,
+    ) -> Edges<'_, E, Ty, Ix> {
         Edges {
             skip_start: a,
             edges: &self.g.edges,
@@ -913,7 +1045,10 @@ where
     /// just the nodes without edges.
     ///
     /// The whole iteration computes in **O(|V|)** time where V is the set of nodes.
-    pub fn externals(&self, dir: Direction) -> Externals<'_, N, Ty, Ix> {
+    pub fn externals(
+        &self,
+        dir: Direction,
+    ) -> Externals<'_, N, Ty, Ix> {
         Externals {
             iter: self.raw_nodes().iter().enumerate(),
             dir,
@@ -923,7 +1058,7 @@ where
 
     /// Convert the `StableGraph` into iterators of Nodes and Edges
     pub fn into_nodes_edges_iters(
-        self,
+        self
     ) -> (
         impl Iterator<Item = StableGraphNode<N, Ix>>,
         impl Iterator<Item = StableGraphEdge<E, Ix>>,
@@ -970,7 +1105,9 @@ where
         T: GraphIndex,
         U: GraphIndex,
     {
-        assert!(T::is_node_index() != U::is_node_index() || i.index() != j.index());
+        assert!(
+            T::is_node_index() != U::is_node_index() || i.index() != j.index()
+        );
 
         // Allow two mutable indexes here -- they are nonoverlapping
         unsafe {
@@ -997,8 +1134,10 @@ where
     /// Computes in **O(n + e')** time, where **n** is the number of node indices and
     ///  **e'** is the number of affected edges, including *n* calls to `.remove_edge()`
     /// where *n* is the number of edges with an endpoint in a removed node.
-    pub fn retain_nodes<F>(&mut self, mut visit: F)
-    where
+    pub fn retain_nodes<F>(
+        &mut self,
+        mut visit: F,
+    ) where
         F: FnMut(Frozen<Self>, NodeIndex<Ix>) -> bool,
     {
         for i in 0..self.node_bound() {
@@ -1022,8 +1161,10 @@ where
     ///
     /// Computes in **O(e'')** time, **e'** is the number of affected edges,
     /// including the calls to `.remove_edge()` for each removed edge.
-    pub fn retain_edges<F>(&mut self, mut visit: F)
-    where
+    pub fn retain_edges<F>(
+        &mut self,
+        mut visit: F,
+    ) where
         F: FnMut(Frozen<Self>, EdgeIndex<Ix>) -> bool,
     {
         for i in 0..self.edge_bound() {
@@ -1159,7 +1300,9 @@ where
                 break;
             }
             if let Some(node_weight) = node.weight.as_ref() {
-                if let Some(new_weight) = node_map(NodeIndex::new(i), node_weight) {
+                if let Some(new_weight) =
+                    node_map(NodeIndex::new(i), node_weight)
+                {
                     result_g.add_node(new_weight);
                     continue;
                 }
@@ -1173,8 +1316,12 @@ where
             let source = edge.source();
             let target = edge.target();
             if let Some(edge_weight) = edge.weight.as_ref() {
-                if result_g.contains_node(source) && result_g.contains_node(target) {
-                    if let Some(new_weight) = edge_map(EdgeIndex::new(i), edge_weight) {
+                if result_g.contains_node(source)
+                    && result_g.contains_node(target)
+                {
+                    if let Some(new_weight) =
+                        edge_map(EdgeIndex::new(i), edge_weight)
+                    {
                         result_g.add_edge(source, target, new_weight);
                         continue;
                     }
@@ -1227,7 +1374,9 @@ where
                 break;
             }
             if let Some(node_weight) = node.weight {
-                if let Some(new_weight) = node_map(NodeIndex::new(i), node_weight) {
+                if let Some(new_weight) =
+                    node_map(NodeIndex::new(i), node_weight)
+                {
                     result_g.add_node(new_weight);
                     continue;
                 }
@@ -1241,8 +1390,12 @@ where
             let source = edge.source();
             let target = edge.target();
             if let Some(edge_weight) = edge.weight {
-                if result_g.contains_node(source) && result_g.contains_node(target) {
-                    if let Some(new_weight) = edge_map(EdgeIndex::new(i), edge_weight) {
+                if result_g.contains_node(source)
+                    && result_g.contains_node(target)
+                {
+                    if let Some(new_weight) =
+                        edge_map(EdgeIndex::new(i), edge_weight)
+                    {
                         result_g.add_edge(source, target, new_weight);
                         continue;
                     }
@@ -1263,8 +1416,10 @@ where
     /// or they are filled with default values.
     ///
     /// Nodes are inserted automatically to match the edges.
-    pub fn extend_with_edges<I>(&mut self, iterable: I)
-    where
+    pub fn extend_with_edges<I>(
+        &mut self,
+        iterable: I,
+    ) where
         I: IntoIterator,
         I::Item: IntoWeightedEdge<E>,
         <I::Item as IntoWeightedEdge<E>>::NodeId: Into<NodeIndex<Ix>>,
@@ -1294,7 +1449,11 @@ where
 
     /// Create a new node using a vacant position,
     /// updating the free nodes doubly linked list.
-    fn occupy_vacant_node(&mut self, node_idx: NodeIndex<Ix>, weight: N) {
+    fn occupy_vacant_node(
+        &mut self,
+        node_idx: NodeIndex<Ix>,
+        weight: N,
+    ) {
         let node_slot = &mut self.g.nodes[node_idx.index()];
         let _old = node_slot.weight.replace(weight);
         debug_assert!(_old.is_none());
@@ -1315,8 +1474,10 @@ where
 
     /// Create the node if it does not exist,
     /// adding vacant nodes for padding if needed.
-    fn ensure_node_exists(&mut self, node_ix: NodeIndex<Ix>)
-    where
+    fn ensure_node_exists(
+        &mut self,
+        node_ix: NodeIndex<Ix>,
+    ) where
         N: Default,
     {
         if let Some(Some(_)) = self.g.node_weight(node_ix) {
@@ -1345,7 +1506,8 @@ where
                 // free node
                 node.next = [free_node._into_edge(), EdgeIndex::end()];
                 if free_node != NodeIndex::end() {
-                    self.g.nodes[free_node.index()].next[1] = EdgeIndex::new(node_index);
+                    self.g.nodes[free_node.index()].next[1] =
+                        EdgeIndex::new(node_index);
                 }
                 free_node = NodeIndex::new(node_index);
             }
@@ -1369,13 +1531,13 @@ where
                     edge.next = an.next;
                     an.next[0] = edge_idx;
                     an.next[1] = edge_idx;
-                }
+                },
                 Pair::Both(an, bn) => {
                     // a and b are different indices
                     edge.next = [an.next[0], bn.next[1]];
                     an.next[0] = edge_idx;
                     bn.next[1] = edge_idx;
-                }
+                },
             }
             self.edge_count += 1;
         }
@@ -1407,9 +1569,16 @@ where
                     free_node.index()
                 );
             }
-            debug_assert!(false, "Corrupt free list: missing {:?}", free_node.index());
+            debug_assert!(
+                false,
+                "Corrupt free list: missing {:?}",
+                free_node.index()
+            );
         }
-        debug_assert_eq!(self.node_count(), self.raw_nodes().len() - free_node_len);
+        debug_assert_eq!(
+            self.node_count(),
+            self.raw_nodes().len() - free_node_len
+        );
 
         let mut free_edge_len = 0;
         let mut free_edge = self.free_edge;
@@ -1426,9 +1595,16 @@ where
                     free_node.index()
                 );
             }
-            debug_assert!(false, "Corrupt free list: missing {:?}", free_edge.index());
+            debug_assert!(
+                false,
+                "Corrupt free list: missing {:?}",
+                free_edge.index()
+            );
         }
-        debug_assert_eq!(self.edge_count(), self.raw_edges().len() - free_edge_len);
+        debug_assert_eq!(
+            self.edge_count(),
+            self.raw_edges().len() - free_edge_len
+        );
     }
 }
 
@@ -1449,7 +1625,10 @@ where
         }
     }
 
-    fn clone_from(&mut self, rhs: &Self) {
+    fn clone_from(
+        &mut self,
+        rhs: &Self,
+    ) {
         self.g.clone_from(&rhs.g);
         self.node_count = rhs.node_count;
         self.edge_count = rhs.edge_count;
@@ -1467,7 +1646,10 @@ where
     Ix: IndexType,
 {
     type Output = N;
-    fn index(&self, index: NodeIndex<Ix>) -> &N {
+    fn index(
+        &self,
+        index: NodeIndex<Ix>,
+    ) -> &N {
         self.node_weight(index).unwrap()
     }
 }
@@ -1480,7 +1662,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn index_mut(&mut self, index: NodeIndex<Ix>) -> &mut N {
+    fn index_mut(
+        &mut self,
+        index: NodeIndex<Ix>,
+    ) -> &mut N {
         self.node_weight_mut(index).unwrap()
     }
 }
@@ -1494,7 +1679,10 @@ where
     Ix: IndexType,
 {
     type Output = E;
-    fn index(&self, index: EdgeIndex<Ix>) -> &E {
+    fn index(
+        &self,
+        index: EdgeIndex<Ix>,
+    ) -> &E {
         self.edge_weight(index).unwrap()
     }
 }
@@ -1507,7 +1695,10 @@ where
     Ty: EdgeType,
     Ix: IndexType,
 {
-    fn index_mut(&mut self, index: EdgeIndex<Ix>) -> &mut E {
+    fn index_mut(
+        &mut self,
+        index: EdgeIndex<Ix>,
+    ) -> &mut E {
         self.edge_weight_mut(index).unwrap()
     }
 }
@@ -1573,7 +1764,8 @@ where
     Ix: IndexType,
 {
     fn from(graph: StableGraph<N, E, Ty, Ix>) -> Self {
-        let mut result_g = Graph::with_capacity(graph.node_count(), graph.edge_count());
+        let mut result_g =
+            Graph::with_capacity(graph.node_count(), graph.edge_count());
         // mapping from old node index to new node index
         let mut node_index_map = vec![NodeIndex::end(); graph.node_bound()];
 
@@ -1610,8 +1802,9 @@ where
     type Item = (NodeIndex<Ix>, &'a N);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter
-            .ex_find_map(|(i, node)| node.weight.as_ref().map(move |w| (node_index(i), w)))
+        self.iter.ex_find_map(|(i, node)| {
+            node.weight.as_ref().map(move |w| (node_index(i), w))
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -1625,8 +1818,9 @@ where
     Ix: IndexType,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter
-            .ex_rfind_map(|(i, node)| node.weight.as_ref().map(move |w| (node_index(i), w)))
+        self.iter.ex_rfind_map(|(i, node)| {
+            node.weight.as_ref().map(move |w| (node_index(i), w))
+        })
     }
 }
 
@@ -1650,7 +1844,10 @@ impl<E, Ix: IndexType> PartialEq for EdgeReference<'_, E, Ix>
 where
     E: PartialEq,
 {
-    fn eq(&self, rhs: &Self) -> bool {
+    fn eq(
+        &self,
+        rhs: &Self,
+    ) -> bool {
         self.index == rhs.index && self.weight == rhs.weight
     }
 }
@@ -1733,7 +1930,9 @@ where
         }
 
         if iterate_over.unwrap_or(Incoming) == Incoming {
-            while let Some(Edge { node, weight, next }) = self.edges.get(self.next[1].index()) {
+            while let Some(Edge { node, weight, next }) =
+                self.edges.get(self.next[1].index())
+            {
                 debug_assert!(weight.is_some());
                 let edge_index = self.next[1];
                 self.next[1] = next[1];
@@ -1855,13 +2054,14 @@ where
                 Some((index, node)) => {
                     if node.weight.is_some()
                         && node.next[k] == EdgeIndex::end()
-                        && (Ty::is_directed() || node.next[1 - k] == EdgeIndex::end())
+                        && (Ty::is_directed()
+                            || node.next[1 - k] == EdgeIndex::end())
                     {
                         return Some(NodeIndex::new(index));
                     } else {
                         continue;
                     }
-                }
+                },
             }
         }
     }
@@ -1910,12 +2110,12 @@ where
     fn next(&mut self) -> Option<NodeIndex<Ix>> {
         // First any outgoing edges
         match self.edges.get(self.next[0].index()) {
-            None => {}
+            None => {},
             Some(edge) => {
                 debug_assert!(edge.weight.is_some());
                 self.next[0] = edge.next[0];
                 return Some(edge.node[1]);
-            }
+            },
         }
         // Then incoming edges
         // For an "undirected" iterator (traverse both incoming
@@ -2096,7 +2296,10 @@ where
     fn visit_map(&self) -> FixedBitSet {
         FixedBitSet::with_capacity(self.node_bound())
     }
-    fn reset_map(&self, map: &mut Self::Map) {
+    fn reset_map(
+        &self,
+        map: &mut Self::Map,
+    ) {
         map.clear();
         map.grow(self.node_bound());
     }
@@ -2119,7 +2322,8 @@ where
     type EdgeType = Ty;
 }
 
-impl<'a, N, E: 'a, Ty, Ix> visit::IntoNodeIdentifiers for &'a StableGraph<N, E, Ty, Ix>
+impl<'a, N, E: 'a, Ty, Ix> visit::IntoNodeIdentifiers
+    for &'a StableGraph<N, E, Ty, Ix>
 where
     Ty: EdgeType,
     Ix: IndexType,
@@ -2140,7 +2344,8 @@ where
     }
 }
 
-impl<'a, N, E, Ty, Ix> visit::IntoNodeReferences for &'a StableGraph<N, E, Ty, Ix>
+impl<'a, N, E, Ty, Ix> visit::IntoNodeReferences
+    for &'a StableGraph<N, E, Ty, Ix>
 where
     Ty: EdgeType,
     Ix: IndexType,
@@ -2163,32 +2368,47 @@ where
     fn node_bound(&self) -> usize {
         self.node_indices().next_back().map_or(0, |i| i.index() + 1)
     }
-    fn to_index(&self, ix: NodeIndex<Ix>) -> usize {
+    fn to_index(
+        &self,
+        ix: NodeIndex<Ix>,
+    ) -> usize {
         ix.index()
     }
-    fn from_index(&self, ix: usize) -> Self::NodeId {
+    fn from_index(
+        &self,
+        ix: usize,
+    ) -> Self::NodeId {
         NodeIndex::new(ix)
     }
 }
 
-impl<'a, N, E: 'a, Ty, Ix> visit::IntoNeighbors for &'a StableGraph<N, E, Ty, Ix>
+impl<'a, N, E: 'a, Ty, Ix> visit::IntoNeighbors
+    for &'a StableGraph<N, E, Ty, Ix>
 where
     Ty: EdgeType,
     Ix: IndexType,
 {
     type Neighbors = Neighbors<'a, E, Ix>;
-    fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
+    fn neighbors(
+        self,
+        n: Self::NodeId,
+    ) -> Self::Neighbors {
         (*self).neighbors(n)
     }
 }
 
-impl<'a, N, E: 'a, Ty, Ix> visit::IntoNeighborsDirected for &'a StableGraph<N, E, Ty, Ix>
+impl<'a, N, E: 'a, Ty, Ix> visit::IntoNeighborsDirected
+    for &'a StableGraph<N, E, Ty, Ix>
 where
     Ty: EdgeType,
     Ix: IndexType,
 {
     type NeighborsDirected = Neighbors<'a, E, Ix>;
-    fn neighbors_directed(self, n: NodeIndex<Ix>, d: Direction) -> Self::NeighborsDirected {
+    fn neighbors_directed(
+        self,
+        n: NodeIndex<Ix>,
+        d: Direction,
+    ) -> Self::NeighborsDirected {
         StableGraph::neighbors_directed(self, n, d)
     }
 }
@@ -2199,7 +2419,10 @@ where
     Ix: IndexType,
 {
     type Edges = Edges<'a, E, Ty, Ix>;
-    fn edges(self, a: Self::NodeId) -> Self::Edges {
+    fn edges(
+        self,
+        a: Self::NodeId,
+    ) -> Self::Edges {
         self.edges(a)
     }
 }
@@ -2237,27 +2460,39 @@ where
             .map_or(0, |edge| edge.id().index() + 1)
     }
 
-    fn to_index(&self, ix: EdgeIndex<Ix>) -> usize {
+    fn to_index(
+        &self,
+        ix: EdgeIndex<Ix>,
+    ) -> usize {
         ix.index()
     }
 
-    fn from_index(&self, ix: usize) -> Self::EdgeId {
+    fn from_index(
+        &self,
+        ix: usize,
+    ) -> Self::EdgeId {
         EdgeIndex::new(ix)
     }
 }
 
-impl<'a, N, E, Ty, Ix> visit::IntoEdgesDirected for &'a StableGraph<N, E, Ty, Ix>
+impl<'a, N, E, Ty, Ix> visit::IntoEdgesDirected
+    for &'a StableGraph<N, E, Ty, Ix>
 where
     Ty: EdgeType,
     Ix: IndexType,
 {
     type EdgesDirected = Edges<'a, E, Ty, Ix>;
-    fn edges_directed(self, a: Self::NodeId, dir: Direction) -> Self::EdgesDirected {
+    fn edges_directed(
+        self,
+        a: Self::NodeId,
+        dir: Direction,
+    ) -> Self::EdgesDirected {
         self.edges_directed(a, dir)
     }
 }
 
-impl<'a, N: 'a, E: 'a, Ty, Ix> visit::IntoEdgeReferences for &'a StableGraph<N, E, Ty, Ix>
+impl<'a, N: 'a, E: 'a, Ty, Ix> visit::IntoEdgeReferences
+    for &'a StableGraph<N, E, Ty, Ix>
 where
     Ty: EdgeType,
     Ix: IndexType,
@@ -2406,6 +2641,9 @@ fn test_reverse() {
     reversed_gr.reverse();
 
     for i in gr.node_indices() {
-        itertools::assert_equal(gr.edges_directed(i, Incoming), reversed_gr.edges(i));
+        itertools::assert_equal(
+            gr.edges_directed(i, Incoming),
+            reversed_gr.edges(i),
+        );
     }
 }
