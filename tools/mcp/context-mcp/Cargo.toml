@@ -9,7 +9,7 @@ name = "context-mcp"
 path = "src/main.rs"
 
 [dependencies]
-context-api = { path = "../../../crates/context-api" }
+context-api = { path = "../../../crates/context-stack/context-api" }
 
 rmcp = { version = "0.14", features = ["server", "transport-io"] }
 serde = { version = "1", features = ["derive"] }
