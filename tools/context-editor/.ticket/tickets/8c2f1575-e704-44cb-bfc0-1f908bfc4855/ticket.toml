@@ -1,0 +1,7 @@
+id = "8c2f1575-e704-44cb-bfc0-1f908bfc4855"
+created_at = "2026-04-01T13:36:29.713545600+00:00"
+title = "[context-editor][SVO-RM] Phase 2b: Secondary Rays -- Reflections, Refractions, Shadows"
+state = "in-review"
+component = "context-editor"
+phase = "svo-ray-march"
+type = "tracker-improvement"

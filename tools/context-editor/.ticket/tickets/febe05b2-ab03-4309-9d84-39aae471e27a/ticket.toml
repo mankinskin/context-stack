@@ -1,0 +1,7 @@
+id = "febe05b2-ab03-4309-9d84-39aae471e27a"
+created_at = "2026-04-01T13:33:10.649204800+00:00"
+title = "[context-editor][SVO-RM] Phase 1a: World-to-SVO Transform and Layout Validation"
+state = "in-review"
+component = "context-editor"
+phase = "svo-ray-march"
+type = "tracker-improvement"
