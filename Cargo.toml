@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+  "context-api",
+  "context-insert",
+  "context-read",
+  "context-search",
+  "context-trace",
+  "context-trace-macros",
+  "ngrams",
+]
+exclude = ["./deps/petgraph"]
+
+[profile.dev]
+debug = true
+opt-level = 0
+
+[profile.release]
+opt-level = 2
+
+[workspace.metadata.context-stack]
+members = [
+  "context-api",
+  "context-insert",
+  "context-read",
+  "context-search",
+  "context-trace",
+  "context-trace-macros",
+  "ngrams",
+]
+ticket_workspace = ".ticket"
+submodule_path = "crates/context-stack"
