@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Context Editor — Sandbox</title>
+    <script>
+      // Silence dioxus devtools WebSocket noise when running under trunk serve.
+      //
+      // dioxus-web always tries to connect to ws://host/_dioxus (the `dx serve`
+      // hot-reload endpoint). When built with trunk there is no such server, so
+      // every attempt would log a console error then retry forever.
+      //
+      // Strategy: intercept the constructor for /_dioxus URLs and return a mock
+      // that uses Object.create(_WS.prototype) so it passes `instanceof
+      // WebSocket` checks required by wasm-bindgen, but never fires onopen /
+      // onclose / onerror. Dioxus's devtools future just parks on await()
+      // indefinitely — zero console noise, zero retries.
+      (function () {
+        var _WS = window.WebSocket;
+        var noop = function () {};
+        window.WebSocket = function (url, protocols) {
+          if (typeof url === "string" && url.indexOf("/_dioxus") !== -1) {
+            // Use Object.create(_WS.prototype) so the mock passes
+            // `instanceof WebSocket` checks inside wasm-bindgen.
+            //
+            // IMPORTANT: WebSocket.prototype defines onopen/onclose/onerror/
+            // onmessage as native accessor properties whose setters perform an
+            // internal-slot check ("is this a real WebSocket?"). Assigning to
+            // them via `mock.onopen = null` invokes those setters, which throw
+            // TypeError — causing WebSocket::new() in Rust to return Err and
+            // .unwrap() to panic. Fix: pre-define ALL of them as own *data*
+            // properties via Object.defineProperties so the prototype accessor
+            // is shadowed and never invoked.
+            var mock = Object.create(_WS.prototype);
+            Object.defineProperties(mock, {
+              readyState:          { value: 0,      writable: true, configurable: true },
+              bufferedAmount:      { value: 0,      writable: true, configurable: true },
+              url:                 { value: url,    writable: true, configurable: true },
+              protocol:            { value: "",     writable: true, configurable: true },
+              extensions:          { value: "",     writable: true, configurable: true },
+              binaryType:          { value: "blob", writable: true, configurable: true },
+              // Event handlers — must be own data props to shadow prototype setters.
+              onopen:              { value: null,   writable: true, configurable: true },
+              onclose:             { value: null,   writable: true, configurable: true },
+              onerror:             { value: null,   writable: true, configurable: true },
+              onmessage:           { value: null,   writable: true, configurable: true },
+              // Methods — shadow prototype methods with safe no-ops.
+              send:                { value: noop,   writable: true, configurable: true },
+              close:               { value: function () { mock.readyState = 3; }, writable: true, configurable: true },
+              addEventListener:    { value: noop,   writable: true, configurable: true },
+              removeEventListener: { value: noop,   writable: true, configurable: true },
+              dispatchEvent:       { value: function () { return true; }, writable: true, configurable: true },
+            });
+            return mock;
+          }
+          return protocols !== undefined
+            ? new _WS(url, protocols)
+            : new _WS(url);
+        };
+        window.WebSocket.prototype  = _WS.prototype;
+        window.WebSocket.CONNECTING = _WS.CONNECTING;
+        window.WebSocket.OPEN       = _WS.OPEN;
+        window.WebSocket.CLOSING    = _WS.CLOSING;
+        window.WebSocket.CLOSED     = _WS.CLOSED;
+      })();
+
+      // Ensure keyboard controls reach the Bevy canvas after any scene click.
+      (function () {
+        function focusCanvas() {
+          var canvas = document.getElementById("bevy-canvas");
+          if (!canvas) return;
+          if (canvas.tabIndex !== 0) canvas.tabIndex = 0;
+          if (typeof canvas.focus === "function") canvas.focus();
+        }
+
+        window.addEventListener("load", focusCanvas);
+        window.addEventListener("pointerdown", function () {
+          focusCanvas();
+        });
+      })();
+    </script>
+    <!-- Trunk will inline the compiled WASM binary here -->
+    <link data-trunk rel="rust" data-wasm-opt="z" />
+    <!-- Tailwind CDN for utility classes used by the glass UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0a12;
+        color: #e2e8f0;
+        font-family: 'Inter', sans-serif;
+      }
+      #bevy-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        outline: none;
+      }
+      #main {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+        pointer-events: none;
+      }
+      body[data-bevy-ready="true"] #bevy-loading-spinner {
+        opacity: 0;
+        transform: scale(0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Bevy attaches to this canvas directly -->
+    <canvas id="bevy-canvas"></canvas>
+    
+    <!-- Dioxus mounts the virtual DOM here. Must match the id passed to launch(). -->
+    <div id="main"></div>
+  </body>
+</html>

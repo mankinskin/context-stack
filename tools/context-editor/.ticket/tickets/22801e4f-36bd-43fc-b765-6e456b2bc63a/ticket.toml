@@ -1,0 +1,7 @@
+id = "22801e4f-36bd-43fc-b765-6e456b2bc63a"
+created_at = "2026-04-01T13:35:10.820978800+00:00"
+title = "[context-editor][SVO-RM] Phase 2a: SDF Blending and Front-to-Back Alpha Compositing"
+state = "in-review"
+component = "context-editor"
+phase = "svo-ray-march"
+type = "tracker-improvement"

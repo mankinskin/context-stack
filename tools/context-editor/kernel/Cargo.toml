@@ -1,0 +1,29 @@
+[package]
+name = "context-editor-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+# Enable SpacetimeDB multiplayer support. Disabled by default because it pulls
+# in native-tls/openssl-sys which cannot compile to wasm32-unknown-unknown.
+multiplayer = ["dep:spacetimedb-sdk"]
+
+[dependencies]
+wgpu = { version = "27.0.1", default-features = false, features = ["webgpu", "webgl"] }
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_asset",
+    "bevy_pbr",
+    "bevy_winit",
+    "bevy_window",
+    "bevy_gizmos",
+] }
+bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
+bytemuck = { version = "1", features = ["derive"] }
+dioxus = { version = "0.7", features = ["web"] }
+futures-timer = { version = "3.0.3", features = ["wasm-bindgen"] }
+spacetimedb-sdk = { version = "1.12", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3.92", features = ["Window", "Document", "Element", "HtmlElement", "console"] }

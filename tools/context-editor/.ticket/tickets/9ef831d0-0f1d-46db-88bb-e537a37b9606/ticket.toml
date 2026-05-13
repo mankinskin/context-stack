@@ -1,0 +1,7 @@
+id = "9ef831d0-0f1d-46db-88bb-e537a37b9606"
+created_at = "2026-04-01T13:34:24.296208700+00:00"
+title = "[context-editor][SVO-RM] Phase 1b: Core SVO Ray March Compute Shader"
+state = "in-review"
+component = "context-editor"
+phase = "svo-ray-march"
+type = "tracker-improvement"
