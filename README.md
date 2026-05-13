@@ -11,7 +11,8 @@ Repository layout:
 - `context-trace`
 - `context-trace-macros`
 - `ngrams`
-- `deps/petgraph`
+- `deps/petgraph` (submodule)
+- `deps/justlog` (submodule)
 
 This repository is intended to be mounted back into `context-engine` as the
 `crates/context-stack` submodule. Its history is rewritten from the source

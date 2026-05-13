@@ -9,7 +9,7 @@ members = [
   "context-trace-macros",
   "ngrams",
 ]
-exclude = ["./deps/petgraph"]
+exclude = ["./deps/petgraph", "./deps/justlog"]
 
 [profile.dev]
 debug = true
