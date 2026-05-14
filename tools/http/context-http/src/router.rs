@@ -6,16 +6,25 @@
 
 use std::path::PathBuf;
 
-use viewer_api::{
-    axum::{
-        routing::{
-            get,
-            post,
-        },
-        Router,
+use axum::{
+    body::Body,
+    http::{
+        header,
+        HeaderValue,
+        Response,
+        StatusCode,
     },
-    default_cors,
-    with_static_files,
+    response::IntoResponse,
+    routing::{
+        get,
+        post,
+    },
+    Router,
+};
+use tower::service_fn;
+use tower_http::{
+    cors::CorsLayer,
+    services::ServeDir,
 };
 
 use crate::{
@@ -104,6 +113,39 @@ pub fn create_router(
 
     // Optionally serve static files (future web frontend).
     with_static_files(router, static_dir)
+}
+
+fn default_cors() -> CorsLayer {
+    CorsLayer::permissive()
+}
+
+fn with_static_files(
+    router: Router,
+    static_dir: Option<PathBuf>,
+) -> Router {
+    if let Some(dir) = static_dir {
+        if dir.exists() {
+            let index = dir.join("index.html");
+            let index_html = std::fs::read(&index).unwrap_or_default();
+            let spa_fallback = service_fn(move |_req| {
+                let body = index_html.clone();
+                async move {
+                    let mut res: Response<Body> =
+                        (StatusCode::OK, body).into_response();
+                    res.headers_mut().insert(
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("text/html; charset=utf-8"),
+                    );
+                    Ok::<_, std::convert::Infallible>(res)
+                }
+            });
+            return router.fallback_service(
+                ServeDir::new(&dir).fallback(spa_fallback),
+            );
+        }
+    }
+
+    router
 }
 
 #[cfg(test)]

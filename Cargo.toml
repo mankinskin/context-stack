@@ -8,6 +8,11 @@ members = [
   "context-trace",
   "context-trace-macros",
   "ngrams",
+  "tools/cli/context-cli",
+  "tools/mcp/context-mcp",
+  "tools/http/context-http",
+  "tools/context-editor/kernel",
+  "tools/context-editor/sandbox-app",
 ]
 exclude = ["./deps/petgraph", "./deps/justlog"]
 
@@ -27,6 +32,11 @@ members = [
   "context-trace",
   "context-trace-macros",
   "ngrams",
+  "tools/cli/context-cli",
+  "tools/mcp/context-mcp",
+  "tools/http/context-http",
+  "tools/context-editor/kernel",
+  "tools/context-editor/sandbox-app",
 ]
 ticket_workspace = ".ticket"
 submodule_path = "crates/context-stack"

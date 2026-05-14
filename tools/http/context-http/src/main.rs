@@ -7,10 +7,13 @@
 
 use std::path::PathBuf;
 
+use axum::serve;
 use tracing::info;
-use viewer_api::{
-    init_tracing_full,
-    TracingConfig,
+use tracing_subscriber::{
+    fmt,
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    EnvFilter,
 };
 
 use context_api::workspace::manager::WorkspaceManager;
@@ -20,10 +23,7 @@ use context_http::state::AppState;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing (console + optional file logging via LOG_FILE env)
-    let tracing_config =
-        TracingConfig::from_env("context-http", PathBuf::from("logs"))
-            .with_level("info");
-    init_tracing_full(&tracing_config);
+    init_tracing(PathBuf::from("logs"));
 
     info!("context-http starting...");
 
@@ -70,7 +70,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(feature = "graphql")]
     info!("GraphQL Playground available at http://{addr}/api/graphql");
 
-    viewer_api::axum::serve(listener, app).await?;
+    serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     Ok(())
+}
+
+fn init_tracing(log_dir: PathBuf) {
+    let level = std::env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+    let file_logging = std::env::var("LOG_FILE").is_ok();
+    let filter = EnvFilter::try_new(&level)
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let fmt_layer = fmt::layer()
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true);
+
+    if file_logging {
+        let _ = std::fs::create_dir_all(&log_dir);
+        let file_appender =
+            tracing_appender::rolling::daily(&log_dir, "context-http.log");
+        let (non_blocking, guard) =
+            tracing_appender::non_blocking(file_appender);
+        std::mem::forget(guard);
+
+        let file_layer = fmt::layer()
+            .with_writer(non_blocking)
+            .with_ansi(false)
+            .with_target(true)
+            .with_thread_ids(true)
+            .with_file(true)
+            .with_line_number(true);
+
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt_layer)
+            .with(file_layer)
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt_layer)
+            .init();
+    }
+}
+
+async fn shutdown_signal() {
+    let _ = tokio::signal::ctrl_c().await;
+    info!("Received shutdown signal");
 }

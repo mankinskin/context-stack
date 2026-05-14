@@ -33,7 +33,7 @@ use tracing::{
     info,
     warn,
 };
-use viewer_api::axum::{
+use axum::{
     extract::State,
     Json,
 };

@@ -24,7 +24,7 @@ use tracing::{
     info,
     instrument,
 };
-use viewer_api::axum::{
+use axum::{
     extract::{
         Path,
         Query,

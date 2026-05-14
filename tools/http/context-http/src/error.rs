@@ -13,7 +13,7 @@ use context_api::error::{
     SearchError,
     WorkspaceError,
 };
-use viewer_api::axum::{
+use axum::{
     http::StatusCode,
     response::{
         IntoResponse,

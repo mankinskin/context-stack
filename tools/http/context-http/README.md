@@ -283,7 +283,7 @@ All configuration is via environment variables:
 - **Blocking ops in spawn_blocking**: `WorkspaceManager` is synchronous. All calls are wrapped in `tokio::task::spawn_blocking` to avoid blocking the async runtime.
 - **Mutex for shared state**: `WorkspaceManager` requires `&mut self`, so it's wrapped in `Arc<Mutex<_>>`.
 - **GraphQL is feature-gated**: The `graphql` feature adds `async-graphql` dependencies. It's read-only — all mutations go through the RPC endpoint.
-- **Reuses viewer-api infra**: CORS, tracing initialization, and static file serving come from the shared `viewer-api` crate.
+- **Standalone HTTP bootstrap**: CORS, tracing initialization, and static file serving are handled locally so the tool can build inside standalone `context-stack` without a `viewer-api` dependency.
 
 ## Testing
 
@@ -300,11 +300,11 @@ cargo test -p context-http --features graphql
 | Crate | Purpose |
 |-------|---------|
 | `context-api` | Domain logic, `Command`/`CommandResult`, `WorkspaceManager` |
-| `viewer-api` | Shared HTTP infra (axum, CORS, tracing, static files) |
-| `axum` 0.7 | HTTP framework |
+| `axum` 0.8 | HTTP framework |
 | `tokio` 1 | Async runtime |
 | `serde` / `serde_json` | JSON serialization |
 | `tracing` 0.1 | Structured logging |
-| `tower-http` 0.5 | CORS middleware |
+| `tracing-subscriber` / `tracing-appender` | Local tracing and optional file logging |
+| `tower-http` 0.6 | CORS and static-file middleware |
 | `async-graphql` 7 | GraphQL schema (optional) |
 | `async-graphql-axum` 7 | GraphQL axum integration (optional) |

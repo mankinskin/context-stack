@@ -116,6 +116,17 @@ pub fn register_world_presets(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub fn register_world_presets(
+    _presets: impl IntoIterator<
+        Item = (
+            impl Into<String>,
+            impl Fn(&mut bevy::prelude::World) + Send + Sync + 'static,
+        ),
+    >,
+) {
+}
+
 /// Returns the names of all registered presets (in registration order).
 #[cfg(target_arch = "wasm32")]
 pub fn world_preset_names() -> Vec<String> {
@@ -125,6 +136,11 @@ pub fn world_preset_names() -> Vec<String> {
         .iter()
         .map(|(n, _)| n.clone())
         .collect()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn world_preset_names() -> Vec<String> {
+    Vec::new()
 }
 
 /// Resets [`VoxelWorld`](crate::svo::VoxelWorld) and applies preset `index`.
@@ -144,6 +160,13 @@ pub fn apply_registered_preset(
         drop(reg);
         f(world);
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn apply_registered_preset(
+    _index: u32,
+    _world: &mut bevy::prelude::World,
+) {
 }
 
 pub struct WorldEvent {

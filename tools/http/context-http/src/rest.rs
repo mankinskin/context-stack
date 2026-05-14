@@ -27,9 +27,10 @@ use tracing::{
     info,
     instrument,
 };
-use viewer_api::axum::{
+use axum::{
     extract::{
         Path,
+        Query,
         State,
     },
     Json,
@@ -302,9 +303,7 @@ pub struct DiffQuery {
 pub async fn diff_workspaces(
     State(state): State<AppState>,
     Path((name_a, name_b)): Path<(String, String)>,
-    viewer_api::axum::extract::Query(query): viewer_api::axum::extract::Query<
-        DiffQuery,
-    >,
+    Query(query): Query<DiffQuery>,
 ) -> Result<Json<GraphDiffResult>, HttpError> {
     info!(
         workspace_a = %name_a,
