@@ -1,0 +1,285 @@
+use crate::server::{
+    CommandHelp,
+    ParamHelp,
+};
+
+pub(super) fn diagnostics_commands() -> Vec<CommandHelp> {
+    vec![
+        // -- Debug --
+        CommandHelp {
+            name: "get_snapshot",
+            category: "debug",
+            summary: "Get a full snapshot of the graph (for debugging/inspection).",
+            parameters: &[ParamHelp {
+                name: "workspace",
+                param_type: "string",
+                required: true,
+                description: "Target workspace name.",
+            }],
+            example: r#"{"command": "get_snapshot", "workspace": "demo"}"#,
+            result_type: "Snapshot (JSON object)",
+            notes: "Can be very large for big graphs. Use get_statistics for a quick summary instead.",
+        },
+        CommandHelp {
+            name: "get_statistics",
+            category: "debug",
+            summary: "Get summary statistics about the graph.",
+            parameters: &[ParamHelp {
+                name: "workspace",
+                param_type: "string",
+                required: true,
+                description: "Target workspace name.",
+            }],
+            example: r#"{"command": "get_statistics", "workspace": "demo"}"#,
+            result_type: "Statistics { vertex_count, atom_count, pattern_count, max_width, edge_count }",
+            notes: "Lightweight — always safe to call. Good for checking graph size before list_vertices.",
+        },
+        CommandHelp {
+            name: "validate_graph",
+            category: "debug",
+            summary: "Run integrity validation on the graph.",
+            parameters: &[ParamHelp {
+                name: "workspace",
+                param_type: "string",
+                required: true,
+                description: "Target workspace name.",
+            }],
+            example: r#"{"command": "validate_graph", "workspace": "demo"}"#,
+            result_type: "ValidationReport { valid: bool, vertex_count, issues: [string] }",
+            notes: "Checks for structural issues. Empty issues array means the graph is healthy.",
+        },
+        CommandHelp {
+            name: "show_graph",
+            category: "debug",
+            summary: "Get a human-readable text display of the entire graph.",
+            parameters: &[ParamHelp {
+                name: "workspace",
+                param_type: "string",
+                required: true,
+                description: "Target workspace name.",
+            }],
+            example: r#"{"command": "show_graph", "workspace": "demo"}"#,
+            result_type: "GraphDisplay { display: string }",
+            notes: "Useful for understanding graph structure. Can be large.",
+        },
+        CommandHelp {
+            name: "show_vertex",
+            category: "debug",
+            summary: "Get a human-readable text display of a single vertex and its neighborhood.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "index",
+                    param_type: "integer",
+                    required: true,
+                    description: "Vertex index to display.",
+                },
+            ],
+            example: r#"{"command": "show_vertex", "workspace": "demo", "index": 3}"#,
+            result_type: "GraphDisplay { display: string }",
+            notes: "More focused than show_graph — shows one vertex with its parents and children.",
+        },
+        // -- Trace Logs --
+        CommandHelp {
+            name: "list_logs",
+            category: "logs",
+            summary: "List trace log files in a workspace.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "pattern",
+                    param_type: "string",
+                    required: false,
+                    description: "Optional filename pattern to filter results.",
+                },
+                ParamHelp {
+                    name: "limit",
+                    param_type: "integer",
+                    required: false,
+                    description: "Max number of files to return (default: 100).",
+                },
+            ],
+            example: r#"{"command": "list_logs", "workspace": "demo"}"#,
+            result_type: "LogList { logs: [LogFileInfo] }",
+            notes: "Log files are created when commands are run with trace:true. Files are stored in <workspace>/logs/.",
+        },
+        CommandHelp {
+            name: "get_log",
+            category: "logs",
+            summary: "Read entries from a trace log file.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "filename",
+                    param_type: "string",
+                    required: true,
+                    description: "Log filename (from list_logs).",
+                },
+                ParamHelp {
+                    name: "filter",
+                    param_type: "string",
+                    required: false,
+                    description: "Filter entries by level or message substring.",
+                },
+                ParamHelp {
+                    name: "limit",
+                    param_type: "integer",
+                    required: false,
+                    description: "Max entries to return (default: 100).",
+                },
+                ParamHelp {
+                    name: "offset",
+                    param_type: "integer",
+                    required: false,
+                    description: "Skip this many entries (default: 0).",
+                },
+            ],
+            example: r#"{"command": "get_log", "workspace": "demo", "filename": "20260315T120000000_insert_sequence.log"}"#,
+            result_type: "LogEntries { filename, total, offset, limit, returned, entries: [LogEntryInfo] }",
+            notes: "Use filter to narrow results by level (e.g. 'ERROR') or message content.",
+        },
+        CommandHelp {
+            name: "query_log",
+            category: "logs",
+            summary: "Query a trace log file with a JQ expression.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "filename",
+                    param_type: "string",
+                    required: true,
+                    description: "Log filename.",
+                },
+                ParamHelp {
+                    name: "query",
+                    param_type: "string",
+                    required: true,
+                    description: "JQ expression to filter/transform entries.",
+                },
+                ParamHelp {
+                    name: "limit",
+                    param_type: "integer",
+                    required: false,
+                    description: "Max results (default: 100).",
+                },
+            ],
+            example: r#"{"command": "query_log", "workspace": "demo", "filename": "20260315T120000000_insert_sequence.log", "query": "select(.level == \"INFO\")"}"#,
+            result_type: "LogQueryResult { query, matches, entries: [LogEntryInfo] }",
+            notes: "Uses the jaq engine — most standard jq syntax works. Query runs against each log entry as a JSON object.",
+        },
+        CommandHelp {
+            name: "analyze_log",
+            category: "logs",
+            summary: "Get statistical analysis of a trace log file.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "filename",
+                    param_type: "string",
+                    required: true,
+                    description: "Log filename.",
+                },
+            ],
+            example: r#"{"command": "analyze_log", "workspace": "demo", "filename": "20260315T120000000_insert_sequence.log"}"#,
+            result_type: "LogAnalysis { total_entries, by_level, by_event_type, spans, errors }",
+            notes: "Provides a quick overview of the log: entry counts by level, event types, span summaries, and any errors.",
+        },
+        CommandHelp {
+            name: "search_logs",
+            category: "logs",
+            summary: "Search across all trace log files with a JQ expression.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "query",
+                    param_type: "string",
+                    required: true,
+                    description: "JQ expression to search with.",
+                },
+                ParamHelp {
+                    name: "limit_per_file",
+                    param_type: "integer",
+                    required: false,
+                    description: "Max matches per file (default: 10).",
+                },
+            ],
+            example: r#"{"command": "search_logs", "workspace": "demo", "query": "select(.level == \"ERROR\")"}"#,
+            result_type: "LogSearchResult { query, files_with_matches, results: [LogFileSearchResult] }",
+            notes: "Searches all .log files in the workspace's log directory. Results are grouped by file.",
+        },
+        CommandHelp {
+            name: "delete_log",
+            category: "logs",
+            summary: "Delete a specific trace log file.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "filename",
+                    param_type: "string",
+                    required: true,
+                    description: "Log filename to delete.",
+                },
+            ],
+            example: r#"{"command": "delete_log", "workspace": "demo", "filename": "20260315T120000000_insert_sequence.log"}"#,
+            result_type: "Ok",
+            notes: "Permanently deletes the log file. Use list_logs first to find the filename.",
+        },
+        CommandHelp {
+            name: "delete_logs",
+            category: "logs",
+            summary: "Delete trace log files, optionally by age.",
+            parameters: &[
+                ParamHelp {
+                    name: "workspace",
+                    param_type: "string",
+                    required: true,
+                    description: "Target workspace name.",
+                },
+                ParamHelp {
+                    name: "older_than_days",
+                    param_type: "integer",
+                    required: false,
+                    description: "Only delete logs older than this many days. Omit to delete all.",
+                },
+            ],
+            example: r#"{"command": "delete_logs", "workspace": "demo", "older_than_days": 7}"#,
+            result_type: "LogDeleteResult { deleted_count, freed_bytes }",
+            notes: "Use with older_than_days for periodic cleanup. Omit to delete all log files.",
+        },
+    ]
+}
