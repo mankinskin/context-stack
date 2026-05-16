@@ -61,6 +61,10 @@ use bevy::{
 
 use crate::debug_overlay::DebugOverlayState;
 
+mod node;
+
+pub use node::WireframeOverlayNode;
+
 /// Maximum octree depth used for wireframe buffer budget calculations.
 /// Must match the `max_depth` passed to `VoxelWorld::new()` in `lib.rs`.
 pub const MAX_OCTREE_DEPTH: u32 = 12;
@@ -84,8 +88,8 @@ pub const MAX_WIREFRAME_CUBES: u64 =
     2 * MAX_WIREFRAME_GRID_SIZE * MAX_WIREFRAME_GRID_SIZE
         / WIREFRAME_INDICES_PER_CUBE as u64;
 
-const WIREFRAME_UNIFORM_SIZE: u64 = 80; // mat4x4f (64) + vec4f (16)
-const MAT4_BYTES: usize = core::mem::size_of::<[f32; 16]>(); // 64 — byte offset of the color field
+const WIREFRAME_UNIFORM_SIZE: u64 = 80;
+const MAT4_BYTES: usize = core::mem::size_of::<[f32; 16]>();
 
 // ---------------------------------------------------------------------------
 // Main-world resources
@@ -110,24 +114,17 @@ pub struct WireframeOverlayBuffers {
 
 impl ExtractResource for WireframeOverlayBuffers {
     type Source = WireframeOverlayBuffers;
+
     fn extract_resource(source: &Self::Source) -> Self {
         source.clone()
     }
 }
-
-// ---------------------------------------------------------------------------
-// Render-world resources
-// ---------------------------------------------------------------------------
 
 #[derive(Resource)]
 pub struct WireframeOverlayPipeline(pub CachedRenderPipelineId);
 
 #[derive(Resource)]
 pub struct WireframeOverlayBindGroup(pub BindGroup);
-
-// ---------------------------------------------------------------------------
-// Init + upload (main world)
-// ---------------------------------------------------------------------------
 
 pub fn init_wireframe_overlay(
     mut commands: Commands,
@@ -140,19 +137,23 @@ pub fn init_wireframe_overlay(
     let Some(device) = device else { return };
 
     let vertex_buf = device.create_buffer(&BufferDescriptor {
-        label: Some("wireframe_corners"),
-        size: MAX_WIREFRAME_CUBES * WIREFRAME_VERTS_PER_CUBE as u64 * 12,
+        label: Some("wireframe_overlay_vertices"),
+        size: MAX_WIREFRAME_CUBES
+            * WIREFRAME_VERTS_PER_CUBE as u64
+            * core::mem::size_of::<[f32; 3]>() as u64,
         usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
     let index_buf = device.create_buffer(&BufferDescriptor {
-        label: Some("wireframe_indices"),
-        size: MAX_WIREFRAME_CUBES * WIREFRAME_INDICES_PER_CUBE as u64 * 4,
+        label: Some("wireframe_overlay_indices"),
+        size: MAX_WIREFRAME_CUBES
+            * WIREFRAME_INDICES_PER_CUBE as u64
+            * core::mem::size_of::<u32>() as u64,
         usage: BufferUsages::INDEX | BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
     let uniform_buf = device.create_buffer(&BufferDescriptor {
-        label: Some("wireframe_uniform"),
+        label: Some("wireframe_overlay_uniforms"),
         size: WIREFRAME_UNIFORM_SIZE,
         usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         mapped_at_creation: false,
@@ -164,51 +165,52 @@ pub fn init_wireframe_overlay(
         uniform_buf,
         index_count: 0,
     });
-    commands.init_resource::<WireframeData>();
 }
 
-/// Upload wireframe corner + index + uniform data to the GPU each frame.
 pub fn upload_wireframe_data(
-    data: Option<Res<WireframeData>>,
-    mut buffers: Option<ResMut<WireframeOverlayBuffers>>,
+    wire_data: Option<Res<WireframeData>>,
+    buffers: Option<ResMut<WireframeOverlayBuffers>>,
+    camera_query: Query<(&GlobalTransform, &Projection), With<Camera3d>>,
     render_queue: Option<Res<RenderQueue>>,
-    camera_q: Query<(&GlobalTransform, &Projection), With<Camera3d>>,
-    state: Res<DebugOverlayState>,
+    state: Option<Res<DebugOverlayState>>,
 ) {
-    let Some(ref mut buffers) = buffers else {
-        return;
-    };
     let Some(render_queue) = render_queue else {
         return;
     };
-    let Some(data) = data else { return };
+    let Some(mut buffers) = buffers else {
+        return;
+    };
 
-    if !state.enabled || data.indices.is_empty() {
+    let Some(wire_data) = wire_data else {
         buffers.index_count = 0;
         return;
+    };
+
+    let max_vertices = (MAX_WIREFRAME_CUBES * WIREFRAME_VERTS_PER_CUBE as u64)
+        as usize;
+    let max_indices = (MAX_WIREFRAME_CUBES * WIREFRAME_INDICES_PER_CUBE as u64)
+        as usize;
+    let corners = &wire_data.corners[..wire_data.corners.len().min(max_vertices)];
+    let indices = &wire_data.indices[..wire_data.indices.len().min(max_indices)];
+
+    buffers.index_count = indices.len() as u32;
+
+    if !corners.is_empty() {
+        render_queue.write_buffer(
+            &buffers.vertex_buf,
+            0,
+            bytemuck::cast_slice(corners),
+        );
+    }
+    if !indices.is_empty() {
+        render_queue.write_buffer(
+            &buffers.index_buf,
+            0,
+            bytemuck::cast_slice(indices),
+        );
     }
 
-    let corner_count = data
-        .corners
-        .len()
-        .min(MAX_WIREFRAME_CUBES as usize * WIREFRAME_VERTS_PER_CUBE);
-    let index_count = data
-        .indices
-        .len()
-        .min(MAX_WIREFRAME_CUBES as usize * WIREFRAME_INDICES_PER_CUBE);
-    render_queue.write_buffer(
-        &buffers.vertex_buf,
-        0,
-        bytemuck::cast_slice(&data.corners[..corner_count]),
-    );
-    render_queue.write_buffer(
-        &buffers.index_buf,
-        0,
-        bytemuck::cast_slice(&data.indices[..index_count]),
-    );
-    buffers.index_count = index_count as u32;
-
-    let Ok((transform, projection)) = camera_q.single() else {
+    let Ok((transform, projection)) = camera_query.single() else {
         return;
     };
 
@@ -216,9 +218,12 @@ pub fn upload_wireframe_data(
     let proj_mat = projection.get_clip_from_view();
     let view_proj = proj_mat * view_mat;
 
-    let color: [f32; 4] = match state.wire_color {
-        Color::Srgba(c) => [c.red, c.green, c.blue, c.alpha],
-        _ => [0.0, 1.0, 0.0, 1.0],
+    let color: [f32; 4] = match state {
+        Some(state) => match state.wire_color {
+            Color::Srgba(c) => [c.red, c.green, c.blue, c.alpha],
+            _ => [0.0, 1.0, 0.0, 1.0],
+        },
+        None => [0.0, 1.0, 0.0, 1.0],
     };
 
     let mut data = [0u8; WIREFRAME_UNIFORM_SIZE as usize];
@@ -293,10 +298,7 @@ pub fn queue_wireframe_pipeline(
         },
         depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
-            // depth_write_enabled=false: wireframe is a debug overlay, never
-            // clobber the depth buffer written by the depth-bridge pass.
             depth_write_enabled: false,
-            // Always: wireframe lines draw on top of ray-marched voxel surfaces.
             depth_compare: CompareFunction::Always,
             stencil: StencilState::default(),
             bias: DepthBiasState::default(),
@@ -316,7 +318,9 @@ pub fn rebuild_wireframe_bind_group(
     device: Res<RenderDevice>,
     buffers: Option<Res<WireframeOverlayBuffers>>,
 ) {
-    let Some(buffers) = buffers else { return };
+    let Some(buffers) = buffers else {
+        return;
+    };
     let layout = device.create_bind_group_layout(
         "bgl_wireframe_overlay",
         &[BindGroupLayoutEntry {
@@ -341,106 +345,3 @@ pub fn rebuild_wireframe_bind_group(
     commands.insert_resource(WireframeOverlayBindGroup(bind_group));
 }
 
-// ---------------------------------------------------------------------------
-// Render node
-// ---------------------------------------------------------------------------
-
-pub struct WireframeOverlayNode {
-    view_query: QueryState<&'static ViewTarget>,
-}
-
-impl FromWorld for WireframeOverlayNode {
-    fn from_world(world: &mut World) -> Self {
-        Self {
-            view_query: world.query(),
-        }
-    }
-}
-
-impl Node for WireframeOverlayNode {
-    fn update(
-        &mut self,
-        world: &mut World,
-    ) {
-        self.view_query.update_archetypes(world);
-    }
-
-    fn run(
-        &self,
-        _graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext,
-        world: &World,
-    ) -> Result<(), NodeRunError> {
-        let Some(pipeline_res) =
-            world.get_resource::<WireframeOverlayPipeline>()
-        else {
-            return Ok(());
-        };
-        let Some(bind_group) =
-            world.get_resource::<WireframeOverlayBindGroup>()
-        else {
-            return Ok(());
-        };
-        let Some(pipeline_cache) = world.get_resource::<PipelineCache>() else {
-            return Ok(());
-        };
-        let Some(buffers) = world.get_resource::<WireframeOverlayBuffers>()
-        else {
-            return Ok(());
-        };
-        if buffers.index_count == 0 {
-            return Ok(());
-        }
-        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0)
-        else {
-            return Ok(());
-        };
-        let binding = self.view_query.query_manual(world);
-        let Ok(view_target) = binding.single() else {
-            return Ok(());
-        };
-
-        let color_attachment = view_target.get_unsampled_color_attachment();
-
-        // The pipeline has depth_stencil: Some(...), so the render pass MUST
-        // provide a depth attachment.  Skip the draw when SvoDepthTexture is
-        // not yet available (first frame, or headless mode) to avoid a WebGPU
-        // validation error.
-        let Some(depth_tex) = world
-            .get_resource::<crate::render::depth_bridge::SvoDepthTexture>()
-        else {
-            return Ok(());
-        };
-
-        let depth_attachment = RenderPassDepthStencilAttachment {
-            view: &depth_tex.view,
-            depth_ops: Some(Operations {
-                load: LoadOp::Load,
-                store: StoreOp::Discard,
-            }),
-            stencil_ops: None,
-        };
-
-        {
-            let mut pass = render_context.command_encoder().begin_render_pass(
-                &RenderPassDescriptor {
-                    label: Some("wireframe_overlay_pass"),
-                    color_attachments: &[Some(color_attachment)],
-                    depth_stencil_attachment: Some(depth_attachment),
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                },
-            );
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &bind_group.0, &[]);
-            pass.set_vertex_buffer(0, *buffers.vertex_buf.slice(..));
-            pass.set_index_buffer(
-                *buffers.index_buf.slice(..),
-                IndexFormat::Uint32,
-            );
-            pass.draw_indexed(0..buffers.index_count, 0, 0..1);
-        }
-
-        Ok(())
-    }
-}

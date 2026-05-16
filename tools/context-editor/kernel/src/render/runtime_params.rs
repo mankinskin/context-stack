@@ -10,6 +10,10 @@ use bytemuck::{
     Zeroable,
 };
 
+mod plugin;
+
+pub use plugin::RuntimeParamsPlugin;
+
 // ---------------------------------------------------------------------------
 // Per-subsystem parameter resources
 // ---------------------------------------------------------------------------
@@ -375,104 +379,8 @@ pub fn upload_render_uniforms(
 }
 
 // ---------------------------------------------------------------------------
-// Plugin
-// ---------------------------------------------------------------------------
-
-/// Registers all runtime parameter resources and the per-frame uniform upload.
-pub struct RuntimeParamsPlugin;
-
-impl Plugin for RuntimeParamsPlugin {
-    fn build(
-        &self,
-        app: &mut App,
-    ) {
-        app.init_resource::<RenderParams>();
-        app.add_systems(
-            PostUpdate,
-            (init_uniform_buffer, upload_render_uniforms).chain(),
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_params_are_sane() {
-        let p = RenderParams::default();
-        assert_eq!(p.svo.max_depth, 10);
-        assert_eq!(p.splat.max_splats, 2_000_000);
-        assert!(p.splat.generation_enabled);
-        assert!(p.double_buffer.enabled);
-        assert_eq!(p.double_buffer.upload_budget_bytes, 4 * 1024 * 1024);
-        assert_eq!(p.tile.tile_size, 16);
-        assert_eq!(p.sort.num_passes, 8);
-        assert!((p.glass.ior - 1.5).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn gpu_uniforms_size_is_pod() {
-        // Must be a multiple of 16 for WebGPU alignment.
-        let size = std::mem::size_of::<GpuRenderUniforms>();
-        assert_eq!(
-            size % 16,
-            0,
-            "GpuRenderUniforms must be 16-byte aligned, got {size}"
-        );
-    }
-
-    #[test]
-    fn from_params_computes_grid_dimensions() {
-        let params = RenderParams::default(); // tile_size=16
-        let uniforms = GpuRenderUniforms::from_params(
-            &params,
-            &Mat4::IDENTITY,
-            &Mat4::IDENTITY,
-            Vec3::ZERO,
-            Vec2::new(800.0, 600.0),
-            42,
-        );
-        // 800/16=50, 600/16=37.5 → ceil → 38
-        assert_eq!(uniforms.grid_width, 50);
-        assert_eq!(uniforms.grid_height, 38);
-        assert_eq!(uniforms.frame_index, 42);
-    }
-
-    #[test]
-    fn glass_chromatic_scales_packed() {
-        let params = RenderParams::default();
-        let uniforms = GpuRenderUniforms::from_params(
-            &params,
-            &Mat4::IDENTITY,
-            &Mat4::IDENTITY,
-            Vec3::ZERO,
-            Vec2::new(1920.0, 1080.0),
-            0,
-        );
-        assert!((uniforms.chromatic_scales[0] - 1.0).abs() < f32::EPSILON);
-        assert!((uniforms.chromatic_scales[1] - 1.1).abs() < f32::EPSILON);
-        assert!((uniforms.chromatic_scales[2] - 1.2).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn disabled_generation_preserves_max_splats() {
-        let mut params = RenderParams::default();
-        params.splat.generation_enabled = false;
-        // generation_enabled is a CPU-side flag — the uniform still
-        // carries max_splats so the GPU buffer allocation stays stable.
-        let uniforms = GpuRenderUniforms::from_params(
-            &params,
-            &Mat4::IDENTITY,
-            &Mat4::IDENTITY,
-            Vec3::ZERO,
-            Vec2::new(640.0, 480.0),
-            0,
-        );
-        assert_eq!(uniforms.max_splats, 2_000_000);
-    }
-}
+mod tests;

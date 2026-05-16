@@ -15,8 +15,10 @@
 
 pub mod svo_page_table;
 pub mod svo_transform;
+mod double_bind_groups;
 pub use svo_page_table::SvoPageTableBuffer;
 pub use svo_transform::SvoTransformBuffer;
+pub use double_bind_groups::DoubleBindGroups;
 
 use bevy::{
     prelude::Resource,
@@ -379,104 +381,5 @@ impl GpuBindGroupLayouts {
 /// correct bind group without any per-frame allocation.
 ///
 /// [`active_svo_group`]: DoubleBindGroups::active_svo_group
-#[derive(Resource)]
-pub struct DoubleBindGroups {
-    front_svo_group: BindGroup,
-    back_svo_group: BindGroup,
-}
-
-impl DoubleBindGroups {
-    /// Build both bind groups from the pre-allocated buffers.
-    pub fn new(
-        device: &RenderDevice,
-        layout: &GpuBindGroupLayouts,
-        svo: &SvoDoubleBuffer,
-        camera: &CameraUniformBuffer,
-        globals: &GlobalUniformBuffer,
-    ) -> Self {
-        let make_group = |svo_buf: &Buffer| {
-            // Bevy 0.18 API: create_bind_group(label, layout, entries)
-            device.create_bind_group(
-                "bg_svo",
-                &layout.svo_group,
-                &[
-                    BindGroupEntry {
-                        binding: 0,
-                        resource: svo_buf.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 1,
-                        resource: camera.0.as_entire_binding(),
-                    },
-                    BindGroupEntry {
-                        binding: 2,
-                        resource: globals.0.as_entire_binding(),
-                    },
-                ],
-            )
-        };
-        Self {
-            front_svo_group: make_group(&svo.front),
-            back_svo_group: make_group(&svo.back),
-        }
-    }
-
-    /// Returns the bind group for the SVO buffer currently being read by the GPU.
-    pub fn active_svo_group(
-        &self,
-        current_is_front: bool,
-    ) -> &BindGroup {
-        if current_is_front {
-            &self.front_svo_group
-        } else {
-            &self.back_svo_group
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Unit tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn svo_double_buffer_swap_logic() {
-        // Verify the swap pointer logic without a GPU device.
-        // We can't call SvoDoubleBuffer::new without a RenderDevice, so we
-        // test the invariants with a hand-rolled struct.
-        struct FakeSvo {
-            current_is_front: bool,
-        }
-        impl FakeSvo {
-            fn write_is_back(&self) -> bool {
-                self.current_is_front
-            }
-            fn read_is_front(&self) -> bool {
-                self.current_is_front
-            }
-            fn swap(&mut self) {
-                self.current_is_front = !self.current_is_front;
-            }
-        }
-
-        let mut svo = FakeSvo {
-            current_is_front: true,
-        };
-        assert!(svo.read_is_front(), "before swap: GPU reads front");
-        assert!(svo.write_is_back(), "before swap: WASM writes back");
-        svo.swap();
-        assert!(
-            !svo.read_is_front(),
-            "after swap: GPU reads back (old back)"
-        );
-        assert!(
-            !svo.write_is_back(),
-            "after swap: WASM writes front (old front)"
-        );
-        svo.swap();
-        assert!(svo.read_is_front(), "double swap: back to original");
-    }
-}
+mod tests;

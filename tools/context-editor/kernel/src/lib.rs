@@ -77,9 +77,11 @@ pub use simulation::{
 
 use std::sync::{
     Arc,
-    Mutex,
     OnceLock,
 };
+
+#[cfg(target_arch = "wasm32")]
+use std::sync::Mutex;
 
 // ---------------------------------------------------------------------------
 // World preset registry

@@ -126,6 +126,7 @@ fn simulate_particles(
 
     // Diagnostic: log particle count at milestones so the browser console
     // confirms the simulation is running and emitters are seeded.
+    #[cfg(target_arch = "wasm32")]
     let count_before = system.particles.len();
 
     // Emit new particles

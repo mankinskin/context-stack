@@ -178,32 +178,34 @@ fn apply_tool(
 
     match state.active_tool {
         EditorTool::Paint => {
-            // Place voxels offset by the surface normal
             let center = info.cell + info.normal.round().as_ivec3();
-            for dx in -brush_ri..=brush_ri {
-                for dy in -brush_ri..=brush_ri {
-                    for dz in -brush_ri..=brush_ri {
-                        let off = IVec3::new(dx, dy, dz);
-                        if off.as_vec3().length() <= brush_r {
-                            svo.set_voxel(center + off, state.current_material);
-                        }
-                    }
-                }
-            }
+            apply_brush(center, brush_ri, brush_r, |cell| {
+                svo.set_voxel(cell, state.current_material);
+            });
         },
         EditorTool::Carve => {
-            let center = info.cell;
-            for dx in -brush_ri..=brush_ri {
-                for dy in -brush_ri..=brush_ri {
-                    for dz in -brush_ri..=brush_ri {
-                        let off = IVec3::new(dx, dy, dz);
-                        if off.as_vec3().length() <= brush_r {
-                            svo.remove_voxel(center + off);
-                        }
-                    }
+            apply_brush(info.cell, brush_ri, brush_r, |cell| {
+                svo.remove_voxel(cell);
+            });
+        },
+    }
+}
+
+fn apply_brush(
+    center: IVec3,
+    brush_ri: i32,
+    brush_r: f32,
+    mut apply: impl FnMut(IVec3),
+) {
+    for dx in -brush_ri..=brush_ri {
+        for dy in -brush_ri..=brush_ri {
+            for dz in -brush_ri..=brush_ri {
+                let offset = IVec3::new(dx, dy, dz);
+                if offset.as_vec3().length() <= brush_r {
+                    apply(center + offset);
                 }
             }
-        },
+        }
     }
 }
 

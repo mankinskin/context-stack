@@ -10,11 +10,20 @@ use bevy::prelude::*;
 use crate::{
     multiplayer_backend::CHUNK_SIZE,
     svo::{
-        OctreeNode,
         VoxelMaterial,
         VoxelWorld,
     },
 };
+
+mod noise;
+mod plugin;
+
+pub use noise::{
+    fbm,
+    noise2d,
+    noise3d,
+};
+pub use plugin::WorldGenPlugin;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -42,135 +51,6 @@ pub const MATERIAL_SAND: u32 = VoxelMaterial::new(210, 190, 140, 24).pack();
 pub const MATERIAL_SNOW: u32 = VoxelMaterial::new(240, 245, 255, 8).pack();
 pub const MATERIAL_DIRT: u32 = VoxelMaterial::new(100, 70, 40, 22).pack();
 pub const MATERIAL_WATER: u32 = VoxelMaterial::new(30, 80, 180, 4).pack();
-
-// ---------------------------------------------------------------------------
-// Noise primitives
-// ---------------------------------------------------------------------------
-
-/// Simple hash-based pseudo-random noise (deterministic from seed).
-///
-/// Produces values in [-1.0, 1.0]. Not a true Simplex implementation but
-/// shares the same API and determinism guarantees for procedural generation.
-pub fn noise3d(
-    seed: u64,
-    x: f32,
-    y: f32,
-    z: f32,
-) -> f32 {
-    let ix = (x.floor() as i32) as u64;
-    let iy = (y.floor() as i32) as u64;
-    let iz = (z.floor() as i32) as u64;
-
-    let fx = x - x.floor();
-    let fy = y - y.floor();
-    let fz = z - z.floor();
-
-    // Smoothstep interpolation weights
-    let ux = fx * fx * (3.0 - 2.0 * fx);
-    let uy = fy * fy * (3.0 - 2.0 * fy);
-    let uz = fz * fz * (3.0 - 2.0 * fz);
-
-    // Hash at 8 corners
-    let v000 = hash_to_float(seed, ix, iy, iz);
-    let v100 = hash_to_float(seed, ix.wrapping_add(1), iy, iz);
-    let v010 = hash_to_float(seed, ix, iy.wrapping_add(1), iz);
-    let v110 = hash_to_float(seed, ix.wrapping_add(1), iy.wrapping_add(1), iz);
-    let v001 = hash_to_float(seed, ix, iy, iz.wrapping_add(1));
-    let v101 = hash_to_float(seed, ix.wrapping_add(1), iy, iz.wrapping_add(1));
-    let v011 = hash_to_float(seed, ix, iy.wrapping_add(1), iz.wrapping_add(1));
-    let v111 = hash_to_float(
-        seed,
-        ix.wrapping_add(1),
-        iy.wrapping_add(1),
-        iz.wrapping_add(1),
-    );
-
-    // Trilinear interpolation
-    let x00 = lerp(v000, v100, ux);
-    let x10 = lerp(v010, v110, ux);
-    let x01 = lerp(v001, v101, ux);
-    let x11 = lerp(v011, v111, ux);
-    let y0 = lerp(x00, x10, uy);
-    let y1 = lerp(x01, x11, uy);
-    lerp(y0, y1, uz)
-}
-
-/// 2D noise (for biome selection).
-pub fn noise2d(
-    seed: u64,
-    x: f32,
-    z: f32,
-) -> f32 {
-    noise3d(seed, x, 0.0, z)
-}
-
-/// Fractal Brownian Motion — layered noise for terrain detail.
-pub fn fbm(
-    seed: u64,
-    x: f32,
-    y: f32,
-    z: f32,
-    octaves: u32,
-) -> f32 {
-    let mut value = 0.0f32;
-    let mut amplitude = 1.0f32;
-    let mut frequency = 1.0f32;
-    let mut max_amp = 0.0f32;
-
-    for i in 0..octaves {
-        value += noise3d(
-            seed.wrapping_add(i as u64 * 31337),
-            x * frequency,
-            y * frequency,
-            z * frequency,
-        ) * amplitude;
-        max_amp += amplitude;
-        amplitude *= 0.5;
-        frequency *= 2.0;
-    }
-
-    if max_amp > 0.0 {
-        value / max_amp
-    } else {
-        0.0
-    }
-}
-
-fn hash_to_float(
-    seed: u64,
-    x: u64,
-    y: u64,
-    z: u64,
-) -> f32 {
-    let h = hash_combine(seed, x, y, z);
-    // Map to [-1.0, 1.0]
-    (h as f32 / u32::MAX as f32) * 2.0 - 1.0
-}
-
-fn hash_combine(
-    seed: u64,
-    x: u64,
-    y: u64,
-    z: u64,
-) -> u32 {
-    let mut h = seed
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(x.wrapping_mul(1442695040888963407))
-        .wrapping_add(y.wrapping_mul(2862933555777941757))
-        .wrapping_add(z.wrapping_mul(3037000499));
-    h ^= h >> 33;
-    h = h.wrapping_mul(0xff51afd7ed558ccd);
-    h ^= h >> 33;
-    (h & 0xFFFFFFFF) as u32
-}
-
-fn lerp(
-    a: f32,
-    b: f32,
-    t: f32,
-) -> f32 {
-    a + (b - a) * t
-}
 
 // ---------------------------------------------------------------------------
 // Biomes
@@ -455,195 +335,8 @@ impl RegrowthTracker {
 }
 
 // ---------------------------------------------------------------------------
-// Plugin
-// ---------------------------------------------------------------------------
-
-/// Plugin registering world generation resources.
-pub struct WorldGenPlugin;
-
-impl Plugin for WorldGenPlugin {
-    fn build(
-        &self,
-        app: &mut App,
-    ) {
-        app.init_resource::<WorldGenerator>();
-        app.init_resource::<RegrowthTracker>();
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn noise3d_deterministic() {
-        let a = noise3d(42, 1.5, 2.5, 3.5);
-        let b = noise3d(42, 1.5, 2.5, 3.5);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn noise3d_different_seeds() {
-        let a = noise3d(1, 1.0, 2.0, 3.0);
-        let b = noise3d(2, 1.0, 2.0, 3.0);
-        assert_ne!(a, b);
-    }
-
-    #[test]
-    fn noise3d_in_range() {
-        for i in 0..100 {
-            let v = noise3d(42, i as f32 * 0.1, 0.0, 0.0);
-            assert!(v >= -1.0 && v <= 1.0, "noise value {v} out of range");
-        }
-    }
-
-    #[test]
-    fn fbm_deterministic() {
-        let a = fbm(42, 1.0, 2.0, 3.0, 4);
-        let b = fbm(42, 1.0, 2.0, 3.0, 4);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn biome_classification() {
-        assert_eq!(Biome::from_noise(-0.5), Biome::Snow);
-        assert_eq!(Biome::from_noise(-0.1), Biome::Forest);
-        assert_eq!(Biome::from_noise(0.1), Biome::Desert);
-        assert_eq!(Biome::from_noise(0.5), Biome::Mountain);
-        assert_eq!(Biome::from_noise(0.8), Biome::Ocean);
-    }
-
-    #[test]
-    fn biome_surface_materials_differ() {
-        let mats: Vec<u32> = [
-            Biome::Snow,
-            Biome::Forest,
-            Biome::Desert,
-            Biome::Mountain,
-            Biome::Ocean,
-        ]
-        .iter()
-        .map(|b| b.surface_material())
-        .collect();
-        // All unique
-        for i in 0..mats.len() {
-            for j in (i + 1)..mats.len() {
-                assert_ne!(mats[i], mats[j], "biome materials should differ");
-            }
-        }
-    }
-
-    #[test]
-    fn regrowth_only_forests_and_snow() {
-        assert!(Biome::Forest.supports_regrowth());
-        assert!(Biome::Snow.supports_regrowth());
-        assert!(!Biome::Desert.supports_regrowth());
-        assert!(!Biome::Mountain.supports_regrowth());
-        assert!(!Biome::Ocean.supports_regrowth());
-    }
-
-    #[test]
-    fn sample_density_below_surface_positive() {
-        let gen = WorldGenerator::new(42);
-        // Well below base height → should be solid
-        let d = gen.sample_density(0.0, 0.0, 0.0);
-        assert!(d > 0.0, "deep underground should be solid, got {d}");
-    }
-
-    #[test]
-    fn sample_density_above_surface_negative() {
-        let gen = WorldGenerator::new(42);
-        // Well above any terrain → should be air
-        let d = gen.sample_density(0.0, 500.0, 0.0);
-        assert!(d < 0.0, "high above terrain should be air, got {d}");
-    }
-
-    #[test]
-    fn generate_chunk_produces_voxels() {
-        let gen = WorldGenerator::new(42);
-        let mut world = VoxelWorld::new(8);
-        // Generate a chunk around sea level
-        let count = gen.generate_chunk_into(&mut world, 0, 3, 0); // y=48..63
-        assert!(count > 0, "chunk at surface level should have voxels");
-    }
-
-    #[test]
-    fn generate_chunk_above_terrain_empty() {
-        let gen = WorldGenerator::new(42);
-        let mut world = VoxelWorld::new(8);
-        // Generate a chunk way above terrain
-        let count = gen.generate_chunk_into(&mut world, 0, 30, 0); // y=480..495
-        assert_eq!(count, 0, "chunk far above terrain should be empty");
-    }
-
-    #[test]
-    fn tree_template_valid() {
-        let tree = tree_template();
-        assert!(!tree.voxels.is_empty());
-        // Has both trunk and leaf colors
-        let colors: std::collections::HashSet<u32> =
-            tree.voxels.iter().map(|(_, c)| *c).collect();
-        assert!(
-            colors.len() >= 2,
-            "tree should have at least trunk + leaves"
-        );
-    }
-
-    #[test]
-    fn boulder_template_valid() {
-        let boulder = boulder_template();
-        assert!(!boulder.voxels.is_empty());
-        assert_eq!(boulder.voxels.len(), 18); // 3×2×3
-    }
-
-    #[test]
-    fn regrowth_tracker_basic() {
-        let mut tracker = RegrowthTracker::default();
-        tracker.entries.push(RegrowthEntry {
-            x: 1,
-            y: 2,
-            z: 3,
-            delta_tick: 0,
-        });
-        tracker.entries.push(RegrowthEntry {
-            x: 4,
-            y: 5,
-            z: 6,
-            delta_tick: 1000,
-        });
-
-        let regrown = tracker.tick_regrowth(REGROWTH_TICKS + 1);
-        assert_eq!(regrown.len(), 1);
-        assert_eq!(regrown[0], IVec3::new(1, 2, 3));
-        assert_eq!(tracker.entries.len(), 1); // second entry still pending
-    }
-
-    #[test]
-    fn regrowth_tracker_none_expired() {
-        let mut tracker = RegrowthTracker::default();
-        tracker.entries.push(RegrowthEntry {
-            x: 0,
-            y: 0,
-            z: 0,
-            delta_tick: 100,
-        });
-        let regrown = tracker.tick_regrowth(200);
-        assert!(regrown.is_empty());
-    }
-
-    #[test]
-    fn same_seed_same_density() {
-        let gen1 = WorldGenerator::new(12345);
-        let gen2 = WorldGenerator::new(12345);
-        for i in 0..20 {
-            let x = i as f32 * 3.7;
-            let d1 = gen1.sample_density(x, 50.0, x * 0.5);
-            let d2 = gen2.sample_density(x, 50.0, x * 0.5);
-            assert_eq!(d1, d2, "same seed must produce identical density");
-        }
-    }
-}
+mod tests;

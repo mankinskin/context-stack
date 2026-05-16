@@ -15,6 +15,18 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+mod helpers;
+mod plugin;
+
+pub use helpers::{
+    compute_damage,
+    spatial_hash,
+    validate_interaction_range,
+    world_to_chunk,
+    world_to_local,
+};
+pub use plugin::MultiplayerBackendPlugin;
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -173,57 +185,6 @@ pub struct CombatEvent {
 }
 
 // ---------------------------------------------------------------------------
-// Spatial hashing
-// ---------------------------------------------------------------------------
-
-/// Compute a spatial hash for chunk coordinates.
-///
-/// Uses FNV-1a–style mixing to distribute chunks across hash space.
-pub fn spatial_hash(
-    cx: i32,
-    cy: i32,
-    cz: i32,
-) -> u64 {
-    let mut h: u64 = 0xcbf29ce484222325;
-    for byte in cx
-        .to_le_bytes()
-        .iter()
-        .chain(&cy.to_le_bytes())
-        .chain(&cz.to_le_bytes())
-    {
-        h ^= *byte as u64;
-        h = h.wrapping_mul(0x100000001b3);
-    }
-    h
-}
-
-/// Convert world voxel coordinates to chunk coordinates.
-pub fn world_to_chunk(
-    x: i32,
-    y: i32,
-    z: i32,
-) -> (i32, i32, i32) {
-    (
-        x.div_euclid(CHUNK_SIZE as i32),
-        y.div_euclid(CHUNK_SIZE as i32),
-        z.div_euclid(CHUNK_SIZE as i32),
-    )
-}
-
-/// Convert world voxel coordinates to local-within-chunk coordinates.
-pub fn world_to_local(
-    x: i32,
-    y: i32,
-    z: i32,
-) -> (u8, u8, u8) {
-    (
-        x.rem_euclid(CHUNK_SIZE as i32) as u8,
-        y.rem_euclid(CHUNK_SIZE as i32) as u8,
-        z.rem_euclid(CHUNK_SIZE as i32) as u8,
-    )
-}
-
-// ---------------------------------------------------------------------------
 // Reducer request types
 // ---------------------------------------------------------------------------
 
@@ -361,30 +322,6 @@ pub struct CombatEventQueue {
 }
 
 // ---------------------------------------------------------------------------
-// Validation helpers (client-side mirrors of server logic)
-// ---------------------------------------------------------------------------
-
-/// Validate that a player is within interaction range of a target position.
-pub fn validate_interaction_range(
-    player_pos: (f32, f32, f32),
-    target: (f32, f32, f32),
-) -> bool {
-    let dx = player_pos.0 - target.0;
-    let dy = player_pos.1 - target.1;
-    let dz = player_pos.2 - target.2;
-    (dx * dx + dy * dy + dz * dz).sqrt() <= MAX_INTERACTION_RANGE
-}
-
-/// Compute damage from weapon stats against a target.
-pub fn compute_damage(
-    base_damage: i32,
-    weapon_weight: f32,
-) -> i32 {
-    let weight_bonus = (weapon_weight * 2.0) as i32;
-    (base_damage + weight_bonus).max(1)
-}
-
-// ---------------------------------------------------------------------------
 // Offline/singleplayer game tick
 // ---------------------------------------------------------------------------
 
@@ -453,202 +390,8 @@ fn drain_reducer_queue_system(
 }
 
 // ---------------------------------------------------------------------------
-// Plugin
-// ---------------------------------------------------------------------------
-
-/// Plugin registering multiplayer backend types and fallback tick systems.
-pub struct MultiplayerBackendPlugin;
-
-impl Plugin for MultiplayerBackendPlugin {
-    fn build(
-        &self,
-        app: &mut App,
-    ) {
-        app.init_resource::<MultiplayerConnection>();
-        app.init_resource::<PlayerTable>();
-        app.init_resource::<BlueprintTable>();
-        app.init_resource::<InventoryTable>();
-        app.init_resource::<ReducerQueue>();
-        app.init_resource::<CombatEventQueue>();
-        app.init_resource::<LocalGameTick>();
-
-        // Insert a default local player row
-        let identity = PlayerIdentity::local();
-        let mut player_table = PlayerTable::default();
-        player_table.players.insert(identity, PlayerRow::default());
-        app.insert_resource(player_table);
-
-        app.add_systems(
-            Update,
-            (local_tick_system, drain_reducer_queue_system),
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn spatial_hash_deterministic() {
-        let h1 = spatial_hash(1, 2, 3);
-        let h2 = spatial_hash(1, 2, 3);
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn spatial_hash_differs_for_different_coords() {
-        let h1 = spatial_hash(0, 0, 0);
-        let h2 = spatial_hash(1, 0, 0);
-        let h3 = spatial_hash(0, 1, 0);
-        assert_ne!(h1, h2);
-        assert_ne!(h1, h3);
-        assert_ne!(h2, h3);
-    }
-
-    #[test]
-    fn world_to_chunk_positive() {
-        assert_eq!(world_to_chunk(0, 0, 0), (0, 0, 0));
-        assert_eq!(world_to_chunk(15, 15, 15), (0, 0, 0));
-        assert_eq!(world_to_chunk(16, 0, 0), (1, 0, 0));
-        assert_eq!(world_to_chunk(32, 48, 64), (2, 3, 4));
-    }
-
-    #[test]
-    fn world_to_chunk_negative() {
-        assert_eq!(world_to_chunk(-1, 0, 0), (-1, 0, 0));
-        assert_eq!(world_to_chunk(-16, 0, 0), (-1, 0, 0));
-        assert_eq!(world_to_chunk(-17, 0, 0), (-2, 0, 0));
-    }
-
-    #[test]
-    fn world_to_local_positive() {
-        assert_eq!(world_to_local(0, 0, 0), (0, 0, 0));
-        assert_eq!(world_to_local(5, 10, 15), (5, 10, 15));
-        assert_eq!(world_to_local(16, 0, 0), (0, 0, 0));
-        assert_eq!(world_to_local(17, 0, 0), (1, 0, 0));
-    }
-
-    #[test]
-    fn world_to_local_negative() {
-        // -1 mod 16 = 15
-        assert_eq!(world_to_local(-1, 0, 0), (15, 0, 0));
-        assert_eq!(world_to_local(-16, 0, 0), (0, 0, 0));
-    }
-
-    #[test]
-    fn validate_interaction_range_within() {
-        assert!(validate_interaction_range((0.0, 0.0, 0.0), (5.0, 0.0, 0.0)));
-    }
-
-    #[test]
-    fn validate_interaction_range_too_far() {
-        assert!(!validate_interaction_range(
-            (0.0, 0.0, 0.0),
-            (20.0, 0.0, 0.0)
-        ));
-    }
-
-    #[test]
-    fn validate_interaction_range_exact_boundary() {
-        assert!(validate_interaction_range(
-            (0.0, 0.0, 0.0),
-            (MAX_INTERACTION_RANGE, 0.0, 0.0)
-        ));
-    }
-
-    #[test]
-    fn compute_damage_minimum_one() {
-        assert_eq!(compute_damage(0, 0.0), 1);
-    }
-
-    #[test]
-    fn compute_damage_with_weight_bonus() {
-        // base=10, weight=5.0 → bonus=10, total=20
-        assert_eq!(compute_damage(10, 5.0), 20);
-    }
-
-    #[test]
-    fn player_identity_local() {
-        let id = PlayerIdentity::local();
-        assert_eq!(id.id, 1);
-    }
-
-    #[test]
-    fn player_table_online_count() {
-        let mut table = PlayerTable::default();
-        assert_eq!(table.online_count(), 0);
-        table
-            .players
-            .insert(PlayerIdentity::new(1), PlayerRow::default());
-        table
-            .players
-            .insert(PlayerIdentity::new(2), PlayerRow::default());
-        assert_eq!(table.online_count(), 2);
-    }
-
-    #[test]
-    fn inventory_occupied_count() {
-        let mut inv = InventoryTable::default();
-        inv.slots.push(InventorySlot {
-            slot_id: 1,
-            owner: PlayerIdentity::local(),
-            blueprint_id: 100,
-            quantity: 5,
-            slot_index: 0,
-        });
-        inv.slots.push(InventorySlot {
-            slot_id: 2,
-            owner: PlayerIdentity::local(),
-            blueprint_id: 200,
-            quantity: 0, // empty
-            slot_index: 1,
-        });
-        assert_eq!(inv.occupied_count(), 1);
-    }
-
-    #[test]
-    fn reducer_queue_drain() {
-        let mut queue = ReducerQueue::default();
-        queue.push(ReducerRequest::PlayerMove {
-            position: (1.0, 2.0, 3.0),
-            yaw: 0.5,
-        });
-        queue.push(ReducerRequest::UpdateVoxel {
-            x: 0,
-            y: 0,
-            z: 0,
-            new_color: 0xFF0000,
-        });
-        let drained = queue.drain();
-        assert_eq!(drained.len(), 2);
-        assert!(queue.pending.is_empty());
-    }
-
-    #[test]
-    fn item_type_roundtrip() {
-        for v in 0..4u8 {
-            let t = ItemType::from_u8(v);
-            assert_eq!(t as u8, v);
-        }
-        // Unknown maps to Block
-        assert_eq!(ItemType::from_u8(99), ItemType::Block);
-    }
-
-    #[test]
-    fn local_game_tick_default() {
-        let tick = LocalGameTick::default();
-        assert_eq!(tick.tick, 0);
-        assert_eq!(tick.timer_ms, 0.0);
-    }
-
-    #[test]
-    fn combat_event_queue_default_empty() {
-        let q = CombatEventQueue::default();
-        assert!(q.events.is_empty());
-    }
-}
+mod tests;
