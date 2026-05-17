@@ -15,6 +15,6 @@ Repository layout:
 - `deps/justlog` (submodule)
 
 This repository is intended to be mounted back into `context-engine` as the
-`crates/context-stack` submodule. Its history is rewritten from the source
+`context-stack` submodule. Its history is rewritten from the source
 repository so that `main` reflects the standalone submodule root rather than the
 original `crates/*` paths.

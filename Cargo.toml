@@ -39,4 +39,4 @@ members = [
   "tools/context-editor/sandbox-app",
 ]
 ticket_workspace = ".ticket"
-submodule_path = "crates/context-stack"
+submodule_path = "context-stack"
