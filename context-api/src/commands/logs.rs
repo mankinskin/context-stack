@@ -330,7 +330,8 @@ pub fn search_logs(
                 .into_iter()
                 .take(limit_per_file)
                 .filter_map(|v| {
-                    let log_entry: Result<LogEntry, _> = serde_json::from_value(v);
+                    let log_entry: Result<LogEntry, _> =
+                        serde_json::from_value(v);
                     log_entry.ok().map(|e| LogEntryInfo::from(&e))
                 })
                 .collect();

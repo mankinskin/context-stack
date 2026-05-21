@@ -45,8 +45,8 @@ async fn test_workflow_basic() {
         .expect("workflow should not fail");
     let text = extract_text(&result);
 
-    let parsed: serde_json::Value = serde_json::from_str(&text)
-        .expect("workflow output should be JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).expect("workflow output should be JSON");
 
     assert_eq!(parsed["name"], "basic");
     assert!(
@@ -138,8 +138,7 @@ async fn test_workflow_steps_have_valid_commands() {
             step.step,
         );
         let cmd_name = cmd.unwrap().as_str().unwrap();
-        let known: Vec<&str> =
-            all_commands().iter().map(|c| c.name).collect();
+        let known: Vec<&str> = all_commands().iter().map(|c| c.name).collect();
         assert!(
             known.contains(&cmd_name),
             "Step {} references unknown command '{}' (known: {:?})",

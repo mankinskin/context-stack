@@ -59,7 +59,7 @@ fn reconcile_triggers_rollback() {
     match reconcile(&snapshot, &predicted, &thresholds) {
         ReconcileResult::Rollback { position_error, .. } => {
             assert!((position_error - 5.0).abs() < 0.01);
-        }
+        },
         ReconcileResult::Agree => panic!("should have rolled back"),
     }
 }
@@ -80,10 +80,16 @@ fn hermite_endpoints() {
     };
     let state = HermiteState::from_snapshots(&prev, &next, 1.0);
 
-    let start = HermiteState { t: 0.0, ..state.clone() };
+    let start = HermiteState {
+        t: 0.0,
+        ..state.clone()
+    };
     assert!((start.position() - Vec3::ZERO).length() < 0.01);
 
-    let end = HermiteState { t: 1.0, ..state.clone() };
+    let end = HermiteState {
+        t: 1.0,
+        ..state.clone()
+    };
     assert!((end.position() - Vec3::new(10.0, 0.0, 0.0)).length() < 0.01);
 }
 
@@ -104,7 +110,11 @@ fn hermite_midpoint_is_smooth() {
     let mut state = HermiteState::from_snapshots(&prev, &next, 1.0);
     state.t = 0.5;
     let mid = state.position();
-    assert!(mid.x > 3.0 && mid.x < 7.0, "midpoint x={} should be roughly 5", mid.x);
+    assert!(
+        mid.x > 3.0 && mid.x < 7.0,
+        "midpoint x={} should be roughly 5",
+        mid.x
+    );
 }
 
 #[test]
@@ -128,7 +138,11 @@ fn rollback_reapplies_inputs() {
     };
 
     let corrected = apply_rollback(&snapshot, &buffer, 1.0);
-    assert!((corrected.x - 12.0).abs() < 0.01, "corrected.x={}", corrected.x);
+    assert!(
+        (corrected.x - 12.0).abs() < 0.01,
+        "corrected.x={}",
+        corrected.x
+    );
 }
 
 #[test]

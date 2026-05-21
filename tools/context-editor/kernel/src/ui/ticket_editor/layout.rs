@@ -54,7 +54,9 @@ pub fn force_directed_step(
     }
 
     for edge in edges {
-        if let (Some(&pa), Some(&pb)) = (positions.get(&edge.from), positions.get(&edge.to)) {
+        if let (Some(&pa), Some(&pb)) =
+            (positions.get(&edge.from), positions.get(&edge.to))
+        {
             let delta = pb - pa;
             let dist = delta.length();
             let force = delta.normalize_or_zero() * SPRING_K * dist;
@@ -69,7 +71,9 @@ pub fn force_directed_step(
     }
 
     for id in &ids {
-        if let (Some(vel), Some(pos)) = (velocities.get_mut(id), positions.get_mut(id)) {
+        if let (Some(vel), Some(pos)) =
+            (velocities.get_mut(id), positions.get_mut(id))
+        {
             *vel *= LAYOUT_DAMPING;
             let speed = vel.length();
             if speed > MAX_VELOCITY {

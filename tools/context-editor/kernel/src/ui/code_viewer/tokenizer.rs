@@ -124,9 +124,8 @@ pub fn tokenize_rust_line(line: &str) -> Vec<SyntaxToken> {
         if !ch.is_alphanumeric() && ch != '_' {
             flush_buf(&mut buf, &mut tokens);
             let kind = match ch {
-                '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^' | '%' => {
-                    TokenKind::Operator
-                }
+                '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^'
+                | '%' => TokenKind::Operator,
                 _ => TokenKind::Punctuation,
             };
             tokens.push(SyntaxToken {

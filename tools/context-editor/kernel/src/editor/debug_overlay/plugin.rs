@@ -1,5 +1,7 @@
-use super::*;
-use super::wireframe::draw_svo_wireframe;
+use super::{
+    wireframe::draw_svo_wireframe,
+    *,
+};
 
 pub struct DebugOverlayPlugin;
 

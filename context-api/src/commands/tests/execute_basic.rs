@@ -1,8 +1,10 @@
-use super::tmp_manager;
-use super::super::{
-    execute,
-    Command,
-    CommandResult,
+use super::{
+    super::{
+        Command,
+        CommandResult,
+        execute,
+    },
+    tmp_manager,
 };
 
 #[test]
@@ -29,8 +31,7 @@ fn execute_create_workspace() {
 #[test]
 fn execute_add_atom() {
     let (_tmp, mut mgr) = tmp_manager();
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
 
     let result = execute(
         &mut mgr,
@@ -51,8 +52,7 @@ fn execute_add_atom() {
 fn execute_full_workflow() {
     let (_tmp, mut mgr) = tmp_manager();
 
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
 
     let chars: Vec<char> = vec!['a', 'b', 'c'];
     execute(
@@ -141,18 +141,15 @@ fn execute_full_workflow() {
         other => panic!("expected ValidationReport, got: {other:?}"),
     }
 
-    execute(&mut mgr, Command::SaveWorkspace { name: "ws".into() })
-        .unwrap();
-    execute(&mut mgr, Command::CloseWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::SaveWorkspace { name: "ws".into() }).unwrap();
+    execute(&mut mgr, Command::CloseWorkspace { name: "ws".into() }).unwrap();
 }
 
 #[test]
 fn execute_insert_and_read_workflow() {
     let (_tmp, mut mgr) = tmp_manager();
 
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
 
     let insert = execute(
         &mut mgr,

@@ -157,7 +157,8 @@ fn effective_lod_behind_glass_reduces_depth() {
         screen_max: Vec2::ONE,
         blur_strength: 0.8,
     });
-    let depth = effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
+    let depth =
+        effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
     assert_eq!(depth, 10 - params.glass_lod_reduction);
 }
 
@@ -170,7 +171,8 @@ fn effective_lod_clear_glass_no_reduction() {
         screen_max: Vec2::ONE,
         blur_strength: 0.3,
     });
-    let depth = effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
+    let depth =
+        effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
     assert_eq!(depth, 10);
 }
 
@@ -184,7 +186,8 @@ fn effective_lod_disabled_glass_no_reduction() {
         screen_max: Vec2::ONE,
         blur_strength: 1.0,
     });
-    let depth = effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
+    let depth =
+        effective_lod_depth(10, Vec2::new(0.5, 0.5), &occluders, &params);
     assert_eq!(depth, 10);
 }
 

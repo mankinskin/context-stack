@@ -1,7 +1,7 @@
 use super::{
+    NodeType,
     DEFAULT_CUBE_HALF_EXTENT,
     DEFAULT_NODE_RADIUS,
-    NodeType,
 };
 use bevy::prelude::IVec3;
 
@@ -17,12 +17,10 @@ impl ClusterShape {
     /// Generate the list of voxel offsets for this shape.
     pub fn voxel_offsets(&self) -> Vec<IVec3> {
         match self {
-            ClusterShape::Sphere { radius_voxels } => {
-                sphere_offsets(*radius_voxels as i32)
-            }
-            ClusterShape::Cube { half_extent_voxels } => {
-                cube_offsets(*half_extent_voxels as i32)
-            }
+            ClusterShape::Sphere { radius_voxels } =>
+                sphere_offsets(*radius_voxels as i32),
+            ClusterShape::Cube { half_extent_voxels } =>
+                cube_offsets(*half_extent_voxels as i32),
             ClusterShape::Custom(offsets) => offsets.clone(),
         }
     }

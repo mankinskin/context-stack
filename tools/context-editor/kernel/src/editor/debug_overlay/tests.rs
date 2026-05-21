@@ -185,5 +185,8 @@ fn collect_occ_only_skips_empty() {
         }
     }
 
-    assert!(cubes.is_empty(), "empty world should produce no occupied cubes");
+    assert!(
+        cubes.is_empty(),
+        "empty world should produce no occupied cubes"
+    );
 }

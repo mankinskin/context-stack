@@ -312,4 +312,3 @@ pub fn update_ray_march_uniforms(
 
     render_queue.write_buffer(&uniform_buf.0, 0, bytemuck::bytes_of(&data));
 }
-

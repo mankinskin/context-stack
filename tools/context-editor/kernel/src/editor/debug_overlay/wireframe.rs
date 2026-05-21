@@ -121,7 +121,12 @@ pub(super) fn draw_svo_wireframe(
                                 if slot & 2 != 0 { half } else { 0.0 },
                                 if slot & 4 != 0 { half } else { 0.0 },
                             );
-                        queue.push_back((usize::MAX, depth + 1, child_origin, half));
+                        queue.push_back((
+                            usize::MAX,
+                            depth + 1,
+                            child_origin,
+                            half,
+                        ));
                     }
                 }
                 continue;
@@ -148,10 +153,20 @@ pub(super) fn draw_svo_wireframe(
                     );
                 if mask & (1 << slot) == 0 {
                     if depth + 1 <= full_grid_cap {
-                        queue.push_back((usize::MAX, depth + 1, child_origin, half));
+                        queue.push_back((
+                            usize::MAX,
+                            depth + 1,
+                            child_origin,
+                            half,
+                        ));
                     }
                 } else {
-                    queue.push_back((first + slot, depth + 1, child_origin, half));
+                    queue.push_back((
+                        first + slot,
+                        depth + 1,
+                        child_origin,
+                        half,
+                    ));
                 }
             }
         }
@@ -184,19 +199,39 @@ pub(super) fn draw_svo_wireframe(
         (3, 7),
     ];
 
-    wire_data.corners.reserve(cubes.len() * WIREFRAME_VERTS_PER_CUBE);
-    wire_data.indices.reserve(cubes.len() * WIREFRAME_INDICES_PER_CUBE);
+    wire_data
+        .corners
+        .reserve(cubes.len() * WIREFRAME_VERTS_PER_CUBE);
+    wire_data
+        .indices
+        .reserve(cubes.len() * WIREFRAME_INDICES_PER_CUBE);
     for (i, &(center, extent)) in cubes.iter().enumerate() {
         let base = (i * WIREFRAME_VERTS_PER_CUBE) as u32;
         let half = extent * 0.5;
-        wire_data.corners.push((center + Vec3::new(-half, -half, -half)).to_array());
-        wire_data.corners.push((center + Vec3::new(half, -half, -half)).to_array());
-        wire_data.corners.push((center + Vec3::new(half, half, -half)).to_array());
-        wire_data.corners.push((center + Vec3::new(-half, half, -half)).to_array());
-        wire_data.corners.push((center + Vec3::new(-half, -half, half)).to_array());
-        wire_data.corners.push((center + Vec3::new(half, -half, half)).to_array());
-        wire_data.corners.push((center + Vec3::new(half, half, half)).to_array());
-        wire_data.corners.push((center + Vec3::new(-half, half, half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-half, -half, -half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(half, -half, -half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(half, half, -half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-half, half, -half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-half, -half, half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(half, -half, half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(half, half, half)).to_array());
+        wire_data
+            .corners
+            .push((center + Vec3::new(-half, half, half)).to_array());
         for &(a, b) in &CUBE_EDGES {
             wire_data.indices.push(base + a);
             wire_data.indices.push(base + b);

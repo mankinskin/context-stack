@@ -78,10 +78,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn init_tracing(log_dir: PathBuf) {
-    let level = std::env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+    let level =
+        std::env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
     let file_logging = std::env::var("LOG_FILE").is_ok();
-    let filter = EnvFilter::try_new(&level)
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter =
+        EnvFilter::try_new(&level).unwrap_or_else(|_| EnvFilter::new("info"));
     let fmt_layer = fmt::layer()
         .with_target(true)
         .with_thread_ids(true)

@@ -24,8 +24,7 @@ fn tmp_server() -> (tempfile::TempDir, ContextServer) {
 
 /// Parse the text content of a `CallToolResult` into an `ExecuteOutput`.
 fn parse_output(result: &CallToolResult) -> ExecuteOutput {
-    let content =
-        result.content.first().expect("result should have content");
+    let content = result.content.first().expect("result should have content");
     match &content.raw {
         RawContent::Text(text_content) =>
             serde_json::from_str(&text_content.text)

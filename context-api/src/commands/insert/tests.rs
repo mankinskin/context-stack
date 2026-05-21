@@ -68,7 +68,8 @@ fn insert_sequence_too_short() {
     let err = mgr.insert_sequence("ws", "").unwrap_err();
     match err {
         crate::error::InsertError::QueryTooShort => {},
-        other => panic!("expected QueryTooShort for empty string, got: {other}"),
+        other =>
+            panic!("expected QueryTooShort for empty string, got: {other}"),
     }
 }
 

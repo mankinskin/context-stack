@@ -134,7 +134,7 @@ fn build_bincode_export(
 ///
 /// Returns `(metadata, graph)`.
 fn parse_bincode_export(
-    data: &[u8],
+    data: &[u8]
 ) -> Result<(WorkspaceMetadata, Hypergraph<BaseGraphKind>), WorkspaceError> {
     let make_err = |msg: &str| {
         WorkspaceError::SerializationError(format!(
@@ -179,10 +179,10 @@ fn parse_bincode_export(
 
     let graph: Hypergraph<BaseGraphKind> = bincode::deserialize(&data[pos..])
         .map_err(|e| {
-            WorkspaceError::SerializationError(format!(
-                "bincode graph deserialize: {e}"
-            ))
-        })?;
+        WorkspaceError::SerializationError(format!(
+            "bincode graph deserialize: {e}"
+        ))
+    })?;
 
     Ok((metadata, graph))
 }

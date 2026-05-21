@@ -14,7 +14,9 @@ fn csg_union_takes_minimum() {
 
 #[test]
 fn csg_intersection_takes_maximum() {
-    assert!((sdf_csg(CsgOp::Intersection, 2.0, 3.0) - 3.0).abs() < f32::EPSILON);
+    assert!(
+        (sdf_csg(CsgOp::Intersection, 2.0, 3.0) - 3.0).abs() < f32::EPSILON
+    );
 }
 
 #[test]
@@ -62,7 +64,10 @@ fn cut_particles_expire() {
     assert_eq!(pool.particles.len(), 10);
 
     tick_cut_particles(&mut pool, 2.0);
-    assert!(pool.particles.is_empty(), "all particles should have expired");
+    assert!(
+        pool.particles.is_empty(),
+        "all particles should have expired"
+    );
 }
 
 #[test]
@@ -93,7 +98,12 @@ fn emit_respects_max_cap() {
         direction: Vec3::Y,
         impact_strength: 1.0,
     };
-    emit_cut_particles(&mut pool, &req, [255; 4], MAX_CUT_PARTICLES as u32 + 100);
+    emit_cut_particles(
+        &mut pool,
+        &req,
+        [255; 4],
+        MAX_CUT_PARTICLES as u32 + 100,
+    );
     assert_eq!(pool.particles.len(), MAX_CUT_PARTICLES);
 }
 

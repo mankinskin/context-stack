@@ -118,24 +118,34 @@ fn find_empty_slot_index_gap() {
 
 #[test]
 fn validate_drop_position_in_range() {
-    assert!(validate_drop_position((0.0, 10.0, 0.0), Vec3::new(2.0, 10.0, 0.0)));
+    assert!(validate_drop_position(
+        (0.0, 10.0, 0.0),
+        Vec3::new(2.0, 10.0, 0.0)
+    ));
 }
 
 #[test]
 fn validate_drop_position_too_far() {
-    assert!(!validate_drop_position((0.0, 10.0, 0.0), Vec3::new(100.0, 10.0, 0.0)));
+    assert!(!validate_drop_position(
+        (0.0, 10.0, 0.0),
+        Vec3::new(100.0, 10.0, 0.0)
+    ));
 }
 
 #[test]
 fn validate_drop_position_below_ground() {
-    assert!(!validate_drop_position((0.0, 10.0, 0.0), Vec3::new(0.0, -5.0, 0.0)));
+    assert!(!validate_drop_position(
+        (0.0, 10.0, 0.0),
+        Vec3::new(0.0, -5.0, 0.0)
+    ));
 }
 
 #[test]
 fn ghost_preview_valid_placement() {
     let slot = sample_cached_slot();
     let data = sample_voxel_data();
-    let preview = build_ghost_preview(&slot, Vec3::new(5.0, 10.0, 3.0), true, &data);
+    let preview =
+        build_ghost_preview(&slot, Vec3::new(5.0, 10.0, 3.0), true, &data);
     assert!(preview.valid);
     assert_eq!(preview.world_origin, IVec3::new(5, 10, 3));
     assert_eq!(preview.voxel_offsets.len(), 3);
@@ -146,7 +156,8 @@ fn ghost_preview_valid_placement() {
 fn ghost_preview_invalid_placement() {
     let slot = sample_cached_slot();
     let data = sample_voxel_data();
-    let preview = build_ghost_preview(&slot, Vec3::new(0.0, 0.0, 0.0), false, &data);
+    let preview =
+        build_ghost_preview(&slot, Vec3::new(0.0, 0.0, 0.0), false, &data);
     assert!(!preview.valid);
     assert!(preview.opacity < GHOST_OPACITY);
 }

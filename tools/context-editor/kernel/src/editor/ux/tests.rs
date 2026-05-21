@@ -47,7 +47,10 @@ fn new_edit_clears_redos() {
     assert_eq!(history.redos.len(), 1);
 
     history.push_edit(snap2);
-    assert!(history.redos.is_empty(), "redo stack should be cleared after new edit");
+    assert!(
+        history.redos.is_empty(),
+        "redo stack should be cleared after new edit"
+    );
 }
 
 #[test]
@@ -129,7 +132,10 @@ fn apply_undo_restores_voxel() {
     apply_undo(&mut world, &snapshot);
     let node = world.descend_to(IVec3::ZERO);
     if let Some(index) = node {
-        assert_eq!(world.nodes[index].color_data, 0, "voxel should be cleared after undo");
+        assert_eq!(
+            world.nodes[index].color_data, 0,
+            "voxel should be cleared after undo"
+        );
     }
 }
 

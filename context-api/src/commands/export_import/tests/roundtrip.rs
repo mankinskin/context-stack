@@ -1,8 +1,8 @@
 use super::{
+    super::*,
     add_atoms,
     tmp_manager,
 };
-use super::super::*;
 
 #[test]
 fn export_import_json_round_trip() {
@@ -80,8 +80,8 @@ fn export_inline_json_returns_bytes() {
     mgr.create_workspace("inline").unwrap();
     add_atoms(&mut mgr, "inline", &['a']);
 
-    let result = export_workspace(&mgr, "inline", ExportFormat::Json, None)
-        .unwrap();
+    let result =
+        export_workspace(&mgr, "inline", ExportFormat::Json, None).unwrap();
 
     assert!(result.is_some());
     let bytes = result.unwrap();
@@ -100,8 +100,9 @@ fn export_inline_bincode_returns_bytes() {
     mgr.create_workspace("inline-bin").unwrap();
     add_atoms(&mut mgr, "inline-bin", &['z']);
 
-    let result = export_workspace(&mgr, "inline-bin", ExportFormat::Bincode, None)
-        .unwrap();
+    let result =
+        export_workspace(&mgr, "inline-bin", ExportFormat::Bincode, None)
+            .unwrap();
 
     assert!(result.is_some());
     let bytes = result.unwrap();

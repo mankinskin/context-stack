@@ -131,55 +131,60 @@ pub fn queue_ray_march_pipelines(
         .load("embedded://context_editor_kernel/render/svo_ray_march.wgsl");
 
     if existing_cmp.is_none() {
-        let id = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
-            label: Some("svo_ray_march_compute".into()),
-            layout: vec![compute_bind_group_layout()],
-            push_constant_ranges: vec![],
-            shader: shader.clone(),
-            shader_defs: vec![],
-            entry_point: Some("ray_march_main".into()),
-            zero_initialize_workgroup_memory: true,
-        });
+        let id =
+            pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+                label: Some("svo_ray_march_compute".into()),
+                layout: vec![compute_bind_group_layout()],
+                push_constant_ranges: vec![],
+                shader: shader.clone(),
+                shader_defs: vec![],
+                entry_point: Some("ray_march_main".into()),
+                zero_initialize_workgroup_memory: true,
+            });
         commands.insert_resource(SvoRayMarchComputePipeline(id));
     }
 
     if existing_blit.is_none() {
-        let id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
-            label: Some("svo_ray_march_blit".into()),
-            layout: vec![blit_dummy_group0_layout(), blit_bind_group_layout()],
-            push_constant_ranges: vec![],
-            vertex: VertexState {
-                shader: shader.clone(),
-                shader_defs: vec![],
-                entry_point: Some("blit_vs".into()),
-                buffers: vec![],
-            },
-            fragment: Some(FragmentState {
-                shader,
-                shader_defs: vec![],
-                entry_point: Some("blit_fs".into()),
-                targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
-                    blend: Some(BlendState {
-                        color: BlendComponent {
-                            src_factor: BlendFactor::One,
-                            dst_factor: BlendFactor::Zero,
-                            operation: BlendOperation::Add,
-                        },
-                        alpha: BlendComponent::OVER,
-                    }),
-                    write_mask: ColorWrites::ALL,
-                })],
-            }),
-            primitive: PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: MultisampleState {
-                count: 4,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            zero_initialize_workgroup_memory: false,
-        });
+        let id =
+            pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("svo_ray_march_blit".into()),
+                layout: vec![
+                    blit_dummy_group0_layout(),
+                    blit_bind_group_layout(),
+                ],
+                push_constant_ranges: vec![],
+                vertex: VertexState {
+                    shader: shader.clone(),
+                    shader_defs: vec![],
+                    entry_point: Some("blit_vs".into()),
+                    buffers: vec![],
+                },
+                fragment: Some(FragmentState {
+                    shader,
+                    shader_defs: vec![],
+                    entry_point: Some("blit_fs".into()),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: Some(BlendState {
+                            color: BlendComponent {
+                                src_factor: BlendFactor::One,
+                                dst_factor: BlendFactor::Zero,
+                                operation: BlendOperation::Add,
+                            },
+                            alpha: BlendComponent::OVER,
+                        }),
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState {
+                    count: 4,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                zero_initialize_workgroup_memory: false,
+            });
         commands.insert_resource(SvoRayMarchBlitPipeline(id));
     }
 }
@@ -196,7 +201,9 @@ pub fn rebuild_ray_march_bind_groups(
     page_table_buf: Option<Res<SvoPageTableBuffer>>,
 ) {
     let Some(rm_buffers) = rm_buffers else { return };
-    let Some(rm_uniforms) = rm_uniforms else { return };
+    let Some(rm_uniforms) = rm_uniforms else {
+        return;
+    };
     let Some(svo) = svo else { return };
     let Some(svo_tf) = svo_tf else { return };
 
@@ -206,7 +213,8 @@ pub fn rebuild_ray_march_bind_groups(
         .unwrap_or_else(|| svo.read_source().as_entire_binding());
 
     {
-        let layout = pipeline_cache.get_bind_group_layout(&compute_bind_group_layout());
+        let layout =
+            pipeline_cache.get_bind_group_layout(&compute_bind_group_layout());
         let bind_group = device.create_bind_group(
             "bg_svo_ray_march_compute",
             &layout,
@@ -241,7 +249,8 @@ pub fn rebuild_ray_march_bind_groups(
     }
 
     {
-        let layout = pipeline_cache.get_bind_group_layout(&blit_bind_group_layout());
+        let layout =
+            pipeline_cache.get_bind_group_layout(&blit_bind_group_layout());
         let bind_group = device.create_bind_group(
             "bg_svo_ray_march_blit",
             &layout,

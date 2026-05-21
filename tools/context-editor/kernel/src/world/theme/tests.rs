@@ -74,9 +74,6 @@ fn theme_update_repacks_voxels() {
         world.mark_dirty(leaf_idx);
     }
 
-    assert_eq!(
-        world.nodes[leaf_idx].color_data,
-        light.voxel_primary.pack()
-    );
+    assert_eq!(world.nodes[leaf_idx].color_data, light.voxel_primary.pack());
     assert!(!world.take_dirty_ranges().is_empty());
 }

@@ -1,7 +1,9 @@
 use super::*;
 
-use crate::multiplayer_backend::ItemBlueprint;
-use crate::multiplayer_backend::PlayerIdentity;
+use crate::multiplayer_backend::{
+    ItemBlueprint,
+    PlayerIdentity,
+};
 
 #[test]
 fn weapon_sdf_fist_defaults() {
@@ -112,7 +114,8 @@ fn damage_number_pool_eviction() {
         if pool.active.len() >= MAX_DAMAGE_NUMBERS {
             pool.active.pop_front();
         }
-        pool.active.push_back(DamageNumber::new(i as i32, Vec3::ZERO, true));
+        pool.active
+            .push_back(DamageNumber::new(i as i32, Vec3::ZERO, true));
     }
     assert_eq!(pool.active.len(), MAX_DAMAGE_NUMBERS);
     assert_eq!(pool.active.front().unwrap().value, 10);
@@ -129,7 +132,9 @@ fn battle_glass_decays() {
     let t = effect.timer / BATTLE_GLASS_DURATION;
     effect.distortion = BATTLE_GLASS_MAX_DISTORTION * t;
     effect.tint_red = 0.3 * t;
-    assert!((effect.distortion - BATTLE_GLASS_MAX_DISTORTION * 0.5).abs() < 0.001);
+    assert!(
+        (effect.distortion - BATTLE_GLASS_MAX_DISTORTION * 0.5).abs() < 0.001
+    );
     assert!((effect.tint_red - 0.15).abs() < 0.001);
 }
 
@@ -152,7 +157,8 @@ fn player_vitals_smooth_animation() {
     let dt = 0.016;
     let speed = 8.0;
     for _ in 0..10 {
-        vitals.display_hp += (vitals.current_hp as f32 - vitals.display_hp) * speed * dt;
+        vitals.display_hp +=
+            (vitals.current_hp as f32 - vitals.display_hp) * speed * dt;
     }
     assert!(vitals.display_hp < 100.0);
     assert!(vitals.display_hp > 50.0);

@@ -1,8 +1,8 @@
 use super::{
+    super::*,
     add_atoms,
     tmp_manager,
 };
-use super::super::*;
 
 #[test]
 fn import_overwrite_false_fails_if_exists() {

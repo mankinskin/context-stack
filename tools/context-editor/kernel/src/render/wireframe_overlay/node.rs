@@ -26,22 +26,28 @@ impl Node for WireframeOverlayNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let Some(pipeline_res) = world.get_resource::<WireframeOverlayPipeline>() else {
+        let Some(pipeline_res) =
+            world.get_resource::<WireframeOverlayPipeline>()
+        else {
             return Ok(());
         };
-        let Some(bind_group) = world.get_resource::<WireframeOverlayBindGroup>() else {
+        let Some(bind_group) =
+            world.get_resource::<WireframeOverlayBindGroup>()
+        else {
             return Ok(());
         };
         let Some(pipeline_cache) = world.get_resource::<PipelineCache>() else {
             return Ok(());
         };
-        let Some(buffers) = world.get_resource::<WireframeOverlayBuffers>() else {
+        let Some(buffers) = world.get_resource::<WireframeOverlayBuffers>()
+        else {
             return Ok(());
         };
         if buffers.index_count == 0 {
             return Ok(());
         }
-        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0) else {
+        let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_res.0)
+        else {
             return Ok(());
         };
         let binding = self.view_query.query_manual(world);
@@ -82,7 +88,10 @@ impl Node for WireframeOverlayNode {
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group.0, &[]);
         pass.set_vertex_buffer(0, *buffers.vertex_buf.slice(..));
-        pass.set_index_buffer(*buffers.index_buf.slice(..), IndexFormat::Uint32);
+        pass.set_index_buffer(
+            *buffers.index_buf.slice(..),
+            IndexFormat::Uint32,
+        );
         pass.draw_indexed(0..buffers.index_count, 0, 0..1);
 
         Ok(())

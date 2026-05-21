@@ -53,7 +53,10 @@ fn validate_interaction_range_within() {
 
 #[test]
 fn validate_interaction_range_too_far() {
-    assert!(!validate_interaction_range((0.0, 0.0, 0.0), (20.0, 0.0, 0.0)));
+    assert!(!validate_interaction_range(
+        (0.0, 0.0, 0.0),
+        (20.0, 0.0, 0.0)
+    ));
 }
 
 #[test]
@@ -84,8 +87,12 @@ fn player_identity_local() {
 fn player_table_online_count() {
     let mut table = PlayerTable::default();
     assert_eq!(table.online_count(), 0);
-    table.players.insert(PlayerIdentity::new(1), PlayerRow::default());
-    table.players.insert(PlayerIdentity::new(2), PlayerRow::default());
+    table
+        .players
+        .insert(PlayerIdentity::new(1), PlayerRow::default());
+    table
+        .players
+        .insert(PlayerIdentity::new(2), PlayerRow::default());
     assert_eq!(table.online_count(), 2);
 }
 

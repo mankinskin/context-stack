@@ -2,11 +2,13 @@ use std::collections::HashSet;
 
 use crate::types::TokenRef;
 
-use super::tmp_manager;
-use super::super::{
-    execute,
-    Command,
-    CommandResult,
+use super::{
+    super::{
+        Command,
+        CommandResult,
+        execute,
+    },
+    tmp_manager,
 };
 
 #[test]
@@ -40,8 +42,7 @@ fn execute_list_workspaces_empty() {
 #[test]
 fn execute_get_atom() {
     let (_tmp, mut mgr) = tmp_manager();
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
 
     let result = execute(
         &mut mgr,
@@ -87,8 +88,7 @@ fn execute_get_atom() {
 #[test]
 fn execute_get_vertex() {
     let (_tmp, mut mgr) = tmp_manager();
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
     execute(
         &mut mgr,
         Command::AddAtom {
@@ -117,8 +117,7 @@ fn execute_get_vertex() {
 #[test]
 fn execute_delete_workspace() {
     let (_tmp, mut mgr) = tmp_manager();
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
     let result =
         execute(&mut mgr, Command::DeleteWorkspace { name: "ws".into() })
             .unwrap();
@@ -128,8 +127,7 @@ fn execute_delete_workspace() {
 #[test]
 fn execute_snapshot() {
     let (_tmp, mut mgr) = tmp_manager();
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
     execute(
         &mut mgr,
         Command::AddAtom {
@@ -157,8 +155,7 @@ fn execute_snapshot() {
 #[test]
 fn execute_insert_first_match_via_command() {
     let (_tmp, mut mgr) = tmp_manager();
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
 
     let chars: Vec<char> = vec!['a', 'b'];
     execute(
@@ -216,8 +213,7 @@ fn execute_insert_first_match_via_command() {
 #[test]
 fn execute_insert_sequences_via_command() {
     let (_tmp, mut mgr) = tmp_manager();
-    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() })
-        .unwrap();
+    execute(&mut mgr, Command::CreateWorkspace { name: "ws".into() }).unwrap();
 
     let texts: HashSet<String> =
         ["abc", "def"].iter().map(|s| s.to_string()).collect();

@@ -100,8 +100,12 @@ fn generate_chunk_above_terrain_empty() {
 fn tree_template_valid() {
     let tree = tree_template();
     assert!(!tree.voxels.is_empty());
-    let colors: std::collections::HashSet<u32> = tree.voxels.iter().map(|(_, color)| *color).collect();
-    assert!(colors.len() >= 2, "tree should have at least trunk + leaves");
+    let colors: std::collections::HashSet<u32> =
+        tree.voxels.iter().map(|(_, color)| *color).collect();
+    assert!(
+        colors.len() >= 2,
+        "tree should have at least trunk + leaves"
+    );
 }
 
 #[test]

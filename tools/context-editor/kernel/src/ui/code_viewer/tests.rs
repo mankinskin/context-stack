@@ -40,21 +40,31 @@ fn tokenize_empty_line() {
 #[test]
 fn tokenize_keyword() {
     let tokens = tokenize_rust_line("fn main");
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Plain && t.text == "main"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Keyword && t.text == "fn"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Plain && t.text == "main"));
 }
 
 #[test]
 fn tokenize_type() {
     let tokens = tokenize_rust_line("let x: u32");
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Keyword && t.text == "let"));
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Type && t.text == "u32"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Keyword && t.text == "let"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Type && t.text == "u32"));
 }
 
 #[test]
 fn tokenize_string_literal() {
     let tokens = tokenize_rust_line("let s = \"hello world\";");
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::String && t.text.contains("hello")));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::String && t.text.contains("hello")));
 }
 
 #[test]
@@ -68,20 +78,27 @@ fn tokenize_comment() {
 #[test]
 fn tokenize_number() {
     let tokens = tokenize_rust_line("42");
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Number && t.text == "42"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Number && t.text == "42"));
 }
 
 #[test]
 fn tokenize_escaped_string() {
     let tokens = tokenize_rust_line(r#"\"hello \\\"world\\\"\""#);
-    let string_tokens: Vec<_> = tokens.iter().filter(|t| t.kind == TokenKind::String).collect();
+    let string_tokens: Vec<_> = tokens
+        .iter()
+        .filter(|t| t.kind == TokenKind::String)
+        .collect();
     assert_eq!(string_tokens.len(), 1);
 }
 
 #[test]
 fn tokenize_operators() {
     let tokens = tokenize_rust_line("a + b");
-    assert!(tokens.iter().any(|t| t.kind == TokenKind::Operator && t.text == "+"));
+    assert!(tokens
+        .iter()
+        .any(|t| t.kind == TokenKind::Operator && t.text == "+"));
 }
 
 #[test]
@@ -96,7 +113,8 @@ fn source_file_new() {
 
 #[test]
 fn source_file_get_range() {
-    let file = SourceFile::new("t.rs".into(), "line0\nline1\nline2\nline3\nline4");
+    let file =
+        SourceFile::new("t.rs".into(), "line0\nline1\nline2\nline3\nline4");
     let range = file.get_range(1, 4);
     assert_eq!(range.len(), 3);
     assert_eq!(range[0], "line1");

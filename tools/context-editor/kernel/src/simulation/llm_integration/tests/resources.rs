@@ -217,9 +217,7 @@ fn result_queue_shader_result() {
                 .into(),
         function_name: "sd_custom".into(),
     });
-    if let Some(GenerationResult::Shader { function_name, .. }) =
-        queue.pop()
-    {
+    if let Some(GenerationResult::Shader { function_name, .. }) = queue.pop() {
         assert_eq!(function_name, "sd_custom");
     } else {
         panic!("Expected Shader result");

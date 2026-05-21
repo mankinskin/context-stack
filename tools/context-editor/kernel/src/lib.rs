@@ -125,7 +125,7 @@ pub fn register_world_presets(
             impl Into<String>,
             impl Fn(&mut bevy::prelude::World) + Send + Sync + 'static,
         ),
-    >,
+    >
 ) {
 }
 

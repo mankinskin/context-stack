@@ -89,7 +89,10 @@ fn sd_capsule_on_surface() {
         Vec3::new(0.0, 1.8, 0.0),
         0.3,
     );
-    assert!(d.abs() < 0.05, "point on capsule surface should have distance ~0, got {d}");
+    assert!(
+        d.abs() < 0.05,
+        "point on capsule surface should have distance ~0, got {d}"
+    );
 }
 
 #[test]
@@ -100,7 +103,10 @@ fn sd_capsule_inside() {
         Vec3::new(0.0, 1.8, 0.0),
         0.3,
     );
-    assert!(d < 0.0, "point inside capsule should have negative distance");
+    assert!(
+        d < 0.0,
+        "point inside capsule should have negative distance"
+    );
 }
 
 #[test]
@@ -111,7 +117,10 @@ fn sd_capsule_outside() {
         Vec3::new(0.0, 1.8, 0.0),
         0.3,
     );
-    assert!(d > 4.0, "point far from capsule should have large positive distance");
+    assert!(
+        d > 4.0,
+        "point far from capsule should have large positive distance"
+    );
 }
 
 #[test]

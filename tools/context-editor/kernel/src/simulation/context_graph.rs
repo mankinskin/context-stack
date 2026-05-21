@@ -16,9 +16,7 @@ pub use shapes::{
     ClusterShape,
 };
 
-use crate::svo::{
-    VoxelMaterial,
-};
+use crate::svo::VoxelMaterial;
 
 #[cfg(test)]
 pub(crate) use shapes::{

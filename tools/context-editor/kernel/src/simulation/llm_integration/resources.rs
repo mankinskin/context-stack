@@ -126,7 +126,9 @@ impl GenerationHistory {
         &self,
         content_id: u64,
     ) -> Option<&GeneratedContent> {
-        self.entries.iter().find(|entry| entry.content_id == content_id)
+        self.entries
+            .iter()
+            .find(|entry| entry.content_id == content_id)
     }
 
     pub fn count(&self) -> usize {
@@ -149,7 +151,9 @@ impl CustomShaderTable {
         &self,
         shader_id: u64,
     ) -> Option<&CustomShader> {
-        self.shaders.iter().find(|shader| shader.shader_id == shader_id)
+        self.shaders
+            .iter()
+            .find(|shader| shader.shader_id == shader_id)
     }
 
     pub fn add_or_update(

@@ -220,13 +220,9 @@ fn test_query_log() {
     let tmp = TempDir::new().unwrap();
     write_test_log(tmp.path(), "test.log", SAMPLE_LOG);
 
-    let (entries, total) = query_log(
-        tmp.path(),
-        "test.log",
-        "select(.level == \"ERROR\")",
-        100,
-    )
-    .unwrap();
+    let (entries, total) =
+        query_log(tmp.path(), "test.log", "select(.level == \"ERROR\")", 100)
+            .unwrap();
     assert_eq!(total, 1);
     assert_eq!(entries.len(), 1);
 }
@@ -308,11 +304,13 @@ fn test_list_logs_feature_flags() {
     assert!(snapshot_log.has_graph_snapshot);
     assert!(!snapshot_log.has_search_ops);
 
-    let search_log = logs.iter().find(|l| l.filename.contains("search")).unwrap();
+    let search_log =
+        logs.iter().find(|l| l.filename.contains("search")).unwrap();
     assert!(search_log.has_search_ops);
     assert!(!search_log.has_insert_ops);
 
-    let insert_log = logs.iter().find(|l| l.filename.contains("insert")).unwrap();
+    let insert_log =
+        logs.iter().find(|l| l.filename.contains("insert")).unwrap();
     assert!(insert_log.has_insert_ops);
     assert!(!insert_log.has_search_ops);
 

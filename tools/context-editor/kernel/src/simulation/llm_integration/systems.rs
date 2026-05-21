@@ -43,7 +43,10 @@ fn process_results_system(
                     creator: PlayerIdentity::local(),
                     prompt: String::new(),
                     mode: GenerationMode::VoxelStructure,
-                    result_data: format!("{{\"voxels_count\":{}}}", voxel_count),
+                    result_data: format!(
+                        "{{\"voxels_count\":{}}}",
+                        voxel_count
+                    ),
                     created_tick: 0,
                 });
             },

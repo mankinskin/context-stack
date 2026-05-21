@@ -44,7 +44,8 @@ fn identical_graphs_are_equivalent() {
 fn extra_vertex_in_b_is_divergent_full() {
     let snap_a = make_snap(vec![(0, "a", 1)], vec![]);
     let snap_b = make_snap(vec![(0, "a", 1), (1, "b", 1)], vec![]);
-    let result = compare_snapshots(&snap_a, "a", &snap_b, "b", CompareMode::Full);
+    let result =
+        compare_snapshots(&snap_a, "a", &snap_b, "b", CompareMode::Full);
     assert_eq!(result.summary.verdict, DiffVerdict::Divergent);
     assert_eq!(result.only_in_b.len(), 1);
     assert_eq!(result.only_in_b[0].label, "b");
@@ -52,8 +53,7 @@ fn extra_vertex_in_b_is_divergent_full() {
 
 #[test]
 fn b_subset_of_a_returns_subset_verdict() {
-    let snap_a =
-        make_snap(vec![(0, "a", 1), (1, "b", 1), (2, "c", 1)], vec![]);
+    let snap_a = make_snap(vec![(0, "a", 1), (1, "b", 1), (2, "c", 1)], vec![]);
     let snap_b = make_snap(vec![(0, "a", 1), (1, "b", 1)], vec![]);
     let result =
         compare_snapshots(&snap_a, "a", &snap_b, "b", CompareMode::Subset);
@@ -114,12 +114,7 @@ fn pattern_subset_in_b_counts_as_identical() {
             (4, "bc", 2),
             (5, "abc", 3),
         ],
-        vec![
-            (5, 3, 0, 0),
-            (5, 2, 0, 1),
-            (5, 0, 1, 0),
-            (5, 4, 1, 1),
-        ],
+        vec![(5, 3, 0, 0), (5, 2, 0, 1), (5, 0, 1, 0), (5, 4, 1, 1)],
     );
     let snap_b = make_snap(
         vec![
@@ -166,8 +161,14 @@ fn pattern_mismatch_no_common_pattern() {
     let abc = result.shared.iter().find(|sv| sv.label == "abc").unwrap();
     assert_eq!(abc.match_kind, VertexMatchKind::PatternMismatch);
     let diff = abc.pattern_diff.as_ref().unwrap();
-    assert_eq!(diff.only_in_a, vec![vec!["ab".to_string(), "c".to_string()]]);
-    assert_eq!(diff.only_in_b, vec![vec!["a".to_string(), "bc".to_string()]]);
+    assert_eq!(
+        diff.only_in_a,
+        vec![vec!["ab".to_string(), "c".to_string()]]
+    );
+    assert_eq!(
+        diff.only_in_b,
+        vec![vec!["a".to_string(), "bc".to_string()]]
+    );
     assert!(diff.common.is_empty());
 }
 
@@ -192,12 +193,7 @@ fn extra_patterns_in_b() {
             (4, "bc", 2),
             (5, "abc", 3),
         ],
-        vec![
-            (5, 3, 0, 0),
-            (5, 2, 0, 1),
-            (5, 0, 1, 0),
-            (5, 4, 1, 1),
-        ],
+        vec![(5, 3, 0, 0), (5, 2, 0, 1), (5, 0, 1, 0), (5, 4, 1, 1)],
     );
     let result =
         compare_snapshots(&snap_a, "a", &snap_b, "b", CompareMode::Full);

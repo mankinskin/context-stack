@@ -344,4 +344,3 @@ fn vertex_subgraph(
 
     Some(GraphSnapshot { nodes, edges })
 }
-

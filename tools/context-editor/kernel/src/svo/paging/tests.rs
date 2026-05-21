@@ -43,9 +43,13 @@ fn frustum_behind_camera_evicts_all_pages() {
     let reject_all = Frustum {
         planes: [Vec4::new(-1.0, 0.0, 0.0, -1e9); 6],
     };
-    let (_gpu_nodes, page_table) = page_manager.build(&world, Some(&reject_all));
+    let (_gpu_nodes, page_table) =
+        page_manager.build(&world, Some(&reject_all));
     for &base in &page_table {
-        assert_eq!(base, 0xFFFF_FFFF, "rejecting frustum should evict all pages");
+        assert_eq!(
+            base, 0xFFFF_FFFF,
+            "rejecting frustum should evict all pages"
+        );
     }
 }
 

@@ -95,5 +95,8 @@ fn child_index_all_combinations() {
             }
         }
     }
-    assert!(seen.iter().all(|&present| present), "all 8 slots must be covered");
+    assert!(
+        seen.iter().all(|&present| present),
+        "all 8 slots must be covered"
+    );
 }

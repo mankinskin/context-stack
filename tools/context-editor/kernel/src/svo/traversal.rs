@@ -52,7 +52,14 @@ impl VoxelWorld {
             let cx = if slot & 1 != 0 { ox + half } else { ox };
             let cy = if slot & 2 != 0 { oy + half } else { oy };
             let cz = if slot & 4 != 0 { oz + half } else { oz };
-            self.fill_positions(first_child + slot, cx, cy, cz, child_size, out);
+            self.fill_positions(
+                first_child + slot,
+                cx,
+                cy,
+                cz,
+                child_size,
+                out,
+            );
         }
     }
 
@@ -139,7 +146,13 @@ impl VoxelWorld {
         pos: IVec3,
     ) -> f32 {
         self.descend_to(pos)
-            .map(|idx| if self.nodes[idx].color_data != 0 { 1.0 } else { 0.0 })
+            .map(|idx| {
+                if self.nodes[idx].color_data != 0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
             .unwrap_or(0.0)
     }
 }

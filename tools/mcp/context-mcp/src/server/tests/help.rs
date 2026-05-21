@@ -43,8 +43,8 @@ async fn test_help_specific_command() {
         .expect("help should not fail");
     let text = extract_text(&result);
 
-    let parsed: serde_json::Value = serde_json::from_str(&text)
-        .expect("help output should be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).expect("help output should be valid JSON");
     assert_eq!(parsed["name"], "insert_sequence");
     assert_eq!(parsed["category"], "insert");
     assert!(parsed["summary"].as_str().unwrap().len() > 0);
@@ -72,8 +72,7 @@ async fn test_help_unknown_command_fuzzy() {
     let text = extract_text(&result);
 
     assert!(
-        text.contains("insert_sequence")
-            || text.contains("insert_first_match"),
+        text.contains("insert_sequence") || text.contains("insert_first_match"),
         "should suggest commands containing 'insert': {text}"
     );
 }

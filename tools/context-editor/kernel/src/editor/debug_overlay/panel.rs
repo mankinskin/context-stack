@@ -52,15 +52,22 @@ pub fn DebugPanel() -> Element {
         .unwrap_or_else(|| "?".to_string());
 
     let mut free_fly = use_signal(|| FREE_FLY_ENABLED.load(Ordering::Relaxed));
-    let mut neighbor_blend = use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
-    let mut shadow_rays = use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
-    let mut reflection_rays = use_signal(|| REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed));
-    let mut wireframe_en = use_signal(|| WIREFRAME_ENABLED.load(Ordering::Relaxed));
+    let mut neighbor_blend =
+        use_signal(|| NEIGHBOR_BLEND_ENABLED.load(Ordering::Relaxed));
+    let mut shadow_rays =
+        use_signal(|| SHADOW_RAYS_ENABLED.load(Ordering::Relaxed));
+    let mut reflection_rays =
+        use_signal(|| REFLECTION_RAYS_ENABLED.load(Ordering::Relaxed));
+    let mut wireframe_en =
+        use_signal(|| WIREFRAME_ENABLED.load(Ordering::Relaxed));
     let mut depth = use_signal(|| WIREFRAME_DEPTH.load(Ordering::Relaxed));
-    let mut occupied = use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
+    let mut occupied =
+        use_signal(|| WIREFRAME_OCCUPIED.load(Ordering::Relaxed));
     let mut lod_en = use_signal(|| LOD_ENABLED.load(Ordering::Relaxed));
-    let mut lod_thresh = use_signal(|| LOD_THRESHOLD_X1000.load(Ordering::Relaxed));
-    let mut lod_soft = use_signal(|| LOD_SOFTNESS_X1000.load(Ordering::Relaxed));
+    let mut lod_thresh =
+        use_signal(|| LOD_THRESHOLD_X1000.load(Ordering::Relaxed));
+    let mut lod_soft =
+        use_signal(|| LOD_SOFTNESS_X1000.load(Ordering::Relaxed));
 
     rsx! {
         GlassPanel { title: "Debug".to_string(),

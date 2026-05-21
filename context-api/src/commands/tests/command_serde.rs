@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use crate::types::TokenRef;
 
 use super::super::{
-    export_import,
     Command,
+    export_import,
 };
 
 #[test]

@@ -186,12 +186,14 @@ pub fn upload_wireframe_data(
         return;
     };
 
-    let max_vertices = (MAX_WIREFRAME_CUBES * WIREFRAME_VERTS_PER_CUBE as u64)
-        as usize;
-    let max_indices = (MAX_WIREFRAME_CUBES * WIREFRAME_INDICES_PER_CUBE as u64)
-        as usize;
-    let corners = &wire_data.corners[..wire_data.corners.len().min(max_vertices)];
-    let indices = &wire_data.indices[..wire_data.indices.len().min(max_indices)];
+    let max_vertices =
+        (MAX_WIREFRAME_CUBES * WIREFRAME_VERTS_PER_CUBE as u64) as usize;
+    let max_indices =
+        (MAX_WIREFRAME_CUBES * WIREFRAME_INDICES_PER_CUBE as u64) as usize;
+    let corners =
+        &wire_data.corners[..wire_data.corners.len().min(max_vertices)];
+    let indices =
+        &wire_data.indices[..wire_data.indices.len().min(max_indices)];
 
     buffers.index_count = indices.len() as u32;
 
@@ -344,4 +346,3 @@ pub fn rebuild_wireframe_bind_group(
     );
     commands.insert_resource(WireframeOverlayBindGroup(bind_group));
 }
-

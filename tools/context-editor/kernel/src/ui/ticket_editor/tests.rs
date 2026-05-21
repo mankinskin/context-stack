@@ -37,9 +37,15 @@ fn ticket_state_unknown_defaults_new() {
 
 #[test]
 fn priority_roughness_order() {
-    assert!(Priority::Critical.glass_roughness() < Priority::High.glass_roughness());
-    assert!(Priority::High.glass_roughness() < Priority::Medium.glass_roughness());
-    assert!(Priority::Medium.glass_roughness() < Priority::Low.glass_roughness());
+    assert!(
+        Priority::Critical.glass_roughness() < Priority::High.glass_roughness()
+    );
+    assert!(
+        Priority::High.glass_roughness() < Priority::Medium.glass_roughness()
+    );
+    assert!(
+        Priority::Medium.glass_roughness() < Priority::Low.glass_roughness()
+    );
 }
 
 #[test]
@@ -51,8 +57,14 @@ fn priority_from_str() {
 
 #[test]
 fn edge_kind_colors_distinct() {
-    assert_ne!(EdgeKind::DependsOn.edge_color(), EdgeKind::Blocks.edge_color());
-    assert_ne!(EdgeKind::Blocks.edge_color(), EdgeKind::RelatedTo.edge_color());
+    assert_ne!(
+        EdgeKind::DependsOn.edge_color(),
+        EdgeKind::Blocks.edge_color()
+    );
+    assert_ne!(
+        EdgeKind::Blocks.edge_color(),
+        EdgeKind::RelatedTo.edge_color()
+    );
 }
 
 #[test]
@@ -319,7 +331,8 @@ fn voxel_line_single_point() {
 
 #[test]
 fn voxel_line_horizontal() {
-    let line = voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(5.0, 0.0, 0.0));
+    let line =
+        voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(5.0, 0.0, 0.0));
     assert!(line.len() >= 5);
     assert_eq!(line[0], (0, 0, 0));
     assert_eq!(*line.last().unwrap(), (5, 0, 0));
@@ -331,7 +344,8 @@ fn voxel_line_horizontal() {
 
 #[test]
 fn voxel_line_diagonal() {
-    let line = voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(3.0, 3.0, 3.0));
+    let line =
+        voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(3.0, 3.0, 3.0));
     assert!(!line.is_empty());
     assert_eq!(line[0], (0, 0, 0));
     assert_eq!(*line.last().unwrap(), (3, 3, 3));
@@ -339,7 +353,8 @@ fn voxel_line_diagonal() {
 
 #[test]
 fn voxel_line_no_duplicates() {
-    let line = voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(10.0, 5.0, 3.0));
+    let line =
+        voxel_line_3d(Vec3::new(0.0, 0.0, 0.0), Vec3::new(10.0, 5.0, 3.0));
     for i in 1..line.len() {
         assert_ne!(line[i], line[i - 1], "Duplicate entry at index {}", i);
     }

@@ -118,7 +118,8 @@ impl SourceFile {
         content: &str,
     ) -> Self {
         let language = Language::from_path(&path);
-        let lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+        let lines: Vec<String> =
+            content.lines().map(|line| line.to_string()).collect();
         Self {
             path,
             language,
@@ -189,7 +190,8 @@ impl CodePanel {
         delta_lines: i32,
         total_lines: usize,
     ) {
-        let new_start = (self.visible_start as i32 + delta_lines).max(0) as usize;
+        let new_start =
+            (self.visible_start as i32 + delta_lines).max(0) as usize;
         let window = self.visible_line_count();
         let max_start = total_lines.saturating_sub(window);
         self.visible_start = new_start.min(max_start);

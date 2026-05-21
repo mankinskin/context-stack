@@ -16,9 +16,7 @@ mod sdf;
 pub use plugin::SkillPlugin;
 pub use sdf::SpellSdf;
 
-use crate::multiplayer_backend::{
-    PlayerIdentity,
-};
+use crate::multiplayer_backend::PlayerIdentity;
 
 #[cfg(test)]
 pub(crate) use sdf::sd_capsule_line;

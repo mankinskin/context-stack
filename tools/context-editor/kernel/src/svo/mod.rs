@@ -309,4 +309,3 @@ fn merge_ranges(sorted: &[(usize, usize)]) -> Vec<(usize, usize)> {
     }
     out
 }
-

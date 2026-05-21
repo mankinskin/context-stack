@@ -8,21 +8,19 @@
 //! atomics: the UI writes settings, and the Bevy system reads them each frame.
 
 use bevy::prelude::*;
-use std::{
-    sync::atomic::{
-        AtomicBool,
-        AtomicI32,
-        AtomicU32,
-        AtomicU64,
-        Ordering,
-    },
+use std::sync::atomic::{
+    AtomicBool,
+    AtomicI32,
+    AtomicU32,
+    AtomicU64,
+    Ordering,
 };
 
 mod panel;
 mod plugin;
-mod wireframe;
 #[cfg(test)]
 mod tests;
+mod wireframe;
 
 pub use panel::DebugPanel;
 pub use plugin::DebugOverlayPlugin;
@@ -226,7 +224,7 @@ fn init_platform_info() {
 
 /// Write camera world position and orientation into shared atomics each frame.
 fn track_camera_state(
-    camera_q: Query<(&Transform, Option<&CharacterController>), With<Camera3d>>,
+    camera_q: Query<(&Transform, Option<&CharacterController>), With<Camera3d>>
 ) {
     let Ok((tf, ctrl)) = camera_q.single() else {
         return;
@@ -253,10 +251,8 @@ fn track_svo_state(
     generator: Option<Res<WorldGenerator>>,
 ) {
     SVO_NODE_COUNT.store(voxel_world.nodes.len() as u64, Ordering::Relaxed);
-    SVO_DIRTY_RANGES.store(
-        voxel_world.dirty_ranges.len() as u32,
-        Ordering::Relaxed,
-    );
+    SVO_DIRTY_RANGES
+        .store(voxel_world.dirty_ranges.len() as u32, Ordering::Relaxed);
     SVO_MAX_DEPTH.store(voxel_world.max_depth, Ordering::Relaxed);
     if let Some(generator) = generator {
         let seed = generator.seed;

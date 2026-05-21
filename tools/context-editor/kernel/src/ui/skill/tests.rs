@@ -28,8 +28,12 @@ fn mana_cost_minimum_clamp() {
 
 #[test]
 fn base_radius_varies_by_type() {
-    assert!(SpellType::Gravity.base_radius() > SpellType::Fireball.base_radius());
-    assert!(SpellType::Shield.base_radius() > SpellType::Lightning.base_radius());
+    assert!(
+        SpellType::Gravity.base_radius() > SpellType::Fireball.base_radius()
+    );
+    assert!(
+        SpellType::Shield.base_radius() > SpellType::Lightning.base_radius()
+    );
 }
 
 #[test]

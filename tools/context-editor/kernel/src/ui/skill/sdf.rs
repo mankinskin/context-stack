@@ -43,9 +43,8 @@ impl SpellSdf {
         p: Vec3,
     ) -> f32 {
         match self {
-            SpellSdf::Fireball { center, radius, .. } => {
-                (p - *center).length() - radius
-            }
+            SpellSdf::Fireball { center, radius, .. } =>
+                (p - *center).length() - radius,
             SpellSdf::Shield {
                 center,
                 outer_radius,
@@ -53,15 +52,14 @@ impl SpellSdf {
                 ..
             } => {
                 let d_outer = (p - *center).length() - outer_radius;
-                let d_inner = (p - *center).length() - (outer_radius - thickness);
+                let d_inner =
+                    (p - *center).length() - (outer_radius - thickness);
                 d_outer.max(-d_inner)
-            }
-            SpellSdf::Frost { center, radius, .. } => {
-                (p - *center).length() - radius
-            }
-            SpellSdf::Gravity { center, radius, .. } => {
-                (p - *center).length() - radius
-            }
+            },
+            SpellSdf::Frost { center, radius, .. } =>
+                (p - *center).length() - radius,
+            SpellSdf::Gravity { center, radius, .. } =>
+                (p - *center).length() - radius,
             SpellSdf::Lightning {
                 origin,
                 direction,
@@ -72,7 +70,7 @@ impl SpellSdf {
                 let dir = direction.normalize_or_zero();
                 let end = *origin + dir * *length;
                 sd_capsule_line(p, *origin, end, *radius)
-            }
+            },
         }
     }
 }

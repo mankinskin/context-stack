@@ -8,8 +8,10 @@ use crate::{
     types::WorkspaceInfo,
 };
 
-use super::tmp_manager;
-use super::super::WorkspaceApi;
+use super::{
+    super::WorkspaceApi,
+    tmp_manager,
+};
 
 #[test]
 fn workspace_api_trait_is_object_safe_enough() {

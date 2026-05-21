@@ -13,12 +13,12 @@
 //!                          swap() ──────▶   pointer flip, < 0.01 ms
 //! ```
 
+mod double_bind_groups;
 pub mod svo_page_table;
 pub mod svo_transform;
-mod double_bind_groups;
+pub use double_bind_groups::DoubleBindGroups;
 pub use svo_page_table::SvoPageTableBuffer;
 pub use svo_transform::SvoTransformBuffer;
-pub use double_bind_groups::DoubleBindGroups;
 
 use bevy::{
     prelude::Resource,
