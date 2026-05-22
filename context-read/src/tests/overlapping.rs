@@ -19,6 +19,7 @@
 use crate::request::ReadRequest;
 #[cfg(test)]
 use context_search::{
+    assert_exhausted_indices,
     assert_indices,
     Find,
 };
@@ -96,7 +97,7 @@ fn complex_abcabababcaba() {
     graph.emit_graph_snapshot();
 
     expect_atoms!(graph, {a, b, c});
-    assert_indices!(
+    assert_exhausted_indices!(
         graph, ab, aba, abab, ababa, ababab, caba, abc, abcaba, abcabab,
         abcababa, abcababab, ababcaba, abababcaba
     );

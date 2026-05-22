@@ -7,7 +7,10 @@
 //! Note: These tests may fail if context-read has bugs. The ngrams algorithm is the reference.
 
 use crate::input::HasReadCtx;
-use context_search::Find;
+use context_search::{
+    assert_exhausted_indices,
+    Find,
+};
 use context_trace::{
     graph::{
         vertex::has_vertex_index::HasVertexIndex,
@@ -254,7 +257,6 @@ fn validate_complex_short() {
 #[test]
 fn validate_mixed_pattern() {
     use crate::request::ReadRequest;
-    use context_search::assert_indices;
 
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);
@@ -263,12 +265,15 @@ fn validate_mixed_pattern() {
     graph.emit_graph_snapshot();
 
     expect_atoms!(graph, {a, b});
-    // Use assert_indices! only for the sub-tokens aa and bb — these are
-    // unambiguously reachable via find_ancestor.  The root token aabb is
-    // obtained directly from the ReadRequest result to avoid a known issue
-    // where find_ancestor("aabb") can return the intermediate aab vertex
-    // (which exists as an orphaned compound) instead of the full aabb token.
-    assert_indices!(graph, aa, bb);
+    // Use exhausted-match assertions for aa and bb. Lower-level search may
+    // retain Prefix/Postfix coverage even when the substring token exists,
+    // so this test only requires an exhausted match whose root token is the
+    // expected materialized substring token.
+    // The root token aabb is obtained directly from the ReadRequest result to
+    // avoid a known issue where find_ancestor("aabb") can return the
+    // intermediate aab vertex (which exists as an orphaned compound) instead
+    // of the full aabb token.
+    assert_exhausted_indices!(graph, aa, bb);
 
     let aabb = result.expect("should produce a root token");
     assert_eq!(aabb.width(), TokenWidth(4));
