@@ -20,9 +20,9 @@ use crate::{
 
 /// Represents a request to read a sequence into the hypergraph.
 ///
-/// `ReadRequest` provides a structured way to specify what should be read
-/// and how. It can be created from various input types (strings, patterns, etc.)
-/// and processed by the reading context.
+/// `ReadRequest` provides a structured way to specify what should be read and
+/// how. It is a data-oriented wrapper around the same `ReadCtx` pipeline used
+/// by the crate-level `read()` entry point.
 ///
 /// # Example
 /// ```rust,ignore
@@ -79,7 +79,11 @@ impl ReadRequest {
 
     /// Execute this read request on the given graph.
     ///
-    /// Returns the root token of the inserted/found sequence, or None if the
+    /// The request is forwarded into `ReadCtx`, which may materialize new
+    /// overlap tokens and additional decompositions while it consumes the
+    /// sequence left-to-right.
+    ///
+    /// Returns the root token of the inserted/found sequence, or `None` if the
     /// input was empty.
     #[allow(dead_code)]
     pub(crate) fn execute(

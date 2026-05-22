@@ -17,6 +17,10 @@ pub(crate) struct RootManager {
     #[deref]
     #[deref_mut]
     pub(crate) graph: HypergraphRef,
+    /// Materialized token covering everything committed so far.
+    ///
+    /// This is the running root for the current read, not a promise that the
+    /// token has only one decomposition.
     #[new(default)]
     pub(crate) root: Option<Token>,
     /// The last token committed by `commit_state`: T2 for `WithOverlap`, the
@@ -27,7 +31,8 @@ pub(crate) struct RootManager {
     /// `true` while the root is a flat, work-in-progress container built
     /// exclusively by `append_token` / `append_pattern` (unknown-atom path).
     /// Such a root may be extended in-place without invalidating semantic
-    /// compound tokens.  Cleared to `false` by every `commit_state` call.
+    /// compound tokens. Cleared to `false` by every overlap-aware
+    /// `commit_state` call.
     #[new(default)]
     pub(crate) flat_root: bool,
 }
@@ -137,6 +142,17 @@ impl RootManager {
     // commit_state — dispatch over BandState variants
     // -------------------------------------------------------------------------
 
+    /// Materialize one expansion step into the running root.
+    ///
+    /// `BandState::Single` handles the no-overlap case for the current step.
+    /// `BandState::WithOverlap` handles the overlap bundle produced by the
+    /// expansion logic. In both cases the commit happens immediately so the next
+    /// overlap search sees up-to-date graph state and anchor context.
+    ///
+    /// This method does not define a canonical ordering over child patterns.
+    /// It only updates the root/anchor state needed to continue the left-to-
+    /// right read.
+
     pub(crate) fn commit_state(
         &mut self,
         state: BandState,
@@ -242,16 +258,15 @@ impl RootManager {
     ///
     /// Symmetric-pattern rule (`aaa` family):
     ///   When `old_root`'s own child pattern equals `[last_child, token]`, the
-    ///   two-atom span IS the old root.  In that case we reuse `old_root` as the
-    ///   `combined` token (no new vertex allocated) and record both valid adjacent
-    ///   binary decompositions:
-    ///     - `[..prefix.., old_root]`   (primary, always created)
-    ///     - `[old_root, token]`        (symmetric, added as a second pattern)
+    ///   two-atom span IS the old root. In that case we reuse `old_root` as the
+    ///   `combined` token (no new vertex allocated) and record the additional
+    ///   valid adjacent decomposition `[old_root, token]` alongside the pattern
+    ///   produced by the root rebuild.
     ///
     ///   Example: old_root = `aa = [[a, a]]`, last_child = `a`, token = `a`
     ///     old_root pattern == [last_child, token] → reuse old_root as combined
-    ///     primary pattern  : `[a, aa]`
-    ///     symmetric pattern: `[aa, a]`  ← added here
+    ///     rebuilt pattern : `[a, aa]`
+    ///     added peer path : `[aa, a]`
     ///
     ///   This avoids creating a duplicate `aa` vertex (which `insert_pattern`
     ///   would do because it always allocates a fresh vertex).
@@ -319,15 +334,14 @@ impl RootManager {
             "commit_state: tail extension — rebuilt root"
         );
 
-        // Symmetric-pattern insertion (`aaa` family):
+        // Additional adjacent-pattern insertion (`aaa` family):
         //
         // When old_root IS the two-atom span (detected above), the new root has
-        // two equally-valid adjacent binary decompositions:
-        //   - `[..prefix.., combined]`  (primary, already built above)
-        //   - `[old_root, token]`       (symmetric — added here)
+        // another valid adjacent binary decomposition `[old_root, token]` in
+        // addition to the rebuilt pattern added above.
         //
-        // Because combined == old_root in this branch, the symmetric pattern is
-        // exactly [combined, token] = [old_root, token].
+        // Because combined == old_root in this branch, the added pattern is
+        // exactly `[combined, token]`.
         if old_root_is_span {
             if let Some(or) = old_root {
                 let symmetric_pat =
@@ -357,7 +371,8 @@ impl RootManager {
     /// Append a pattern of new atom indices to the root.
     ///
     /// Used exclusively by the unknown-atom segment path; not called from the
-    /// expansion loop.
+    /// overlap-expansion loop. This path may keep the root flat and extendable
+    /// until the read reaches a semantic overlap/materialization step.
     pub(crate) fn append_pattern(
         &mut self,
         new: Pattern,
@@ -392,7 +407,7 @@ impl RootManager {
 
     /// Append a single token to the root.
     ///
-    /// Used exclusively by the unknown-atom segment path.  Extends the root
+    /// Used exclusively by the unknown-atom segment path. Extends the root
     /// in-place only when `flat_root` is `true`; otherwise wraps the semantic
     /// root in a new compound via `insert_pattern`.
     #[context_trace::instrument_sig(skip(self, token))]

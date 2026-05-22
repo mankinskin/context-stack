@@ -30,6 +30,11 @@ pub use pipeline::{
 
 /// One-shot entry point: read `input` into `graph` and return the root token.
 ///
+/// This is a thin convenience wrapper over `ReadCtx::new(...).read_sequence()`.
+/// The returned token is the materialized root for the consumed input span.
+/// The graph may store multiple first-class decompositions for that token; this
+/// entry point does not choose or expose a canonical child-pattern ordering.
+///
 /// Returns `None` when the input is empty.
 ///
 /// # Example

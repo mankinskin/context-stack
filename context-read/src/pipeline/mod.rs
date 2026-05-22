@@ -74,9 +74,9 @@ impl SegmentResult {
 /// Context for reading sequences and building the hypergraph.
 ///
 /// `ReadCtx` is the top-level orchestrator of the read pipeline. It owns a
-/// `RootManager` (which tracks the running root token) and a `SegmentIter`
-/// (which partitions the input atom stream into alternating unknown/known
-/// chunks).
+/// `RootManager` (which tracks the running root token, overlap anchor, and
+/// flat-root state) and a `SegmentIter` (which partitions the input atom stream
+/// into alternating unknown/known chunks).
 ///
 /// ## Eager vs Lazy
 ///
@@ -86,13 +86,16 @@ impl SegmentResult {
 ///   resolved to atoms **on demand** as segments are consumed. This enables
 ///   streaming input and bounded memory usage.
 ///
-/// Both paths produce identical results — the only difference is when atom
-/// resolution occurs.
+/// Both paths feed the same overlap-expansion logic. The only difference is
+/// when atom resolution occurs.
 #[derive(Debug)]
 pub struct ReadCtx {
-    /// The root manager (Option to allow taking it for BlockExpansionCtx)
+    /// The mutable root/anchor state for the read currently in progress.
+    ///
+    /// Stored as `Option` so ownership can be temporarily transferred into
+    /// `BlockExpansionCtx` during known-block expansion.
     root: Option<RootManager>,
-    /// Iterator over segments of unknown/known atoms.
+    /// Iterator over alternating unknown/known segments.
     ///
     /// This is an `ErasedSegmentIter` (type-erased via `Box<dyn Iterator>`)
     /// to keep the public API simple regardless of whether the backing
@@ -185,8 +188,12 @@ impl ReadCtx {
 
     /// Read the full sequence, consuming all segments.
     ///
-    /// Returns the final root token after all segments have been processed,
-    /// or `None` if the input was empty.
+    /// Unknown runs are appended directly. Known runs are expanded one
+    /// materialized overlap step at a time until the whole input has been
+    /// committed into the running root.
+    ///
+    /// Returns the final root token after all segments have been processed, or
+    /// `None` if the input was empty.
     pub fn read_sequence(&mut self) -> Option<Token> {
         // Consume all segments via the Iterator impl (which calls read_segment)
         self.find_map(|_| None as Option<()>);
@@ -194,6 +201,11 @@ impl ReadCtx {
     }
 
     /// Read the next segment and return a structured `SegmentResult`.
+    ///
+    /// A segment may contain only new atoms, only known atoms, or an unknown
+    /// prefix followed by a known run. Known runs are delegated to
+    /// `BlockExpansionCtx`, which materializes every overlap-expansion step
+    /// before returning control.
     ///
     /// Returns `None` when all segments have been consumed.
     pub fn read_next_segment(&mut self) -> Option<SegmentResult> {
