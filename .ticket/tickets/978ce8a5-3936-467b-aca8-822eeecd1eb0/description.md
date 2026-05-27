@@ -1,15 +1,45 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#algorithm` `#expansion` `#overlap` `#refactoring`
-summary: Redesign the ExpansionCtx inner loop so it drives insert_next_match in a cursor-advancing loop over known-atom segments, correctly handles the new/known classification boundary, and collects a tight set of decomposition patterns from all detected overlaps.
+summary: Orchestrate the spec-first reconciliation of context-read expansion so it reuses lower-crate postfix/search/insert primitives and materializes blocks without bespoke root surgery.
 status: 🔄 in-progress
-phase: 2-implementation
-design: 20260315_DESIGN_ROOT_UPDATE_STEPS.md
-parent: 20260314_PLAN_CONTEXT_READ_UX_IMPROVEMENT.md
-related: 20260315_PLAN_INTEGRATION_TEST_REMEDIATION.md, 20260314_PLAN_INSERT_NEXT_MATCH.md, 20260314_PLAN_APPEND_TO_PATTERN_FIX.md
-priority: top — this is the core algorithm fix that unblocks RC-1, RC-2, RC-3 and all 20 ignored integration tests
+phase: 1-spec-and-design-reconciliation
+related: 20260315_PLAN_CONTEXT_READ_RESTRUCTURE.md, 20260315_PLAN_COMPLEMENT_AND_C3.md
+priority: top — current umbrella plan for the 2026-05-25 reconciliation tickets and the remaining read-algorithm cleanup
 ---
 
 # Plan: Expansion Loop Redesign — `insert_next_match` Cursor Loop inside `ExpansionCtx`
+
+## 2026-05-25 Update
+
+This ticket now acts as the umbrella implementation plan for the read-algorithm
+reconciliation work. The old RC-1 / RC-2 / RC-3 analysis remains useful as
+historical context, but it is no longer the authoritative execution order.
+
+### Current execution order
+
+1. Replace bespoke postfix witness discovery with trace-owned traversal.
+2. Replace root surgery with structural block materialization.
+3. Separate requested-range materialization from wrapper-range replacement in
+  the split or merge plan used by `context-insert`.
+4. Unify overlap bundling under one structural formula.
+5. Revisit prior roots when later reads materialize tighter overlap subparts.
+6. Layer `context-read` tests after the primitive patterns already used in
+   `context-trace`, `context-search`, and `context-insert`.
+
+### Sequencing rules
+
+- Treat the spec chain as authoritative; current shortcut code is not the
+  contract.
+- Treat dirty-cut replacement as a wrapper-splice problem: the requested token
+  and the parent replacement token may be different ranges.
+- Do not let helper wrapper ranges become new authoritative clean split
+  boundaries unless the underlying witness is genuinely clean.
+- Keep C3 and broader chain buffering work deferred until the semantic repair
+  tickets above are green.
+- Do not use broad failing read tests as the design source of truth when they
+  conflict with the block/postfix/overlap algorithm.
+- Reuse lower-crate primitives instead of duplicating witness traversal,
+  overlap search, or bundle materialization in `context-read`.
 
 **Date:** 2026-03-15
 **Scope:** Medium (algorithm change in `context-read`; call-site ripple into `context-api`)
@@ -47,6 +77,18 @@ Fix the read/insert pipeline so that:
 3. The new/known classification is preserved as the correct boundary control —
    new atoms are concatenated directly without overlap search; known atoms go
    through the expansion loop.
+
+## 2026-05-26 implementation note
+
+The remaining overlap failures now require an explicit representation for dirty
+cut replacement:
+
+- `context-read` still chooses the next block by the same block/postfix/overlap
+  algorithm.
+- `context-insert` must explicitly model the difference between the requested
+  token range and the wrapper range that gets spliced into the parent pattern.
+- The umbrella plan therefore treats root-surgery removal and wrapper-splice
+  planning as adjacent but separate slices.
 
 ---
 
