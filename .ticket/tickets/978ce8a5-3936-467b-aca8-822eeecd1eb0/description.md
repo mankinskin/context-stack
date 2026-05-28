@@ -19,8 +19,8 @@ historical context, but it is no longer the authoritative execution order.
 
 1. Replace bespoke postfix witness discovery with trace-owned traversal.
 2. Replace root surgery with structural block materialization.
-3. Separate requested-range materialization from wrapper-range replacement in
-  the split or merge plan used by `context-insert`.
+3. Separate requested-range materialization from any beneficial wrapper-backed
+  replacement in the split or merge plan used by `context-insert`.
 4. Unify overlap bundling under one structural formula.
 5. Revisit prior roots when later reads materialize tighter overlap subparts.
 6. Layer `context-read` tests after the primitive patterns already used in
@@ -30,8 +30,9 @@ historical context, but it is no longer the authoritative execution order.
 
 - Treat the spec chain as authoritative; current shortcut code is not the
   contract.
-- Treat dirty-cut replacement as a wrapper-splice problem: the requested token
-  and the parent replacement token may be different ranges.
+- Treat dirty-cut replacement as a direct-or-wrapper root update problem: the
+  requested token and the parent replacement token may differ, but wrappers are
+  only valid when they are beneficial rather than redundant.
 - Do not let helper wrapper ranges become new authoritative clean split
   boundaries unless the underlying witness is genuinely clean.
 - Keep C3 and broader chain buffering work deferred until the semantic repair
@@ -86,9 +87,25 @@ cut replacement:
 - `context-read` still chooses the next block by the same block/postfix/overlap
   algorithm.
 - `context-insert` must explicitly model the difference between the requested
-  token range and the wrapper range that gets spliced into the parent pattern.
+  token range, the pattern-local witnesses at the tight root, and any wrapper
+  range that is actually beneficial enough to splice into the parent pattern.
 - The umbrella plan therefore treats root-surgery removal and wrapper-splice
   planning as adjacent but separate slices.
+
+### Spec anchors
+
+Current reviewed merge requirements and examples live in:
+
+- [context-read pipeline](../../../../.spec/specs/e0913182-7a5e-4c8f-a750-799afd58baae/body.md)
+- [graph induction](../../../../.spec/specs/16c3ad95-451d-4c09-a118-ca90bcefed9a/body.md)
+
+Use those sections as the source of truth for:
+
+- the tight-root invariant, which means every valid merge updates the root;
+- per-pattern witnesses across multiple root child patterns;
+- wrapper-benefit gating;
+- inner partition materialization and the focused validation cases that should
+  land before the broad read regressions are revisited.
 
 ---
 
