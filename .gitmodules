@@ -1,6 +1,0 @@
-[submodule "deps/petgraph"]
-	path = deps/petgraph
-	url = https://github.com/mankinskin/petgraph
-[submodule "deps/justlog"]
-	path = deps/justlog
-	url = https://github.com/mankinskin/justlog

@@ -74,8 +74,7 @@ features = ["derive"]
 version = "^0.34"
 
 [dependencies.petgraph]
-#git = "https://github.com/mankinskin/petgraph"
-path = "../deps/petgraph"
+git = "https://github.com/mankinskin/petgraph"
 
 [dependencies.pretty_assertions]
 features = ["unstable"]
