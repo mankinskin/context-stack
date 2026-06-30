@@ -78,7 +78,7 @@ pub(super) async fn execute_command_impl(
                 error: None,
                 trace: trace_summary,
             };
-            let json = serde_json::to_string_pretty(&output).map_err(|e| {
+            let json = serde_json::to_string(&output).map_err(|e| {
                 McpError::internal_error(
                     format!("Serialization failed: {e}"),
                     None,
@@ -94,7 +94,7 @@ pub(super) async fn execute_command_impl(
                 error: Some(format!("{api_error}")),
                 trace: None,
             };
-            let json = serde_json::to_string_pretty(&output).map_err(|e| {
+            let json = serde_json::to_string(&output).map_err(|e| {
                 McpError::internal_error(
                     format!("Serialization failed: {e}"),
                     None,
@@ -117,7 +117,7 @@ pub(super) async fn help_command_impl(
     if let Some(ref cmd_name) = input.command {
         let needle = cmd_name.to_lowercase();
         if let Some(cmd) = commands.iter().find(|c| c.name == needle) {
-            let json = serde_json::to_string_pretty(cmd).map_err(|e| {
+            let json = serde_json::to_string(cmd).map_err(|e| {
                 McpError::internal_error(
                     format!("Serialization failed: {e}"),
                     None,
@@ -267,7 +267,7 @@ pub(super) async fn workflow_command_impl(
     // Build the requested workflow
     match build_workflow(&name, &input.workspace) {
         Some(wf) => {
-            let json = serde_json::to_string_pretty(&wf).map_err(|e| {
+            let json = serde_json::to_string(&wf).map_err(|e| {
                 McpError::internal_error(
                     format!("Serialization failed: {e}"),
                     None,
