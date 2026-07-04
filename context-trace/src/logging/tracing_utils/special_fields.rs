@@ -5,6 +5,7 @@
 //! format_event without parsing formatted strings.
 
 use tracing::{
+    Span,
     Subscriber,
     field::{
         Field,
@@ -35,6 +36,24 @@ pub struct SpecialFields {
     pub associated_types: Vec<(String, String)>,
 }
 
+/// Correlation identifiers captured from span attributes.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CorrelationFields {
+    pub operation_id: Option<String>,
+    pub run_id: Option<String>,
+    pub session_id: Option<String>,
+    pub journal_id: Option<String>,
+}
+
+impl CorrelationFields {
+    fn has_any(&self) -> bool {
+        self.operation_id.is_some()
+            || self.run_id.is_some()
+            || self.session_id.is_some()
+            || self.journal_id.is_some()
+    }
+}
+
 impl SpecialFields {
     fn has_any(&self) -> bool {
         self.fn_sig.is_some()
@@ -56,6 +75,7 @@ pub fn is_special_field(name: &str) -> bool {
 #[derive(Default)]
 struct SpecialFieldVisitor {
     fields: SpecialFields,
+    correlation: CorrelationFields,
 }
 
 impl SpecialFieldVisitor {
@@ -73,6 +93,17 @@ impl SpecialFieldVisitor {
                     .associated_types
                     .push((name.to_string(), value.to_string()));
             },
+            _ => {},
+        }
+
+        match name {
+            "operation_id" =>
+                self.correlation.operation_id = Some(value.to_string()),
+            "run_id" => self.correlation.run_id = Some(value.to_string()),
+            "session_id" =>
+                self.correlation.session_id = Some(value.to_string()),
+            "journal_id" =>
+                self.correlation.journal_id = Some(value.to_string()),
             _ => {},
         }
     }
@@ -104,6 +135,30 @@ impl Visit for SpecialFieldVisitor {
 /// so that special fields are available when `format_event` runs.
 pub struct SpecialFieldExtractor;
 
+/// Read correlation fields from the currently entered span, if available.
+pub fn current_correlation_fields() -> CorrelationFields {
+    let mut fields = CorrelationFields::default();
+
+    Span::current().with_subscriber(|(id, subscriber)| {
+        let Some(registry) =
+            subscriber.downcast_ref::<tracing_subscriber::registry::Registry>()
+        else {
+            return;
+        };
+
+        let Some(span_ref) = registry.span(id) else {
+            return;
+        };
+
+        if let Some(ext_fields) = span_ref.extensions().get::<CorrelationFields>()
+        {
+            fields = ext_fields.clone();
+        }
+    });
+
+    fields
+}
+
 impl<S> Layer<S> for SpecialFieldExtractor
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
@@ -119,6 +174,9 @@ where
             attrs.record(&mut visitor);
             if visitor.fields.has_any() {
                 span.extensions_mut().insert(visitor.fields);
+            }
+            if visitor.correlation.has_any() {
+                span.extensions_mut().insert(visitor.correlation);
             }
         }
     }

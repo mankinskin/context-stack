@@ -6182,6 +6182,7 @@ dependencies = [
 [[package]]
 name = "petgraph"
 version = "0.8.2"
+source = "git+https://github.com/mankinskin/petgraph#9fe7e95ccc34c7bc9b72377d5fcc715bd432325d"
 dependencies = [
  "fixedbitset 0.5.7",
  "hashbrown 0.15.5",

@@ -6,6 +6,8 @@
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::logging::tracing_utils::current_correlation_fields;
+
 use super::search_path::{
     EdgeRef,
     VizPathGraph,
@@ -451,6 +453,144 @@ pub struct GraphMutation {
     pub ops: Vec<DeltaOp>,
 }
 
+// ---------------------------------------------------------------------------
+// Graph Replay Envelope (v1)
+// ---------------------------------------------------------------------------
+
+/// Current replay envelope schema version.
+pub const GRAPH_REPLAY_SCHEMA_V1: &str = "graph-replay/v1";
+
+/// Deterministic replay step payload for one graph operation frame.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
+pub struct GraphReplayStep {
+    /// Monotonically increasing step index within the operation stream.
+    pub step: usize,
+    /// Transition to apply for this frame.
+    pub transition: Transition,
+    /// Location hints for node/edge highlighting.
+    pub location: LocationInfo,
+    /// Query cursor context for search/read operations.
+    pub query: QueryInfo,
+    /// Human-readable description for this step.
+    pub description: String,
+    /// Snapshot-after transition for deterministic rendering.
+    pub path_graph: VizPathGraph,
+    /// Optional graph mutation payload (insert/update operations).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub graph_mutation: Option<GraphMutation>,
+}
+
+/// Replay envelope used by log-viewer to reconstruct operation playback.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
+pub struct GraphReplayEnvelope {
+    /// Replay schema version.
+    pub schema_version: String,
+    /// Canonical operation identifier (currently `path_id`).
+    pub operation_id: String,
+    /// Path-scoped stream identifier used by existing graph-op consumers.
+    pub path_id: String,
+    /// Operation category.
+    pub op_type: OperationType,
+    /// Optional cross-store correlation identifiers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub journal_id: Option<String>,
+    /// Deterministic replay frame.
+    pub step: GraphReplayStep,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ReplayCorrelationIds {
+    operation_id: Option<String>,
+    run_id: Option<String>,
+    session_id: Option<String>,
+    journal_id: Option<String>,
+}
+
+fn parse_query_pairs(input: &str) -> impl Iterator<Item = (&str, &str)> {
+    input.split('&').filter_map(|pair| {
+        let (k, v) = pair.split_once('=')?;
+        Some((k.trim(), v.trim()))
+    })
+}
+
+fn extract_correlation_ids(path_id: &str) -> ReplayCorrelationIds {
+    let mut ids = ReplayCorrelationIds::default();
+
+    // Support query-style metadata in path_id, e.g.
+    // search/context-search/token-7-123?operation_id=op-1&run_id=r-1
+    if let Some((_, query)) = path_id.split_once('?') {
+        for (key, value) in parse_query_pairs(query) {
+            if value.is_empty() {
+                continue;
+            }
+            match key {
+                "operation_id" => ids.operation_id = Some(value.to_string()),
+                "run_id" => ids.run_id = Some(value.to_string()),
+                "session_id" => ids.session_id = Some(value.to_string()),
+                "journal_id" => ids.journal_id = Some(value.to_string()),
+                _ => {},
+            }
+        }
+    }
+
+    // Support semicolon KV suffixes, e.g.
+    // .../token-7-123;run_id=r-1;session_id=s-1
+    if path_id.contains(';') {
+        for segment in path_id.split(';').skip(1) {
+            if let Some((key, value)) = segment.split_once('=') {
+                let value = value.trim();
+                if value.is_empty() {
+                    continue;
+                }
+                match key.trim() {
+                    "operation_id" if ids.operation_id.is_none() =>
+                        ids.operation_id = Some(value.to_string()),
+                    "run_id" if ids.run_id.is_none() =>
+                        ids.run_id = Some(value.to_string()),
+                    "session_id" if ids.session_id.is_none() =>
+                        ids.session_id = Some(value.to_string()),
+                    "journal_id" if ids.journal_id.is_none() =>
+                        ids.journal_id = Some(value.to_string()),
+                    _ => {},
+                }
+            }
+        }
+    }
+
+    let span_ids = current_correlation_fields();
+    if ids.operation_id.is_none() {
+        ids.operation_id = span_ids.operation_id;
+    }
+    if ids.run_id.is_none() {
+        ids.run_id = span_ids.run_id;
+    }
+    if ids.session_id.is_none() {
+        ids.session_id = span_ids.session_id;
+    }
+    if ids.journal_id.is_none() {
+        ids.journal_id = span_ids.journal_id;
+    }
+
+    // Environment fallback for callers that scope correlation at process level.
+    if ids.run_id.is_none() {
+        ids.run_id = std::env::var("CONTEXT_RUN_ID").ok();
+    }
+    if ids.session_id.is_none() {
+        ids.session_id = std::env::var("CONTEXT_SESSION_ID").ok();
+    }
+    if ids.journal_id.is_none() {
+        ids.journal_id = std::env::var("CONTEXT_JOURNAL_ID").ok();
+    }
+
+    ids
+}
+
 impl GraphMutation {
     /// Create a mutation with a single operation.
     pub fn single(op: DeltaOp) -> Self {
@@ -526,6 +666,30 @@ pub struct GraphOpEvent {
 }
 
 impl GraphOpEvent {
+    /// Convert this graph-op event into the `graph-replay/v1` envelope.
+    pub fn to_replay_envelope(&self) -> GraphReplayEnvelope {
+        let ids = extract_correlation_ids(&self.path_id);
+
+        GraphReplayEnvelope {
+            schema_version: GRAPH_REPLAY_SCHEMA_V1.to_string(),
+            operation_id: ids.operation_id.unwrap_or_else(|| self.path_id.clone()),
+            path_id: self.path_id.clone(),
+            op_type: self.op_type,
+            run_id: ids.run_id,
+            session_id: ids.session_id,
+            journal_id: ids.journal_id,
+            step: GraphReplayStep {
+                step: self.step,
+                transition: self.transition.clone(),
+                location: self.location.clone(),
+                query: self.query.clone(),
+                description: self.description.clone(),
+                path_graph: self.path_graph.clone(),
+                graph_mutation: self.graph_mutation.clone(),
+            },
+        }
+    }
+
     /// Emit this event as a structured tracing log entry.
     ///
     /// The log-viewer frontend detects events by the presence of the
@@ -533,8 +697,11 @@ impl GraphOpEvent {
     /// human-readable description.
     pub fn emit(&self) {
         let json = serde_json::to_string(self).unwrap_or_default();
+        let replay_json = serde_json::to_string(&self.to_replay_envelope())
+            .unwrap_or_default();
         tracing::info!(
             graph_op = %json,
+            graph_replay = %replay_json,
             step = self.step,
             op_type = ?self.op_type,
             "{}",
@@ -696,5 +863,145 @@ impl QueryInfo {
             matched_positions: Vec::new(),
             active_token: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replay_envelope_uses_v1_schema_and_path_id_as_operation_id() {
+        let event = GraphOpEvent {
+            step: 7,
+            op_type: OperationType::Search,
+            transition: Transition::Done {
+                final_node: Some(42),
+                success: true,
+            },
+            location: LocationInfo::default(),
+            query: QueryInfo::default(),
+            description: "done".to_string(),
+            path_id: "search/context-search/token-42".to_string(),
+            path_graph: VizPathGraph::default(),
+            graph_mutation: None,
+        };
+
+        let envelope = event.to_replay_envelope();
+        assert_eq!(envelope.schema_version, GRAPH_REPLAY_SCHEMA_V1);
+        assert_eq!(envelope.operation_id, event.path_id);
+        assert_eq!(envelope.path_id, "search/context-search/token-42");
+        assert_eq!(envelope.op_type, OperationType::Search);
+        assert_eq!(envelope.step.step, 7);
+        assert_eq!(envelope.step.transition, event.transition);
+    }
+
+    #[test]
+    fn replay_envelope_preserves_optional_mutation_payload() {
+        let mutation = GraphMutation::single(DeltaOp::AddNode {
+            index: 9,
+            width: 3,
+        });
+        let event = GraphOpEvent {
+            step: 1,
+            op_type: OperationType::Insert,
+            transition: Transition::CreateRoot {
+                node: PathNode {
+                    index: 9,
+                    width: 3,
+                },
+            },
+            location: LocationInfo::default(),
+            query: QueryInfo::default(),
+            description: "create root".to_string(),
+            path_id: "insert/context-insert/op-1".to_string(),
+            path_graph: VizPathGraph::default(),
+            graph_mutation: Some(mutation.clone()),
+        };
+
+        let envelope = event.to_replay_envelope();
+        assert_eq!(envelope.step.graph_mutation, Some(mutation));
+    }
+
+    #[test]
+    fn replay_envelope_extracts_ids_from_query_suffix() {
+        let event = GraphOpEvent {
+            step: 1,
+            op_type: OperationType::Read,
+            transition: Transition::Done {
+                final_node: Some(9),
+                success: true,
+            },
+            location: LocationInfo::default(),
+            query: QueryInfo::default(),
+            description: "done".to_string(),
+            path_id: "read/context-read/token-9-123?operation_id=op-9&run_id=run-1&session_id=s-1&journal_id=j-1".to_string(),
+            path_graph: VizPathGraph::default(),
+            graph_mutation: None,
+        };
+
+        let envelope = event.to_replay_envelope();
+        assert_eq!(envelope.operation_id, "op-9");
+        assert_eq!(envelope.run_id.as_deref(), Some("run-1"));
+        assert_eq!(envelope.session_id.as_deref(), Some("s-1"));
+        assert_eq!(envelope.journal_id.as_deref(), Some("j-1"));
+    }
+
+    #[test]
+    fn replay_envelope_extracts_ids_from_semicolon_suffix() {
+        let event = GraphOpEvent {
+            step: 1,
+            op_type: OperationType::Read,
+            transition: Transition::Done {
+                final_node: Some(9),
+                success: true,
+            },
+            location: LocationInfo::default(),
+            query: QueryInfo::default(),
+            description: "done".to_string(),
+            path_id: "read/context-read/token-9-123;operation_id=op-9;run_id=run-1;session_id=s-1;journal_id=j-1".to_string(),
+            path_graph: VizPathGraph::default(),
+            graph_mutation: None,
+        };
+
+        let envelope = event.to_replay_envelope();
+        assert_eq!(envelope.operation_id, "op-9");
+        assert_eq!(envelope.run_id.as_deref(), Some("run-1"));
+        assert_eq!(envelope.session_id.as_deref(), Some("s-1"));
+        assert_eq!(envelope.journal_id.as_deref(), Some("j-1"));
+    }
+
+    #[test]
+    fn replay_envelope_reads_correlation_from_active_span() {
+        let _tracing = crate::init_test_tracing!();
+        let span = tracing::info_span!(
+            "replay_scope",
+            operation_id = "op-span",
+            run_id = "run-span",
+            session_id = "session-span",
+            journal_id = "journal-span"
+        );
+        let _entered = span.enter();
+
+        let event = GraphOpEvent {
+            step: 2,
+            op_type: OperationType::Read,
+            transition: Transition::Done {
+                final_node: Some(3),
+                success: true,
+            },
+            location: LocationInfo::default(),
+            query: QueryInfo::default(),
+            description: "done".to_string(),
+            path_id: "read/context-read/token-3-123".to_string(),
+            path_graph: VizPathGraph::default(),
+            graph_mutation: None,
+        };
+
+        let envelope = event.to_replay_envelope();
+        assert_eq!(envelope.operation_id, "op-span");
+        assert_eq!(envelope.run_id.as_deref(), Some("run-span"));
+        assert_eq!(envelope.session_id.as_deref(), Some("session-span"));
+        assert_eq!(envelope.journal_id.as_deref(), Some("journal-span"));
     }
 }

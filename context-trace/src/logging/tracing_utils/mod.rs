@@ -32,7 +32,11 @@ pub use debug_to_json::{
     new_signature_store,
 };
 pub use span_fields::SpanFieldFormatter;
-pub use special_fields::SpecialFieldExtractor;
+pub use special_fields::{
+    CorrelationFields,
+    SpecialFieldExtractor,
+    current_correlation_fields,
+};
 pub use test_tracing::TestTracing;
 pub use writers::{
     FlushingWriter,
