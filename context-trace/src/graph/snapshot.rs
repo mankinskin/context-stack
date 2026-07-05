@@ -106,8 +106,9 @@ where
         let json = serde_json::to_string(&snapshot).unwrap_or_default();
         tracing::info!(
             graph_data = %json,
-            node_count = snapshot.nodes.len(),
-            edge_count = snapshot.edges.len(),
+            nodes = snapshot.nodes.len(),
+            edges = snapshot.edges.len(),
+            operation = "graph_snapshot",
             "graph_snapshot"
         );
     }

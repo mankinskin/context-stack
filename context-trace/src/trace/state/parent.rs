@@ -37,10 +37,10 @@ impl StateAdvance for ParentState {
         let entry = self.path.graph_root_child_location();
         let graph = trav.graph();
         let pattern = self.path.root_pattern::<G>(&graph).clone();
-        if let Some(next_i) =
+        if let Some(next_index) =
             TravDir::<G>::pattern_index_next(pattern.borrow(), entry.sub_index)
         {
-            tracing::debug!(next_i = next_i, "Found next child in pattern");
+            tracing::debug!(next_index, "Found next child in pattern");
             let root_parent = self.clone();
             let ParentState {
                 path,
@@ -52,7 +52,7 @@ impl StateAdvance for ParentState {
                     entry_pos: root_pos,
                     exit_pos: root_pos.0.into(),
                     start_pos: prev_pos.0, // Use prev_pos for start path tracing
-                    path: path.into_range(next_i),
+                    path: path.into_range(next_index),
                 },
                 root_parent,
             })

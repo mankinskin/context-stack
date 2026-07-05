@@ -58,7 +58,7 @@ impl<T: SearchKind> Iterator for CompareIterator<T> {
             match cs.compare_leaf_tokens(&self.children.trav) {
                 Prefixes(next) => {
                     tracing::debug!(
-                        num_prefixes = next.len(),
+                        prefix_count = next.len(),
                         "got Prefixes, extending queue"
                     );
                     self.children.queue.extend(next);

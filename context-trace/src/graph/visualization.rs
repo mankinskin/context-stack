@@ -703,7 +703,8 @@ impl GraphOpEvent {
             graph_op = %json,
             graph_replay = %replay_json,
             step = self.step,
-            op_type = ?self.op_type,
+            operation_type = ?self.op_type,
+            operation = "graph_op_event",
             "{}",
             self.description,
         );

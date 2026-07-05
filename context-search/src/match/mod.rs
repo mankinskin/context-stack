@@ -206,7 +206,7 @@ where
             },
             Prefixes(next) => {
                 tracing::debug!(
-                    num_prefixes = next.len(),
+                    prefix_count = next.len(),
                     "got Prefixes, extending queue"
                 );
                 let prefix_children: Vec<PrefixChildInfo> = next

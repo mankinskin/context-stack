@@ -291,7 +291,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
 
                 trace!(
                     mode = "GraphMajor",
-                    num_prefixes = prefixes.len(),
+                    prefix_count = prefixes.len(),
                     checkpoint_pos = %checkpoint_pos,
                     "decomposing graph path token into prefixes (position-annotated)"
                 );
@@ -354,7 +354,7 @@ impl CompareState<Candidate, Candidate, PositionAnnotated<ChildLocation>> {
                     mode = "QueryMajor",
                     cursor_pos = %self.query.current().atom_position,
                     base_pos = %base_position,
-                    num_prefixes = cursor_prefixes.len(),
+                    prefix_count = cursor_prefixes.len(),
                     "decomposing query cursor token into prefixes (position-annotated)"
                 );
 
