@@ -159,40 +159,18 @@ impl WorkspaceManager {
             return self.read_pattern(ws_name, token.index.0);
         }
 
-        // Multi-character path: use context-read's ReadCtx
-        {
-            let ws = self.get_workspace(ws_name).map_err(|_| {
-                ReadError::WorkspaceNotOpen {
-                    workspace: ws_name.to_string(),
-                }
-            })?;
-            let graph_ref = ws.graph_ref();
-
-            let mut read_ctx =
-                context_read::pipeline::ReadCtx::new(graph_ref, text.chars());
-
-            let root_token = read_ctx.read_sequence();
-
-            match root_token {
-                Some(token) => {
-                    // Mark workspace dirty (atoms may have been created)
-                    drop(read_ctx);
-                    let ws = self.get_workspace_mut(ws_name).map_err(|_| {
-                        ReadError::WorkspaceNotOpen {
-                            workspace: ws_name.to_string(),
-                        }
-                    })?;
-                    ws.mark_dirty();
-
-                    // Build PatternReadResult from the root token
-                    self.read_pattern(ws_name, token.index.0)
+        let insert = self.insert_sequence(ws_name, text).map_err(|error| {
+            match error {
+                crate::error::InsertError::WorkspaceNotOpen { workspace } => {
+                    ReadError::WorkspaceNotOpen { workspace }
                 },
-                None => Err(ReadError::InternalError(format!(
-                    "read_sequence returned None for text of length \
-                     {char_count}"
-                ))),
+                other => ReadError::InternalError(format!(
+                    "insert_sequence failed while reading {text:?}: {other}"
+                )),
             }
-        }
+        })?;
+
+        self.read_pattern(ws_name, insert.token.index)
     }
 
     /// Read a file's contents through the graph.

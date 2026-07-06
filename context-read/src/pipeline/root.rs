@@ -403,6 +403,10 @@ impl RootManager {
                     self.flat_root = true;
                 },
         }
+
+        if self.root.is_some() {
+            self.anchor = self.root;
+        }
     }
 
     /// Append a single token to the root.
@@ -435,6 +439,8 @@ impl RootManager {
             self.root = Some(token);
             self.flat_root = true;
         }
+
+        self.anchor = self.root;
     }
 
     /// Returns the rightmost token in the root's pattern, or the root itself

@@ -20,7 +20,8 @@ mod tests;
 
 use std::collections::HashSet;
 
-use context_read::pipeline::ReadCtx;
+use context_search::Find;
+use context_trace::graph::vertex::atom::Atom;
 use context_trace::graph::vertex::pattern::Pattern;
 use tracing::debug;
 
@@ -73,31 +74,24 @@ impl WorkspaceManager {
             "insert_first_match: resolved tokens"
         );
 
-        // Capture a snapshot of all known vertex indices before the read so
-        // we can determine whether anything new was created.
-        let pre_vertex_count = graph_ref.vertex_count();
-
-        // Delegate to the full ReadCtx pipeline via a Pattern of resolved tokens.
-        // This correctly handles the case where no composite exists yet (e.g.
-        // atoms [a, b] → creates new ab token) as well as idempotent re-insertion
-        // (returns the existing token when already present).
         let pattern = Pattern::from(tokens);
-        let token = ReadCtx::new(graph_ref.clone(), pattern)
-            .read_sequence()
-            .ok_or_else(|| {
-                InsertError::InternalError(
-                    "read_sequence returned no token for non-empty input"
-                        .to_string(),
-                )
-            })?;
 
-        let post_vertex_count = graph_ref.vertex_count();
-        let already_existed = post_vertex_count == pre_vertex_count;
+        let exact_match = graph_ref.find_ancestor(pattern.clone()).ok().filter(
+            |response| response.is_entire_root() && response.query_exhausted(),
+        );
+
+        let already_existed = exact_match.is_some();
+
+        let token = if let Some(response) = exact_match {
+            response.root_token()
+        } else {
+            graph_ref.insert_pattern(pattern)
+        };
 
         debug!(
             token = ?token,
             already_existed,
-            "insert_first_match: read_sequence complete"
+            "insert_first_match: exact insert complete"
         );
 
         // Mark workspace dirty if new vertices were created.
@@ -155,23 +149,31 @@ impl WorkspaceManager {
 
         debug!(
             text,
-            "insert_sequence: delegating to ReadCtx::read_sequence"
+            "insert_sequence: driving outer insert_next_match loop"
         );
 
         // Capture a snapshot of all known vertex indices before the read so
         // we can determine whether anything new was created.
         let pre_vertex_count = graph_ref.vertex_count();
 
-        // Delegate to the full read pipeline via ReadCtx.
-        // Collect chars to avoid lifetime issues with the &str borrow.
-        let token = ReadCtx::new(graph_ref.clone(), text.chars())
-            .read_sequence()
-            .ok_or_else(|| {
-                InsertError::InternalError(
-                    "read_sequence returned no token for non-empty input"
-                        .to_string(),
-                )
-            })?;
+        let atoms = text
+            .chars()
+            .map(|ch| {
+                graph_ref
+                    .get_atom_index(Atom::Element(ch))
+                    .map(|index| context_trace::Token::new(index, 1))
+                    .unwrap_or_else(|_| graph_ref.insert_atom(Atom::Element(ch)))
+            })
+            .collect::<Vec<_>>();
+
+        let atom_pattern = Pattern::from(atoms);
+        let token = if let Some(response) = graph_ref.find_ancestor(atom_pattern.clone()).ok().filter(
+            |response| response.is_entire_root() && response.query_exhausted(),
+        ) {
+            response.root_token()
+        } else {
+            graph_ref.insert_pattern(atom_pattern)
+        };
 
         let post_vertex_count = graph_ref.vertex_count();
         let already_existed = post_vertex_count == pre_vertex_count;
