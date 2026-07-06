@@ -293,10 +293,7 @@ struct PathStep {
 fn flatten_path_steps<R: PathRole>(
     path: &RootedRolePath<R, IndexRoot>
 ) -> Vec<PathStep> {
-    use context_trace::{
-        HasChildPath,
-        RootedPath,
-    };
+    use context_trace::HasChildPath;
 
     let child_path = path.child_path();
     let mut steps = Vec::with_capacity(child_path.len() + 1);

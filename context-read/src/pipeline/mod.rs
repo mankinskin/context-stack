@@ -15,7 +15,6 @@ use crate::{
         LazyAtomIter,
         NextSegment,
         SegmentIter,
-        ToNewAtomIndices,
     },
 };
 
