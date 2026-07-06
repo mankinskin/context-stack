@@ -62,67 +62,89 @@ impl From<ApiError> for HttpError {
     }
 }
 
+fn status_for_workspace_error(err: &WorkspaceError) -> StatusCode {
+    match err {
+        WorkspaceError::NotFound { .. } => StatusCode::NOT_FOUND,
+        WorkspaceError::AlreadyExists { .. } => StatusCode::CONFLICT,
+        WorkspaceError::NotOpen { .. } => StatusCode::BAD_REQUEST,
+        WorkspaceError::AlreadyOpen { .. } => StatusCode::CONFLICT,
+        WorkspaceError::LockConflict { .. } => StatusCode::LOCKED,
+        WorkspaceError::IoError(_)
+        | WorkspaceError::SerializationError(_)
+        | WorkspaceError::NgramsFailed { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+        WorkspaceError::NgramsTimeout { .. } => StatusCode::GATEWAY_TIMEOUT,
+    }
+}
+
+fn status_for_pattern_error(err: &PatternError) -> StatusCode {
+    match err {
+        PatternError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
+        PatternError::AtomNotFound { .. } => StatusCode::NOT_FOUND,
+        PatternError::VertexNotFound { .. } => StatusCode::NOT_FOUND,
+        PatternError::TooShort { .. }
+        | PatternError::DuplicateAtomInInput { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        PatternError::AtomAlreadyInPattern { .. } => StatusCode::CONFLICT,
+        PatternError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn status_for_search_error(err: &SearchError) -> StatusCode {
+    match err {
+        SearchError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
+        SearchError::TokenNotFound { .. } => StatusCode::NOT_FOUND,
+        SearchError::QueryTooShort => StatusCode::UNPROCESSABLE_ENTITY,
+        SearchError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn status_for_insert_error(err: &InsertError) -> StatusCode {
+    match err {
+        InsertError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
+        InsertError::TokenNotFound { .. } => StatusCode::NOT_FOUND,
+        InsertError::QueryTooShort => StatusCode::UNPROCESSABLE_ENTITY,
+        InsertError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn status_for_read_error(err: &ReadError) -> StatusCode {
+    match err {
+        ReadError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
+        ReadError::VertexNotFound { .. } => StatusCode::NOT_FOUND,
+        ReadError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        ReadError::SequenceTooShort { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        ReadError::FileReadError { .. } => StatusCode::BAD_REQUEST,
+    }
+}
+
+fn status_for_log_error(err: &LogError) -> StatusCode {
+    match err {
+        LogError::FileNotFound { .. } => StatusCode::NOT_FOUND,
+        LogError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        LogError::QueryError(_) => StatusCode::BAD_REQUEST,
+        LogError::DirectoryError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn status_for_compare_error(err: &context_api::error::CompareError) -> StatusCode {
+    match err {
+        context_api::error::CompareError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
+        context_api::error::CompareError::VertexNotFound { .. } => StatusCode::NOT_FOUND,
+    }
+}
+
 /// Map an `ApiError` to an HTTP status code.
 fn status_for_api_error(err: &ApiError) -> StatusCode {
     match err {
-        ApiError::Workspace(e) => match e {
-            WorkspaceError::NotFound { .. } => StatusCode::NOT_FOUND,
-            WorkspaceError::AlreadyExists { .. } => StatusCode::CONFLICT,
-            WorkspaceError::NotOpen { .. } => StatusCode::BAD_REQUEST,
-            WorkspaceError::AlreadyOpen { .. } => StatusCode::CONFLICT,
-            WorkspaceError::LockConflict { .. } => StatusCode::LOCKED,
-            WorkspaceError::IoError(_)
-            | WorkspaceError::SerializationError(_) =>
-                StatusCode::INTERNAL_SERVER_ERROR,
-            WorkspaceError::NgramsTimeout { .. } => StatusCode::GATEWAY_TIMEOUT,
-            WorkspaceError::NgramsFailed { .. } =>
-                StatusCode::INTERNAL_SERVER_ERROR,
-        },
+        ApiError::Workspace(e) => status_for_workspace_error(e),
         ApiError::Atom(e) => match e {
             AtomError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
         },
-        ApiError::Pattern(e) => match e {
-            PatternError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
-            PatternError::AtomNotFound { .. } => StatusCode::NOT_FOUND,
-            PatternError::VertexNotFound { .. } => StatusCode::NOT_FOUND,
-            PatternError::TooShort { .. }
-            | PatternError::DuplicateAtomInInput { .. } =>
-                StatusCode::UNPROCESSABLE_ENTITY,
-            PatternError::AtomAlreadyInPattern { .. } => StatusCode::CONFLICT,
-            PatternError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        },
-        ApiError::Search(e) => match e {
-            SearchError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
-            SearchError::TokenNotFound { .. } => StatusCode::NOT_FOUND,
-            SearchError::QueryTooShort => StatusCode::UNPROCESSABLE_ENTITY,
-            SearchError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        },
-        ApiError::Insert(e) => match e {
-            InsertError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
-            InsertError::TokenNotFound { .. } => StatusCode::NOT_FOUND,
-            InsertError::QueryTooShort => StatusCode::UNPROCESSABLE_ENTITY,
-            InsertError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        },
-        ApiError::Read(e) => match e {
-            ReadError::WorkspaceNotOpen { .. } => StatusCode::BAD_REQUEST,
-            ReadError::VertexNotFound { .. } => StatusCode::NOT_FOUND,
-            ReadError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ReadError::SequenceTooShort { .. } =>
-                StatusCode::UNPROCESSABLE_ENTITY,
-            ReadError::FileReadError { .. } => StatusCode::BAD_REQUEST,
-        },
-        ApiError::Log(e) => match e {
-            LogError::FileNotFound { .. } => StatusCode::NOT_FOUND,
-            LogError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            LogError::QueryError(_) => StatusCode::BAD_REQUEST,
-            LogError::DirectoryError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        },
-        ApiError::Compare(e) => match e {
-            context_api::error::CompareError::WorkspaceNotOpen { .. } =>
-                StatusCode::BAD_REQUEST,
-            context_api::error::CompareError::VertexNotFound { .. } =>
-                StatusCode::NOT_FOUND,
-        },
+        ApiError::Pattern(e) => status_for_pattern_error(e),
+        ApiError::Search(e) => status_for_search_error(e),
+        ApiError::Insert(e) => status_for_insert_error(e),
+        ApiError::Read(e) => status_for_read_error(e),
+        ApiError::Log(e) => status_for_log_error(e),
+        ApiError::Compare(e) => status_for_compare_error(e),
     }
 }
 

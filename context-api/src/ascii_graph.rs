@@ -28,6 +28,83 @@ pub enum AsciiRenderMode {
     Dag,
 }
 
+fn grammar_layout(
+    rules: &[AsciiOwnedRule],
+    id_by_label: &BTreeMap<String, usize>,
+) -> String {
+    let mut patterns_by_parent = BTreeMap::<String, Vec<Vec<String>>>::new();
+    for rule in rules {
+        patterns_by_parent
+            .entry(rule.parent.clone())
+            .or_default()
+            .extend(rule.patterns.clone());
+    }
+
+    let mut labels: Vec<String> = patterns_by_parent.keys().cloned().collect();
+    labels.sort_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
+
+    let mut leaf_labels: Vec<String> = id_by_label
+        .keys()
+        .filter(|label| !patterns_by_parent.contains_key(*label))
+        .cloned()
+        .collect();
+    leaf_labels.sort();
+
+    let token_width = labels.iter().map(|label| label.len() + 2).max().unwrap_or(0);
+    let mut out = String::new();
+    out.push_str("Grammar layout (aligned)\n");
+    if !leaf_labels.is_empty() {
+        out.push_str(&format!("Atoms: {}\n", leaf_labels.join(", ")));
+    }
+    out.push('\n');
+
+    for label in labels {
+        append_grammar_line(&mut out, &label, &patterns_by_parent, token_width);
+    }
+
+    out
+}
+
+fn append_grammar_line(
+    out: &mut String,
+    label: &str,
+    patterns_by_parent: &BTreeMap<String, Vec<Vec<String>>>,
+    token_width: usize,
+) {
+    let mut patterns = patterns_by_parent.get(label).cloned().unwrap_or_default();
+    patterns.sort();
+
+    if patterns.is_empty() {
+        out.push_str(&format!(
+            "{:<token_width$} -> (leaf)\n",
+            format!("({})", label),
+            token_width = token_width
+        ));
+        return;
+    }
+
+    let rendered_patterns = patterns
+        .iter()
+        .map(|pattern| format!("[{}]", pattern.join(", ")))
+        .collect::<Vec<_>>();
+
+    if rendered_patterns.len() == 1 {
+        out.push_str(&format!(
+            "{:<token_width$} -> {}\n",
+            format!("({})", label),
+            rendered_patterns[0],
+            token_width = token_width
+        ));
+    } else {
+        out.push_str(&format!(
+            "{:<token_width$} -> {{ {} }}\n",
+            format!("({})", label),
+            rendered_patterns.join(", "),
+            token_width = token_width
+        ));
+    }
+}
+
 pub fn render_layered_ascii(
     rules: &[AsciiRule<'_>]
 ) -> Result<String, AsciiRenderError> {
@@ -93,73 +170,7 @@ pub fn render_layered_ascii_owned_with_mode(
     }
 
     match mode {
-        AsciiRenderMode::Grammar => {
-            let mut patterns_by_parent =
-                BTreeMap::<String, Vec<Vec<String>>>::new();
-            for rule in rules {
-                patterns_by_parent
-                    .entry(rule.parent.clone())
-                    .or_default()
-                    .extend(rule.patterns.clone());
-            }
-
-            let mut labels: Vec<String> =
-                patterns_by_parent.keys().cloned().collect();
-            labels.sort_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
-
-            let mut leaf_labels: Vec<String> = id_by_label
-                .keys()
-                .filter(|label| !patterns_by_parent.contains_key(*label))
-                .cloned()
-                .collect();
-            leaf_labels.sort();
-
-            let token_width = labels
-                .iter()
-                .map(|label| label.len() + 2)
-                .max()
-                .unwrap_or(0);
-
-            let mut out = String::new();
-            out.push_str("Grammar layout (aligned)\n");
-            if !leaf_labels.is_empty() {
-                out.push_str(&format!("Atoms: {}\n", leaf_labels.join(", ")));
-            }
-            out.push('\n');
-            for label in labels {
-                let mut patterns =
-                    patterns_by_parent.get(&label).cloned().unwrap_or_default();
-                patterns.sort();
-                if patterns.is_empty() {
-                    out.push_str(&format!(
-                        "{:<token_width$} -> (leaf)\n",
-                        format!("({})", label),
-                        token_width = token_width
-                    ));
-                } else {
-                    let rendered_patterns = patterns
-                        .iter()
-                        .map(|pattern| format!("[{}]", pattern.join(", ")))
-                        .collect::<Vec<_>>();
-                    if rendered_patterns.len() == 1 {
-                        out.push_str(&format!(
-                            "{:<token_width$} -> {}\n",
-                            format!("({})", label),
-                            rendered_patterns[0],
-                            token_width = token_width
-                        ));
-                    } else {
-                        out.push_str(&format!(
-                            "{:<token_width$} -> {{ {} }}\n",
-                            format!("({})", label),
-                            rendered_patterns.join(", "),
-                            token_width = token_width
-                        ));
-                    }
-                }
-            }
-            Ok(out)
-        },
+        AsciiRenderMode::Grammar => Ok(grammar_layout(rules, &id_by_label)),
         AsciiRenderMode::Dag => Ok(graph.render()),
     }
 }

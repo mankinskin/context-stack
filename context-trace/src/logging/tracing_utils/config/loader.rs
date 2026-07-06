@@ -16,6 +16,76 @@ use std::{
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 
+fn parse_env_bool(var: &str) -> Option<bool> {
+    env::var(var)
+        .ok()
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+}
+
+fn parse_env_bool_with_legacy(
+    primary: &str,
+    legacy: &str,
+) -> Option<bool> {
+    parse_env_bool(primary).or_else(|| parse_env_bool(legacy))
+}
+
+fn apply_span_enter_env(config: &mut FormatConfig) {
+    if let Some(value) = parse_env_bool("TRACING_SPAN_ENTER_SHOW") {
+        config.span_enter.show = value;
+    }
+    if let Some(value) = parse_env_bool_with_legacy(
+        "TRACING_SPAN_ENTER_SHOW_FN_SIGNATURE",
+        "TRACING_SHOW_FN_SIGNATURE",
+    ) {
+        config.span_enter.show_fn_signature = value;
+    }
+    if let Some(value) = parse_env_bool_with_legacy(
+        "TRACING_SPAN_ENTER_SHOW_FIELDS",
+        "TRACING_SHOW_SPAN_FIELDS",
+    ) {
+        config.span_enter.show_fields = value;
+    }
+}
+
+fn apply_span_close_env(config: &mut FormatConfig) {
+    if let Some(value) = parse_env_bool("TRACING_SPAN_CLOSE_SHOW") {
+        config.span_close.show = value;
+    }
+    if let Some(value) = parse_env_bool_with_legacy(
+        "TRACING_SPAN_CLOSE_SHOW_TIMING",
+        "TRACING_SHOW_SPAN_TIMING",
+    ) {
+        config.span_close.show_timing = value;
+    }
+}
+
+fn apply_panic_env(config: &mut FormatConfig) {
+    if let Some(value) = parse_env_bool("TRACING_PANIC_SHOW") {
+        config.panic.show = value;
+    }
+    if let Some(value) = parse_env_bool("TRACING_PANIC_SHOW_MESSAGE") {
+        config.panic.show_message = value;
+    }
+    if let Some(value) = parse_env_bool("TRACING_PANIC_SHOW_STDERR") {
+        config.panic.show_stderr = value;
+    }
+    if let Some(value) = parse_env_bool("TRACING_PANIC_SHOW_DEFAULT_HOOK") {
+        config.panic.show_default_hook = value;
+    }
+}
+
+fn apply_general_format_env(config: &mut FormatConfig) {
+    if let Some(value) = parse_env_bool("TRACING_ENABLE_INDENTATION") {
+        config.enable_indentation = value;
+    }
+    if let Some(value) = parse_env_bool("TRACING_SHOW_FILE_LOCATION") {
+        config.show_file_location = value;
+    }
+    if let Some(value) = parse_env_bool("TRACING_ENABLE_ANSI") {
+        config.enable_ansi = value;
+    }
+}
+
 impl FormatConfig {
     /// Load configuration from a TOML file
     ///
@@ -177,71 +247,10 @@ impl FormatConfig {
     pub fn from_env() -> Self {
         let mut config = Self::default();
 
-        // Span enter configuration
-        if let Ok(val) = env::var("TRACING_SPAN_ENTER_SHOW") {
-            config.span_enter.show =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_SPAN_ENTER_SHOW_FN_SIGNATURE") {
-            config.span_enter.show_fn_signature =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        } else if let Ok(val) = env::var("TRACING_SHOW_FN_SIGNATURE") {
-            // Legacy name
-            config.span_enter.show_fn_signature =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_SPAN_ENTER_SHOW_FIELDS") {
-            config.span_enter.show_fields =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        } else if let Ok(val) = env::var("TRACING_SHOW_SPAN_FIELDS") {
-            // Legacy name
-            config.span_enter.show_fields =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-
-        // Span close configuration
-        if let Ok(val) = env::var("TRACING_SPAN_CLOSE_SHOW") {
-            config.span_close.show =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_SPAN_CLOSE_SHOW_TIMING") {
-            config.span_close.show_timing =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        } else if let Ok(val) = env::var("TRACING_SHOW_SPAN_TIMING") {
-            // Legacy name
-            config.span_close.show_timing =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-
-        // Panic configuration
-        if let Ok(val) = env::var("TRACING_PANIC_SHOW") {
-            config.panic.show = val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_PANIC_SHOW_MESSAGE") {
-            config.panic.show_message =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_PANIC_SHOW_STDERR") {
-            config.panic.show_stderr =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_PANIC_SHOW_DEFAULT_HOOK") {
-            config.panic.show_default_hook =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-
-        // General formatting configuration
-        if let Ok(val) = env::var("TRACING_ENABLE_INDENTATION") {
-            config.enable_indentation =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_SHOW_FILE_LOCATION") {
-            config.show_file_location =
-                val == "1" || val.eq_ignore_ascii_case("true");
-        }
-        if let Ok(val) = env::var("TRACING_ENABLE_ANSI") {
-            config.enable_ansi = val == "1" || val.eq_ignore_ascii_case("true");
-        }
+        apply_span_enter_env(&mut config);
+        apply_span_close_env(&mut config);
+        apply_panic_env(&mut config);
+        apply_general_format_env(&mut config);
 
         config
     }

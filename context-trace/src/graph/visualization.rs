@@ -519,50 +519,57 @@ fn parse_query_pairs(input: &str) -> impl Iterator<Item = (&str, &str)> {
     })
 }
 
-fn extract_correlation_ids(path_id: &str) -> ReplayCorrelationIds {
-    let mut ids = ReplayCorrelationIds::default();
+fn set_correlation_id(ids: &mut ReplayCorrelationIds, key: &str, value: &str) {
+    match key {
+        "operation_id" => ids.operation_id = Some(value.to_string()),
+        "run_id" => ids.run_id = Some(value.to_string()),
+        "session_id" => ids.session_id = Some(value.to_string()),
+        "journal_id" => ids.journal_id = Some(value.to_string()),
+        _ => {},
+    }
+}
 
-    // Support query-style metadata in path_id, e.g.
-    // search/context-search/token-7-123?operation_id=op-1&run_id=r-1
+fn set_correlation_id_if_missing(
+    ids: &mut ReplayCorrelationIds,
+    key: &str,
+    value: &str,
+) {
+    match key {
+        "operation_id" if ids.operation_id.is_none() =>
+            ids.operation_id = Some(value.to_string()),
+        "run_id" if ids.run_id.is_none() => ids.run_id = Some(value.to_string()),
+        "session_id" if ids.session_id.is_none() =>
+            ids.session_id = Some(value.to_string()),
+        "journal_id" if ids.journal_id.is_none() =>
+            ids.journal_id = Some(value.to_string()),
+        _ => {},
+    }
+}
+
+fn apply_query_correlation_ids(ids: &mut ReplayCorrelationIds, path_id: &str) {
     if let Some((_, query)) = path_id.split_once('?') {
         for (key, value) in parse_query_pairs(query) {
-            if value.is_empty() {
-                continue;
-            }
-            match key {
-                "operation_id" => ids.operation_id = Some(value.to_string()),
-                "run_id" => ids.run_id = Some(value.to_string()),
-                "session_id" => ids.session_id = Some(value.to_string()),
-                "journal_id" => ids.journal_id = Some(value.to_string()),
-                _ => {},
+            if !value.is_empty() {
+                set_correlation_id(ids, key, value);
             }
         }
     }
+}
 
-    // Support semicolon KV suffixes, e.g.
-    // .../token-7-123;run_id=r-1;session_id=s-1
+fn apply_semicolon_correlation_ids(ids: &mut ReplayCorrelationIds, path_id: &str) {
     if path_id.contains(';') {
         for segment in path_id.split(';').skip(1) {
             if let Some((key, value)) = segment.split_once('=') {
                 let value = value.trim();
-                if value.is_empty() {
-                    continue;
-                }
-                match key.trim() {
-                    "operation_id" if ids.operation_id.is_none() =>
-                        ids.operation_id = Some(value.to_string()),
-                    "run_id" if ids.run_id.is_none() =>
-                        ids.run_id = Some(value.to_string()),
-                    "session_id" if ids.session_id.is_none() =>
-                        ids.session_id = Some(value.to_string()),
-                    "journal_id" if ids.journal_id.is_none() =>
-                        ids.journal_id = Some(value.to_string()),
-                    _ => {},
+                if !value.is_empty() {
+                    set_correlation_id_if_missing(ids, key.trim(), value);
                 }
             }
         }
     }
+}
 
+fn fill_missing_from_span(ids: &mut ReplayCorrelationIds) {
     let span_ids = current_correlation_fields();
     if ids.operation_id.is_none() {
         ids.operation_id = span_ids.operation_id;
@@ -576,8 +583,9 @@ fn extract_correlation_ids(path_id: &str) -> ReplayCorrelationIds {
     if ids.journal_id.is_none() {
         ids.journal_id = span_ids.journal_id;
     }
+}
 
-    // Environment fallback for callers that scope correlation at process level.
+fn fill_missing_from_env(ids: &mut ReplayCorrelationIds) {
     if ids.run_id.is_none() {
         ids.run_id = std::env::var("CONTEXT_RUN_ID").ok();
     }
@@ -587,6 +595,23 @@ fn extract_correlation_ids(path_id: &str) -> ReplayCorrelationIds {
     if ids.journal_id.is_none() {
         ids.journal_id = std::env::var("CONTEXT_JOURNAL_ID").ok();
     }
+}
+
+fn extract_correlation_ids(path_id: &str) -> ReplayCorrelationIds {
+    let mut ids = ReplayCorrelationIds::default();
+
+    // Support query-style metadata in path_id, e.g.
+    // search/context-search/token-7-123?operation_id=op-1&run_id=r-1
+    apply_query_correlation_ids(&mut ids, path_id);
+
+    // Support semicolon KV suffixes, e.g.
+    // .../token-7-123;run_id=r-1;session_id=s-1
+    apply_semicolon_correlation_ids(&mut ids, path_id);
+
+    fill_missing_from_span(&mut ids);
+
+    // Environment fallback for callers that scope correlation at process level.
+    fill_missing_from_env(&mut ids);
 
     ids
 }

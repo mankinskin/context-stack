@@ -116,73 +116,78 @@ fn extract_associated_types(
 ) {
     match ty {
         syn::Type::Path(type_path) => {
-            // Look for Self::AssocType pattern in the path itself
-            let segments: Vec<_> = type_path.path.segments.iter().collect();
-            for i in 0..segments.len().saturating_sub(1) {
-                if segments[i].ident == "Self" {
-                    // Found Self, next segment is the associated type
-                    let assoc_name = segments[i + 1].ident.to_string();
-                    if !result.contains(&assoc_name) {
-                        result.push(assoc_name);
-                    }
-                }
+            collect_associated_types_from_path(type_path, result);
+            collect_associated_types_from_path_generics(type_path, result);
+        },
+        _ => {
+            for nested in nested_types(ty) {
+                extract_associated_types(nested, result);
             }
+        },
+    }
+}
 
-            // Also check for qualified self (e.g., <Self as Trait>::Type)
-            if let Some(qself) = &type_path.qself {
-                if let syn::Type::Path(self_path) = &*qself.ty {
-                    if self_path.path.segments.len() == 1
-                        && self_path.path.segments[0].ident == "Self"
-                    {
-                        // This is Self::Something
-                        if let Some(segment) =
-                            type_path.path.segments.get(qself.position)
-                        {
-                            let assoc_name = segment.ident.to_string();
-                            if !result.contains(&assoc_name) {
-                                result.push(assoc_name);
-                            }
-                        }
-                    }
-                }
-            }
+fn push_unique(result: &mut Vec<String>, assoc_name: String) {
+    if !result.contains(&assoc_name) {
+        result.push(assoc_name);
+    }
+}
 
-            // Also check generic arguments for nested associated types
-            for segment in &type_path.path.segments {
-                if let syn::PathArguments::AngleBracketed(args) =
-                    &segment.arguments
-                {
-                    for arg in &args.args {
-                        if let syn::GenericArgument::Type(inner_ty) = arg {
-                            extract_associated_types(inner_ty, result);
-                        }
-                    }
+fn collect_associated_types_from_path(
+    type_path: &syn::TypePath,
+    result: &mut Vec<String>,
+) {
+    let segments: Vec<_> = type_path.path.segments.iter().collect();
+
+    for i in 0..segments.len().saturating_sub(1) {
+        if segments[i].ident == "Self" {
+            let assoc_name = segments[i + 1].ident.to_string();
+            push_unique(result, assoc_name);
+        }
+    }
+
+    if let Some(qself) = &type_path.qself {
+        let is_qself_self = matches!(
+            &*qself.ty,
+            syn::Type::Path(self_path)
+                if self_path.path.segments.len() == 1
+                    && self_path.path.segments[0].ident == "Self"
+        );
+
+        if is_qself_self {
+            if let Some(segment) = type_path.path.segments.get(qself.position) {
+                let assoc_name = segment.ident.to_string();
+                push_unique(result, assoc_name);
+            }
+        }
+    }
+}
+
+fn collect_associated_types_from_path_generics(
+    type_path: &syn::TypePath,
+    result: &mut Vec<String>,
+) {
+    for segment in &type_path.path.segments {
+        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+            for arg in &args.args {
+                if let syn::GenericArgument::Type(inner_ty) = arg {
+                    extract_associated_types(inner_ty, result);
                 }
             }
-        },
-        syn::Type::Tuple(tuple) =>
-            for elem in &tuple.elems {
-                extract_associated_types(elem, result);
-            },
-        syn::Type::Array(array) => {
-            extract_associated_types(&array.elem, result);
-        },
-        syn::Type::Ptr(ptr) => {
-            extract_associated_types(&ptr.elem, result);
-        },
-        syn::Type::Reference(reference) => {
-            extract_associated_types(&reference.elem, result);
-        },
-        syn::Type::Slice(slice) => {
-            extract_associated_types(&slice.elem, result);
-        },
-        syn::Type::Paren(paren) => {
-            extract_associated_types(&paren.elem, result);
-        },
-        syn::Type::Group(group) => {
-            extract_associated_types(&group.elem, result);
-        },
-        _ => {},
+        }
+    }
+}
+
+fn nested_types(ty: &syn::Type) -> Vec<&syn::Type> {
+    match ty {
+        syn::Type::Tuple(tuple) => tuple.elems.iter().collect(),
+        syn::Type::Array(array) => vec![&array.elem],
+        syn::Type::Ptr(ptr) => vec![&ptr.elem],
+        syn::Type::Reference(reference) => vec![&reference.elem],
+        syn::Type::Slice(slice) => vec![&slice.elem],
+        syn::Type::Paren(paren) => vec![&paren.elem],
+        syn::Type::Group(group) => vec![&group.elem],
+        _ => Vec::new(),
     }
 }
 

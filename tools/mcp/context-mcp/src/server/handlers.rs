@@ -24,6 +24,155 @@ use super::{
     extract_workspace_name,
 };
 
+fn text_result(text: impl Into<String>) -> CallToolResult {
+    CallToolResult::success(vec![Content::text(text.into())])
+}
+
+fn json_result<T: serde::Serialize>(value: &T) -> Result<CallToolResult, McpError> {
+    let json = serde_json::to_string(value).map_err(|e| {
+        McpError::internal_error(format!("Serialization failed: {e}"), None)
+    })?;
+    Ok(text_result(json))
+}
+
+fn matching_command_names<'a>(
+    commands: &'a [super::CommandHelp],
+    needle: &str,
+) -> Vec<&'a str> {
+    commands
+        .iter()
+        .filter(|command| {
+            command.name.contains(needle)
+                || command.summary.to_lowercase().contains(needle)
+        })
+        .map(|command| command.name)
+        .collect()
+}
+
+fn command_help_result(
+    commands: &[super::CommandHelp],
+    cmd_name: &str,
+) -> Result<CallToolResult, McpError> {
+    let needle = cmd_name.to_lowercase();
+    if let Some(command) = commands.iter().find(|command| command.name == needle) {
+        return json_result(command);
+    }
+
+    let matches = matching_command_names(commands, &needle);
+    let message = if matches.is_empty() {
+        format!(
+            "No command named '{}'. Use help with no arguments to see all commands.",
+            cmd_name,
+        )
+    } else {
+        format!(
+            "No exact match for '{}'. Did you mean one of: {}?\n\nCall help with the exact command name for details.",
+            cmd_name,
+            matches.join(", "),
+        )
+    };
+
+    Ok(text_result(message))
+}
+
+fn render_category_help(
+    category: &super::CategoryInfo,
+    commands: &[super::CommandHelp],
+) -> String {
+    let category_commands: Vec<_> = commands
+        .iter()
+        .filter(|command| command.category == category.name)
+        .collect();
+
+    let mut text = format!(
+        "## {} ({})\n\n{}\n\n",
+        category.display, category.name, category.description
+    );
+    for command in &category_commands {
+        text.push_str(&format!(
+            "### {}\n{}\n\nExample:\n```\n{}\n```\n\nResult: {}\n\n",
+            command.name, command.summary, command.example, command.result_type
+        ));
+        if !command.parameters.is_empty() {
+            text.push_str("Parameters:\n");
+            for parameter in command.parameters {
+                text.push_str(&format!(
+                    "  - `{}` ({}{}): {}\n",
+                    parameter.name,
+                    parameter.param_type,
+                    if parameter.required {
+                        ", required"
+                    } else {
+                        ", optional"
+                    },
+                    parameter.description,
+                ));
+            }
+            text.push('\n');
+        }
+        if !command.notes.is_empty() {
+            text.push_str(&format!("Note: {}\n\n", command.notes));
+        }
+        text.push_str("---\n\n");
+    }
+
+    text
+}
+
+fn category_help_result(
+    commands: &[super::CommandHelp],
+    cat_name: &str,
+) -> CallToolResult {
+    let needle = cat_name.to_lowercase();
+    let categories = all_categories();
+    let Some(category) = categories.iter().find(|category| category.name == needle) else {
+        let valid: Vec<&str> = categories.iter().map(|category| category.name).collect();
+        return text_result(format!(
+            "Unknown category '{}'. Valid categories: {}",
+            cat_name,
+            valid.join(", "),
+        ));
+    };
+
+    text_result(render_category_help(category, commands))
+}
+
+fn overview_help_result(commands: &[super::CommandHelp]) -> CallToolResult {
+    let categories = all_categories();
+    let mut text = String::from(
+        "# Context Engine — Command Reference\n\n\
+             Use the `execute` tool to run any command. Use `help` with a specific\n\
+             command name for detailed parameters and examples.\n\n\
+             **Typical workflow:** create_workspace → add_atoms → insert_sequence → search_sequence → read_as_text → save_workspace\n\n\
+             **Tip:** Use the `workflow` tool for ready-to-use command sequences.\n\n",
+    );
+
+    for category in &categories {
+        let category_commands: Vec<_> = commands
+            .iter()
+            .filter(|command| command.category == category.name)
+            .collect();
+
+        text.push_str(&format!(
+            "## {} ({})\n\n{}\n\n",
+            category.display, category.name, category.description
+        ));
+        text.push_str("| Command | Summary |\n|---------|----------|\n");
+        for command in &category_commands {
+            text.push_str(&format!("| `{}` | {} |\n", command.name, command.summary));
+        }
+        text.push('\n');
+    }
+
+    text.push_str(
+        "---\n\n\
+             Call `help` with `command: \"<name>\"` for full parameter details and examples.\n\
+             Call `help` with `category: \"<name>\"` for all commands in a category.\n",
+    );
+
+    text_result(text)
+}
+
 pub(super) async fn execute_command_impl(
     server: &ContextServer,
     Parameters(input): Parameters<ExecuteInput>,
@@ -113,130 +262,15 @@ pub(super) async fn help_command_impl(
 ) -> Result<CallToolResult, McpError> {
     let commands = all_commands();
 
-    // Case 1: Specific command requested
     if let Some(ref cmd_name) = input.command {
-        let needle = cmd_name.to_lowercase();
-        if let Some(cmd) = commands.iter().find(|c| c.name == needle) {
-            let json = serde_json::to_string(cmd).map_err(|e| {
-                McpError::internal_error(
-                    format!("Serialization failed: {e}"),
-                    None,
-                )
-            })?;
-            return Ok(CallToolResult::success(vec![Content::text(json)]));
-        } else {
-            // Fuzzy: show commands that contain the search term
-            let matches: Vec<&str> = commands
-                .iter()
-                .filter(|c| {
-                    c.name.contains(&needle)
-                        || c.summary.to_lowercase().contains(&needle)
-                })
-                .map(|c| c.name)
-                .collect();
-
-            let msg = if matches.is_empty() {
-                format!(
-                    "No command named '{}'. Use help with no arguments to see all commands.",
-                    cmd_name,
-                )
-            } else {
-                format!(
-                    "No exact match for '{}'. Did you mean one of: {}?\n\nCall help with the exact command name for details.",
-                    cmd_name,
-                    matches.join(", "),
-                )
-            };
-            return Ok(CallToolResult::success(vec![Content::text(msg)]));
-        }
+        return command_help_result(&commands, cmd_name);
     }
 
-    // Case 2: Specific category requested
     if let Some(ref cat_name) = input.category {
-        let needle = cat_name.to_lowercase();
-        let categories = all_categories();
-        let cat = categories.iter().find(|c| c.name == needle);
-
-        if cat.is_none() {
-            let valid: Vec<&str> = categories.iter().map(|c| c.name).collect();
-            return Ok(CallToolResult::success(vec![Content::text(format!(
-                "Unknown category '{}'. Valid categories: {}",
-                cat_name,
-                valid.join(", "),
-            ))]));
-        }
-        let cat = cat.unwrap();
-
-        let cat_commands: Vec<_> =
-            commands.iter().filter(|c| c.category == needle).collect();
-
-        let mut text = format!(
-            "## {} ({})\n\n{}\n\n",
-            cat.display, cat.name, cat.description
-        );
-        for cmd in &cat_commands {
-            text.push_str(&format!(
-                "### {}\n{}\n\nExample:\n```\n{}\n```\n\nResult: {}\n\n",
-                cmd.name, cmd.summary, cmd.example, cmd.result_type
-            ));
-            if !cmd.parameters.is_empty() {
-                text.push_str("Parameters:\n");
-                for p in cmd.parameters {
-                    text.push_str(&format!(
-                        "  - `{}` ({}{}): {}\n",
-                        p.name,
-                        p.param_type,
-                        if p.required {
-                            ", required"
-                        } else {
-                            ", optional"
-                        },
-                        p.description,
-                    ));
-                }
-                text.push('\n');
-            }
-            if !cmd.notes.is_empty() {
-                text.push_str(&format!("Note: {}\n\n", cmd.notes));
-            }
-            text.push_str("---\n\n");
-        }
-
-        return Ok(CallToolResult::success(vec![Content::text(text)]));
+        return Ok(category_help_result(&commands, cat_name));
     }
 
-    // Case 3: Full overview
-    let categories = all_categories();
-    let mut text = String::from(
-        "# Context Engine — Command Reference\n\n\
-             Use the `execute` tool to run any command. Use `help` with a specific\n\
-             command name for detailed parameters and examples.\n\n\
-             **Typical workflow:** create_workspace → add_atoms → insert_sequence → search_sequence → read_as_text → save_workspace\n\n\
-             **Tip:** Use the `workflow` tool for ready-to-use command sequences.\n\n",
-    );
-
-    for cat in &categories {
-        let cat_commands: Vec<_> =
-            commands.iter().filter(|c| c.category == cat.name).collect();
-
-        text.push_str(&format!(
-            "## {} ({})\n\n{}\n\n",
-            cat.display, cat.name, cat.description
-        ));
-        text.push_str("| Command | Summary |\n|---------|----------|\n");
-        for cmd in &cat_commands {
-            text.push_str(&format!("| `{}` | {} |\n", cmd.name, cmd.summary));
-        }
-        text.push('\n');
-    }
-
-    text.push_str(
-            "---\n\n\
-             Call `help` with `command: \"<name>\"` for full parameter details and examples.\n\
-             Call `help` with `category: \"<name>\"` for all commands in a category.\n",
-        );
-
-    Ok(CallToolResult::success(vec![Content::text(text)]))
+    Ok(overview_help_result(&commands))
 }
 
 pub(super) async fn workflow_command_impl(

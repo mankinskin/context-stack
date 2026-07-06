@@ -157,6 +157,67 @@ impl<K: SearchKind> SearchState<K>
 where
     K::Trav: Clone,
 {
+    fn step_metadata(step_result: &BfsStepResult) -> Option<(usize, bool)> {
+        match step_result {
+            BfsStepResult::Expanded {
+                node_index,
+                is_parent,
+                ..
+            }
+            | BfsStepResult::FoundMatch {
+                node_index,
+                is_parent,
+                ..
+            }
+            | BfsStepResult::Skipped {
+                node_index,
+                is_parent,
+                ..
+            } => Some((*node_index, *is_parent)),
+            BfsStepResult::Empty => None,
+        }
+    }
+
+    fn reset_compare_viz_state(&mut self) {
+        self.viz_path.end_path.clear();
+        self.viz_path.end_edges.clear();
+        self.viz_path.root_exit_edge = None;
+    }
+
+    fn emit_parent_visit(&mut self, node_index: usize) {
+        let push_from = if let Some(current_root_node) = self.viz_path.root {
+            current_root_node.index
+        } else if let Some(top) = self.viz_path.start_path.last() {
+            top.index
+        } else {
+            self.viz_path
+                .start_node
+                .map(|n| n.index)
+                .unwrap_or(self.start_node)
+        };
+
+        self.emit_graph_op(
+            Transition::VisitParent {
+                from: PathNode {
+                    index: push_from,
+                    width: 1,
+                },
+                to: PathNode {
+                    index: node_index,
+                    width: 1,
+                },
+                entry_pos: 0,
+                edge: EdgeRef {
+                    from: push_from,
+                    to: node_index,
+                    pattern_idx: 0,
+                    sub_index: 0,
+                },
+            },
+            format!("Visiting candidate parent {node_index} from {push_from}"),
+        );
+    }
+
     /// Build and emit a [`GraphOpEvent`] for the current algorithm state.
     ///
     /// `current_root` and `matched_nodes` are inferred from the [`Transition`]
@@ -832,61 +893,15 @@ where
         // BfsStepResult carries node_index and is_parent for event emission.
         let matched_state = loop {
             let step_result = self.matches.pop_and_process_one();
-
-            // Extract node_index and is_parent from all non-Empty variants
-            let (node_index, is_parent) = match &step_result {
-                BfsStepResult::Expanded {
-                    node_index,
-                    is_parent,
-                    ..
-                }
-                | BfsStepResult::FoundMatch {
-                    node_index,
-                    is_parent,
-                    ..
-                }
-                | BfsStepResult::Skipped {
-                    node_index,
-                    is_parent,
-                    ..
-                } => (*node_index, *is_parent),
-                BfsStepResult::Empty => {
-                    trace!("no more matches found");
-                    return None;
-                },
+            let Some((node_index, is_parent)) = Self::step_metadata(&step_result) else {
+                trace!("no more matches found");
+                return None;
             };
 
             // Emit VisitParent BEFORE processing so the visualization shows
             // navigation to the candidate before any child comparison.
             if is_parent {
-                let push_from =
-                    if let Some(current_root_node) = self.viz_path.root {
-                        current_root_node.index
-                    } else if let Some(top) = self.viz_path.start_path.last() {
-                        // After CandidateMismatch clears root, the top of
-                        // start_path is the last confirmed ancestor — use it
-                        // so the edge connects correctly (e.g. ab → abc).
-                        top.index
-                    } else {
-                        self.viz_path
-                            .start_node
-                            .map(|n| n.index)
-                            .unwrap_or(self.start_node)
-                    };
-                self.emit_graph_op(
-                    Transition::VisitParent {
-                        from: PathNode { index: push_from, width: 1 }, // TODO: get real width
-                        to: PathNode { index: node_index, width: 1 },   // TODO: get real width
-                        entry_pos: 0,
-                        edge: EdgeRef {
-                            from: push_from,
-                            to: node_index,
-                            pattern_idx: 0,
-                            sub_index: 0,
-                        },
-                    },
-                    format!("Visiting candidate parent {node_index} from {push_from}"),
-                );
+                self.emit_parent_visit(node_index);
             }
 
             match step_result {
@@ -897,9 +912,7 @@ where
                 } => {
                     // Clear transient end_path from any previous comparison
                     // before starting a new comparison for this candidate.
-                    self.viz_path.end_path.clear();
-                    self.viz_path.end_edges.clear();
-                    self.viz_path.root_exit_edge = None;
+                    self.reset_compare_viz_state();
 
                     // Emit child comparison events from the BFS comparison.
                     // Root was already set by VisitParent, so VisitChild
@@ -937,9 +950,7 @@ where
                     ..
                 } => {
                     // Clear transient end_path from any previous comparison.
-                    self.viz_path.end_path.clear();
-                    self.viz_path.end_edges.clear();
-                    self.viz_path.root_exit_edge = None;
+                    self.reset_compare_viz_state();
 
                     // Emit child comparison events first so the visualization
                     // shows the comparison before confirming the match.
@@ -973,9 +984,7 @@ where
                     is_parent,
                 } => {
                     // Clear transient end_path from any previous comparison.
-                    self.viz_path.end_path.clear();
-                    self.viz_path.end_edges.clear();
-                    self.viz_path.root_exit_edge = None;
+                    self.reset_compare_viz_state();
 
                     // Emit child comparison events. Root was set by
                     // VisitParent, so VisitChild arrows appear during

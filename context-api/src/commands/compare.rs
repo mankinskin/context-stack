@@ -50,6 +50,140 @@ use crate::{
     workspace::manager::WorkspaceManager,
 };
 
+fn diff_vertex_entries(
+    source: &label_map::LabelMap,
+    source_keys: &HashSet<&String>,
+    other_keys: &HashSet<&String>,
+) -> Vec<DiffVertexEntry> {
+    let mut entries: Vec<_> = source_keys
+        .difference(other_keys)
+        .map(|label| {
+            let entry = &source[*label];
+            DiffVertexEntry {
+                label: (*label).clone(),
+                width: entry.width,
+                patterns: entry.patterns.iter().cloned().collect(),
+                is_atom: entry.is_atom,
+            }
+        })
+        .collect();
+    entries.sort_by(|a, b| a.label.cmp(&b.label));
+    entries
+}
+
+fn compare_shared_vertices(
+    shared_labels: &[&&String],
+    map_a: &label_map::LabelMap,
+    map_b: &label_map::LabelMap,
+) -> (Vec<SharedVertex>, usize, usize) {
+    let mut shared = Vec::new();
+    let mut pattern_mismatch_count = 0usize;
+    let mut width_mismatch_count = 0usize;
+
+    for label in shared_labels {
+        let entry_a = &map_a[**label];
+        let entry_b = &map_b[**label];
+
+        if entry_a.width != entry_b.width {
+            width_mismatch_count += 1;
+            shared.push(SharedVertex {
+                label: (*label).to_string(),
+                width: entry_a.width,
+                match_kind: VertexMatchKind::WidthMismatch {
+                    width_a: entry_a.width,
+                    width_b: entry_b.width,
+                },
+                pattern_diff: None,
+            });
+            continue;
+        }
+
+        let common: Vec<Vec<String>> = entry_a
+            .patterns
+            .intersection(&entry_b.patterns)
+            .cloned()
+            .collect();
+        let only_a_pats: Vec<Vec<String>> = entry_a
+            .patterns
+            .difference(&entry_b.patterns)
+            .cloned()
+            .collect();
+        let only_b_pats: Vec<Vec<String>> = entry_b
+            .patterns
+            .difference(&entry_a.patterns)
+            .cloned()
+            .collect();
+
+        let match_kind = if entry_a.patterns == entry_b.patterns {
+            VertexMatchKind::Identical
+        } else if entry_b.patterns.is_subset(&entry_a.patterns) {
+            VertexMatchKind::Identical
+        } else if !common.is_empty() {
+            VertexMatchKind::ExtraPatterns
+        } else {
+            pattern_mismatch_count += 1;
+            VertexMatchKind::PatternMismatch
+        };
+
+        let pattern_diff = match match_kind {
+            VertexMatchKind::ExtraPatterns | VertexMatchKind::PatternMismatch => {
+                Some(PatternDiff {
+                    only_in_a: only_a_pats,
+                    only_in_b: only_b_pats,
+                    common,
+                })
+            },
+            _ => None,
+        };
+
+        shared.push(SharedVertex {
+            label: (*label).to_string(),
+            width: entry_a.width,
+            match_kind,
+            pattern_diff,
+        });
+    }
+
+    (shared, pattern_mismatch_count, width_mismatch_count)
+}
+
+fn compute_verdict(
+    mode: &CompareMode,
+    only_in_a: &[DiffVertexEntry],
+    only_in_b: &[DiffVertexEntry],
+    shared: &[SharedVertex],
+    pattern_mismatch_count: usize,
+    width_mismatch_count: usize,
+) -> DiffVerdict {
+    match mode {
+        CompareMode::Full => {
+            if only_in_a.is_empty()
+                && only_in_b.is_empty()
+                && width_mismatch_count == 0
+                && pattern_mismatch_count == 0
+            {
+                DiffVerdict::Equivalent
+            } else {
+                DiffVerdict::Divergent
+            }
+        },
+        CompareMode::Subset => {
+            let extra_patterns_in_b = shared
+                .iter()
+                .any(|vertex| vertex.match_kind == VertexMatchKind::ExtraPatterns);
+            let b_is_subset = only_in_b.is_empty()
+                && width_mismatch_count == 0
+                && pattern_mismatch_count == 0
+                && !extra_patterns_in_b;
+            if b_is_subset {
+                DiffVerdict::Subset
+            } else {
+                DiffVerdict::Divergent
+            }
+        },
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Core comparison algorithm (pure function)
 // ---------------------------------------------------------------------------
@@ -77,141 +211,18 @@ pub(crate) fn compare_snapshots(
         v.sort_by_key(|l| l.as_str());
         v
     };
-
-    let only_in_a: Vec<DiffVertexEntry> = {
-        let mut v: Vec<_> = keys_a
-            .difference(&keys_b)
-            .map(|label| {
-                let e = &map_a[*label];
-                DiffVertexEntry {
-                    label: (*label).clone(),
-                    width: e.width,
-                    patterns: e.patterns.iter().cloned().collect(),
-                    is_atom: e.is_atom,
-                }
-            })
-            .collect();
-        v.sort_by(|a, b| a.label.cmp(&b.label));
-        v
-    };
-
-    let only_in_b: Vec<DiffVertexEntry> = {
-        let mut v: Vec<_> = keys_b
-            .difference(&keys_a)
-            .map(|label| {
-                let e = &map_b[*label];
-                DiffVertexEntry {
-                    label: (*label).clone(),
-                    width: e.width,
-                    patterns: e.patterns.iter().cloned().collect(),
-                    is_atom: e.is_atom,
-                }
-            })
-            .collect();
-        v.sort_by(|a, b| a.label.cmp(&b.label));
-        v
-    };
-
-    // ── Step 3: classify shared vertices ────────────────────────────────
-
-    let mut shared: Vec<SharedVertex> = Vec::new();
-    let mut pattern_mismatch_count = 0usize;
-    let mut width_mismatch_count = 0usize;
-
-    for label in &shared_labels {
-        let ea = &map_a[**label];
-        let eb = &map_b[**label];
-
-        // Width check (fatal mismatch)
-        if ea.width != eb.width {
-            width_mismatch_count += 1;
-            shared.push(SharedVertex {
-                label: (*label).to_string(),
-                width: ea.width,
-                match_kind: VertexMatchKind::WidthMismatch {
-                    width_a: ea.width,
-                    width_b: eb.width,
-                },
-                pattern_diff: None,
-            });
-            continue;
-        }
-
-        // ── Step 4: pattern diff ─────────────────────────────────────────
-
-        let common: Vec<Vec<String>> =
-            ea.patterns.intersection(&eb.patterns).cloned().collect();
-        let only_a_pats: Vec<Vec<String>> =
-            ea.patterns.difference(&eb.patterns).cloned().collect();
-        let only_b_pats: Vec<Vec<String>> =
-            eb.patterns.difference(&ea.patterns).cloned().collect();
-
-        let match_kind = if ea.patterns == eb.patterns {
-            // Identical pattern sets
-            VertexMatchKind::Identical
-        } else if eb.patterns.is_subset(&ea.patterns) {
-            // B has a strict subset of A's patterns.
-            // Context-read is minimal by design — this is expected and valid.
-            VertexMatchKind::Identical
-        } else if !common.is_empty() {
-            // B has at least one novel pattern but shares others with A.
-            VertexMatchKind::ExtraPatterns
-        } else {
-            // No common pattern — genuine structural divergence.
-            pattern_mismatch_count += 1;
-            VertexMatchKind::PatternMismatch
-        };
-
-        let pattern_diff = match match_kind {
-            VertexMatchKind::ExtraPatterns
-            | VertexMatchKind::PatternMismatch => Some(PatternDiff {
-                only_in_a: only_a_pats,
-                only_in_b: only_b_pats,
-                common,
-            }),
-            _ => None,
-        };
-
-        shared.push(SharedVertex {
-            label: (*label).to_string(),
-            width: ea.width,
-            match_kind,
-            pattern_diff,
-        });
-    }
-
-    // ── Step 5: compute verdict ──────────────────────────────────────────
-
-    let verdict = match mode {
-        CompareMode::Full => {
-            if only_in_a.is_empty()
-                && only_in_b.is_empty()
-                && width_mismatch_count == 0
-                && pattern_mismatch_count == 0
-            {
-                DiffVerdict::Equivalent
-            } else {
-                DiffVerdict::Divergent
-            }
-        },
-        CompareMode::Subset => {
-            // B must add no new labels, and shared vertices must not have
-            // fatal mismatches.  ExtraPatterns counts as a B-side addition
-            // and therefore also fails the subset check.
-            let extra_patterns_in_b = shared
-                .iter()
-                .any(|sv| sv.match_kind == VertexMatchKind::ExtraPatterns);
-            let b_is_subset = only_in_b.is_empty()
-                && width_mismatch_count == 0
-                && pattern_mismatch_count == 0
-                && !extra_patterns_in_b;
-            if b_is_subset {
-                DiffVerdict::Subset
-            } else {
-                DiffVerdict::Divergent
-            }
-        },
-    };
+    let only_in_a = diff_vertex_entries(&map_a, &keys_a, &keys_b);
+    let only_in_b = diff_vertex_entries(&map_b, &keys_b, &keys_a);
+    let (shared, pattern_mismatch_count, width_mismatch_count) =
+        compare_shared_vertices(&shared_labels, &map_a, &map_b);
+    let verdict = compute_verdict(
+        &mode,
+        &only_in_a,
+        &only_in_b,
+        &shared,
+        pattern_mismatch_count,
+        width_mismatch_count,
+    );
 
     let summary = DiffSummary {
         verdict: verdict.clone(),

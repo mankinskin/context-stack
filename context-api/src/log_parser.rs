@@ -201,6 +201,139 @@ impl LogParser {
         Self
     }
 
+    fn fields_object<'a>(
+        &self,
+        json: &'a TracingJson,
+    ) -> Option<&'a serde_json::Map<String, serde_json::Value>> {
+        json.fields.as_ref()?.as_object()
+    }
+
+    fn collect_entry_fields(
+        &self,
+        json: &TracingJson,
+    ) -> HashMap<String, serde_json::Value> {
+        let mut fields = HashMap::new();
+
+        if let Some(obj) = self.fields_object(json) {
+            for (key, value) in obj {
+                if !matches!(
+                    key.as_str(),
+                    "message"
+                        | "backtrace"
+                        | "panic_file"
+                        | "panic_line"
+                        | "panic_column"
+                ) {
+                    fields.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        if let Some(span) = &json.span {
+            for (key, value) in &span.0.fields {
+                if key != "name" {
+                    fields.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        fields
+    }
+
+    fn extract_panic_fields(
+        &self,
+        json: &TracingJson,
+    ) -> (Option<String>, Option<u32>) {
+        let Some(obj) = self.fields_object(json) else {
+            return (None, None);
+        };
+
+        let panic_file = obj
+            .get("panic_file")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string);
+        let panic_line = obj
+            .get("panic_line")
+            .and_then(serde_json::Value::as_u64)
+            .map(|line| line as u32);
+
+        (panic_file, panic_line)
+    }
+
+    fn extract_message(
+        &self,
+        json: &TracingJson,
+    ) -> String {
+        self.fields_object(json)
+            .and_then(|obj| obj.get("message"))
+            .map(|value| match value {
+                serde_json::Value::String(text) => strip_ansi_codes(text),
+                other => strip_ansi_codes(&other.to_string()),
+            })
+            .unwrap_or_default()
+    }
+
+    fn extract_backtrace(
+        &self,
+        json: &TracingJson,
+    ) -> Option<String> {
+        self.fields_object(json)
+            .and_then(|obj| obj.get("backtrace"))
+            .map(|value| match value {
+                serde_json::Value::String(text) => text.clone(),
+                other => other.to_string(),
+            })
+    }
+
+    fn detect_event_type(
+        &self,
+        message: &str,
+        json: &TracingJson,
+    ) -> String {
+        if (message.contains("new") || message.contains("enter"))
+            && json.span.as_ref().and_then(|span| span.0.name.as_ref()).is_some()
+        {
+            return if message.contains("new") {
+                "span_new".to_string()
+            } else {
+                "span_enter".to_string()
+            };
+        }
+
+        if (message.contains("close") || message.contains("exit"))
+            && json.span.is_some()
+        {
+            return "span_exit".to_string();
+        }
+
+        "event".to_string()
+    }
+
+    fn apply_message_fallback(
+        &self,
+        mut message: String,
+        event_type: &mut String,
+        json: &TracingJson,
+    ) -> String {
+        if !message.is_empty() {
+            return message;
+        }
+
+        if let Some(name) = json.span.as_ref().and_then(|span| span.0.name.as_ref()) {
+            *event_type = "span_enter".to_string();
+            message = format!("Span: {}", name);
+        }
+
+        if message.is_empty() {
+            message = json
+                .target
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string());
+        }
+
+        message
+    }
+
     /// Parse log content into structured entries.
     ///
     /// Handles both pretty-printed JSON (multi-line) and NDJSON formats.
@@ -270,54 +403,12 @@ impl LogParser {
             });
 
         let depth = json.spans.as_ref().map(|s| s.len()).unwrap_or(0);
-
-        let mut fields: HashMap<String, serde_json::Value> = HashMap::new();
-        if let Some(field_value) = &json.fields {
-            if let Some(obj) = field_value.as_object() {
-                for (key, value) in obj {
-                    if key != "message"
-                        && key != "backtrace"
-                        && key != "panic_file"
-                        && key != "panic_line"
-                        && key != "panic_column"
-                    {
-                        fields.insert(key.clone(), value.clone());
-                    }
-                }
-            }
-        }
-
-        if let Some(span) = &json.span {
-            for (key, value) in &span.0.fields {
-                if key != "name" {
-                    fields.insert(key.clone(), value.clone());
-                }
-            }
-        }
+        let fields = self.collect_entry_fields(json);
 
         let file = json.file.clone();
         let source_line = json.line;
+        let (mut panic_file, mut panic_line) = self.extract_panic_fields(json);
 
-        let mut panic_file = None;
-        let mut panic_line = None;
-
-        // First check for panic location fields (from panic hook)
-        if let Some(field_value) = &json.fields {
-            if let Some(obj) = field_value.as_object() {
-                if let Some(pf) = obj.get("panic_file") {
-                    if let Some(s) = pf.as_str() {
-                        panic_file = Some(s.to_string());
-                    }
-                }
-                if let Some(pl) = obj.get("panic_line") {
-                    if let Some(n) = pl.as_u64() {
-                        panic_line = Some(n as u32);
-                    }
-                }
-            }
-        }
-
-        // If no panic fields, try to parse from message (for old log files)
         if panic_file.is_none() && message.contains("panicked at") {
             if let Some((pf, pl, _col)) = parse_panic_location(&message) {
                 panic_file = Some(pf);
@@ -350,60 +441,13 @@ impl LogParser {
         &self,
         json: &TracingJson,
     ) -> (String, String, Option<String>) {
-        let mut message = String::new();
-        let mut event_type = "event".to_string();
-        let mut backtrace = None;
-
-        if let Some(fields) = &json.fields {
-            if let Some(obj) = fields.as_object() {
-                if let Some(msg) = obj.get("message") {
-                    message = match msg {
-                        serde_json::Value::String(s) => strip_ansi_codes(s),
-                        other => strip_ansi_codes(&other.to_string()),
-                    };
-                }
-
-                if let Some(bt) = obj.get("backtrace") {
-                    backtrace = match bt {
-                        serde_json::Value::String(s) => Some(s.clone()),
-                        other => Some(other.to_string()),
-                    };
-                }
-            }
-        }
-
-        // Detect span events from message content
-        if message.contains("new") || message.contains("enter") {
-            if let Some(span) = &json.span {
-                if span.0.name.is_some() {
-                    if message.contains("new") {
-                        event_type = "span_new".to_string();
-                    } else {
-                        event_type = "span_enter".to_string();
-                    }
-                }
-            }
-        } else if message.contains("close") || message.contains("exit") {
-            if json.span.is_some() {
-                event_type = "span_exit".to_string();
-            }
-        }
-
-        // If message is empty, use target or generate a description
-        if message.is_empty() {
-            if let Some(span) = &json.span {
-                if let Some(name) = &span.0.name {
-                    message = format!("Span: {}", name);
-                    event_type = "span_enter".to_string();
-                }
-            }
-            if message.is_empty() {
-                message = json
-                    .target
-                    .clone()
-                    .unwrap_or_else(|| "Unknown".to_string());
-            }
-        }
+        let mut event_type = self.detect_event_type(&self.extract_message(json), json);
+        let message = self.apply_message_fallback(
+            self.extract_message(json),
+            &mut event_type,
+            json,
+        );
+        let backtrace = self.extract_backtrace(json);
 
         (message, event_type, backtrace)
     }
