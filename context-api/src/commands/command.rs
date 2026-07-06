@@ -230,47 +230,123 @@ fn default_ngrams_timeout_secs() -> u64 {
 impl Command {
     pub fn command_name(&self) -> &'static str {
         match self {
-            Command::CreateWorkspace { .. } => "create_workspace",
-            Command::CreateWorkspaceFromNgrams { .. } =>
-                "create_workspace_from_ngrams",
-            Command::OpenWorkspace { .. } => "open_workspace",
-            Command::CloseWorkspace { .. } => "close_workspace",
-            Command::SaveWorkspace { .. } => "save_workspace",
-            Command::ListWorkspaces => "list_workspaces",
-            Command::DeleteWorkspace { .. } => "delete_workspace",
-            Command::AddAtom { .. } => "add_atom",
-            Command::AddAtoms { .. } => "add_atoms",
-            Command::GetAtom { .. } => "get_atom",
-            Command::ListAtoms { .. } => "list_atoms",
-            Command::AddSimplePattern { .. } => "add_simple_pattern",
-            Command::GetVertex { .. } => "get_vertex",
-            Command::ListVertices { .. } => "list_vertices",
-            Command::SearchPattern { .. } => "search_pattern",
-            Command::SearchSequence { .. } => "search_sequence",
-            Command::InsertFirstMatch { .. } => "insert_first_match",
-            Command::InsertSequence { .. } => "insert_sequence",
-            Command::InsertSequences { .. } => "insert_sequences",
-            Command::ReadPattern { .. } => "read_pattern",
-            Command::ReadAsText { .. } => "read_as_text",
-            Command::ReadSequence { .. } => "read_sequence",
-            Command::ReadFile { .. } => "read_file",
-            Command::GetSnapshot { .. } => "get_snapshot",
-            Command::GetStatistics { .. } => "get_statistics",
-            Command::ValidateGraph { .. } => "validate_graph",
-            Command::ShowGraph { .. } => "show_graph",
-            Command::ShowVertex { .. } => "show_vertex",
-            Command::RenderAsciiGraph { .. } => "render_ascii_graph",
-            Command::ListLogs { .. } => "list_logs",
-            Command::GetLog { .. } => "get_log",
-            Command::QueryLog { .. } => "query_log",
-            Command::AnalyzeLog { .. } => "analyze_log",
-            Command::SearchLogs { .. } => "search_logs",
-            Command::DeleteLog { .. } => "delete_log",
-            Command::DeleteLogs { .. } => "delete_logs",
-            Command::ExportWorkspace { .. } => "export_workspace",
-            Command::ImportWorkspace { .. } => "import_workspace",
-            Command::CompareWorkspaces { .. } => "compare_workspaces",
-            Command::CompareVertices { .. } => "compare_vertices",
+            Command::CreateWorkspace { .. }
+            | Command::CreateWorkspaceFromNgrams { .. }
+            | Command::OpenWorkspace { .. }
+            | Command::CloseWorkspace { .. }
+            | Command::SaveWorkspace { .. }
+            | Command::ListWorkspaces
+            | Command::DeleteWorkspace { .. } => workspace_command_name(self),
+            Command::AddAtom { .. }
+            | Command::AddAtoms { .. }
+            | Command::GetAtom { .. }
+            | Command::ListAtoms { .. }
+            | Command::AddSimplePattern { .. }
+            | Command::GetVertex { .. }
+            | Command::ListVertices { .. } => graph_command_name(self),
+            Command::SearchPattern { .. }
+            | Command::SearchSequence { .. }
+            | Command::InsertFirstMatch { .. }
+            | Command::InsertSequence { .. }
+            | Command::InsertSequences { .. }
+            | Command::ReadPattern { .. }
+            | Command::ReadAsText { .. }
+            | Command::ReadSequence { .. }
+            | Command::ReadFile { .. } => traversal_command_name(self),
+            Command::GetSnapshot { .. }
+            | Command::GetStatistics { .. }
+            | Command::ValidateGraph { .. }
+            | Command::ShowGraph { .. }
+            | Command::ShowVertex { .. }
+            | Command::RenderAsciiGraph { .. } => inspection_command_name(self),
+            Command::ListLogs { .. }
+            | Command::GetLog { .. }
+            | Command::QueryLog { .. }
+            | Command::AnalyzeLog { .. }
+            | Command::SearchLogs { .. }
+            | Command::DeleteLog { .. }
+            | Command::DeleteLogs { .. } => log_command_name(self),
+            Command::ExportWorkspace { .. }
+            | Command::ImportWorkspace { .. }
+            | Command::CompareWorkspaces { .. }
+            | Command::CompareVertices { .. } => integration_command_name(self),
         }
+    }
+}
+
+fn workspace_command_name(cmd: &Command) -> &'static str {
+    match cmd {
+        Command::CreateWorkspace { .. } => "create_workspace",
+        Command::CreateWorkspaceFromNgrams { .. } =>
+            "create_workspace_from_ngrams",
+        Command::OpenWorkspace { .. } => "open_workspace",
+        Command::CloseWorkspace { .. } => "close_workspace",
+        Command::SaveWorkspace { .. } => "save_workspace",
+        Command::ListWorkspaces => "list_workspaces",
+        Command::DeleteWorkspace { .. } => "delete_workspace",
+        _ => unreachable!("workspace command expected"),
+    }
+}
+
+fn graph_command_name(cmd: &Command) -> &'static str {
+    match cmd {
+        Command::AddAtom { .. } => "add_atom",
+        Command::AddAtoms { .. } => "add_atoms",
+        Command::GetAtom { .. } => "get_atom",
+        Command::ListAtoms { .. } => "list_atoms",
+        Command::AddSimplePattern { .. } => "add_simple_pattern",
+        Command::GetVertex { .. } => "get_vertex",
+        Command::ListVertices { .. } => "list_vertices",
+        _ => unreachable!("graph command expected"),
+    }
+}
+
+fn traversal_command_name(cmd: &Command) -> &'static str {
+    match cmd {
+        Command::SearchPattern { .. } => "search_pattern",
+        Command::SearchSequence { .. } => "search_sequence",
+        Command::InsertFirstMatch { .. } => "insert_first_match",
+        Command::InsertSequence { .. } => "insert_sequence",
+        Command::InsertSequences { .. } => "insert_sequences",
+        Command::ReadPattern { .. } => "read_pattern",
+        Command::ReadAsText { .. } => "read_as_text",
+        Command::ReadSequence { .. } => "read_sequence",
+        Command::ReadFile { .. } => "read_file",
+        _ => unreachable!("traversal command expected"),
+    }
+}
+
+fn inspection_command_name(cmd: &Command) -> &'static str {
+    match cmd {
+        Command::GetSnapshot { .. } => "get_snapshot",
+        Command::GetStatistics { .. } => "get_statistics",
+        Command::ValidateGraph { .. } => "validate_graph",
+        Command::ShowGraph { .. } => "show_graph",
+        Command::ShowVertex { .. } => "show_vertex",
+        Command::RenderAsciiGraph { .. } => "render_ascii_graph",
+        _ => unreachable!("inspection command expected"),
+    }
+}
+
+fn log_command_name(cmd: &Command) -> &'static str {
+    match cmd {
+        Command::ListLogs { .. } => "list_logs",
+        Command::GetLog { .. } => "get_log",
+        Command::QueryLog { .. } => "query_log",
+        Command::AnalyzeLog { .. } => "analyze_log",
+        Command::SearchLogs { .. } => "search_logs",
+        Command::DeleteLog { .. } => "delete_log",
+        Command::DeleteLogs { .. } => "delete_logs",
+        _ => unreachable!("log command expected"),
+    }
+}
+
+fn integration_command_name(cmd: &Command) -> &'static str {
+    match cmd {
+        Command::ExportWorkspace { .. } => "export_workspace",
+        Command::ImportWorkspace { .. } => "import_workspace",
+        Command::CompareWorkspaces { .. } => "compare_workspaces",
+        Command::CompareVertices { .. } => "compare_vertices",
+        _ => unreachable!("integration command expected"),
     }
 }

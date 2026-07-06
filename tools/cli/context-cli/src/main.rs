@@ -457,6 +457,274 @@ fn workspace_name_from_cli_cmd(cmd: &CliCommand) -> Option<&str> {
     }
 }
 
+fn map_workspace_command(cmd: CliCommand) -> Result<Command, CliCommand> {
+    match cmd {
+        CliCommand::Create { name } => Ok(Command::CreateWorkspace { name }),
+        CliCommand::CreateNgrams {
+            name,
+            text,
+            timeout_secs,
+        } => Ok(Command::CreateWorkspaceFromNgrams {
+            name,
+            text,
+            timeout_secs,
+        }),
+        CliCommand::Open { name } => Ok(Command::OpenWorkspace { name }),
+        CliCommand::Close { name } => Ok(Command::CloseWorkspace { name }),
+        CliCommand::Save { name } => Ok(Command::SaveWorkspace { name }),
+        CliCommand::List => Ok(Command::ListWorkspaces),
+        CliCommand::Delete { name } => Ok(Command::DeleteWorkspace { name }),
+        other => map_import_export_command(other),
+    }
+}
+
+fn map_import_export_command(cmd: CliCommand) -> Result<Command, CliCommand> {
+    match cmd {
+        CliCommand::ExportWorkspace {
+            workspace,
+            format,
+            path,
+        } => {
+            let export_format = match format.to_lowercase().as_str() {
+                "bincode" => ExportFormat::Bincode,
+                _ => ExportFormat::Json,
+            };
+            Ok(Command::ExportWorkspace {
+                workspace,
+                format: export_format,
+                path,
+            })
+        },
+        CliCommand::ImportWorkspace {
+            name,
+            path,
+            overwrite,
+        } => Ok(Command::ImportWorkspace {
+            name,
+            path,
+            overwrite,
+        }),
+        other => Err(other),
+    }
+}
+
+fn map_edit_command(cmd: CliCommand) -> Result<Command, CliCommand> {
+    match cmd {
+        CliCommand::AddAtom { workspace, ch } => Ok(Command::AddAtom { workspace, ch }),
+        CliCommand::AddAtoms { workspace, chars } => Ok(Command::AddAtoms {
+            workspace,
+            chars: chars.chars().collect(),
+        }),
+        CliCommand::AddPattern { workspace, atoms } => Ok(Command::AddSimplePattern {
+            workspace,
+            atoms: atoms.chars().collect(),
+        }),
+        CliCommand::SearchSequence { workspace, text } => {
+            Ok(Command::SearchSequence { workspace, text })
+        },
+        CliCommand::SearchPattern { workspace, query } => Ok(Command::SearchPattern {
+            workspace,
+            query: parse_token_refs(&query),
+        }),
+        CliCommand::InsertSequence { workspace, text } => {
+            Ok(Command::InsertSequence { workspace, text })
+        },
+        CliCommand::InsertFirstMatch { workspace, query } => {
+            Ok(Command::InsertFirstMatch {
+                workspace,
+                query: parse_token_refs(&query),
+            })
+        },
+        CliCommand::InsertSequences { workspace, texts } => Ok(Command::InsertSequences {
+            workspace,
+            texts: texts.into_iter().collect::<HashSet<_>>(),
+        }),
+        other => Err(other),
+    }
+}
+
+fn map_query_command(cmd: CliCommand) -> Result<Command, CliCommand> {
+    match cmd {
+        CliCommand::GetVertex { workspace, index } => Ok(Command::GetVertex { workspace, index }),
+        CliCommand::ListVertices { workspace } => Ok(Command::ListVertices { workspace }),
+        CliCommand::ListAtoms { workspace } => Ok(Command::ListAtoms { workspace }),
+        other => map_read_display_command(other),
+    }
+}
+
+fn map_read_display_command(cmd: CliCommand) -> Result<Command, CliCommand> {
+    match cmd {
+        CliCommand::ReadPattern { workspace, index } => Ok(Command::ReadPattern { workspace, index }),
+        CliCommand::ReadAsText { workspace, index } => Ok(Command::ReadAsText { workspace, index }),
+        CliCommand::ReadSequence { workspace, text } => Ok(Command::ReadSequence { workspace, text }),
+        CliCommand::ReadFile { workspace, path } => Ok(Command::ReadFile { workspace, path }),
+        CliCommand::Validate { workspace } => Ok(Command::ValidateGraph { workspace }),
+        CliCommand::Snapshot { workspace } => Ok(Command::GetSnapshot { workspace }),
+        CliCommand::Stats { workspace } => Ok(Command::GetStatistics { workspace }),
+        CliCommand::Show { workspace } => Ok(Command::ShowGraph { workspace }),
+        CliCommand::ShowVertex { workspace, index } => Ok(Command::ShowVertex { workspace, index }),
+        CliCommand::RenderGraph { workspace, ascii_dag } => Ok(Command::RenderAsciiGraph {
+            workspace,
+            ascii_dag,
+        }),
+        other => Err(other),
+    }
+}
+
+fn map_log_command(cmd: CliCommand) -> Result<Command, CliCommand> {
+    match cmd {
+        CliCommand::ListLogs { workspace, pattern } => Ok(Command::ListLogs {
+            workspace,
+            pattern,
+            limit: 100,
+        }),
+        CliCommand::GetLog {
+            workspace,
+            filename,
+            filter,
+            limit,
+        } => Ok(Command::GetLog {
+            workspace,
+            filename,
+            filter,
+            limit,
+            offset: 0,
+        }),
+        CliCommand::QueryLog {
+            workspace,
+            filename,
+            query,
+        } => Ok(Command::QueryLog {
+            workspace,
+            filename,
+            query,
+            limit: 100,
+        }),
+        CliCommand::AnalyzeLog { workspace, filename } => {
+            Ok(Command::AnalyzeLog { workspace, filename })
+        },
+        CliCommand::SearchLogs { workspace, query } => Ok(Command::SearchLogs {
+            workspace,
+            query,
+            limit_per_file: 10,
+        }),
+        CliCommand::DeleteLog { workspace, filename } => {
+            Ok(Command::DeleteLog { workspace, filename })
+        },
+        CliCommand::DeleteLogs {
+            workspace,
+            older_than_days,
+        } => Ok(Command::DeleteLogs {
+            workspace,
+            older_than_days,
+        }),
+        other => Err(other),
+    }
+}
+
+fn run_compare_workspaces(
+    manager: &mut WorkspaceManager,
+    workspace_a: String,
+    workspace_b: String,
+    mode: String,
+    format: String,
+) {
+    let compare_mode = parse_compare_mode(&mode);
+    let _ = execute(manager, Command::OpenWorkspace { name: workspace_a.clone() });
+    let _ = execute(manager, Command::OpenWorkspace { name: workspace_b.clone() });
+    let cmd = Command::CompareWorkspaces {
+        workspace_a,
+        workspace_b,
+        mode: compare_mode,
+    };
+    match execute(manager, cmd) {
+        Ok(result) => {
+            if format.to_lowercase() == "json" {
+                match serde_json::to_string_pretty(&result) {
+                    Ok(json) => println!("{json}"),
+                    Err(e) => eprintln!("Error serializing result: {e}"),
+                }
+            } else {
+                output::print_command_result(&result);
+            }
+            use context_api::{
+                commands::CommandResult,
+                types::DiffVerdict,
+            };
+            if let CommandResult::GraphDiff(ref diff) = result {
+                if diff.summary.verdict == DiffVerdict::Divergent {
+                    std::process::exit(1);
+                }
+            }
+        },
+        Err(e) => {
+            eprintln!("Error: {e}");
+            std::process::exit(2);
+        },
+    }
+}
+
+fn handle_special_command(
+    manager: &mut WorkspaceManager,
+    cmd: CliCommand,
+) -> Result<Option<Command>, ()> {
+    match cmd {
+        CliCommand::Repl => {
+            repl::run(manager);
+            Err(())
+        },
+        CliCommand::Compare {
+            workspace_a,
+            workspace_b,
+            mode,
+            format,
+        } => {
+            run_compare_workspaces(manager, workspace_a, workspace_b, mode, format);
+            Err(())
+        },
+        CliCommand::CompareVertex {
+            workspace_a,
+            index_a,
+            workspace_b,
+            index_b,
+        } => {
+            open_compare_workspaces(manager, &workspace_a, &workspace_b);
+            Ok(Some(Command::CompareVertices {
+                workspace_a,
+                workspace_b,
+                index_a,
+                index_b,
+            }))
+        },
+        other => Ok(Some(
+            map_workspace_command(other)
+                .or_else(map_edit_command)
+                .or_else(map_query_command)
+                .or_else(map_log_command)
+                .unwrap_or_else(|_| unreachable!("unhandled CLI command variant")),
+        )),
+    }
+}
+
+fn open_compare_workspaces(
+    manager: &mut WorkspaceManager,
+    workspace_a: &str,
+    workspace_b: &str,
+) {
+    let _ = execute(
+        manager,
+        Command::OpenWorkspace {
+            name: workspace_a.to_string(),
+        },
+    );
+    let _ = execute(
+        manager,
+        Command::OpenWorkspace {
+            name: workspace_b.to_string(),
+        },
+    );
+}
+
 fn main() {
     // Initialize tracing (respects RUST_LOG env var).
     tracing_subscriber::fmt()
@@ -494,286 +762,71 @@ fn execute_subcommand(
         None
     };
 
-    let api_cmd = match cmd {
-        CliCommand::Create { name } => Command::CreateWorkspace { name },
-        CliCommand::CreateNgrams {
-            name,
-            text,
-            timeout_secs,
-        } => Command::CreateWorkspaceFromNgrams {
-            name,
-            text,
-            timeout_secs,
-        },
-        CliCommand::Open { name } => Command::OpenWorkspace { name },
-        CliCommand::Close { name } => Command::CloseWorkspace { name },
-        CliCommand::Save { name } => Command::SaveWorkspace { name },
-        CliCommand::List => Command::ListWorkspaces,
-        CliCommand::Delete { name } => Command::DeleteWorkspace { name },
-        CliCommand::AddAtom { workspace, ch } =>
-            Command::AddAtom { workspace, ch },
-        CliCommand::AddAtoms { workspace, chars } => Command::AddAtoms {
-            workspace,
-            chars: chars.chars().collect(),
-        },
-        CliCommand::AddPattern { workspace, atoms } => {
-            let atom_chars: Vec<char> = atoms.chars().collect();
-            Command::AddSimplePattern {
-                workspace,
-                atoms: atom_chars,
-            }
-        },
-        CliCommand::GetVertex { workspace, index } =>
-            Command::GetVertex { workspace, index },
-        CliCommand::ListVertices { workspace } =>
-            Command::ListVertices { workspace },
-        CliCommand::ListAtoms { workspace } => Command::ListAtoms { workspace },
-        CliCommand::SearchSequence { workspace, text } =>
-            Command::SearchSequence { workspace, text },
-        CliCommand::SearchPattern { workspace, query } =>
-            Command::SearchPattern {
-                workspace,
-                query: parse_token_refs(&query),
-            },
-        CliCommand::InsertSequence { workspace, text } =>
-            Command::InsertSequence { workspace, text },
-        CliCommand::InsertFirstMatch { workspace, query } =>
-            Command::InsertFirstMatch {
-                workspace,
-                query: parse_token_refs(&query),
-            },
-        CliCommand::InsertSequences { workspace, texts } => {
-            let text_set: HashSet<String> = texts.into_iter().collect();
-            Command::InsertSequences {
-                workspace,
-                texts: text_set,
-            }
-        },
-        CliCommand::ReadPattern { workspace, index } =>
-            Command::ReadPattern { workspace, index },
-        CliCommand::ReadAsText { workspace, index } =>
-            Command::ReadAsText { workspace, index },
-        CliCommand::ReadSequence { workspace, text } =>
-            Command::ReadSequence { workspace, text },
-        CliCommand::ReadFile { workspace, path } =>
-            Command::ReadFile { workspace, path },
-        CliCommand::Validate { workspace } =>
-            Command::ValidateGraph { workspace },
-        CliCommand::Snapshot { workspace } =>
-            Command::GetSnapshot { workspace },
-        CliCommand::Stats { workspace } => Command::GetStatistics { workspace },
-        CliCommand::Show { workspace } => Command::ShowGraph { workspace },
-        CliCommand::ShowVertex { workspace, index } =>
-            Command::ShowVertex { workspace, index },
-        CliCommand::RenderGraph {
-            workspace,
-            ascii_dag,
-        } => Command::RenderAsciiGraph {
-            workspace,
-            ascii_dag,
-        },
-        CliCommand::Repl => {
-            repl::run(manager);
-            return;
-        },
-        CliCommand::Compare {
-            workspace_a,
-            workspace_b,
-            mode,
-            format,
-        } => {
-            let compare_mode = parse_compare_mode(&mode);
-            // Attempt to open both workspaces if not already open
-            let _ = execute(
-                manager,
-                Command::OpenWorkspace {
-                    name: workspace_a.clone(),
-                },
-            );
-            let _ = execute(
-                manager,
-                Command::OpenWorkspace {
-                    name: workspace_b.clone(),
-                },
-            );
-            let cmd = Command::CompareWorkspaces {
-                workspace_a,
-                workspace_b,
-                mode: compare_mode,
-            };
-            match execute(manager, cmd) {
-                Ok(result) => {
-                    if format.to_lowercase() == "json" {
-                        match serde_json::to_string_pretty(&result) {
-                            Ok(json) => println!("{json}"),
-                            Err(e) =>
-                                eprintln!("Error serializing result: {e}"),
-                        }
-                    } else {
-                        output::print_command_result(&result);
-                    }
-                    use context_api::{
-                        commands::CommandResult,
-                        types::DiffVerdict,
-                    };
-                    if let CommandResult::GraphDiff(ref diff) = result {
-                        if diff.summary.verdict == DiffVerdict::Divergent {
-                            std::process::exit(1);
-                        }
-                    }
-                },
-                Err(e) => {
-                    eprintln!("Error: {e}");
-                    std::process::exit(2);
-                },
-            }
-            return;
-        },
-        CliCommand::CompareVertex {
-            workspace_a,
-            index_a,
-            workspace_b,
-            index_b,
-        } => {
-            // Attempt to open both workspaces if not already open
-            let _ = execute(
-                manager,
-                Command::OpenWorkspace {
-                    name: workspace_a.clone(),
-                },
-            );
-            let _ = execute(
-                manager,
-                Command::OpenWorkspace {
-                    name: workspace_b.clone(),
-                },
-            );
-            Command::CompareVertices {
-                workspace_a,
-                workspace_b,
-                index_a,
-                index_b,
-            }
-        },
-        CliCommand::ListLogs { workspace, pattern } => Command::ListLogs {
-            workspace,
-            pattern,
-            limit: 100,
-        },
-        CliCommand::GetLog {
-            workspace,
-            filename,
-            filter,
-            limit,
-        } => Command::GetLog {
-            workspace,
-            filename,
-            filter,
-            limit,
-            offset: 0,
-        },
-        CliCommand::QueryLog {
-            workspace,
-            filename,
-            query,
-        } => Command::QueryLog {
-            workspace,
-            filename,
-            query,
-            limit: 100,
-        },
-        CliCommand::AnalyzeLog {
-            workspace,
-            filename,
-        } => Command::AnalyzeLog {
-            workspace,
-            filename,
-        },
-        CliCommand::SearchLogs { workspace, query } => Command::SearchLogs {
-            workspace,
-            query,
-            limit_per_file: 10,
-        },
-        CliCommand::DeleteLog {
-            workspace,
-            filename,
-        } => Command::DeleteLog {
-            workspace,
-            filename,
-        },
-        CliCommand::DeleteLogs {
-            workspace,
-            older_than_days,
-        } => Command::DeleteLogs {
-            workspace,
-            older_than_days,
-        },
-        CliCommand::ExportWorkspace {
-            workspace,
-            format,
-            path,
-        } => {
-            let export_format = match format.to_lowercase().as_str() {
-                "bincode" => ExportFormat::Bincode,
-                _ => ExportFormat::Json,
-            };
-            Command::ExportWorkspace {
-                workspace,
-                format: export_format,
-                path,
-            }
-        },
-        CliCommand::ImportWorkspace {
-            name,
-            path,
-            overwrite,
-        } => Command::ImportWorkspace {
-            name,
-            path,
-            overwrite,
-        },
+    let api_cmd = match prepare_command(manager, cmd) {
+        Ok(Some(command)) => command,
+        Err(()) => return,
+        Ok(None) => unreachable!("special command handler returned no command"),
     };
 
-    // Traced execution path
-    if trace {
-        if let Some(ws_name) = ws_name_owned {
-            match manager.log_dir(&ws_name) {
-                Ok(log_dir) => {
-                    let config = CaptureConfig {
-                        enabled: true,
-                        log_dir,
-                        level: "TRACE".to_string(),
-                    };
-                    match execute_traced(manager, api_cmd, Some(&config)) {
-                        Ok((result, trace_summary)) => {
-                            output::print_command_result(&result);
-                            if let Some(summary) = trace_summary {
-                                eprintln!(
-                                    "\u{1f4dd} Trace: {} ({} events, {}ms)",
-                                    summary.log_file,
-                                    summary.entry_count,
-                                    summary.duration_ms,
-                                );
-                            }
-                        },
-                        Err(e) => {
-                            eprintln!("Error: {e}");
-                            std::process::exit(1);
-                        },
-                    }
-                    return;
-                },
-                Err(e) => {
-                    eprintln!("Warning: could not enable tracing: {e}");
-                    // Fall through to normal execution
-                },
-            }
-        } else {
-            eprintln!("Warning: --trace requires a workspace-scoped command");
-        }
+    if try_execute_traced(manager, api_cmd.clone(), trace, ws_name_owned.clone()) {
+        return;
     }
 
-    // Normal (non-traced) execution
+    execute_plain(manager, api_cmd);
+}
+
+fn try_execute_traced(
+    manager: &mut WorkspaceManager,
+    api_cmd: Command,
+    trace: bool,
+    ws_name_owned: Option<String>,
+) -> bool {
+    if !trace {
+        return false;
+    }
+
+    if let Some(ws_name) = ws_name_owned {
+        match manager.log_dir(&ws_name) {
+            Ok(log_dir) => {
+                let config = CaptureConfig {
+                    enabled: true,
+                    log_dir,
+                    level: "TRACE".to_string(),
+                };
+                match execute_traced(manager, api_cmd, Some(&config)) {
+                    Ok((result, trace_summary)) => {
+                        output::print_command_result(&result);
+                        if let Some(summary) = trace_summary {
+                            eprintln!(
+                                "\u{1f4dd} Trace: {} ({} events, {}ms)",
+                                summary.log_file,
+                                summary.entry_count,
+                                summary.duration_ms,
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Error: {e}");
+                        std::process::exit(1);
+                    },
+                }
+                return true;
+            },
+            Err(e) => {
+                eprintln!("Warning: could not enable tracing: {e}");
+            },
+        }
+    } else {
+        eprintln!("Warning: --trace requires a workspace-scoped command");
+    }
+
+    false
+}
+
+fn execute_plain(
+    manager: &mut WorkspaceManager,
+    api_cmd: Command,
+) {
     match execute(manager, api_cmd) {
         Ok(result) => output::print_command_result(&result),
         Err(e) => {
@@ -781,4 +834,11 @@ fn execute_subcommand(
             std::process::exit(1);
         },
     }
+}
+
+fn prepare_command(
+    manager: &mut WorkspaceManager,
+    cmd: CliCommand,
+) -> Result<Option<Command>, ()> {
+    handle_special_command(manager, cmd)
 }

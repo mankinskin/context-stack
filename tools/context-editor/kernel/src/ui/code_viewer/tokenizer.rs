@@ -49,6 +49,125 @@ const RUST_TYPES: &[&str] = &[
     "HashMap", "Option", "Result", "Box", "Self",
 ];
 
+fn try_tokenize_comment_or_slash(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    buf: &mut String,
+    tokens: &mut Vec<SyntaxToken>,
+) -> bool {
+    if chars.peek() != Some(&'/') {
+        return false;
+    }
+
+    chars.next();
+    if chars.peek() == Some(&'/') {
+        chars.next();
+        let rest: String = chars.collect();
+        flush_buf(buf, tokens);
+        tokens.push(SyntaxToken {
+            kind: TokenKind::Comment,
+            text: format!("//{}", rest),
+        });
+        return true;
+    }
+
+    flush_buf(buf, tokens);
+    tokens.push(SyntaxToken {
+        kind: TokenKind::Operator,
+        text: "/".into(),
+    });
+    true
+}
+
+fn try_tokenize_string(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    buf: &mut String,
+    tokens: &mut Vec<SyntaxToken>,
+) -> bool {
+    if chars.peek() != Some(&'"') {
+        return false;
+    }
+
+    flush_buf(buf, tokens);
+    let mut string_text = String::new();
+    string_text.push('"');
+    chars.next();
+    let mut escaped = false;
+    while let Some(&ch) = chars.peek() {
+        string_text.push(ch);
+        chars.next();
+        if escaped {
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else if ch == '"' {
+            break;
+        }
+    }
+
+    tokens.push(SyntaxToken {
+        kind: TokenKind::String,
+        text: string_text,
+    });
+    true
+}
+
+fn try_tokenize_number(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    buf: &mut String,
+    tokens: &mut Vec<SyntaxToken>,
+) -> bool {
+    let Some(&ch) = chars.peek() else {
+        return false;
+    };
+    if !ch.is_ascii_digit() || !buf.is_empty() {
+        return false;
+    }
+
+    flush_buf(buf, tokens);
+    let mut number = String::new();
+    while let Some(&next) = chars.peek() {
+        if next.is_ascii_alphanumeric() || next == '.' || next == '_' {
+            number.push(next);
+            chars.next();
+        } else {
+            break;
+        }
+    }
+
+    tokens.push(SyntaxToken {
+        kind: TokenKind::Number,
+        text: number,
+    });
+    true
+}
+
+fn try_tokenize_symbol(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    buf: &mut String,
+    tokens: &mut Vec<SyntaxToken>,
+) -> bool {
+    let Some(&ch) = chars.peek() else {
+        return false;
+    };
+    if ch.is_alphanumeric() || ch == '_' {
+        return false;
+    }
+
+    flush_buf(buf, tokens);
+    let kind = match ch {
+        '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^' | '%' => {
+            TokenKind::Operator
+        },
+        _ => TokenKind::Punctuation,
+    };
+    tokens.push(SyntaxToken {
+        kind,
+        text: ch.to_string(),
+    });
+    chars.next();
+    true
+}
+
 /// Tokenize a single line of Rust source code.
 ///
 /// This is a simple keyword-based tokenizer, not a full parser.
@@ -58,81 +177,22 @@ pub fn tokenize_rust_line(line: &str) -> Vec<SyntaxToken> {
     let mut buf = String::new();
 
     while let Some(&ch) = chars.peek() {
-        if ch == '/' {
-            chars.next();
-            if chars.peek() == Some(&'/') {
-                chars.next();
-                let rest: String = chars.collect();
-                flush_buf(&mut buf, &mut tokens);
-                tokens.push(SyntaxToken {
-                    kind: TokenKind::Comment,
-                    text: format!("//{}", rest),
-                });
+        if ch == '/' && try_tokenize_comment_or_slash(&mut chars, &mut buf, &mut tokens) {
+            if tokens.last().is_some_and(|token| token.kind == TokenKind::Comment) {
                 return tokens;
-            } else {
-                flush_buf(&mut buf, &mut tokens);
-                tokens.push(SyntaxToken {
-                    kind: TokenKind::Operator,
-                    text: "/".into(),
-                });
-                continue;
             }
-        }
-
-        if ch == '"' {
-            flush_buf(&mut buf, &mut tokens);
-            let mut s = String::new();
-            s.push(ch);
-            chars.next();
-            let mut escaped = false;
-            while let Some(&c) = chars.peek() {
-                s.push(c);
-                chars.next();
-                if escaped {
-                    escaped = false;
-                } else if c == '\\' {
-                    escaped = true;
-                } else if c == '"' {
-                    break;
-                }
-            }
-            tokens.push(SyntaxToken {
-                kind: TokenKind::String,
-                text: s,
-            });
             continue;
         }
 
-        if ch.is_ascii_digit() && buf.is_empty() {
-            flush_buf(&mut buf, &mut tokens);
-            let mut num = String::new();
-            while let Some(&c) = chars.peek() {
-                if c.is_ascii_alphanumeric() || c == '.' || c == '_' {
-                    num.push(c);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            tokens.push(SyntaxToken {
-                kind: TokenKind::Number,
-                text: num,
-            });
+        if try_tokenize_string(&mut chars, &mut buf, &mut tokens) {
             continue;
         }
 
-        if !ch.is_alphanumeric() && ch != '_' {
-            flush_buf(&mut buf, &mut tokens);
-            let kind = match ch {
-                '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^'
-                | '%' => TokenKind::Operator,
-                _ => TokenKind::Punctuation,
-            };
-            tokens.push(SyntaxToken {
-                kind,
-                text: ch.to_string(),
-            });
-            chars.next();
+        if try_tokenize_number(&mut chars, &mut buf, &mut tokens) {
+            continue;
+        }
+
+        if try_tokenize_symbol(&mut chars, &mut buf, &mut tokens) {
             continue;
         }
 

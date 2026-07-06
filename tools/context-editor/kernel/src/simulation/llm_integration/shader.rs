@@ -61,50 +61,53 @@ pub enum ShaderValidation {
     TooComplex { instruction_count: usize },
 }
 
-/// Validate a WGSL snippet intended for custom SDF rendering.
-pub fn validate_wgsl_snippet(wgsl: &str) -> ShaderValidation {
-    let trimmed = wgsl.trim();
-
-    if !trimmed.contains("fn sd_custom") {
-        return ShaderValidation::MissingEntryPoint;
-    }
-
+fn find_sd_custom_body(trimmed: &str) -> Result<(&str, &str), ShaderValidation> {
     let Some(fn_start) = trimmed.find("fn sd_custom") else {
-        return ShaderValidation::MissingEntryPoint;
+        return Err(ShaderValidation::MissingEntryPoint);
     };
     let after_fn = &trimmed[fn_start..];
     let Some(body_start) = after_fn.find('{') else {
-        return ShaderValidation::ParseError("Missing function body".into());
+        return Err(ShaderValidation::ParseError("Missing function body".into()));
     };
 
     let body_region = &after_fn[body_start..];
+    let Some(body_end) = find_balanced_body_end(body_region) else {
+        return Err(ShaderValidation::ParseError(
+            "Unbalanced braces in function body".into(),
+        ));
+    };
+
+    Ok((&after_fn[..body_start], &body_region[1..body_end]))
+}
+
+fn find_balanced_body_end(body_region: &str) -> Option<usize> {
     let mut depth: i32 = 0;
-    let mut body_end = 0;
-    for (i, ch) in body_region.char_indices() {
+
+    for (index, ch) in body_region.char_indices() {
         match ch {
             '{' => depth += 1,
             '}' => {
                 depth -= 1;
                 if depth == 0 {
-                    body_end = i;
-                    break;
+                    return Some(index);
                 }
             },
             _ => {},
         }
     }
-    if depth != 0 {
-        return ShaderValidation::ParseError(
-            "Unbalanced braces in function body".into(),
-        );
-    }
 
-    let body = &body_region[1..body_end];
-    let instruction_count = body.chars().filter(|&c| c == ';').count();
+    None
+}
+
+fn validate_instruction_budget(body: &str) -> Result<(), ShaderValidation> {
+    let instruction_count = body.chars().filter(|&ch| ch == ';').count();
     if instruction_count > MAX_SHADER_INSTRUCTIONS {
-        return ShaderValidation::TooComplex { instruction_count };
+        return Err(ShaderValidation::TooComplex { instruction_count });
     }
+    Ok(())
+}
 
+fn validate_disallowed_keywords(trimmed: &str) -> Result<(), ShaderValidation> {
     let disallowed = [
         "textureSample",
         "textureLoad",
@@ -112,20 +115,45 @@ pub fn validate_wgsl_snippet(wgsl: &str) -> ShaderValidation {
         "storageBarrier",
         "workgroupBarrier",
     ];
+
     for keyword in &disallowed {
         if trimmed.contains(keyword) {
-            return ShaderValidation::ParseError(format!(
+            return Err(ShaderValidation::ParseError(format!(
                 "Disallowed construct: {}",
                 keyword
-            ));
+            )));
         }
     }
 
-    let sig_region = &after_fn[..body_start];
-    if !sig_region.contains("vec3<f32>") || !sig_region.contains("f32") {
-        return ShaderValidation::ParseError(
+    Ok(())
+}
+
+fn validate_signature(sig_region: &str) -> Result<(), ShaderValidation> {
+    if sig_region.contains("vec3<f32>") && sig_region.contains("f32") {
+        Ok(())
+    } else {
+        Err(ShaderValidation::ParseError(
             "Function signature must accept (p: vec3<f32>, time: f32)".into(),
-        );
+        ))
+    }
+}
+
+/// Validate a WGSL snippet intended for custom SDF rendering.
+pub fn validate_wgsl_snippet(wgsl: &str) -> ShaderValidation {
+    let trimmed = wgsl.trim();
+
+    let (sig_region, body) = match find_sd_custom_body(trimmed) {
+        Ok(parts) => parts,
+        Err(validation) => return validation,
+    };
+    if let Err(validation) = validate_instruction_budget(body) {
+        return validation;
+    }
+    if let Err(validation) = validate_disallowed_keywords(trimmed) {
+        return validation;
+    }
+    if let Err(validation) = validate_signature(sig_region) {
+        return validation;
     }
 
     ShaderValidation::Valid

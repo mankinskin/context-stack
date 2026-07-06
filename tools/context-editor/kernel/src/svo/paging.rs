@@ -273,6 +273,56 @@ impl PageManager {
         }
     }
 
+    fn child_origin(
+        origin: Vec3,
+        child_size: f32,
+        bit: u8,
+    ) -> Vec3 {
+        let ox = if bit & 1 != 0 { child_size } else { 0.0 };
+        let oy = if bit & 2 != 0 { child_size } else { 0.0 };
+        let oz = if bit & 4 != 0 { child_size } else { 0.0 };
+        origin + Vec3::new(ox, oy, oz)
+    }
+
+    fn populate_boundary_pages(
+        &self,
+        mask: u8,
+        first_child: usize,
+        first_page: u32,
+        origin: Vec3,
+        child_size: f32,
+        frustum: Option<&Frustum>,
+        gpu_nodes: &mut [GpuNode],
+        page_table: &mut [u32],
+        resident: &mut HashSet<u32>,
+    ) {
+        let mut rank = 0u32;
+        for bit in 0u8..8 {
+            if mask & (1 << bit) == 0 {
+                continue;
+            }
+
+            let page_id = first_page + rank;
+            rank += 1;
+
+            let child_origin = Self::child_origin(origin, child_size, bit);
+            let child_max = child_origin + Vec3::splat(child_size);
+            let child_cpu_idx = first_child + bit as usize;
+
+            let is_resident = match frustum {
+                Some(frustum) => frustum.test_aabb(child_origin, child_max),
+                None => true,
+            };
+
+            if is_resident {
+                page_table[page_id as usize] = child_cpu_idx as u32;
+                resident.insert(page_id);
+            } else {
+                gpu_nodes[child_cpu_idx].child_pointer &= !0xFF_u32;
+            }
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Phase 2: page table population and frustum culling
     // -----------------------------------------------------------------------
@@ -300,45 +350,23 @@ impl PageManager {
         let child_size = node_size * 0.5;
 
         if depth + 1 == self.page_depth {
-            let first_page = boundary_first_page[idx];
-            let mut rank = 0u32;
-            for bit in 0u8..8 {
-                if mask & (1 << bit) == 0 {
-                    continue;
-                }
-                let page_id = first_page + rank;
-                rank += 1;
-
-                let ox = if bit & 1 != 0 { child_size } else { 0.0 };
-                let oy = if bit & 2 != 0 { child_size } else { 0.0 };
-                let oz = if bit & 4 != 0 { child_size } else { 0.0 };
-                let child_origin = origin + Vec3::new(ox, oy, oz);
-                let child_max = child_origin + Vec3::splat(child_size);
-                let child_cpu_idx = first_child + bit as usize;
-
-                let is_resident = match frustum {
-                    Some(f) => f.test_aabb(child_origin, child_max),
-                    None => true,
-                };
-
-                if is_resident {
-                    // CPU index == GPU index in flat 8-slot layout.
-                    page_table[page_id as usize] = child_cpu_idx as u32;
-                    resident.insert(page_id);
-                } else {
-                    // Evict: zero cmask so traversal stops here (solid LOD leaf).
-                    gpu_nodes[child_cpu_idx].child_pointer &= !0xFF_u32;
-                }
-            }
+            self.populate_boundary_pages(
+                mask,
+                first_child,
+                boundary_first_page[idx],
+                origin,
+                child_size,
+                frustum,
+                gpu_nodes,
+                page_table,
+                resident,
+            );
         } else {
             for bit in 0u8..8 {
                 if mask & (1 << bit) == 0 {
                     continue;
                 }
-                let ox = if bit & 1 != 0 { child_size } else { 0.0 };
-                let oy = if bit & 2 != 0 { child_size } else { 0.0 };
-                let oz = if bit & 4 != 0 { child_size } else { 0.0 };
-                let child_origin = origin + Vec3::new(ox, oy, oz);
+                let child_origin = Self::child_origin(origin, child_size, bit);
                 let child_cpu_idx = first_child + bit as usize;
                 self.populate_and_cull(
                     svo,

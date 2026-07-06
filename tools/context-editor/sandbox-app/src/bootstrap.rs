@@ -124,6 +124,265 @@ fn setup_baseline_scene(mut commands: Commands) {
     ));
 }
 
+fn paint_ground_slab(
+    voxel_world: &mut VoxelWorld,
+    cx: i32,
+    cz: i32,
+    fy: i32,
+    grass: VoxelMaterial,
+    dirt: VoxelMaterial,
+    stone: VoxelMaterial,
+) {
+    let half_extent = 120;
+    for x in (cx - half_extent)..(cx + half_extent) {
+        for z in (cz - half_extent)..(cz + half_extent) {
+            for dy in 0..4 {
+                voxel_world.set_voxel(IVec3::new(x, fy - dy, z), grass);
+            }
+            for dy in 4..8 {
+                voxel_world.set_voxel(IVec3::new(x, fy - dy, z), dirt);
+            }
+            for dy in 8..12 {
+                voxel_world.set_voxel(IVec3::new(x, fy - dy, z), stone);
+            }
+        }
+    }
+}
+
+fn paint_stone_tower(
+    voxel_world: &mut VoxelWorld,
+    tower_x: i32,
+    tower_z: i32,
+    fy: i32,
+    stone: VoxelMaterial,
+) {
+    paint_stone_tower_walls(voxel_world, tower_x, tower_z, fy, stone);
+    paint_stone_tower_battlements(voxel_world, tower_x, tower_z, fy, stone);
+}
+
+fn paint_stone_tower_walls(
+    voxel_world: &mut VoxelWorld,
+    tower_x: i32,
+    tower_z: i32,
+    fy: i32,
+    stone: VoxelMaterial,
+) {
+    for y in (fy + 1)..=(fy + 48) {
+        for dx in -8_i32..=8 {
+            for dz in -8_i32..=8 {
+                let is_wall = dx <= -7 || dx >= 7 || dz <= -7 || dz >= 7;
+                let is_door = dz <= -7 && dx.abs() <= 1 && y <= fy + 12;
+                if is_wall && !is_door {
+                    voxel_world.set_voxel(IVec3::new(tower_x + dx, y, tower_z + dz), stone);
+                }
+            }
+        }
+    }
+}
+
+fn paint_stone_tower_battlements(
+    voxel_world: &mut VoxelWorld,
+    tower_x: i32,
+    tower_z: i32,
+    fy: i32,
+    stone: VoxelMaterial,
+) {
+    for dx in -8..=8 {
+        for dz in -8..=8 {
+            if should_place_battlement(dx, dz) {
+                for dy in 0..4 {
+                    voxel_world.set_voxel(
+                        IVec3::new(tower_x + dx, fy + 49 + dy, tower_z + dz),
+                        stone,
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn should_place_battlement(
+    dx: i32,
+    dz: i32,
+) -> bool {
+    let is_edge = dx <= -7 || dx >= 7 || dz <= -7 || dz >= 7;
+    let is_corner = (dx <= -7 || dx >= 7) && (dz <= -7 || dz >= 7);
+    is_edge && (is_corner || (dx + dz) % 2 == 0)
+}
+
+fn paint_stone_arch(
+    voxel_world: &mut VoxelWorld,
+    arch_x: i32,
+    arch_z: i32,
+    fy: i32,
+    stone: VoxelMaterial,
+) {
+    for y in (fy + 1)..=(fy + 24) {
+        for t in 0..4 {
+            for w in 0..4 {
+                voxel_world.set_voxel(IVec3::new(arch_x - 8 + t, y, arch_z + w), stone);
+                voxel_world.set_voxel(IVec3::new(arch_x + 5 + t, y, arch_z + w), stone);
+            }
+        }
+    }
+    for dx in -8..=8 {
+        for t in 0..4 {
+            for w in 0..4 {
+                voxel_world.set_voxel(IVec3::new(arch_x + dx, fy + 25 + t, arch_z + w), stone);
+            }
+        }
+    }
+}
+
+fn paint_sand_pyramid(
+    voxel_world: &mut VoxelWorld,
+    pyr_x: i32,
+    pyr_z: i32,
+    fy: i32,
+    sand: VoxelMaterial,
+) {
+    for layer in 0..28 {
+        let r = 24 - layer;
+        let y = fy + 1 + layer;
+        for dx in -r..=r {
+            for dz in -r..=r {
+                voxel_world.set_voxel(IVec3::new(pyr_x + dx, y, pyr_z + dz), sand);
+            }
+        }
+    }
+}
+
+fn paint_water_pool(
+    voxel_world: &mut VoxelWorld,
+    pool_x: i32,
+    pool_z: i32,
+    fy: i32,
+    water: VoxelMaterial,
+) {
+    for dx in -12..=12 {
+        for dz in -12..=12 {
+            for dy in 0..8 {
+                voxel_world.set_voxel(IVec3::new(pool_x + dx, fy - dy, pool_z + dz), water);
+            }
+        }
+    }
+}
+
+fn paint_window_wall(
+    voxel_world: &mut VoxelWorld,
+    cx: i32,
+    cz: i32,
+    fy: i32,
+    stone: VoxelMaterial,
+) {
+    let wall_z = cz + 64;
+    for x in (cx - 60)..=(cx + 60) {
+        for y in (fy + 1)..=(fy + 20) {
+            let rel_x = (x - (cx - 60)) % 24;
+            let rel_y = y - fy;
+            let is_window = (rel_x >= 8 && rel_x <= 15) && (rel_y >= 9 && rel_y <= 16);
+            if !is_window {
+                for w in 0..4 {
+                    voxel_world.set_voxel(IVec3::new(x, y, wall_z + w), stone);
+                }
+            }
+        }
+    }
+}
+
+fn paint_templates(
+    voxel_world: &mut VoxelWorld,
+    cx: i32,
+    cz: i32,
+    fy: i32,
+) {
+    let tree = tree_template();
+    tree.stamp(voxel_world, IVec3::new(cx + 20, fy + 1, cz + 24));
+    tree.stamp(voxel_world, IVec3::new(cx - 12, fy + 1, cz + 40));
+    tree.stamp(voxel_world, IVec3::new(cx + 60, fy + 1, cz + 12));
+    tree.stamp(voxel_world, IVec3::new(cx - 72, fy + 1, cz - 20));
+
+    let boulder = boulder_template();
+    boulder.stamp(voxel_world, IVec3::new(cx + 48, fy + 1, cz - 12));
+    boulder.stamp(voxel_world, IVec3::new(cx - 32, fy + 1, cz - 60));
+}
+
+fn paint_showcase_voxels(
+    voxel_world: &mut VoxelWorld,
+    cx: i32,
+    cz: i32,
+    fy: i32,
+) {
+    let sphere_mat = VoxelMaterial {
+        r: 80,
+        g: 160,
+        b: 230,
+        roughness: 6,
+        metallic: false,
+        sdf_type: 1,
+    };
+    for dy in 1..=4 {
+        for dx in -3_i32..=3 {
+            for dz in 0..3_i32 {
+                voxel_world.set_voxel(IVec3::new(cx - 8 + dx, fy + dy, cz + 30 + dz), sphere_mat);
+            }
+        }
+    }
+
+    let torus_mat = VoxelMaterial {
+        r: 230,
+        g: 130,
+        b: 40,
+        roughness: 6,
+        metallic: false,
+        sdf_type: 3,
+    };
+    for dy in 1..=4 {
+        for dx in -3_i32..=3 {
+            for dz in 0..3_i32 {
+                voxel_world.set_voxel(IVec3::new(cx + 8 + dx, fy + dy, cz + 30 + dz), torus_mat);
+            }
+        }
+    }
+
+    let metallic_mat = VoxelMaterial {
+        r: 192,
+        g: 192,
+        b: 200,
+        roughness: 2,
+        metallic: true,
+        sdf_type: 0,
+    };
+    for dy in 1..=14 {
+        for dx in -8_i32..=8 {
+            for dz in 0..2_i32 {
+                voxel_world.set_voxel(IVec3::new(cx + dx, fy + dy, cz + 18 + dz), metallic_mat);
+            }
+        }
+    }
+}
+
+fn paint_palette_demo(
+    voxel_world: &mut VoxelWorld,
+    palette: &ThemePalette,
+) {
+    voxel_world.apply_sdf_brush(
+        Vec3::new(SCENE_X, SVO_GROUND_Y, SCENE_Z),
+        16.0,
+        palette.voxel_primary.to_voxel_material(),
+    );
+    voxel_world.apply_sdf_brush(
+        Vec3::new(SCENE_X + 48.0, SVO_GROUND_Y, SCENE_Z),
+        12.0,
+        palette.voxel_secondary.to_voxel_material(),
+    );
+    voxel_world.apply_sdf_brush(
+        Vec3::new(SCENE_X - 48.0, SVO_GROUND_Y, SCENE_Z),
+        8.0,
+        palette.voxel_highlight.to_voxel_material(),
+    );
+}
+
 // ---------------------------------------------------------------------------
 // SVO voxel painting — data layer for the custom render pipeline
 //
@@ -143,233 +402,17 @@ pub fn paint_default_scene(world: &mut bevy::prelude::World) {
     let grass = VoxelMaterial::unpack(MATERIAL_GRASS);
     let dirt = VoxelMaterial::unpack(MATERIAL_DIRT);
     let stone = VoxelMaterial::unpack(MATERIAL_STONE);
-
-    let half_extent = 120;
-    for x in (cx - half_extent)..(cx + half_extent) {
-        for z in (cz - half_extent)..(cz + half_extent) {
-            // Top 4 layers: grass
-            for dy in 0..4 {
-                voxel_world.set_voxel(IVec3::new(x, fy - dy, z), grass);
-            }
-            // Next 4 layers: dirt
-            for dy in 4..8 {
-                voxel_world.set_voxel(IVec3::new(x, fy - dy, z), dirt);
-            }
-            // Bottom 4 layers: stone
-            for dy in 8..12 {
-                voxel_world.set_voxel(IVec3::new(x, fy - dy, z), stone);
-            }
-        }
-    }
-
-    // --- Stone tower (hollow, 20×48×20 with doorway) -------------------------
-    let tower_x = cx + 40;
-    let tower_z = cz - 32;
-    for y in (fy + 1)..=(fy + 48) {
-        for dx in -8_i32..=8 {
-            for dz in -8_i32..=8 {
-                let is_wall = dx <= -7 || dx >= 7 || dz <= -7 || dz >= 7;
-                // Doorway on south face, 4 blocks wide, 12 tall
-                let is_door = dz <= -7 && dx.abs() <= 1 && y <= fy + 12;
-                if is_wall && !is_door {
-                    voxel_world.set_voxel(
-                        IVec3::new(tower_x + dx, y, tower_z + dz),
-                        stone,
-                    );
-                }
-            }
-        }
-    }
-    // Tower battlement ring
-    for dx in -8..=8 {
-        for dz in -8..=8 {
-            let is_edge = dx <= -7 || dx >= 7 || dz <= -7 || dz >= 7;
-            let is_corner = (dx <= -7 || dx >= 7) && (dz <= -7 || dz >= 7);
-            if is_edge && (is_corner || (dx + dz) % 2 == 0) {
-                for dy in 0..4 {
-                    voxel_world.set_voxel(
-                        IVec3::new(tower_x + dx, fy + 49 + dy, tower_z + dz),
-                        stone,
-                    );
-                }
-            }
-        }
-    }
-
-    // --- Stone arch (gateway) -------------------------------------------------
-    let arch_x = cx - 24;
-    let arch_z = cz + 16;
-    // Two pillars (4 voxels thick)
-    for y in (fy + 1)..=(fy + 24) {
-        for t in 0..4 {
-            for w in 0..4 {
-                voxel_world.set_voxel(
-                    IVec3::new(arch_x - 8 + t, y, arch_z + w),
-                    stone,
-                );
-                voxel_world.set_voxel(
-                    IVec3::new(arch_x + 5 + t, y, arch_z + w),
-                    stone,
-                );
-            }
-        }
-    }
-    // Lintel
-    for dx in -8..=8 {
-        for t in 0..4 {
-            for w in 0..4 {
-                voxel_world.set_voxel(
-                    IVec3::new(arch_x + dx, fy + 25 + t, arch_z + w),
-                    stone,
-                );
-            }
-        }
-    }
-
-    // --- Stepped pyramid (sand, 28 layers) ------------------------------------
     let sand = VoxelMaterial::unpack(MATERIAL_SAND);
-    let pyr_x = cx - 48;
-    let pyr_z = cz - 48;
-    for layer in 0..28 {
-        let r = 24 - layer;
-        let y = fy + 1 + layer;
-        for dx in -r..=r {
-            for dz in -r..=r {
-                voxel_world
-                    .set_voxel(IVec3::new(pyr_x + dx, y, pyr_z + dz), sand);
-            }
-        }
-    }
-
-    // --- Water pool -----------------------------------------------------------
     let water = VoxelMaterial::unpack(MATERIAL_WATER);
-    let pool_x = cx + 32;
-    let pool_z = cz + 40;
-    for dx in -12..=12 {
-        for dz in -12..=12 {
-            // Carve 8 blocks deep, fill with water
-            for dy in 0..8 {
-                voxel_world.set_voxel(
-                    IVec3::new(pool_x + dx, fy - dy, pool_z + dz),
-                    water,
-                );
-            }
-        }
-    }
-
-    // --- Stone wall with windows (along X axis) -------------------------------
-    let wall_z = cz + 64;
-    for x in (cx - 60)..=(cx + 60) {
-        for y in (fy + 1)..=(fy + 20) {
-            // Window gaps every 24 blocks, 8 wide, at heights 9-16
-            let rel_x = (x - (cx - 60)) % 24;
-            let rel_y = y - fy;
-            let is_window =
-                (rel_x >= 8 && rel_x <= 15) && (rel_y >= 9 && rel_y <= 16);
-            if !is_window {
-                for w in 0..4 {
-                    voxel_world.set_voxel(IVec3::new(x, y, wall_z + w), stone);
-                }
-            }
-        }
-    }
-
-    // --- Trees (use template from world_gen) ----------------------------------
-    let tree = tree_template();
-    tree.stamp(voxel_world, IVec3::new(cx + 20, fy + 1, cz + 24));
-    tree.stamp(voxel_world, IVec3::new(cx - 12, fy + 1, cz + 40));
-    tree.stamp(voxel_world, IVec3::new(cx + 60, fy + 1, cz + 12));
-    tree.stamp(voxel_world, IVec3::new(cx - 72, fy + 1, cz - 20));
-
-    // --- Boulders (use template from world_gen) -------------------------------
-    let boulder = boulder_template();
-    boulder.stamp(voxel_world, IVec3::new(cx + 48, fy + 1, cz - 12));
-    boulder.stamp(voxel_world, IVec3::new(cx - 32, fy + 1, cz - 60));
-
-    // --- SDF-type showcase (Phase 2a/2b visual verification) ------------------
-    // These voxels demonstrate sphere SDF (type 1), torus SDF (type 3), and
-    // metallic reflections.  Placed at ground level, visible from the default
-    // camera position.
-
-    // Sphere-type voxels: a 7×4×3 block of blue-white spheroids to the left.
-    // cx-8 → viewing angle ≈11° from camera centre, well within any FOV.
-    let sphere_mat = VoxelMaterial {
-        r: 80,
-        g: 160,
-        b: 230,
-        roughness: 6,
-        metallic: false,
-        sdf_type: 1,
-    };
-    for dy in 1..=4 {
-        for dx in -3_i32..=3 {
-            for dz in 0..3_i32 {
-                voxel_world.set_voxel(
-                    IVec3::new(cx - 8 + dx, fy + dy, cz + 30 + dz),
-                    sphere_mat,
-                );
-            }
-        }
-    }
-
-    // Torus-type voxels: a 7×4×3 block of amber tori to the right.
-    // cx+8 → same ~11° from centre, symmetric with spheres.
-    let torus_mat = VoxelMaterial {
-        r: 230,
-        g: 130,
-        b: 40,
-        roughness: 6,
-        metallic: false,
-        sdf_type: 3,
-    };
-    for dy in 1..=4 {
-        for dx in -3_i32..=3 {
-            for dz in 0..3_i32 {
-                voxel_world.set_voxel(
-                    IVec3::new(cx + 8 + dx, fy + dy, cz + 30 + dz),
-                    torus_mat,
-                );
-            }
-        }
-    }
-
-    // Metallic-reflective wall: a 17×14×2 silver slab as a backdrop behind
-    // the showcase blocks, close enough to show reflections in ray march mode.
-    let metallic_mat = VoxelMaterial {
-        r: 192,
-        g: 192,
-        b: 200,
-        roughness: 2,
-        metallic: true,
-        sdf_type: 0,
-    };
-    for dy in 1..=14 {
-        for dx in -8_i32..=8 {
-            for dz in 0..2_i32 {
-                voxel_world.set_voxel(
-                    IVec3::new(cx + dx, fy + dy, cz + 18 + dz),
-                    metallic_mat,
-                );
-            }
-        }
-    }
-
-    // --- Palette demo spheres -------------------------------------------------
-    voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X, SVO_GROUND_Y, SCENE_Z),
-        16.0,
-        palette.voxel_primary.to_voxel_material(),
-    );
-    voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X + 48.0, SVO_GROUND_Y, SCENE_Z),
-        12.0,
-        palette.voxel_secondary.to_voxel_material(),
-    );
-    voxel_world.apply_sdf_brush(
-        Vec3::new(SCENE_X - 48.0, SVO_GROUND_Y, SCENE_Z),
-        8.0,
-        palette.voxel_highlight.to_voxel_material(),
-    );
+    paint_ground_slab(voxel_world, cx, cz, fy, grass, dirt, stone);
+    paint_stone_tower(voxel_world, cx + 40, cz - 32, fy, stone);
+    paint_stone_arch(voxel_world, cx - 24, cz + 16, fy, stone);
+    paint_sand_pyramid(voxel_world, cx - 48, cz - 48, fy, sand);
+    paint_water_pool(voxel_world, cx + 32, cz + 40, fy, water);
+    paint_window_wall(voxel_world, cx, cz, fy, stone);
+    paint_templates(voxel_world, cx, cz, fy);
+    paint_showcase_voxels(voxel_world, cx, cz, fy);
+    paint_palette_demo(voxel_world, &palette);
 
     // Rebuild the ref map so theme changes can re-pack palette voxels.
     // Drop the VoxelWorld borrow first so world is available again.

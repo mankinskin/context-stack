@@ -16,7 +16,7 @@ use super::{
     logs,
 };
 
-pub fn execute(
+fn execute_workspace_command(
     manager: &mut WorkspaceManager,
     cmd: Command,
 ) -> Result<CommandResult, ApiError> {
@@ -57,6 +57,15 @@ pub fn execute(
             manager.delete_workspace(&name)?;
             Ok(CommandResult::Ok)
         },
+        _ => unreachable!("workspace command expected"),
+    }
+}
+
+fn execute_graph_command(
+    manager: &mut WorkspaceManager,
+    cmd: Command,
+) -> Result<CommandResult, ApiError> {
+    match cmd {
         Command::AddAtom { workspace, ch } => {
             let info = manager.add_atom(&workspace, ch)?;
             Ok(CommandResult::AtomInfo(info))
@@ -85,6 +94,15 @@ pub fn execute(
             let tokens = manager.list_vertices(&workspace)?;
             Ok(CommandResult::TokenInfoList { tokens })
         },
+        _ => unreachable!("graph command expected"),
+    }
+}
+
+fn execute_traversal_command(
+    manager: &mut WorkspaceManager,
+    cmd: Command,
+) -> Result<CommandResult, ApiError> {
+    match cmd {
         Command::SearchPattern { workspace, query } => {
             let result = manager.search_pattern(&workspace, query)?;
             Ok(CommandResult::SearchResult(result))
@@ -121,6 +139,15 @@ pub fn execute(
             let result = manager.read_file(&workspace, &path)?;
             Ok(CommandResult::ReadResult(result))
         },
+        _ => unreachable!("traversal command expected"),
+    }
+}
+
+fn execute_inspection_command(
+    manager: &mut WorkspaceManager,
+    cmd: Command,
+) -> Result<CommandResult, ApiError> {
+    match cmd {
         Command::GetSnapshot { workspace } => {
             let snapshot = manager.get_snapshot(&workspace)?;
             Ok(CommandResult::Snapshot(snapshot))
@@ -141,13 +168,19 @@ pub fn execute(
             let display = manager.show_vertex(&workspace, index)?;
             Ok(CommandResult::GraphDisplay { display })
         },
-        Command::RenderAsciiGraph {
-            workspace,
-            ascii_dag,
-        } => {
+        Command::RenderAsciiGraph { workspace, ascii_dag } => {
             let display = manager.render_ascii_graph(&workspace, ascii_dag)?;
             Ok(CommandResult::GraphDisplay { display })
         },
+        _ => unreachable!("inspection command expected"),
+    }
+}
+
+fn execute_log_command(
+    manager: &mut WorkspaceManager,
+    cmd: Command,
+) -> Result<CommandResult, ApiError> {
+    match cmd {
         Command::ListLogs {
             workspace,
             pattern,
@@ -155,7 +188,7 @@ pub fn execute(
         } => {
             let log_dir = manager.log_dir(&workspace)?;
             let log_list = logs::list_logs(&log_dir, pattern.as_deref(), limit)
-                .map_err(|e| ApiError::Log(e))?;
+                .map_err(ApiError::Log)?;
             Ok(CommandResult::LogList { logs: log_list })
         },
         Command::GetLog {
@@ -173,7 +206,7 @@ pub fn execute(
                 limit,
                 offset,
             )
-            .map_err(|e| ApiError::Log(e))?;
+            .map_err(ApiError::Log)?;
             let returned = entries.len();
             Ok(CommandResult::LogEntries {
                 filename,
@@ -191,22 +224,17 @@ pub fn execute(
             limit,
         } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let (entries, total) =
-                logs::query_log(&log_dir, &filename, &query, limit)
-                    .map_err(|e| ApiError::Log(e))?;
+            let (entries, total) = logs::query_log(&log_dir, &filename, &query, limit)
+                .map_err(ApiError::Log)?;
             Ok(CommandResult::LogQueryResult {
                 query,
                 matches: total,
                 entries,
             })
         },
-        Command::AnalyzeLog {
-            workspace,
-            filename,
-        } => {
+        Command::AnalyzeLog { workspace, filename } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let analysis = logs::analyze_log(&log_dir, &filename)
-                .map_err(|e| ApiError::Log(e))?;
+            let analysis = logs::analyze_log(&log_dir, &filename).map_err(ApiError::Log)?;
             Ok(CommandResult::LogAnalysis(analysis))
         },
         Command::SearchLogs {
@@ -215,22 +243,17 @@ pub fn execute(
             limit_per_file,
         } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let (results, files_with_matches) =
-                logs::search_logs(&log_dir, &query, limit_per_file)
-                    .map_err(|e| ApiError::Log(e))?;
+            let (results, files_with_matches) = logs::search_logs(&log_dir, &query, limit_per_file)
+                .map_err(ApiError::Log)?;
             Ok(CommandResult::LogSearchResult {
                 query,
                 files_with_matches,
                 results,
             })
         },
-        Command::DeleteLog {
-            workspace,
-            filename,
-        } => {
+        Command::DeleteLog { workspace, filename } => {
             let log_dir = manager.log_dir(&workspace)?;
-            logs::delete_log(&log_dir, &filename)
-                .map_err(|e| ApiError::Log(e))?;
+            logs::delete_log(&log_dir, &filename).map_err(ApiError::Log)?;
             Ok(CommandResult::Ok)
         },
         Command::DeleteLogs {
@@ -238,10 +261,18 @@ pub fn execute(
             older_than_days,
         } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let result = logs::delete_logs(&log_dir, older_than_days)
-                .map_err(|e| ApiError::Log(e))?;
+            let result = logs::delete_logs(&log_dir, older_than_days).map_err(ApiError::Log)?;
             Ok(CommandResult::LogDeleteResult(result))
         },
+        _ => unreachable!("log command expected"),
+    }
+}
+
+fn execute_integration_command(
+    manager: &mut WorkspaceManager,
+    cmd: Command,
+) -> Result<CommandResult, ApiError> {
+    match cmd {
         Command::ExportWorkspace {
             workspace,
             format,
@@ -263,9 +294,7 @@ pub fn execute(
             path,
             overwrite,
         } => {
-            let info = export_import::import_workspace(
-                manager, &name, &path, overwrite,
-            )?;
+            let info = export_import::import_workspace(manager, &name, &path, overwrite)?;
             Ok(CommandResult::WorkspaceInfo(info))
         },
         Command::CompareWorkspaces {
@@ -289,6 +318,55 @@ pub fn execute(
                 .map_err(ApiError::Compare)?;
             Ok(CommandResult::GraphDiff(result))
         },
+        _ => unreachable!("integration command expected"),
+    }
+}
+
+pub fn execute(
+    manager: &mut WorkspaceManager,
+    cmd: Command,
+) -> Result<CommandResult, ApiError> {
+    match cmd {
+        Command::CreateWorkspace { .. }
+        | Command::CreateWorkspaceFromNgrams { .. }
+        | Command::OpenWorkspace { .. }
+        | Command::CloseWorkspace { .. }
+        | Command::SaveWorkspace { .. }
+        | Command::ListWorkspaces
+        | Command::DeleteWorkspace { .. } => execute_workspace_command(manager, cmd),
+        Command::AddAtom { .. }
+        | Command::AddAtoms { .. }
+        | Command::GetAtom { .. }
+        | Command::ListAtoms { .. }
+        | Command::AddSimplePattern { .. }
+        | Command::GetVertex { .. }
+        | Command::ListVertices { .. } => execute_graph_command(manager, cmd),
+        Command::SearchPattern { .. }
+        | Command::SearchSequence { .. }
+        | Command::InsertFirstMatch { .. }
+        | Command::InsertSequence { .. }
+        | Command::InsertSequences { .. }
+        | Command::ReadPattern { .. }
+        | Command::ReadAsText { .. }
+        | Command::ReadSequence { .. }
+        | Command::ReadFile { .. } => execute_traversal_command(manager, cmd),
+        Command::GetSnapshot { .. }
+        | Command::GetStatistics { .. }
+        | Command::ValidateGraph { .. }
+        | Command::ShowGraph { .. }
+        | Command::ShowVertex { .. }
+        | Command::RenderAsciiGraph { .. } => execute_inspection_command(manager, cmd),
+        Command::ListLogs { .. }
+        | Command::GetLog { .. }
+        | Command::QueryLog { .. }
+        | Command::AnalyzeLog { .. }
+        | Command::SearchLogs { .. }
+        | Command::DeleteLog { .. }
+        | Command::DeleteLogs { .. } => execute_log_command(manager, cmd),
+        Command::ExportWorkspace { .. }
+        | Command::ImportWorkspace { .. }
+        | Command::CompareWorkspaces { .. }
+        | Command::CompareVertices { .. } => execute_integration_command(manager, cmd),
     }
 }
 

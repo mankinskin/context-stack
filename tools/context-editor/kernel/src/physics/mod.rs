@@ -150,6 +150,136 @@ fn is_solid(
         .unwrap_or(false)
 }
 
+fn fill_chunk_grid(
+    world: &VoxelWorld,
+    chunk_pos: IVec3,
+    chunk_size: i32,
+    n: usize,
+) -> Vec<bool> {
+    let mut grid = vec![false; n * n * n];
+    for dz in 0..chunk_size {
+        for dy in 0..chunk_size {
+            for dx in 0..chunk_size {
+                let voxel = chunk_pos + IVec3::new(dx, dy, dz);
+                if is_solid(world, voxel) {
+                    grid[(dz as usize * n + dy as usize) * n + dx as usize] = true;
+                }
+            }
+        }
+    }
+    grid
+}
+
+fn mark_consumed_region(
+    consumed: &mut [bool],
+    n: usize,
+    x: usize,
+    y: usize,
+    z: usize,
+    max_x: usize,
+    max_y: usize,
+    max_z: usize,
+) {
+    for cz in z..max_z {
+        for cy in y..max_y {
+            for cx in x..max_x {
+                consumed[(cz * n + cy) * n + cx] = true;
+            }
+        }
+    }
+}
+
+fn emit_box(
+    boxes: &mut Vec<(Vec3, Quat, Collider)>,
+    x: usize,
+    y: usize,
+    z: usize,
+    max_x: usize,
+    max_y: usize,
+    max_z: usize,
+) {
+    let sx = (max_x - x) as f32;
+    let sy = (max_y - y) as f32;
+    let sz = (max_z - z) as f32;
+    let center = Vec3::new(
+        x as f32 + sx * 0.5,
+        y as f32 + sy * 0.5,
+        z as f32 + sz * 0.5,
+    );
+    boxes.push((
+        center,
+        Quat::IDENTITY,
+        Collider::cuboid(sx * 0.5, sy * 0.5, sz * 0.5),
+    ));
+}
+
+fn extend_x(
+    grid: &[bool],
+    consumed: &[bool],
+    n: usize,
+    x: usize,
+    y: usize,
+    z: usize,
+) -> usize {
+    let mut max_x = x + 1;
+    while max_x < n {
+        let index = (z * n + y) * n + max_x;
+        if grid[index] && !consumed[index] {
+            max_x += 1;
+        } else {
+            break;
+        }
+    }
+    max_x
+}
+
+fn extend_y(
+    grid: &[bool],
+    consumed: &[bool],
+    n: usize,
+    x: usize,
+    y: usize,
+    z: usize,
+    max_x: usize,
+) -> usize {
+    let mut max_y = y + 1;
+    'outer_y: while max_y < n {
+        for cx in x..max_x {
+            let index = (z * n + max_y) * n + cx;
+            if !grid[index] || consumed[index] {
+                break 'outer_y;
+            }
+        }
+        max_y += 1;
+    }
+    max_y
+}
+
+fn extend_z(
+    grid: &[bool],
+    consumed: &[bool],
+    n: usize,
+    x: usize,
+    y: usize,
+    z: usize,
+    max_x: usize,
+    max_y: usize,
+) -> usize {
+    let mut max_z = z + 1;
+    'outer_z: while max_z < n {
+        for cy in y..max_y {
+            for cx in x..max_x {
+                let index = (max_z * n + cy) * n + cx;
+                if !grid[index] || consumed[index] {
+                    break 'outer_z;
+                }
+            }
+        }
+        max_z += 1;
+    }
+    max_z
+}
+
 /// Build a compound Rapier [`Collider`] from the occupied voxels in a 16³ chunk.
 ///
 /// Uses a greedy sweep-merged algorithm:
@@ -166,20 +296,7 @@ pub fn rebuild_chunk_collider(
     chunk_size: i32,
 ) -> Option<Collider> {
     let n = chunk_size as usize;
-
-    // Build occupancy grid
-    let mut grid = vec![false; n * n * n];
-    for dz in 0..chunk_size {
-        for dy in 0..chunk_size {
-            for dx in 0..chunk_size {
-                let voxel = chunk_pos + IVec3::new(dx, dy, dz);
-                if is_solid(world, voxel) {
-                    grid[(dz as usize * n + dy as usize) * n + dx as usize] =
-                        true;
-                }
-            }
-        }
-    }
+    let grid = fill_chunk_grid(world, chunk_pos, chunk_size, n);
 
     let mut boxes: Vec<(Vec3, Quat, Collider)> = Vec::new();
     let mut consumed = vec![false; n * n * n];
@@ -192,66 +309,12 @@ pub fn rebuild_chunk_collider(
                     continue;
                 }
 
-                // Greedily extend in X
-                let mut max_x = x + 1;
-                while max_x < n {
-                    let i = (z * n + y) * n + max_x;
-                    if grid[i] && !consumed[i] {
-                        max_x += 1;
-                    } else {
-                        break;
-                    }
-                }
+                let max_x = extend_x(&grid, &consumed, n, x, y, z);
+                let max_y = extend_y(&grid, &consumed, n, x, y, z, max_x);
+                let max_z = extend_z(&grid, &consumed, n, x, y, z, max_x, max_y);
 
-                // Greedily extend in Y
-                let mut max_y = y + 1;
-                'outer_y: while max_y < n {
-                    for cx in x..max_x {
-                        let i = (z * n + max_y) * n + cx;
-                        if !grid[i] || consumed[i] {
-                            break 'outer_y;
-                        }
-                    }
-                    max_y += 1;
-                }
-
-                // Greedily extend in Z
-                let mut max_z = z + 1;
-                'outer_z: while max_z < n {
-                    for cy in y..max_y {
-                        for cx in x..max_x {
-                            let i = (max_z * n + cy) * n + cx;
-                            if !grid[i] || consumed[i] {
-                                break 'outer_z;
-                            }
-                        }
-                    }
-                    max_z += 1;
-                }
-
-                // Mark consumed
-                for cz in z..max_z {
-                    for cy in y..max_y {
-                        for cx in x..max_x {
-                            consumed[(cz * n + cy) * n + cx] = true;
-                        }
-                    }
-                }
-
-                // Emit a box collider for this region
-                let sx = (max_x - x) as f32;
-                let sy = (max_y - y) as f32;
-                let sz = (max_z - z) as f32;
-                let center = Vec3::new(
-                    x as f32 + sx * 0.5,
-                    y as f32 + sy * 0.5,
-                    z as f32 + sz * 0.5,
-                );
-                boxes.push((
-                    center,
-                    Quat::IDENTITY,
-                    Collider::cuboid(sx * 0.5, sy * 0.5, sz * 0.5),
-                ));
+                mark_consumed_region(&mut consumed, n, x, y, z, max_x, max_y, max_z);
+                emit_box(&mut boxes, x, y, z, max_x, max_y, max_z);
             }
         }
     }

@@ -9,6 +9,47 @@ pub enum MarkdownElement {
     CrossReference { target_id: String, label: String },
 }
 
+fn finish_code_block(
+    elements: &mut Vec<MarkdownElement>,
+    code_lang: &mut String,
+    code_buf: &mut String,
+    in_code_block: &mut bool,
+) {
+    elements.push(MarkdownElement::CodeBlock {
+        language: code_lang.clone(),
+        code: code_buf.clone(),
+    });
+    *in_code_block = false;
+    code_buf.clear();
+    code_lang.clear();
+}
+
+fn append_code_line(code_buf: &mut String, line: &str) {
+    if !code_buf.is_empty() {
+        code_buf.push('\n');
+    }
+    code_buf.push_str(line);
+}
+
+fn parse_markdown_line(trimmed: &str) -> Option<MarkdownElement> {
+    if trimmed.starts_with('#') {
+        let level = trimmed.chars().take_while(|&ch| ch == '#').count() as u8;
+        let text = trimmed[level as usize..].trim().to_string();
+        return Some(MarkdownElement::Heading { level, text });
+    }
+
+    if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+        return Some(MarkdownElement::HorizontalRule);
+    }
+
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+        return Some(MarkdownElement::ListItem(trimmed[2..].to_string()));
+    }
+
+    parse_cross_reference(trimmed)
+        .or_else(|| Some(MarkdownElement::Paragraph(trimmed.to_string())))
+}
+
 /// Parse a simple markdown string into structured elements.
 ///
 /// This is a lightweight parser — handles headings, code blocks, list items,
@@ -23,18 +64,14 @@ pub fn parse_markdown(source: &str) -> Vec<MarkdownElement> {
     while let Some(line) = lines.next() {
         if in_code_block {
             if line.trim_start().starts_with("```") {
-                elements.push(MarkdownElement::CodeBlock {
-                    language: code_lang.clone(),
-                    code: code_buf.clone(),
-                });
-                in_code_block = false;
-                code_buf.clear();
-                code_lang.clear();
+                finish_code_block(
+                    &mut elements,
+                    &mut code_lang,
+                    &mut code_buf,
+                    &mut in_code_block,
+                );
             } else {
-                if !code_buf.is_empty() {
-                    code_buf.push('\n');
-                }
-                code_buf.push_str(line);
+                append_code_line(&mut code_buf, line);
             }
             continue;
         }
@@ -51,29 +88,9 @@ pub fn parse_markdown(source: &str) -> Vec<MarkdownElement> {
             continue;
         }
 
-        if trimmed.starts_with('#') {
-            let level = trimmed.chars().take_while(|&c| c == '#').count() as u8;
-            let text = trimmed[level as usize..].trim().to_string();
-            elements.push(MarkdownElement::Heading { level, text });
-            continue;
+        if let Some(element) = parse_markdown_line(trimmed) {
+            elements.push(element);
         }
-
-        if trimmed == "---" || trimmed == "***" || trimmed == "___" {
-            elements.push(MarkdownElement::HorizontalRule);
-            continue;
-        }
-
-        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            elements.push(MarkdownElement::ListItem(trimmed[2..].to_string()));
-            continue;
-        }
-
-        if let Some(xref) = parse_cross_reference(trimmed) {
-            elements.push(xref);
-            continue;
-        }
-
-        elements.push(MarkdownElement::Paragraph(trimmed.to_string()));
     }
 
     if in_code_block && !code_buf.is_empty() {

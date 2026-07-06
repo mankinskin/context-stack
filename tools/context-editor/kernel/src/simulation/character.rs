@@ -18,6 +18,84 @@ const MOVE_SPEED: f32 = 8.0;
 const SPRINT_MULT: f32 = 2.0;
 const MOUSE_SENSITIVITY: f32 = 0.003;
 
+fn movement_input(
+    keys: &ButtonInput<KeyCode>,
+    forward: Vec3,
+    right: Vec3,
+) -> Vec3 {
+    let mut move_dir = Vec3::ZERO;
+    if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
+        move_dir += forward;
+    }
+    if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
+        move_dir -= forward;
+    }
+    if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
+        move_dir += right;
+    }
+    if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
+        move_dir -= right;
+    }
+    move_dir
+}
+
+fn movement_speed(keys: &ButtonInput<KeyCode>) -> f32 {
+    MOVE_SPEED
+        * if keys.pressed(KeyCode::ShiftLeft) {
+            SPRINT_MULT
+        } else {
+            1.0
+        }
+}
+
+fn free_fly_displacement(
+    keys: &ButtonInput<KeyCode>,
+    ctrl: &mut CharacterController,
+    mut move_dir: Vec3,
+    speed: f32,
+    delta_secs: f32,
+    up: Vec3,
+) -> Vec3 {
+    if keys.pressed(KeyCode::KeyQ) {
+        move_dir -= up;
+    }
+    if keys.pressed(KeyCode::KeyE) {
+        move_dir += up;
+    }
+
+    ctrl.vertical_velocity = 0.0;
+
+    if move_dir.length_squared() > 0.0 {
+        move_dir.normalize() * speed * delta_secs
+    } else {
+        Vec3::ZERO
+    }
+}
+
+fn physics_displacement(
+    keys: &ButtonInput<KeyCode>,
+    ctrl: &mut CharacterController,
+    mut move_dir: Vec3,
+    speed: f32,
+    delta_secs: f32,
+    grounded: bool,
+) -> Vec3 {
+    move_dir.y = 0.0;
+    if move_dir.length_squared() > 0.0 {
+        move_dir = move_dir.normalize();
+    }
+
+    if keys.pressed(KeyCode::Space) {
+        ctrl.vertical_velocity += FLY_THRUST * delta_secs;
+    }
+    ctrl.vertical_velocity -= GRAVITY * delta_secs;
+    if grounded && ctrl.vertical_velocity < 0.0 {
+        ctrl.vertical_velocity = 0.0;
+    }
+
+    move_dir * speed * delta_secs + Vec3::Y * ctrl.vertical_velocity * delta_secs
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -101,65 +179,29 @@ fn character_movement(
         let right = *transform.right();
         let up = Vec3::Y;
 
-        let mut move_dir = Vec3::ZERO;
-        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-            move_dir += forward;
-        }
-        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-            move_dir -= forward;
-        }
-        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-            move_dir += right;
-        }
-        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-            move_dir -= right;
-        }
-
-        let speed = MOVE_SPEED
-            * if keys.pressed(KeyCode::ShiftLeft) {
-                SPRINT_MULT
-            } else {
-                1.0
-            };
+        let move_dir = movement_input(&keys, forward, right);
+        let speed = movement_speed(&keys);
+        let delta_secs = time.delta_secs();
 
         let displacement = if is_free_fly_enabled() {
-            // --- Free-fly mode: full 3-axis movement, no gravity ---
-            // Keep the horizontal contribution from the camera-forward direction.
-            // Q = descend, E = ascend (world-space Y).
-            if keys.pressed(KeyCode::KeyQ) {
-                move_dir -= up;
-            }
-            if keys.pressed(KeyCode::KeyE) {
-                move_dir += up;
-            }
-
-            // Reset vertical velocity so physics mode resumes correctly on toggle.
-            ctrl.vertical_velocity = 0.0;
-
-            if move_dir.length_squared() > 0.0 {
-                move_dir.normalize() * speed * time.delta_secs()
-            } else {
-                Vec3::ZERO
-            }
+            free_fly_displacement(
+                &keys,
+                &mut ctrl,
+                move_dir,
+                speed,
+                delta_secs,
+                up,
+            )
         } else {
-            // --- Physics mode: gravity + ground detection ---
-            move_dir.y = 0.0;
-            if move_dir.length_squared() > 0.0 {
-                move_dir = move_dir.normalize();
-            }
-
             let grounded = output.map_or(false, |o| o.grounded);
-
-            if keys.pressed(KeyCode::Space) {
-                ctrl.vertical_velocity += FLY_THRUST * time.delta_secs();
-            }
-            ctrl.vertical_velocity -= GRAVITY * time.delta_secs();
-            if grounded && ctrl.vertical_velocity < 0.0 {
-                ctrl.vertical_velocity = 0.0;
-            }
-
-            move_dir * speed * time.delta_secs()
-                + Vec3::Y * ctrl.vertical_velocity * time.delta_secs()
+            physics_displacement(
+                &keys,
+                &mut ctrl,
+                move_dir,
+                speed,
+                delta_secs,
+                grounded,
+            )
         };
 
         kcc.translation = Some(displacement);
