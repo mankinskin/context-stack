@@ -40,6 +40,7 @@ use crate::{
 };
 use context_trace::{
     HasVertexIndex,
+    Token,
     graph::getters::ErrorReason,
 };
 use derive_more::derive::{
@@ -206,6 +207,106 @@ impl SplitVertexCache {
         }
         states
     }
+
+    fn target_offset_indices(
+        &self,
+        target_positions: &[NonZeroUsize],
+    ) -> Vec<usize> {
+        self.positions
+            .keys()
+            .enumerate()
+            .filter_map(|(index, pos)| target_positions.contains(pos).then_some(index))
+            .collect_vec()
+    }
+
+    fn target_partition_range(
+        root_mode: RootMode,
+        target_offset_indices: &[usize],
+        num_offsets: usize,
+    ) -> PartitionRange {
+        PartitionRange::from(match root_mode {
+            RootMode::Infix => {
+                assert_eq!(
+                    target_offset_indices.len(),
+                    2,
+                    "Infix mode requires exactly 2 target positions"
+                );
+                (target_offset_indices[0] + 1)..=target_offset_indices[1]
+            },
+            RootMode::Prefix => {
+                assert_eq!(
+                    target_offset_indices.len(),
+                    1,
+                    "Prefix mode requires exactly 1 target position"
+                );
+                0..=target_offset_indices[0]
+            },
+            RootMode::Postfix => {
+                assert_eq!(
+                    target_offset_indices.len(),
+                    1,
+                    "Postfix mode requires exactly 1 target position"
+                );
+                (target_offset_indices[0] + 1)..=num_offsets
+            },
+        })
+    }
+
+    fn wrapper_partition_range(
+        root_mode: RootMode,
+        num_offsets: usize,
+    ) -> PartitionRange {
+        PartitionRange::from(match root_mode {
+            RootMode::Infix => 1..=(num_offsets - 1),
+            RootMode::Prefix => 0..=(num_offsets - 1),
+            RootMode::Postfix => 1..=num_offsets,
+        })
+    }
+
+    fn root_mode_inner_splits(
+        &self,
+        ctx: NodeTraceCtx,
+        root_mode: RootMode,
+    ) -> Result<
+        (
+            BTreeMap<NonZeroUsize, SplitPositionCache>,
+            Vec<SplitTraceState>,
+        ),
+        ErrorReason,
+    > {
+        let missing = || ErrorReason::MissingCacheEntry(ctx.index.vertex_index());
+
+        match root_mode {
+            RootMode::Infix => Ok(Self::add_inner_offsets(
+                ctx.clone(),
+                OffsetIndexRange::<In<Trace>>::get_splits(&(0..1), self)
+                    .ok_or_else(missing)?,
+            )),
+            RootMode::Prefix => Ok(Self::add_inner_offsets::<Pre<Trace>, _>(
+                ctx.clone(),
+                OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self)
+                    .ok_or_else(missing)?,
+            )),
+            RootMode::Postfix => Ok(Self::add_inner_offsets::<Post<Trace>, _>(
+                ctx.clone(),
+                OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self)
+                    .ok_or_else(missing)?,
+            )),
+        }
+    }
+
+    fn root_mode_wrapper_splits(
+        &self,
+        ctx: NodeTraceCtx,
+        root_mode: RootMode,
+    ) -> BTreeMap<NonZeroUsize, SplitPositionCache> {
+        match root_mode {
+            RootMode::Prefix => self.add_wrapper_offsets_prefix(ctx),
+            RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx),
+            RootMode::Infix => self.add_wrapper_offsets_infix(ctx),
+        }
+    }
+
     pub(crate) fn root_augmentation(
         &mut self,
         ctx: NodeTraceCtx,
@@ -220,39 +321,14 @@ impl SplitVertexCache {
             "root_augmentation"
         );
 
-        let missing =
-            || ErrorReason::MissingCacheEntry(ctx.index.vertex_index());
-
-        // First add inner offsets for the target partition
-        let (splits, next) = match root_mode {
-            RootMode::Infix => Self::add_inner_offsets(
-                ctx.clone(),
-                OffsetIndexRange::<In<Trace>>::get_splits(&(0..1), self)
-                    .ok_or_else(missing)?,
-            ),
-            RootMode::Prefix => Self::add_inner_offsets::<Pre<Trace>, _>(
-                ctx.clone(),
-                OffsetIndexRange::<Pre<Trace>>::get_splits(&(..0), self)
-                    .ok_or_else(missing)?,
-            ),
-            RootMode::Postfix => Self::add_inner_offsets::<Post<Trace>, _>(
-                ctx.clone(),
-                OffsetIndexRange::<Post<Trace>>::get_splits(&(0..), self)
-                    .ok_or_else(missing)?,
-            ),
-        };
+        let (splits, next) = self.root_mode_inner_splits(ctx.clone(), root_mode)?;
         debug!(
             inner_offsets = ?splits.keys().collect_vec(),
             "After add_inner_offsets"
         );
         self.positions.extend(splits);
 
-        // Then add wrapper offsets for Prefix/Postfix modes
-        let wrapper_splits = match root_mode {
-            RootMode::Prefix => self.add_wrapper_offsets_prefix(ctx.clone()),
-            RootMode::Postfix => self.add_wrapper_offsets_postfix(ctx.clone()),
-            RootMode::Infix => self.add_wrapper_offsets_infix(ctx.clone()),
-        };
+        let wrapper_splits = self.root_mode_wrapper_splits(ctx.clone(), root_mode);
 
         debug!(
             wrapper_offsets = ?wrapper_splits.keys().collect_vec(),
@@ -262,74 +338,16 @@ impl SplitVertexCache {
 
         debug!(final_positions=?self.positions.keys().collect::<Vec<_>>(), "Final positions");
 
-        // Find where the original target positions are in the final positions array
-        // toi = "target offset indices"
-        let toi = self
-            .positions
-            .keys()
-            .enumerate()
-            .filter_map(|(i, pos)| target_positions.contains(pos).then_some(i))
-            .collect_vec();
+        let toi = self.target_offset_indices(&target_positions);
 
         debug!(?toi, "target offset indices");
 
-        // Calculate target partition range based on root mode and original target positions
-        // The target range is defined by where the ORIGINAL target positions are,
-        // not by the total number of offsets (which includes wrapper offsets)
-        let target_range = PartitionRange::from(match root_mode {
-            RootMode::Infix => {
-                // Infix: partitions between first and last target offset
-                assert_eq!(
-                    toi.len(),
-                    2,
-                    "Infix mode requires exactly 2 target positions"
-                );
-                // Partition range from after first offset to before last offset
-                (toi[0] + 1)..=toi[1]
-            },
-            RootMode::Prefix => {
-                // Prefix: all partitions left of (and including) the last target offset
-                assert_eq!(
-                    toi.len(),
-                    1,
-                    "Prefix mode requires exactly 1 target position"
-                );
-                // Partition range from 0 to the target offset index
-                0..=toi[0]
-            },
-            RootMode::Postfix => {
-                // Postfix: all partitions right of (and including) the first target offset
-                assert_eq!(
-                    toi.len(),
-                    1,
-                    "Postfix mode requires exactly 1 target position"
-                );
-                let num_offsets = self.positions.len();
-                // Partition range from after target offset to end
-                (toi[0] + 1)..=num_offsets
-            },
-        });
+        let num_offsets = self.positions.len();
+        let target_range = Self::target_partition_range(root_mode, &toi, num_offsets);
 
         debug!(?target_range, "calculated target_range");
 
-        // Compute required partitions based on target and wrapper ranges
-        // The wrapper range is the full operating range (from first to last offset index)
-        let num_offsets = self.positions.len();
-        let wrapper_range = PartitionRange::from(match root_mode {
-            RootMode::Infix => {
-                // Wrapper spans from first to last offset
-                // For infix with 5 offsets: partitions 1..=4 (skip prefix 0 and postfix 5)
-                1..=(num_offsets - 1)
-            },
-            RootMode::Prefix => {
-                // Wrapper spans from 0 to last wrapper offset
-                0..=(num_offsets - 1)
-            },
-            RootMode::Postfix => {
-                // Wrapper spans from first wrapper offset to end
-                1..=num_offsets
-            },
-        });
+        let wrapper_range = Self::wrapper_partition_range(root_mode, num_offsets);
 
         debug!(?wrapper_range, "calculated wrapper_range");
 
@@ -338,6 +356,34 @@ impl SplitVertexCache {
         debug!(required = ?required.iter().collect::<Vec<_>>(), "computed required partitions");
 
         Ok((next, target_range, required))
+    }
+
+    fn boundary_requires_wrapper(
+        &self,
+        target_range: &PartitionRange,
+        wrapper_range: &PartitionRange,
+    ) -> (bool, bool) {
+        let target_start = *target_range.start();
+        let target_end = *target_range.end();
+        let wrapper_start = *wrapper_range.start();
+        let wrapper_end = *wrapper_range.end();
+
+        let right_boundary_unperfect = wrapper_end > target_end
+            && !self.is_split_perfect_at_index(target_end);
+        let left_boundary_unperfect = wrapper_start < target_start
+            && target_start > 0
+            && !self.is_split_perfect_at_index(target_start - 1);
+
+        (left_boundary_unperfect, right_boundary_unperfect)
+    }
+
+    fn add_partition_if_valid(
+        required: &mut RequiredPartitions,
+        range: PartitionRange,
+    ) {
+        if range.start() <= range.end() {
+            required.add(range);
+        }
     }
 
     /// Compute required partitions from target and wrapper ranges.
@@ -356,63 +402,89 @@ impl SplitVertexCache {
         wrapper_range: &PartitionRange,
     ) -> RequiredPartitions {
         let mut required = RequiredPartitions::new();
-
-        // Target is always required
         required.add(target_range.clone());
-
-        // Wrapper is required only if:
-        // 1. It differs from target AND
-        // 2. There's an unperfect split at the boundary
         if wrapper_range != target_range {
             let target_start = *target_range.start();
             let target_end = *target_range.end();
             let wrapper_start = *wrapper_range.start();
             let wrapper_end = *wrapper_range.end();
 
-            // Check if right boundary split is unperfect (wrapper extends past target on right)
-            let right_boundary_unperfect = wrapper_end > target_end
-                && !self.is_split_perfect_at_index(target_end);
-
-            // Check if left boundary split is unperfect (wrapper extends before target on left)
-            let left_boundary_unperfect = wrapper_start < target_start
-                && target_start > 0
-                && !self.is_split_perfect_at_index(target_start - 1);
-
-            // Only add wrapper-related partitions if there's an unperfect boundary
+            let (left_boundary_unperfect, right_boundary_unperfect) =
+                self.boundary_requires_wrapper(target_range, wrapper_range);
             if right_boundary_unperfect || left_boundary_unperfect {
                 required.add(wrapper_range.clone());
-
-                // Inner partitions: the prefix of target up to the first pattern-aligned boundary
-                // For infix: if target is 1..=3 and wrapper is 1..=4, inner is 1..=2
-                // This is the portion of target before the unperfect boundary child
                 if right_boundary_unperfect && target_end > target_start {
-                    let inner_range =
-                        PartitionRange::new(target_start..=(target_end - 1));
-                    required.add(inner_range);
+                    required.add(PartitionRange::new(target_start..=(target_end - 1)));
                 }
-
-                // Also add the suffix of wrapper after target (e.g., 3..=4 for yz)
-                // This ensures we can build pattern [aby, z] for abyz
                 if right_boundary_unperfect {
-                    let suffix_range =
-                        PartitionRange::new((target_end + 1)..=wrapper_end);
-                    if suffix_range.start() <= suffix_range.end() {
-                        required.add(suffix_range);
-                    }
+                    Self::add_partition_if_valid(
+                        &mut required,
+                        PartitionRange::new((target_end + 1)..=wrapper_end),
+                    );
                 }
-
-                // Handle left boundary extension similarly
                 if left_boundary_unperfect && target_start > wrapper_start {
-                    let prefix_range =
-                        PartitionRange::new(wrapper_start..=(target_start - 1));
-                    if prefix_range.start() <= prefix_range.end() {
-                        required.add(prefix_range);
-                    }
+                    Self::add_partition_if_valid(
+                        &mut required,
+                        PartitionRange::new(wrapper_start..=(target_start - 1)),
+                    );
                 }
             }
         }
 
         required
+    }
+
+    fn wrapper_start_offset(
+        pattern: &[Token],
+        child_index: usize,
+    ) -> usize {
+        pattern
+            .iter()
+            .take(child_index)
+            .map(|child| *child.width)
+            .sum()
+    }
+
+    fn wrapper_end_offset(
+        pattern: &[Token],
+        child_index: usize,
+    ) -> usize {
+        pattern
+            .iter()
+            .take(child_index + 1)
+            .map(|child| *child.width)
+            .sum()
+    }
+
+    fn root_width(pattern: &[Token]) -> usize {
+        pattern.iter().map(|child| *child.width).sum()
+    }
+
+    fn insert_wrapper_split(
+        &self,
+        ctx: &NodeTraceCtx,
+        wrapper_splits: &mut BTreeMap<NonZeroUsize, SplitPositionCache>,
+        offset: usize,
+    ) {
+        if let Some(wrapper_pos) = NonZeroUsize::new(offset)
+            && !self.positions.contains_key(&wrapper_pos)
+            && !wrapper_splits.contains_key(&wrapper_pos)
+        {
+            wrapper_splits.insert(
+                wrapper_pos,
+                SplitPositionCache::root(position_splits(
+                    ctx.patterns.iter(),
+                    wrapper_pos,
+                )),
+            );
+        }
+    }
+
+    fn split_cache_at(
+        &self,
+        pos: Option<NonZeroUsize>,
+    ) -> Option<&SplitPositionCache> {
+        pos.and_then(|pos| self.positions.get(&pos))
     }
 
     pub(crate) fn offset_range_partition<K: RangeRole>(
@@ -500,99 +572,38 @@ impl SplitVertexCache {
         &self,
         ctx: NodeTraceCtx,
     ) -> BTreeMap<NonZeroUsize, SplitPositionCache> {
-        // Get the first (and only) split position for postfix
         let split_pos = self.positions.keys().next().copied();
-
         debug!(?split_pos, "ADD_WRAPPER_OFFSETS_POSTFIX");
 
-        if let Some(pos) = split_pos {
-            let split_cache = &self.positions[&pos];
-            let mut wrapper_splits = BTreeMap::new();
+        let mut wrapper_splits = BTreeMap::new();
+        let Some(split_cache) = self.split_cache_at(split_pos) else {
+            return wrapper_splits;
+        };
 
-            // For each child pattern, find wrapper start position and inner offsets
-            for (pid, pattern) in ctx.patterns.iter() {
-                if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
-                    debug!(?pid, ?trace_pos, "Processing pattern");
+        for (pid, pattern) in ctx.patterns.iter() {
+            if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                debug!(?pid, ?trace_pos, "Processing pattern");
+                let Some(inner_offset) = trace_pos.inner_offset else {
+                    debug!("Perfect split, skipping wrapper offset");
+                    continue;
+                };
 
-                    // Only add wrapper offset if this is an unperfect split
-                    // A perfect split (inner_offset = None) doesn't need a wrapper
-                    if trace_pos.inner_offset.is_none() {
-                        debug!("Perfect split, skipping wrapper offset");
-                        continue;
-                    }
+                let child_index = trace_pos.sub_index;
+                let wrapper_start_offset = Self::wrapper_start_offset(pattern, child_index);
+                debug!(wrapper_start_offset, child_index, wrapper_child = ?pattern[child_index], "Wrapper child info");
 
-                    // The wrapper starts at the beginning of the child that contains the split
-                    let child_index = trace_pos.sub_index;
-                    let wrapper_child = pattern[child_index];
-
-                    // Calculate the wrapper start offset (start of this child in root)
-                    let mut wrapper_start_offset = 0;
-                    for i in 0..child_index {
-                        wrapper_start_offset += *pattern[i].width;
-                    }
-
-                    debug!(
-                        wrapper_start_offset,
-                        child_index,
-                        ?wrapper_child,
-                        "Wrapper child info"
-                    );
-
-                    // Add wrapper start position if not already present and not at root start
-                    if wrapper_start_offset > 0
-                        && let Some(wrapper_pos) =
-                            NonZeroUsize::new(wrapper_start_offset)
-                        && !self.positions.contains_key(&wrapper_pos)
-                    {
-                        debug!(
-                            pos = wrapper_pos.get(),
-                            "Adding wrapper offset"
-                        );
-                        wrapper_splits.insert(
-                            wrapper_pos,
-                            SplitPositionCache::root(position_splits(
-                                ctx.patterns.iter(),
-                                wrapper_pos,
-                            )),
-                        );
-                    }
-
-                    // If the split has an inner_offset, it means there's a split WITHIN the wrapper child
-                    // Add this intermediate offset as well
-                    if let Some(inner_offset) = trace_pos.inner_offset {
-                        let intermediate_offset =
-                            wrapper_start_offset + inner_offset.get();
-                        debug!(
-                            ?inner_offset,
-                            intermediate_offset,
-                            "Found inner offset in wrapper"
-                        );
-                        if let Some(intermediate_pos) =
-                            NonZeroUsize::new(intermediate_offset)
-                            && !self.positions.contains_key(&intermediate_pos)
-                            && !wrapper_splits.contains_key(&intermediate_pos)
-                        {
-                            debug!(
-                                pos = intermediate_pos.get(),
-                                "Adding intermediate offset"
-                            );
-                            wrapper_splits.insert(
-                                intermediate_pos,
-                                SplitPositionCache::root(position_splits(
-                                    ctx.patterns.iter(),
-                                    intermediate_pos,
-                                )),
-                            );
-                        }
-                    }
+                if wrapper_start_offset > 0 {
+                    self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_start_offset);
                 }
-            }
 
-            debug!(count = wrapper_splits.len(), "Total wrapper_splits");
-            wrapper_splits
-        } else {
-            BTreeMap::new()
+                let intermediate_offset = wrapper_start_offset + inner_offset.get();
+                debug!(?inner_offset, intermediate_offset, "Found inner offset in wrapper");
+                self.insert_wrapper_split(&ctx, &mut wrapper_splits, intermediate_offset);
+            }
         }
+
+        debug!(count = wrapper_splits.len(), "Total wrapper_splits");
+        wrapper_splits
     }
 
     /// Add wrapper offsets for Prefix mode
@@ -602,54 +613,28 @@ impl SplitVertexCache {
         &self,
         ctx: NodeTraceCtx,
     ) -> BTreeMap<NonZeroUsize, SplitPositionCache> {
-        // Get the first (and only) split position for prefix
         let split_pos = self.positions.keys().next().copied();
 
-        if let Some(pos) = split_pos {
-            let split_cache = &self.positions[&pos];
-            let mut wrapper_splits = BTreeMap::new();
+        let mut wrapper_splits = BTreeMap::new();
+        let Some(split_cache) = self.split_cache_at(split_pos) else {
+            return wrapper_splits;
+        };
 
-            // For each child pattern, find wrapper end position
-            for (pid, pattern) in ctx.patterns.iter() {
-                if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
-                    // Only add wrapper offset if this is an unperfect split
-                    // A perfect split (inner_offset = None) doesn't need a wrapper
-                    if trace_pos.inner_offset.is_none() {
-                        continue;
-                    }
+        for (pid, pattern) in ctx.patterns.iter() {
+            if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
+                if trace_pos.inner_offset.is_none() {
+                    continue;
+                }
 
-                    // The wrapper ends after the child that contains the split
-                    let child_index = trace_pos.sub_index;
-
-                    // Calculate the wrapper end offset (end of this child in root)
-                    let mut wrapper_end_offset = 0;
-                    for i in 0..=child_index {
-                        wrapper_end_offset += *pattern[i].width;
-                    }
-
-                    // Add wrapper end position if not at root end
-                    let root_width: usize =
-                        pattern.iter().map(|c| *c.width).sum();
-                    if wrapper_end_offset < root_width
-                        && let Some(wrapper_pos) =
-                            NonZeroUsize::new(wrapper_end_offset)
-                        && !self.positions.contains_key(&wrapper_pos)
-                    {
-                        wrapper_splits.insert(
-                            wrapper_pos,
-                            SplitPositionCache::root(position_splits(
-                                ctx.patterns.iter(),
-                                wrapper_pos,
-                            )),
-                        );
-                    }
+                let child_index = trace_pos.sub_index;
+                let wrapper_end_offset = Self::wrapper_end_offset(pattern, child_index);
+                if wrapper_end_offset < Self::root_width(pattern) {
+                    self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_end_offset);
                 }
             }
-
-            wrapper_splits
-        } else {
-            BTreeMap::new()
         }
+
+        wrapper_splits
     }
 
     /// Add wrapper offsets for Infix mode
@@ -669,125 +654,44 @@ impl SplitVertexCache {
 
         let mut wrapper_splits = BTreeMap::new();
 
-        // Handle LEFT split position - add wrapper END offset (like Prefix)
-        if let Some(pos) = left_pos {
-            let split_cache = &self.positions[&pos];
-
+        if let Some(split_cache) = self.split_cache_at(left_pos) {
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
-                    // Only add wrapper offset if this is an unperfect split
                     if trace_pos.inner_offset.is_none() {
                         continue;
                     }
 
-                    // The wrapper ends after the child that contains the split
-                    let child_index = trace_pos.sub_index;
-
-                    // Calculate the wrapper end offset (end of this child in root)
-                    let mut wrapper_end_offset = 0;
-                    for i in 0..=child_index {
-                        wrapper_end_offset += *pattern[i].width;
-                    }
-
-                    // Add wrapper end position if not at root end
-                    let root_width: usize =
-                        pattern.iter().map(|c| *c.width).sum();
-                    if wrapper_end_offset < root_width
-                        && let Some(wrapper_pos) =
-                            NonZeroUsize::new(wrapper_end_offset)
-                        && !self.positions.contains_key(&wrapper_pos)
-                        && !wrapper_splits.contains_key(&wrapper_pos)
-                    {
-                        wrapper_splits.insert(
-                            wrapper_pos,
-                            SplitPositionCache::root(position_splits(
-                                ctx.patterns.iter(),
-                                wrapper_pos,
-                            )),
-                        );
+                    let wrapper_end_offset =
+                        Self::wrapper_end_offset(pattern, trace_pos.sub_index);
+                    if wrapper_end_offset < Self::root_width(pattern) {
+                        self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_end_offset);
                     }
                 }
             }
         }
 
-        // Handle RIGHT split position - add wrapper START offset (like Postfix)
-        if let Some(pos) = right_pos {
-            let split_cache = &self.positions[&pos];
-
+        if let Some(split_cache) = self.split_cache_at(right_pos) {
             for (pid, pattern) in ctx.patterns.iter() {
                 if let Some(trace_pos) = split_cache.pattern_splits.get(pid) {
-                    // Only add wrapper offset if this is an unperfect split
-                    if trace_pos.inner_offset.is_none() {
+                    let Some(inner_offset) = trace_pos.inner_offset else {
                         continue;
-                    }
+                    };
 
-                    // The wrapper starts at the beginning of the child that contains the split
                     let child_index = trace_pos.sub_index;
-
-                    // Calculate the wrapper start offset (start of this child in root)
-                    let mut wrapper_start_offset = 0;
-                    for i in 0..child_index {
-                        wrapper_start_offset += *pattern[i].width;
+                    let wrapper_start_offset = Self::wrapper_start_offset(pattern, child_index);
+                    if wrapper_start_offset > 0 {
+                        self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_start_offset);
                     }
 
-                    // Add wrapper start position if not already present and not at root start
-                    if wrapper_start_offset > 0
-                        && let Some(wrapper_pos) =
-                            NonZeroUsize::new(wrapper_start_offset)
-                        && !self.positions.contains_key(&wrapper_pos)
-                        && !wrapper_splits.contains_key(&wrapper_pos)
-                    {
-                        wrapper_splits.insert(
-                            wrapper_pos,
-                            SplitPositionCache::root(position_splits(
-                                ctx.patterns.iter(),
-                                wrapper_pos,
-                            )),
-                        );
-                    }
+                    self.insert_wrapper_split(
+                        &ctx,
+                        &mut wrapper_splits,
+                        wrapper_start_offset + inner_offset.get(),
+                    );
 
-                    // If the split has an inner_offset, add intermediate offset
-                    if let Some(inner_offset) = trace_pos.inner_offset {
-                        let intermediate_offset =
-                            wrapper_start_offset + inner_offset.get();
-                        if let Some(intermediate_pos) =
-                            NonZeroUsize::new(intermediate_offset)
-                            && !self.positions.contains_key(&intermediate_pos)
-                            && !wrapper_splits.contains_key(&intermediate_pos)
-                        {
-                            wrapper_splits.insert(
-                                intermediate_pos,
-                                SplitPositionCache::root(position_splits(
-                                    ctx.patterns.iter(),
-                                    intermediate_pos,
-                                )),
-                            );
-                        }
-                    }
-
-                    // Also add wrapper END offset for the RIGHT split (needed for outer wrapper like abyz)
-                    // This is the end of the child that contains the right split
-                    let root_width: usize =
-                        pattern.iter().map(|c| *c.width).sum();
-                    let mut wrapper_end_offset = 0;
-                    for i in 0..=child_index {
-                        wrapper_end_offset += *pattern[i].width;
-                    }
-
-                    // Add wrapper end position if not at root end
-                    if wrapper_end_offset < root_width
-                        && let Some(wrapper_pos) =
-                            NonZeroUsize::new(wrapper_end_offset)
-                        && !self.positions.contains_key(&wrapper_pos)
-                        && !wrapper_splits.contains_key(&wrapper_pos)
-                    {
-                        wrapper_splits.insert(
-                            wrapper_pos,
-                            SplitPositionCache::root(position_splits(
-                                ctx.patterns.iter(),
-                                wrapper_pos,
-                            )),
-                        );
+                    let wrapper_end_offset = Self::wrapper_end_offset(pattern, child_index);
+                    if wrapper_end_offset < Self::root_width(pattern) {
+                        self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_end_offset);
                     }
                 }
             }
