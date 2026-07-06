@@ -204,6 +204,251 @@ fn get_enum_parent(variant: &str) -> Option<&'static str> {
     }
 }
 
+fn matching_delimiter(open: char) -> Option<char> {
+    match open {
+        '{' => Some('}'),
+        '(' => Some(')'),
+        '[' => Some(']'),
+        '<' => Some('>'),
+        _ => None,
+    }
+}
+
+fn update_nesting_depth(depth: &mut i32, c: char) {
+    match c {
+        '(' | '[' | '<' | '{' => *depth += 1,
+        ')' | ']' | '>' | '}' => *depth -= 1,
+        _ => {},
+    }
+}
+
+fn find_balanced_end(
+    s: &str,
+    content_start: usize,
+    open: char,
+    close: char,
+) -> Option<usize> {
+    let mut depth = 1;
+
+    for (i, c) in s[content_start..].char_indices() {
+        if c == open {
+            depth += 1;
+        } else if c == close {
+            depth -= 1;
+            if depth == 0 {
+                return Some(content_start + i);
+            }
+        }
+    }
+
+    None
+}
+
+fn is_valid_debug_type_name(name: &str) -> bool {
+    !(name.is_empty()
+        || name.contains(' ')
+        || name.contains('"')
+        || name.contains('[')
+        || name.contains(']'))
+}
+
+fn insert_debug_type_fields(
+    obj: &mut serde_json::Map<String, serde_json::Value>,
+    struct_name: &str,
+) {
+    if let Some(parent_enum) = get_enum_parent(struct_name) {
+        obj.insert(
+            "_type".to_string(),
+            serde_json::Value::String(parent_enum.to_string()),
+        );
+        obj.insert(
+            "_variant".to_string(),
+            serde_json::Value::String(struct_name.to_string()),
+        );
+    } else {
+        obj.insert(
+            "_type".to_string(),
+            serde_json::Value::String(struct_name.to_string()),
+        );
+    }
+}
+
+fn split_top_level_items(s: &str) -> Vec<&str> {
+    let mut items = Vec::new();
+    let mut depth = 0;
+    let mut start = 0;
+
+    for (i, c) in s.char_indices() {
+        update_nesting_depth(&mut depth, c);
+        if c == ',' && depth == 0 {
+            items.push(s[start..i].trim());
+            start = i + c.len_utf8();
+        }
+    }
+
+    items.push(s[start..].trim());
+    items
+}
+
+fn split_top_level_field(item: &str) -> Option<(&str, &str)> {
+    let mut depth = 0;
+
+    for (i, c) in item.char_indices() {
+        update_nesting_depth(&mut depth, c);
+        if c == ':' && depth == 0 {
+            return Some((item[..i].trim(), item[i + c.len_utf8()..].trim()));
+        }
+    }
+
+    None
+}
+
+fn parse_rust_array_value(s: &str) -> Option<serde_json::Value> {
+    if s.starts_with('[') && s.ends_with(']') {
+        let inner = &s[1..s.len() - 1];
+        return Some(serde_json::Value::Array(parse_tuple_fields(inner)));
+    }
+
+    None
+}
+
+fn parse_rust_map_value(s: &str) -> Option<serde_json::Value> {
+    if !(s.starts_with('{') && s.ends_with('}')) {
+        return None;
+    }
+    if serde_json::from_str::<serde_json::Value>(s).is_ok() {
+        return None;
+    }
+
+    let inner = &s[1..s.len() - 1];
+    let mut obj = serde_json::Map::new();
+    parse_struct_fields(inner, &mut obj);
+    if obj.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(obj))
+    }
+}
+
+fn parse_phantom_data_value(s: &str) -> Option<serde_json::Value> {
+    if !(s.starts_with("PhantomData<") && s.ends_with('>')) {
+        return None;
+    }
+
+    let inner = &s[12..s.len() - 1];
+    let mut obj = serde_json::Map::new();
+    obj.insert(
+        "_type".to_string(),
+        serde_json::Value::String("PhantomData".to_string()),
+    );
+    obj.insert(
+        "type_param".to_string(),
+        serde_json::Value::String(inner.to_string()),
+    );
+    Some(serde_json::Value::Object(obj))
+}
+
+fn parse_primitive_value(s: &str) -> Option<serde_json::Value> {
+    if s.starts_with('"') && s.ends_with('"') {
+        return Some(serde_json::Value::String(s[1..s.len() - 1].to_string()));
+    }
+    if let Ok(n) = s.parse::<i64>() {
+        return Some(serde_json::Value::Number(n.into()));
+    }
+    if let Ok(n) = s.parse::<f64>() {
+        if let Some(num) = serde_json::Number::from_f64(n) {
+            return Some(serde_json::Value::Number(num));
+        }
+    }
+    if s == "true" || s == "false" {
+        return Some(serde_json::Value::Bool(s == "true"));
+    }
+    if s == "()" {
+        return Some(serde_json::Value::Null);
+    }
+
+    None
+}
+
+fn starts_with_type_name(s: &str) -> bool {
+    s.chars()
+        .next()
+        .map(|c| c.is_ascii_uppercase())
+        .unwrap_or(false)
+        && (s.contains('{') || s.contains('(') || s.contains("::"))
+}
+
+fn has_debug_prefix(s: &str) -> bool {
+    ["Some(", "None", "Ok(", "Err(", "PhantomData"]
+        .iter()
+        .any(|prefix| s.starts_with(prefix))
+}
+
+fn merge_self_type(
+    sig: &mut serde_json::Value,
+    self_type: &serde_json::Value,
+) {
+    if let Some(sig_obj) = sig.as_object_mut() {
+        sig_obj
+            .entry("self_type".to_string())
+            .or_insert(self_type.clone());
+    }
+}
+
+fn record_signature(
+    store: &SignatureStore,
+    fn_name: &str,
+    fn_sig: Option<serde_json::Value>,
+    self_type: Option<&serde_json::Value>,
+) {
+    if let Ok(mut sigs) = store.lock() {
+        if let Some(mut sig) = fn_sig {
+            if let Some(self_type_val) = self_type {
+                merge_self_type(&mut sig, self_type_val);
+            }
+            sigs.entry(fn_name.to_string()).or_insert(sig);
+            return;
+        }
+
+        if let Some(self_type_val) = self_type {
+            if let Some(existing) = sigs.get_mut(fn_name) {
+                merge_self_type(existing, self_type_val);
+            }
+        }
+    }
+}
+
+fn collect_signature_from_fields(
+    fields_obj: &mut serde_json::Map<String, serde_json::Value>,
+    signatures: Option<&SignatureStore>,
+) {
+    if let Some(fn_sig) = fields_obj.remove("fn_sig") {
+        if let Some(store) = signatures {
+            let fn_name = fn_sig
+                .get("name")
+                .and_then(|n| n.as_str())
+                .map(str::to_string);
+            if let Some(name) = fn_name.as_deref() {
+                record_signature(store, name, Some(fn_sig), None);
+            }
+        }
+    }
+    fields_obj.remove("self_type");
+}
+
+fn simplify_spans_array(spans: &mut Vec<serde_json::Value>) {
+    let simplified: Vec<serde_json::Value> = spans
+        .iter()
+        .map(|span| match span {
+            serde_json::Value::Object(obj) => {
+                obj.get("name").cloned().unwrap_or(serde_json::Value::Null)
+            },
+            other => other.clone(),
+        })
+        .collect();
+    *spans = simplified;
+}
+
 /// Try to parse a Rust Debug-formatted struct, e.g., "StructName { field: value }"
 fn parse_rust_debug(s: &str) -> Option<serde_json::Value> {
     let s = s.trim();
@@ -234,56 +479,23 @@ fn parse_rust_debug(s: &str) -> Option<serde_json::Value> {
     let struct_name = s[..brace_pos].trim();
 
     // struct_name must be a valid identifier (alphanumeric, ::, _, no quotes/brackets)
-    if struct_name.is_empty()
-        || struct_name.contains(' ')
-        || struct_name.contains('"')
-        || struct_name.contains('[')
-        || struct_name.contains(']')
-    {
+    if !is_valid_debug_type_name(struct_name) {
         return None;
     }
 
     let open_brace = s.chars().nth(brace_pos)?;
-    let close_brace = if open_brace == '{' { '}' } else { ')' };
+    let close_brace = matching_delimiter(open_brace)?;
 
     // Find matching close brace
     let content_start = brace_pos + 1;
-    let mut depth = 1;
-    let mut content_end = None;
-    for (i, c) in s[content_start..].char_indices() {
-        if c == open_brace {
-            depth += 1;
-        } else if c == close_brace {
-            depth -= 1;
-            if depth == 0 {
-                content_end = Some(content_start + i);
-                break;
-            }
-        }
-    }
-    let content_end = content_end?;
+    let content_end = find_balanced_end(s, content_start, open_brace, close_brace)?;
     let content = &s[content_start..content_end];
 
     let mut obj = serde_json::Map::new();
 
     // Check if this is a known enum variant (e.g., Some, Ok, Err)
     // If so, use the parent enum as _type and add _variant
-    if let Some(parent_enum) = get_enum_parent(struct_name) {
-        obj.insert(
-            "_type".to_string(),
-            serde_json::Value::String(parent_enum.to_string()),
-        );
-        obj.insert(
-            "_variant".to_string(),
-            serde_json::Value::String(struct_name.to_string()),
-        );
-    } else {
-        // Regular struct/enum - use the name directly as _type
-        obj.insert(
-            "_type".to_string(),
-            serde_json::Value::String(struct_name.to_string()),
-        );
-    }
+    insert_debug_type_fields(&mut obj, struct_name);
 
     // Parse fields
     if open_brace == '{' {
@@ -305,92 +517,22 @@ fn parse_struct_fields(
     s: &str,
     obj: &mut serde_json::Map<String, serde_json::Value>,
 ) {
-    let mut current_key = String::new();
-    let mut current_value = String::new();
-    let mut in_value = false;
-    let mut depth = 0;
-
-    for c in s.chars() {
-        match c {
-            '(' | '[' | '<' | '{' => {
-                depth += 1;
-                if in_value {
-                    current_value.push(c);
-                } else {
-                    current_key.push(c);
-                }
-            },
-            ')' | ']' | '>' | '}' => {
-                depth -= 1;
-                if in_value {
-                    current_value.push(c);
-                } else {
-                    current_key.push(c);
-                }
-            },
-            ':' if depth == 0 && !in_value => {
-                in_value = true;
-            },
-            ',' if depth == 0 => {
-                let key = current_key.trim();
-                let value = current_value.trim();
-                if !key.is_empty() {
-                    obj.insert(key.to_string(), try_parse_value(value));
-                }
-                current_key.clear();
-                current_value.clear();
-                in_value = false;
-            },
-            _ =>
-                if in_value {
-                    current_value.push(c);
-                } else {
-                    current_key.push(c);
-                },
+    for item in split_top_level_items(s) {
+        if let Some((key, value)) = split_top_level_field(item) {
+            if !key.is_empty() {
+                obj.insert(key.to_string(), try_parse_value(value));
+            }
         }
-    }
-
-    // Handle last field
-    let key = current_key.trim();
-    let value = current_value.trim();
-    if !key.is_empty() {
-        obj.insert(key.to_string(), try_parse_value(value));
     }
 }
 
 /// Parse tuple fields
 fn parse_tuple_fields(s: &str) -> Vec<serde_json::Value> {
-    let mut values = Vec::new();
-    let mut current = String::new();
-    let mut depth = 0;
-
-    for c in s.chars() {
-        match c {
-            '(' | '[' | '<' | '{' => {
-                depth += 1;
-                current.push(c);
-            },
-            ')' | ']' | '>' | '}' => {
-                depth -= 1;
-                current.push(c);
-            },
-            ',' if depth == 0 => {
-                let value = current.trim();
-                if !value.is_empty() {
-                    values.push(try_parse_value(value));
-                }
-                current.clear();
-            },
-            _ => current.push(c),
-        }
-    }
-
-    let value = current.trim();
-    if !value.is_empty() {
-        values.push(try_parse_value(value));
-    }
-
-    values
+    split_top_level_items(s)
+        .into_iter()
+        .filter(|value| !value.is_empty())
+        .map(try_parse_value)
+        .collect()
 }
 
 /// Try to parse a value into a more structured form
@@ -398,23 +540,14 @@ fn try_parse_value(s: &str) -> serde_json::Value {
     let s = s.trim();
 
     // Try parsing as a Rust array [...] first
-    if s.starts_with('[') && s.ends_with(']') {
-        let inner = &s[1..s.len() - 1];
-        let values = parse_tuple_fields(inner);
-        return serde_json::Value::Array(values);
+    if let Some(parsed) = parse_rust_array_value(s) {
+        return parsed;
     }
 
     // Try parsing as a Rust HashMap/BTreeMap {key: value, ...}
     // Only if not valid JSON (JSON is handled separately)
-    if s.starts_with('{') && s.ends_with('}') {
-        if serde_json::from_str::<serde_json::Value>(s).is_err() {
-            let inner = &s[1..s.len() - 1];
-            let mut obj = serde_json::Map::new();
-            parse_struct_fields(inner, &mut obj);
-            if !obj.is_empty() {
-                return serde_json::Value::Object(obj);
-            }
-        }
+    if let Some(parsed) = parse_rust_map_value(s) {
+        return parsed;
     }
 
     // Try parsing as a token like "a"(0) -> {"text": "a", "index": 0}
@@ -428,46 +561,12 @@ fn try_parse_value(s: &str) -> serde_json::Value {
     }
 
     // Handle PhantomData<...> by extracting the type parameter
-    if s.starts_with("PhantomData<") && s.ends_with('>') {
-        let inner = &s[12..s.len() - 1];
-        let mut obj = serde_json::Map::new();
-        obj.insert(
-            "_type".to_string(),
-            serde_json::Value::String("PhantomData".to_string()),
-        );
-        obj.insert(
-            "type_param".to_string(),
-            serde_json::Value::String(inner.to_string()),
-        );
-        return serde_json::Value::Object(obj);
+    if let Some(parsed) = parse_phantom_data_value(s) {
+        return parsed;
     }
 
-    // Handle quoted strings
-    if s.starts_with('"') && s.ends_with('"') {
-        return serde_json::Value::String(s[1..s.len() - 1].to_string());
-    }
-
-    // Try parsing as number
-    if let Ok(n) = s.parse::<i64>() {
-        return serde_json::Value::Number(n.into());
-    }
-    if let Ok(n) = s.parse::<f64>() {
-        if let Some(num) = serde_json::Number::from_f64(n) {
-            return serde_json::Value::Number(num);
-        }
-    }
-
-    // Boolean
-    if s == "true" {
-        return serde_json::Value::Bool(true);
-    }
-    if s == "false" {
-        return serde_json::Value::Bool(false);
-    }
-
-    // Unit types like ()
-    if s == "()" {
-        return serde_json::Value::Null;
+    if let Some(parsed) = parse_primitive_value(s) {
+        return parsed;
     }
 
     // Fallback: return as string
@@ -485,18 +584,9 @@ fn looks_like_rust_debug(s: &str) -> bool {
     // With path: path::Name { ... }
     s.starts_with('[')
         || (s.starts_with('{') && s.ends_with('}'))
-        || s.starts_with('"') && s.contains('(')
-        || s.starts_with("Some(")
-        || s.starts_with("None")
-        || s.starts_with("Ok(")
-        || s.starts_with("Err(")
-        || s.starts_with("PhantomData")
-        || (s
-            .chars()
-            .next()
-            .map(|c| c.is_ascii_uppercase())
-            .unwrap_or(false)
-            && (s.contains('{') || s.contains('(') || s.contains("::")))
+        || (s.starts_with('"') && s.contains('('))
+        || has_debug_prefix(s)
+        || starts_with_type_name(s)
 }
 
 /// Check if a string looks like a JSON object or array
@@ -611,76 +701,43 @@ fn collect_and_strip_fn_sigs(
         let fn_sig = span_obj.remove("fn_sig");
         let self_type = span_obj.remove("self_type");
 
-        if let Some(store) = signatures {
-            if let Some(ref fn_name) = name {
-                if let Ok(mut sigs) = store.lock() {
-                    // Insert fn_sig if we have one, merging self_type into it
-                    if let Some(mut sig) = fn_sig {
-                        if let Some(self_type_val) = &self_type {
-                            if let Some(sig_obj) = sig.as_object_mut() {
-                                sig_obj
-                                    .entry("self_type".to_string())
-                                    .or_insert(self_type_val.clone());
-                            }
-                        }
-                        sigs.entry(fn_name.clone()).or_insert(sig);
-                    } else if let Some(self_type_val) = &self_type {
-                        // No fn_sig but we have self_type — add it to existing entry
-                        if let Some(existing) = sigs.get_mut(fn_name) {
-                            if let Some(obj) = existing.as_object_mut() {
-                                obj.entry("self_type".to_string())
-                                    .or_insert(self_type_val.clone());
-                            }
-                        }
-                    }
-                }
-            }
+        if let (Some(store), Some(fn_name)) = (signatures, name.as_deref()) {
+            record_signature(store, fn_name, fn_sig, self_type.as_ref());
         }
 
         name
     }
 
-    // Process "span" object → replace with name string
-    if let Some(serde_json::Value::Object(span_obj)) = obj.get_mut("span") {
-        if let Some(name) = collect_from_span_obj(span_obj, signatures) {
-            obj.insert("span".to_string(), serde_json::Value::String(name));
-        }
-    }
-
-    // Process "spans" array → collect signatures, then replace each object with name string
-    if let Some(serde_json::Value::Array(spans)) = obj.get_mut("spans") {
-        // First pass: collect fn_sig and self_type from each span object
-        for span in spans.iter_mut() {
-            if let serde_json::Value::Object(span_obj) = span {
-                let _ = collect_from_span_obj(span_obj, signatures);
+    fn simplify_span_field(
+        obj: &mut serde_json::Map<String, serde_json::Value>,
+        signatures: Option<&SignatureStore>,
+    ) {
+        if let Some(serde_json::Value::Object(span_obj)) = obj.get_mut("span") {
+            if let Some(name) = collect_from_span_obj(span_obj, signatures) {
+                obj.insert("span".to_string(), serde_json::Value::String(name));
             }
         }
-        // Second pass: replace objects with name strings
-        let simplified: Vec<serde_json::Value> = spans
-            .iter()
-            .map(|s| match s {
-                serde_json::Value::Object(obj) =>
-                    obj.get("name").cloned().unwrap_or(serde_json::Value::Null),
-                other => other.clone(),
-            })
-            .collect();
-        *spans = simplified;
     }
 
-    // Process "fields" object (fn_sig can appear here too)
-    if let Some(serde_json::Value::Object(fields_obj)) = obj.get_mut("fields") {
-        if let Some(fn_sig) = fields_obj.remove("fn_sig") {
-            if let Some(store) = signatures {
-                if let Some(name) = fn_sig.get("name").and_then(|n| n.as_str())
-                {
-                    if let Ok(mut sigs) = store.lock() {
-                        sigs.entry(name.to_string()).or_insert(fn_sig);
-                    }
+    fn simplify_spans_field(
+        obj: &mut serde_json::Map<String, serde_json::Value>,
+        signatures: Option<&SignatureStore>,
+    ) {
+        if let Some(serde_json::Value::Array(spans)) = obj.get_mut("spans") {
+            for span in spans.iter_mut() {
+                if let serde_json::Value::Object(span_obj) = span {
+                    let _ = collect_from_span_obj(span_obj, signatures);
                 }
             }
+            simplify_spans_array(spans);
         }
-        // Also strip self_type from fields
-        fields_obj.remove("self_type");
+    }
+
+    simplify_span_field(obj, signatures);
+    simplify_spans_field(obj, signatures);
+
+    if let Some(serde_json::Value::Object(fields_obj)) = obj.get_mut("fields") {
+        collect_signature_from_fields(fields_obj, signatures);
     }
 }
 
