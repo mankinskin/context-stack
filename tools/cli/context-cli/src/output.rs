@@ -16,6 +16,7 @@ use context_api::{
         GraphStatistics,
         InsertResult,
         LogAnalysis,
+        DiffVertexEntry,
         LogDeleteResult,
         LogEntryInfo,
         LogFileInfo,
@@ -25,6 +26,7 @@ use context_api::{
         PatternReadResult,
         ReadNode,
         SearchResult,
+        SharedVertex,
         TokenInfo,
         ValidationReport,
         VertexInfo,
@@ -36,35 +38,73 @@ use context_api::{
 /// Dispatch a `CommandResult` to the appropriate human-friendly printer.
 pub fn print_command_result(result: &CommandResult) {
     match result {
+        CommandResult::WorkspaceInfo(_)
+        | CommandResult::WorkspaceInfoList { .. }
+        | CommandResult::AtomInfo(_)
+        | CommandResult::AtomInfoList { .. }
+        | CommandResult::OptionalAtomInfo { .. }
+        | CommandResult::PatternInfo(_)
+        | CommandResult::OptionalVertexInfo { .. }
+        | CommandResult::TokenInfoList { .. } => print_info_result(result),
+        CommandResult::SearchResult(_)
+        | CommandResult::InsertResult(_)
+        | CommandResult::InsertResultList { .. }
+        | CommandResult::ReadResult(_) => print_graph_operation_result(result),
+        CommandResult::Text { .. }
+        | CommandResult::Snapshot(_)
+        | CommandResult::Statistics(_)
+        | CommandResult::ValidationReport(_)
+        | CommandResult::GraphDisplay { .. }
+        | CommandResult::Ok
+        | CommandResult::GraphDiff(_)
+        | CommandResult::ExportData { .. } => print_misc_result(result),
+        CommandResult::LogList { .. }
+        | CommandResult::LogEntries { .. }
+        | CommandResult::LogQueryResult { .. }
+        | CommandResult::LogAnalysis(_)
+        | CommandResult::LogSearchResult { .. }
+        | CommandResult::LogDeleteResult(_) => print_log_result(result),
+    }
+}
+
+fn print_info_result(result: &CommandResult) {
+    match result {
         CommandResult::WorkspaceInfo(info) => print_workspace_info(info),
         CommandResult::WorkspaceInfoList { workspaces } => {
             print_workspace_info_list(workspaces);
         },
         CommandResult::AtomInfo(info) => print_atom_info(info),
         CommandResult::AtomInfoList { atoms } => print_atom_info_list(atoms),
-        CommandResult::OptionalAtomInfo { atom } => match atom {
-            Some(info) => print_atom_info(info),
-            None => println!("Atom not found."),
-        },
+        CommandResult::OptionalAtomInfo { atom } => print_optional_atom_info(atom),
         CommandResult::PatternInfo(info) => print_pattern_info(info),
-        CommandResult::OptionalVertexInfo { vertex } => match vertex {
-            Some(info) => print_vertex_info(info),
-            None => println!("Vertex not found."),
+        CommandResult::OptionalVertexInfo { vertex } => {
+            print_optional_vertex_info(vertex);
         },
         CommandResult::TokenInfoList { tokens } =>
             print_token_info_list(tokens),
+        _ => unreachable!("non-info result passed to print_info_result"),
+    }
+}
+
+fn print_graph_operation_result(result: &CommandResult) {
+    match result {
         CommandResult::SearchResult(result) => print_search_result(result),
         CommandResult::InsertResult(result) => print_insert_result(result),
         CommandResult::InsertResultList { results } => {
             print_insert_result_list(results);
         },
         CommandResult::ReadResult(result) => print_read_result(result),
+        _ => unreachable!("non-graph result passed to print_graph_operation_result"),
+    }
+}
+
+fn print_misc_result(result: &CommandResult) {
+    match result {
         CommandResult::Text { text } => println!("{text}"),
         CommandResult::Snapshot(snapshot) => {
-            // Print snapshot as pretty JSON
             match serde_json::to_string_pretty(snapshot) {
                 Ok(json) => println!("{json}"),
-                Err(e) => eprintln!("Error serializing snapshot: {e}"),
+                Err(error) => eprintln!("Error serializing snapshot: {error}"),
             }
         },
         CommandResult::Statistics(stats) => print_statistics(stats),
@@ -73,6 +113,14 @@ pub fn print_command_result(result: &CommandResult) {
         },
         CommandResult::GraphDisplay { display } => println!("{display}"),
         CommandResult::Ok => println!("Ok."),
+        CommandResult::GraphDiff(result) => print_graph_diff(result),
+        CommandResult::ExportData { data, format } => print_export_data(data, format),
+        _ => unreachable!("non-misc result passed to print_misc_result"),
+    }
+}
+
+fn print_log_result(result: &CommandResult) {
+    match result {
         CommandResult::LogList { logs } => print_log_list(logs),
         CommandResult::LogEntries {
             filename,
@@ -82,14 +130,14 @@ pub fn print_command_result(result: &CommandResult) {
             returned: _,
             entries,
         } => {
-            print_log_entries(filename, entries, *total, *offset);
+            print_log_entries_result(filename, entries, *total, *offset);
         },
         CommandResult::LogQueryResult {
             query,
             matches,
             entries,
         } => {
-            print_log_query_result(query, *matches, entries);
+            print_log_query_entries(query, *matches, entries);
         },
         CommandResult::LogAnalysis(analysis) => print_log_analysis(analysis),
         CommandResult::LogSearchResult {
@@ -97,28 +145,78 @@ pub fn print_command_result(result: &CommandResult) {
             files_with_matches,
             results,
         } => {
-            print_log_search_result(query, *files_with_matches, results);
+            print_log_search_entries(query, *files_with_matches, results);
         },
         CommandResult::LogDeleteResult(result) => {
             print_log_delete_result(result);
         },
-        CommandResult::GraphDiff(result) => print_graph_diff(result),
-        CommandResult::ExportData { data, format } => {
-            println!("Exported {} bytes (format: {format:?})", data.len());
-            if matches!(format, ExportFormat::Json) {
-                // For JSON exports, write the data to stdout as text
-                if let Ok(text) = std::str::from_utf8(data) {
-                    println!("{text}");
-                } else {
-                    use std::io::Write;
-                    let _ = std::io::stdout().write_all(data);
-                }
-            } else {
-                use std::io::Write;
-                let _ = std::io::stdout().write_all(data);
-            }
-        },
+        _ => unreachable!("non-log result passed to print_log_result"),
     }
+}
+
+fn print_optional_atom_info(atom: &Option<AtomInfo>) {
+    match atom {
+        Some(info) => print_atom_info(info),
+        None => println!("Atom not found."),
+    }
+}
+
+fn print_optional_vertex_info(vertex: &Option<VertexInfo>) {
+    match vertex {
+        Some(info) => print_vertex_info(info),
+        None => println!("Vertex not found."),
+    }
+}
+
+fn print_log_entries_result(
+    filename: &str,
+    entries: &[LogEntryInfo],
+    total: usize,
+    offset: usize,
+) {
+    print_log_entries(filename, entries, total, offset);
+}
+
+fn print_log_query_entries(
+    query: &str,
+    matches: usize,
+    entries: &[LogEntryInfo],
+) {
+    print_log_query_result(query, matches, entries);
+}
+
+fn print_log_search_entries(
+    query: &str,
+    files_with_matches: usize,
+    results: &[LogFileSearchResult],
+) {
+    print_log_search_result(query, files_with_matches, results);
+}
+
+fn print_export_data(
+    data: &[u8],
+    format: &ExportFormat,
+) {
+    println!("Exported {} bytes (format: {format:?})", data.len());
+    if matches!(format, ExportFormat::Json) {
+        print_json_export_data(data);
+    } else {
+        write_export_bytes(data);
+    }
+}
+
+fn print_json_export_data(data: &[u8]) {
+    if let Ok(text) = std::str::from_utf8(data) {
+        println!("{text}");
+    } else {
+        write_export_bytes(data);
+    }
+}
+
+fn write_export_bytes(data: &[u8]) {
+    use std::io::Write;
+
+    let _ = std::io::stdout().write_all(data);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,81 +232,115 @@ pub fn print_graph_diff(result: &GraphDiffResult) {
     );
     println!("{sep}");
 
-    // -- Shared vertices ---------------------------------------------------
-    if !result.shared.is_empty() {
-        println!("Shared: {} vertex/vertices", result.shared.len());
-        for sv in &result.shared {
-            match &sv.match_kind {
-                VertexMatchKind::Identical => {
-                    println!("  ✓  {:?}  (w={})", sv.label, sv.width);
-                },
-                VertexMatchKind::ExtraPatterns => {
-                    println!(
-                        "  ~  {:?}  (w={})  extra patterns in B",
-                        sv.label, sv.width
-                    );
-                    if let Some(diff) = &sv.pattern_diff {
-                        print_pattern_diff(diff, 5);
-                    }
-                },
-                VertexMatchKind::PatternMismatch => {
-                    println!(
-                        "  ~  {:?}  (w={})  PATTERN MISMATCH",
-                        sv.label, sv.width
-                    );
-                    if let Some(diff) = &sv.pattern_diff {
-                        print_pattern_diff(diff, 5);
-                    }
-                },
-                VertexMatchKind::WidthMismatch { width_a, width_b } => {
-                    println!(
-                        "  !  {:?}  WIDTH MISMATCH  A={}  B={}",
-                        sv.label, width_a, width_b
-                    );
-                },
-            }
-        }
-        println!();
+    print_shared_vertices(&result.shared);
+    print_only_in_a_vertices(&result.workspace_a, &result.only_in_a);
+    print_only_in_b_vertices(&result.workspace_b, &result.only_in_b);
+    print_graph_diff_summary(result);
+}
+
+fn print_shared_vertices(shared: &[SharedVertex]) {
+    if shared.is_empty() {
+        return;
     }
 
-    // -- Only in A ---------------------------------------------------------
-    if !result.only_in_a.is_empty() {
-        println!(
-            "Only in '{}' (A): {}",
-            result.workspace_a,
-            result.only_in_a.len()
-        );
-        for v in &result.only_in_a {
-            println!("  -  {:?}  (w={})", v.label, v.width);
-        }
-        println!();
+    println!("Shared: {} vertex/vertices", shared.len());
+    for vertex in shared {
+        print_shared_vertex(vertex);
+    }
+    println!();
+}
+
+fn print_shared_vertex(vertex: &SharedVertex) {
+    match &vertex.match_kind {
+        VertexMatchKind::Identical => {
+            println!("  ✓  {:?}  (w={})", vertex.label, vertex.width);
+        },
+        VertexMatchKind::ExtraPatterns => {
+            println!(
+                "  ~  {:?}  (w={})  extra patterns in B",
+                vertex.label, vertex.width
+            );
+            print_shared_vertex_pattern_diff(vertex);
+        },
+        VertexMatchKind::PatternMismatch => {
+            println!(
+                "  ~  {:?}  (w={})  PATTERN MISMATCH",
+                vertex.label, vertex.width
+            );
+            print_shared_vertex_pattern_diff(vertex);
+        },
+        VertexMatchKind::WidthMismatch { width_a, width_b } => {
+            println!(
+                "  !  {:?}  WIDTH MISMATCH  A={}  B={}",
+                vertex.label, width_a, width_b
+            );
+        },
+    }
+}
+
+fn print_shared_vertex_pattern_diff(vertex: &SharedVertex) {
+    if let Some(diff) = &vertex.pattern_diff {
+        print_pattern_diff(diff, 5);
+    }
+}
+
+fn print_only_in_a_vertices(
+    workspace_a: &str,
+    vertices: &[DiffVertexEntry],
+) {
+    print_exclusive_vertices(workspace_a, "A", vertices, print_only_in_a_vertex);
+}
+
+fn print_only_in_b_vertices(
+    workspace_b: &str,
+    vertices: &[DiffVertexEntry],
+) {
+    print_exclusive_vertices(workspace_b, "B", vertices, print_only_in_b_vertex);
+}
+
+fn print_exclusive_vertices(
+    workspace: &str,
+    side: &str,
+    vertices: &[DiffVertexEntry],
+    print_vertex: fn(&DiffVertexEntry),
+) {
+    if vertices.is_empty() {
+        return;
     }
 
-    // -- Only in B ---------------------------------------------------------
-    if !result.only_in_b.is_empty() {
-        println!(
-            "Only in '{}' (B): {}",
-            result.workspace_b,
-            result.only_in_b.len()
-        );
-        for v in &result.only_in_b {
-            let note = if v.is_atom {
-                ""
-            } else {
-                "  [unverified by oracle]"
-            };
-            println!("  +  {:?}  (w={}){}", v.label, v.width, note);
-        }
-        println!();
+    println!("Only in '{}' ({}): {}", workspace, side, vertices.len());
+    for vertex in vertices {
+        print_vertex(vertex);
     }
+    println!();
+}
 
-    // -- Summary -----------------------------------------------------------
+fn print_only_in_a_vertex(vertex: &DiffVertexEntry) {
+    println!("  -  {:?}  (w={})", vertex.label, vertex.width);
+}
+
+fn print_only_in_b_vertex(vertex: &DiffVertexEntry) {
+    let note = if vertex.is_atom {
+        ""
+    } else {
+        "  [unverified by oracle]"
+    };
+    println!("  +  {:?}  (w={}){}", vertex.label, vertex.width, note);
+}
+
+fn print_graph_diff_summary(result: &GraphDiffResult) {
     println!(
         "Shared: {}  Only-A: {}  Only-B: {}",
         result.summary.shared_count,
         result.summary.only_in_a_count,
         result.summary.only_in_b_count,
     );
+    print_graph_diff_summary_counts(result);
+    println!();
+    print_graph_diff_verdict(result);
+}
+
+fn print_graph_diff_summary_counts(result: &GraphDiffResult) {
     if result.summary.pattern_mismatch_count > 0 {
         println!(
             "Pattern mismatches: {}",
@@ -218,25 +350,29 @@ pub fn print_graph_diff(result: &GraphDiffResult) {
     if result.summary.width_mismatch_count > 0 {
         println!("Width mismatches: {}", result.summary.width_mismatch_count);
     }
-    println!();
+}
+
+fn print_graph_diff_verdict(result: &GraphDiffResult) {
     match result.summary.verdict {
         DiffVerdict::Equivalent => println!("Result: EQUIVALENT ✓"),
         DiffVerdict::Subset => println!("Result: B IS A VALID SUBSET OF A ✓"),
-        DiffVerdict::Divergent => {
-            println!("Result: DIVERGENT ✗");
-            if result.summary.width_mismatch_count > 0 {
-                println!(
-                    "  {} width mismatch(es) — likely a correctness bug.",
-                    result.summary.width_mismatch_count
-                );
-            }
-            if result.summary.pattern_mismatch_count > 0 {
-                println!(
-                    "  {} vertex/vertices with no common pattern.",
-                    result.summary.pattern_mismatch_count
-                );
-            }
-        },
+        DiffVerdict::Divergent => print_divergent_graph_diff(result),
+    }
+}
+
+fn print_divergent_graph_diff(result: &GraphDiffResult) {
+    println!("Result: DIVERGENT ✗");
+    if result.summary.width_mismatch_count > 0 {
+        println!(
+            "  {} width mismatch(es) — likely a correctness bug.",
+            result.summary.width_mismatch_count
+        );
+    }
+    if result.summary.pattern_mismatch_count > 0 {
+        println!(
+            "  {} vertex/vertices with no common pattern.",
+            result.summary.pattern_mismatch_count
+        );
     }
 }
 
