@@ -215,6 +215,198 @@ impl VizPathGraph {
         Self::default()
     }
 
+    fn require_start_node(
+        &self,
+        message: &str,
+    ) -> Result<(), String> {
+        if self.start_node.is_none() {
+            Err(message.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn ensure_start_node_unset(
+        &self,
+        message: &str,
+    ) -> Result<(), String> {
+        if self.start_node.is_some() {
+            Err(message.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn ensure_root_unset(
+        &self,
+        message: &str,
+    ) -> Result<(), String> {
+        if self.root.is_some() {
+            Err(message.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn clear_end_path(&mut self) {
+        self.end_path.clear();
+        self.end_edges.clear();
+        self.root_exit_edge = None;
+    }
+
+    fn demote_root_to_start_path(&mut self) {
+        if let Some(old_root) = self.root.take() {
+            let old_edge = self.root_entry_edge.take().unwrap();
+            self.start_path.push(old_root);
+            self.start_edges.push(old_edge);
+            self.clear_end_path();
+        }
+    }
+
+    fn set_root_candidate(
+        &mut self,
+        root: PathNode,
+        edge: EdgeRef,
+        tentative: bool,
+    ) {
+        self.root = Some(root);
+        self.root_entry_edge = Some(edge);
+        self.root_tentative = tentative;
+    }
+
+    fn promote_root_from_start_path_or_edge(
+        &mut self,
+        root: PathNode,
+        edge: EdgeRef,
+    ) {
+        if self.start_path.last().map(|node| node.index) == Some(root.index) {
+            self.start_path.pop();
+            self.root = Some(root);
+            self.root_entry_edge = self.start_edges.pop().or(Some(edge));
+        } else {
+            self.root = Some(root);
+            self.root_entry_edge = Some(edge);
+        }
+    }
+
+    fn push_child(
+        &mut self,
+        child: PathNode,
+        edge: EdgeRef,
+    ) {
+        self.end_path.push(child);
+        self.end_edges.push(edge);
+        if self.end_path.len() == 1 {
+            self.root_exit_edge = Some(edge);
+        }
+    }
+
+    fn replace_child(
+        &mut self,
+        child: PathNode,
+        edge: EdgeRef,
+    ) -> Result<(), String> {
+        if self.end_path.is_empty() {
+            return Err("ReplaceChild on empty end_path".into());
+        }
+        *self.end_path.last_mut().unwrap() = child;
+        *self.end_edges.last_mut().unwrap() = edge;
+        if self.end_path.len() == 1 {
+            self.root_exit_edge = Some(edge);
+        }
+        Ok(())
+    }
+
+    fn pop_child(&mut self) -> Result<(), String> {
+        if self.end_path.is_empty() {
+            return Err("PopChild on empty end_path".into());
+        }
+        self.end_path.pop();
+        self.end_edges.pop();
+        if self.end_path.is_empty() {
+            self.root_exit_edge = None;
+        }
+        Ok(())
+    }
+
+    fn set_cursor_pos(
+        &mut self,
+        cursor_pos: usize,
+    ) {
+        self.cursor_pos = cursor_pos;
+    }
+
+    fn mark_done(
+        &mut self,
+        success: bool,
+    ) {
+        self.done = true;
+        self.success = success;
+    }
+
+    fn clear_rejected_root(&mut self) {
+        self.root = None;
+        self.root_entry_edge = None;
+        self.root_exit_edge = None;
+        self.end_path.clear();
+        self.end_edges.clear();
+        self.root_tentative = false;
+    }
+
+    fn pop_rejected_parent(
+        &mut self,
+        node_index: usize,
+    ) {
+        if self.start_path.last().map(|node| node.index) == Some(node_index) {
+            self.start_path.pop();
+            self.start_edges.pop();
+        }
+    }
+
+    fn apply_transition_root_phase(
+        &mut self,
+        transition: &super::visualization::Transition,
+    ) -> Result<(), String> {
+        use super::visualization::Transition;
+
+        match transition {
+            Transition::StartNode { node } => {
+                self.ensure_start_node_unset("StartNode applied twice")?;
+                self.start_node = Some(*node);
+            },
+            Transition::VisitParent { to, edge, .. } => {
+                self.require_start_node("VisitParent before StartNode")?;
+                self.demote_root_to_start_path();
+                self.set_root_candidate(*to, *edge, true);
+            },
+            Transition::CandidateMatch { root, edge } => {
+                if self.root.is_none() {
+                    self.require_start_node("CandidateMatch before StartNode")?;
+                    self.promote_root_from_start_path_or_edge(*root, *edge);
+                }
+                self.root_tentative = false;
+            },
+            _ => unreachable!("non-root transition passed to apply_transition_root_phase"),
+        }
+
+        Ok(())
+    }
+
+    fn apply_transition_cursor_update(
+        &mut self,
+        transition: &super::visualization::Transition,
+    ) {
+        use super::visualization::Transition;
+
+        match transition {
+            Transition::ChildMatch { cursor_pos, .. }
+            | Transition::ChildMismatch { cursor_pos, .. } => {
+                self.set_cursor_pos(*cursor_pos);
+            },
+            _ => unreachable!("non-cursor transition passed to apply_transition_cursor_update"),
+        }
+    }
+
     /// Apply a [`Transition`] to update this path graph in place.
     ///
     /// **Root-setting semantics:**
@@ -230,116 +422,34 @@ impl VizPathGraph {
     ) -> Result<(), String> {
         use super::visualization::Transition;
         match transition {
-            Transition::StartNode { node } => {
-                if self.start_node.is_some() {
-                    return Err("StartNode applied twice".into());
-                }
-                self.start_node = Some(*node);
-            },
-            Transition::VisitParent { to, edge, .. } => {
-                if self.start_node.is_none() {
-                    return Err("VisitParent before StartNode".into());
-                }
-                if let Some(old_root) = self.root.take() {
-                    let old_edge = self.root_entry_edge.take().unwrap();
-                    self.start_path.push(old_root);
-                    self.start_edges.push(old_edge);
-                    // Clear end_path — previous root's children are no longer relevant
-                    self.end_path.clear();
-                    self.end_edges.clear();
-                    self.root_exit_edge = None;
-                }
-                // Set this parent candidate as the root so that subsequent
-                // VisitChild events can populate end_path immediately
-                // (child arrows appear during comparison, not after match).
-                self.root = Some(*to);
-                self.root_entry_edge = Some(*edge);
-                // Mark as tentative until CandidateMatch confirms it.
-                self.root_tentative = true;
-            },
-            Transition::CandidateMatch { root, edge } => {
-                // CandidateMatch signals that the candidate root matched.
-                // If VisitParent already set the root, this is informational.
-                // Only set root as fallback for non-parent candidates (e.g.
-                // start-node matches where no VisitParent was emitted).
-                if self.root.is_none() {
-                    if self.start_node.is_none() {
-                        return Err("CandidateMatch before StartNode".into());
-                    }
-                    if self.start_path.last().map(|n| n.index)
-                        == Some(root.index)
-                    {
-                        self.start_path.pop();
-                        self.root = Some(*root);
-                        self.root_entry_edge =
-                            self.start_edges.pop().or(Some(*edge));
-                    } else {
-                        self.root = Some(*root);
-                        self.root_entry_edge = Some(*edge);
-                    }
-                }
-                // Confirm the root — no longer tentative.
-                self.root_tentative = false;
+            Transition::StartNode { .. }
+            | Transition::VisitParent { .. }
+            | Transition::CandidateMatch { .. } => {
+                self.apply_transition_root_phase(transition)?;
             },
             Transition::VisitChild {
                 to, edge, replace, ..
             } => {
-                // Note: root may be None during comparison events for
-                // non-parent candidates after Expanded demotion. This is
-                // expected — CandidateMatch will set root afterward.
                 if *replace {
-                    if self.end_path.is_empty() {
-                        return Err(
-                            "VisitChild replace on empty end_path".into()
-                        );
-                    }
-                    *self.end_path.last_mut().unwrap() = *to;
-                    *self.end_edges.last_mut().unwrap() = *edge;
-                    // Update root_exit_edge if replacing the first child
-                    if self.end_path.len() == 1 {
-                        self.root_exit_edge = Some(*edge);
-                    }
+                    self.replace_child(*to, *edge)
+                        .map_err(|_| "VisitChild replace on empty end_path".to_string())?;
                 } else {
-                    self.end_path.push(*to);
-                    self.end_edges.push(*edge);
-                    // Set root_exit_edge on the first child pushed
-                    if self.end_path.len() == 1 {
-                        self.root_exit_edge = Some(*edge);
-                    }
+                    self.push_child(*to, *edge);
                 }
             },
-            Transition::ChildMatch { cursor_pos, .. } => {
-                self.cursor_pos = *cursor_pos;
-            },
-            Transition::ChildMismatch { cursor_pos, .. } => {
-                self.cursor_pos = *cursor_pos;
+            Transition::ChildMatch { .. } | Transition::ChildMismatch { .. } => {
+                self.apply_transition_cursor_update(transition);
             },
             Transition::Done { success, .. } => {
-                self.done = true;
-                self.success = *success;
+                self.mark_done(*success);
             },
             Transition::CandidateMismatch { node, .. } => {
-                // If the rejected node is the current root (set by
-                // VisitParent as a candidate), clear it along with any
-                // end_path entries built during child comparison.
                 if self.root.map(|n| n.index) == Some(node.index) {
-                    self.root = None;
-                    self.root_entry_edge = None;
-                    self.root_exit_edge = None;
-                    self.end_path.clear();
-                    self.end_edges.clear();
-                    self.root_tentative = false;
-                } else if self.start_path.last().map(|n| n.index)
-                    == Some(node.index)
-                {
-                    // Safety net: pop a rejected parent from start_path
-                    // (shouldn't normally trigger since VisitParent now sets
-                    // root instead of pushing to start_path).
-                    self.start_path.pop();
-                    self.start_edges.pop();
+                    self.clear_rejected_root();
+                } else {
+                    self.pop_rejected_parent(node.index);
                 }
             },
-            // Informational transitions — no path state change.
             _ => {},
         }
         Ok(())
@@ -355,92 +465,40 @@ impl VizPathGraph {
     ) -> Result<(), String> {
         match transition {
             PathTransition::SetStartNode { node } => {
-                if self.start_node.is_some() {
-                    return Err("SetStartNode called twice".into());
-                }
+                self.ensure_start_node_unset("SetStartNode called twice")?;
                 self.start_node = Some(*node);
             },
             PathTransition::PushParent { parent, edge } => {
-                if self.start_node.is_none() {
-                    return Err("PushParent before SetStartNode".into());
-                }
-                if let Some(old_root) = self.root.take() {
-                    // Root already set — extend start path upward past the old root.
-                    // Demote old root + its edge into start_path, then push the new parent.
-                    let old_edge = self.root_entry_edge.take().unwrap();
-                    self.start_path.push(old_root);
-                    self.start_edges.push(old_edge);
-                    // Clear end_path — previous root's children are no longer relevant
-                    self.end_path.clear();
-                    self.end_edges.clear();
-                    self.root_exit_edge = None;
-                }
+                self.require_start_node("PushParent before SetStartNode")?;
+                self.demote_root_to_start_path();
                 self.start_path.push(*parent);
                 self.start_edges.push(*edge);
             },
             PathTransition::SetRoot { root, edge } => {
-                if self.start_node.is_none() {
-                    return Err("SetRoot before SetStartNode".into());
-                }
-                if self.root.is_some() {
-                    return Err("SetRoot called twice".into());
-                }
-                // If root matches the last start_path entry, pop it
-                // (the node is "graduating" from candidate to confirmed root).
-                // Use the popped edge as root_entry_edge since it correctly connects
-                // the prior start_path node to this root.
-                if self.start_path.last().map(|n| n.index) == Some(root.index) {
-                    self.start_path.pop();
-                    self.root = Some(*root);
-                    self.root_entry_edge =
-                        self.start_edges.pop().or(Some(*edge));
-                } else {
-                    self.root = Some(*root);
-                    self.root_entry_edge = Some(*edge);
-                }
+                self.require_start_node("SetRoot before SetStartNode")?;
+                self.ensure_root_unset("SetRoot called twice")?;
+                self.promote_root_from_start_path_or_edge(*root, *edge);
             },
             PathTransition::PushChild { child, edge } => {
                 if self.root.is_none() {
                     return Err("PushChild before SetRoot".into());
                 }
-                self.end_path.push(*child);
-                self.end_edges.push(*edge);
-                // Set root_exit_edge on the first child pushed
-                if self.end_path.len() == 1 {
-                    self.root_exit_edge = Some(*edge);
-                }
+                self.push_child(*child, *edge);
             },
             PathTransition::PopChild => {
-                if self.end_path.is_empty() {
-                    return Err("PopChild on empty end_path".into());
-                }
-                self.end_path.pop();
-                self.end_edges.pop();
-                // Clear root_exit_edge if end_path is now empty
-                if self.end_path.is_empty() {
-                    self.root_exit_edge = None;
-                }
+                self.pop_child()?;
             },
             PathTransition::ReplaceChild { child, edge } => {
-                if self.end_path.is_empty() {
-                    return Err("ReplaceChild on empty end_path".into());
-                }
-                *self.end_path.last_mut().unwrap() = *child;
-                *self.end_edges.last_mut().unwrap() = *edge;
-                // Update root_exit_edge if replacing the first child
-                if self.end_path.len() == 1 {
-                    self.root_exit_edge = Some(*edge);
-                }
+                self.replace_child(*child, *edge)?;
             },
             PathTransition::ChildMatch { cursor_pos } => {
-                self.cursor_pos = *cursor_pos;
+                self.set_cursor_pos(*cursor_pos);
             },
             PathTransition::ChildMismatch { cursor_pos } => {
-                self.cursor_pos = *cursor_pos;
+                self.set_cursor_pos(*cursor_pos);
             },
             PathTransition::Done { success } => {
-                self.done = true;
-                self.success = *success;
+                self.mark_done(*success);
             },
         }
         Ok(())
