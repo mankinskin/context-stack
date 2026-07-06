@@ -46,6 +46,7 @@ pub(crate) struct OverlapLink {
 /// Invariant: a `BandCapLink` appears only as the last element of an
 /// `OverlapChain::links` list, after all intermediate `OverlapLink`s.
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub(crate) struct BandCapLink {
     /// Top-down child path from the root to the terminal postfix.
     pub(crate) child_path: IndexEndPath,

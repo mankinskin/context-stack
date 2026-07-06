@@ -72,6 +72,9 @@ impl BandState {
         }
     }
 
+    // Pass C3 keeps these chain-oriented helpers available while the direct
+    // collapse path remains the only live caller.
+    #[allow(dead_code)]
     pub(crate) fn anchor_token(&self) -> Option<Token> {
         match self {
             BandState::Single { band } => band.pattern.last().copied(),
@@ -80,10 +83,12 @@ impl BandState {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn end_bound(&self) -> AtomPosition {
         self.primary().end_bound
     }
 
+    #[allow(dead_code)]
     pub(crate) fn has_overlap(&self) -> bool {
         matches!(self, BandState::WithOverlap { .. })
     }
@@ -94,6 +99,7 @@ impl BandState {
     }
 
     /// If this is a `Single` state with exactly one token, return that token.
+    #[allow(dead_code)]
     pub(crate) fn single_token(&self) -> Option<Token> {
         match self {
             BandState::Single { band } if band.pattern.len() == 1 =>
@@ -105,6 +111,7 @@ impl BandState {
     /// Append a token to the single band.
     ///
     /// Panics when called on a `WithOverlap` state.
+    #[allow(dead_code)]
     pub(crate) fn append(
         &mut self,
         token: Token,
@@ -125,6 +132,7 @@ impl BandState {
     /// Transition from `Single` to `WithOverlap`.
     ///
     /// Panics when already in `WithOverlap` state.
+    #[allow(dead_code)]
     pub(crate) fn set_overlap(
         self,
         overlap_band: Band,
@@ -223,6 +231,7 @@ impl BandState {
 /// `push`/`cap`. Full collapse is wired in Pass C3 once the semantic overlap
 /// bundling path is stable.
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub(crate) struct OverlapChain {
     /// The leftmost anchor token at the start of the chain.
     pub(crate) head: Token,
@@ -238,6 +247,7 @@ impl OverlapChain {
     /// # Panics
     /// Panics in debug builds if the chain has already been capped.
     /// (Full validation is deferred to Pass C3.)
+    #[allow(dead_code)]
     pub(crate) fn push(
         &mut self,
         link: OverlapLink,
@@ -271,6 +281,7 @@ impl BandState {
     ///   primary and overlap tokens respectively, with the single overlap link.
     ///
     /// Pass C3 will replace direct `collapse` calls with chain-based collapse.
+    #[allow(dead_code)]
     pub(crate) fn into_chain(self) -> Option<OverlapChain> {
         match self {
             BandState::WithOverlap {

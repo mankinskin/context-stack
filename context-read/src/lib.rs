@@ -1,6 +1,5 @@
 #![deny(clippy::disallowed_methods)]
 
-pub(crate) mod complement;
 pub(crate) mod expansion;
 pub(crate) mod input;
 pub mod pipeline;
