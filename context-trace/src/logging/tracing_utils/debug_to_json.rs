@@ -214,7 +214,10 @@ fn matching_delimiter(open: char) -> Option<char> {
     }
 }
 
-fn update_nesting_depth(depth: &mut i32, c: char) {
+fn update_nesting_depth(
+    depth: &mut i32,
+    c: char,
+) {
     match c {
         '(' | '[' | '<' | '{' => *depth += 1,
         ')' | ']' | '>' | '}' => *depth -= 1,
@@ -440,9 +443,8 @@ fn simplify_spans_array(spans: &mut Vec<serde_json::Value>) {
     let simplified: Vec<serde_json::Value> = spans
         .iter()
         .map(|span| match span {
-            serde_json::Value::Object(obj) => {
-                obj.get("name").cloned().unwrap_or(serde_json::Value::Null)
-            },
+            serde_json::Value::Object(obj) =>
+                obj.get("name").cloned().unwrap_or(serde_json::Value::Null),
             other => other.clone(),
         })
         .collect();
@@ -488,7 +490,8 @@ fn parse_rust_debug(s: &str) -> Option<serde_json::Value> {
 
     // Find matching close brace
     let content_start = brace_pos + 1;
-    let content_end = find_balanced_end(s, content_start, open_brace, close_brace)?;
+    let content_end =
+        find_balanced_end(s, content_start, open_brace, close_brace)?;
     let content = &s[content_start..content_end];
 
     let mut obj = serde_json::Map::new();

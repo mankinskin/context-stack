@@ -80,7 +80,11 @@ where
                 &rendering.gutter_indent,
             )?;
         } else {
-            write!(writer, "EVENT: {}", rendering.message_text.trim_matches('"'))?;
+            write!(
+                writer,
+                "EVENT: {}",
+                rendering.message_text.trim_matches('"')
+            )?;
         }
 
         let mut visitor = FieldVisitor::new(
@@ -90,7 +94,10 @@ where
         event.record(&mut visitor);
         visitor.result?;
 
-        if should_format_span_fields(&self.config, rendering.span_event.as_ref()) {
+        if should_format_span_fields(
+            &self.config,
+            rendering.span_event.as_ref(),
+        ) {
             format_span_fields(
                 &mut writer,
                 ctx,
@@ -143,7 +150,8 @@ where
 
 fn event_message_text(event: &Event<'_>) -> String {
     let mut message_text = String::new();
-    event.record(&mut |field: &tracing::field::Field, value: &dyn fmt::Debug| {
+    event.record(&mut |field: &tracing::field::Field,
+                       value: &dyn fmt::Debug| {
         if field.name() == "message" {
             message_text = format!("{:?}", value);
         }
@@ -183,12 +191,10 @@ fn should_add_blank_before(
     span_event: Option<&SpanEventKind>,
 ) -> bool {
     match span_event {
-        Some(SpanEventKind::Enter) => {
-            formatter.config.whitespace.blank_line_before_span_enter
-        },
-        Some(SpanEventKind::Close) => {
-            formatter.config.whitespace.blank_line_before_span_close
-        },
+        Some(SpanEventKind::Enter) =>
+            formatter.config.whitespace.blank_line_before_span_enter,
+        Some(SpanEventKind::Close) =>
+            formatter.config.whitespace.blank_line_before_span_close,
         None => formatter.config.whitespace.blank_line_before_events,
     }
 }
@@ -198,12 +204,10 @@ fn should_add_blank_after(
     span_event: Option<&SpanEventKind>,
 ) -> bool {
     match span_event {
-        Some(SpanEventKind::Enter) => {
-            formatter.config.whitespace.blank_line_after_span_enter
-        },
-        Some(SpanEventKind::Close) => {
-            formatter.config.whitespace.blank_line_after_span_close
-        },
+        Some(SpanEventKind::Enter) =>
+            formatter.config.whitespace.blank_line_after_span_enter,
+        Some(SpanEventKind::Close) =>
+            formatter.config.whitespace.blank_line_after_span_close,
         None => formatter.config.whitespace.blank_line_after_events,
     }
 }
@@ -269,7 +273,8 @@ fn should_format_span_fields(
     config: &super::config::FormatConfig,
     span_event: Option<&SpanEventKind>,
 ) -> bool {
-    config.span_enter.show_fields && matches!(span_event, Some(SpanEventKind::Enter))
+    config.span_enter.show_fields
+        && matches!(span_event, Some(SpanEventKind::Enter))
 }
 
 fn write_file_location_if_enabled(
@@ -324,7 +329,11 @@ where
     let target = span.as_ref().map(|s| s.metadata().target()).unwrap_or("");
 
     match message_text {
-        "\"enter\"" => write!(writer, "{}", format_span_enter_message(span, target, span_name, config)),
+        "\"enter\"" => write!(
+            writer,
+            "{}",
+            format_span_enter_message(span, target, span_name, config)
+        ),
         "\"close\"" => format_span_close_message(writer, span_name, config),
         _ => write!(writer, "{}", message_text.trim_matches('"')),
     }
@@ -383,7 +392,8 @@ fn append_signature_part(
     config: &super::config::FormatConfig,
 ) {
     if config.span_enter.show_fn_signature
-        && let Some(fn_sig) = special.and_then(|special| special.fn_sig.as_ref())
+        && let Some(fn_sig) =
+            special.and_then(|special| special.fn_sig.as_ref())
     {
         let highlighted = highlight_rust_signature(fn_sig, config.enable_ansi);
         parts.push(format!("- {}", highlighted));
@@ -423,8 +433,7 @@ fn format_span_close_message(
     config: &super::config::FormatConfig,
 ) -> fmt::Result {
     write!(writer, "SPAN CLOSED: {}", span_name)?;
-    if config.span_close.show_timing {
-    }
+    if config.span_close.show_timing {}
     Ok(())
 }
 

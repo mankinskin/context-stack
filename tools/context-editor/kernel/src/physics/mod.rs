@@ -162,7 +162,8 @@ fn fill_chunk_grid(
             for dx in 0..chunk_size {
                 let voxel = chunk_pos + IVec3::new(dx, dy, dz);
                 if is_solid(world, voxel) {
-                    grid[(dz as usize * n + dy as usize) * n + dx as usize] = true;
+                    grid[(dz as usize * n + dy as usize) * n + dx as usize] =
+                        true;
                 }
             }
         }
@@ -311,9 +312,19 @@ pub fn rebuild_chunk_collider(
 
                 let max_x = extend_x(&grid, &consumed, n, x, y, z);
                 let max_y = extend_y(&grid, &consumed, n, x, y, z, max_x);
-                let max_z = extend_z(&grid, &consumed, n, x, y, z, max_x, max_y);
+                let max_z =
+                    extend_z(&grid, &consumed, n, x, y, z, max_x, max_y);
 
-                mark_consumed_region(&mut consumed, n, x, y, z, max_x, max_y, max_z);
+                mark_consumed_region(
+                    &mut consumed,
+                    n,
+                    x,
+                    y,
+                    z,
+                    max_x,
+                    max_y,
+                    max_z,
+                );
                 emit_box(&mut boxes, x, y, z, max_x, max_y, max_z);
             }
         }

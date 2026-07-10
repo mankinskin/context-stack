@@ -291,7 +291,11 @@ impl LogParser {
         json: &TracingJson,
     ) -> String {
         if (message.contains("new") || message.contains("enter"))
-            && json.span.as_ref().and_then(|span| span.0.name.as_ref()).is_some()
+            && json
+                .span
+                .as_ref()
+                .and_then(|span| span.0.name.as_ref())
+                .is_some()
         {
             return if message.contains("new") {
                 "span_new".to_string()
@@ -319,16 +323,16 @@ impl LogParser {
             return message;
         }
 
-        if let Some(name) = json.span.as_ref().and_then(|span| span.0.name.as_ref()) {
+        if let Some(name) =
+            json.span.as_ref().and_then(|span| span.0.name.as_ref())
+        {
             *event_type = "span_enter".to_string();
             message = format!("Span: {}", name);
         }
 
         if message.is_empty() {
-            message = json
-                .target
-                .clone()
-                .unwrap_or_else(|| "Unknown".to_string());
+            message =
+                json.target.clone().unwrap_or_else(|| "Unknown".to_string());
         }
 
         message
@@ -441,7 +445,8 @@ impl LogParser {
         &self,
         json: &TracingJson,
     ) -> (String, String, Option<String>) {
-        let mut event_type = self.detect_event_type(&self.extract_message(json), json);
+        let mut event_type =
+            self.detect_event_type(&self.extract_message(json), json);
         let message = self.apply_message_fallback(
             self.extract_message(json),
             &mut event_type,

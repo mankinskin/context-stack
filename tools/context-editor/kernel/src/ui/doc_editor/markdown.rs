@@ -24,7 +24,10 @@ fn finish_code_block(
     code_lang.clear();
 }
 
-fn append_code_line(code_buf: &mut String, line: &str) {
+fn append_code_line(
+    code_buf: &mut String,
+    line: &str,
+) {
     if !code_buf.is_empty() {
         code_buf.push('\n');
     }

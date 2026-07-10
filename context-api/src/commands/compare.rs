@@ -126,13 +126,12 @@ fn compare_shared_vertices(
         };
 
         let pattern_diff = match match_kind {
-            VertexMatchKind::ExtraPatterns | VertexMatchKind::PatternMismatch => {
-                Some(PatternDiff {
-                    only_in_a: only_a_pats,
-                    only_in_b: only_b_pats,
-                    common,
-                })
-            },
+            VertexMatchKind::ExtraPatterns
+            | VertexMatchKind::PatternMismatch => Some(PatternDiff {
+                only_in_a: only_a_pats,
+                only_in_b: only_b_pats,
+                common,
+            }),
             _ => None,
         };
 
@@ -168,9 +167,9 @@ fn compute_verdict(
             }
         },
         CompareMode::Subset => {
-            let extra_patterns_in_b = shared
-                .iter()
-                .any(|vertex| vertex.match_kind == VertexMatchKind::ExtraPatterns);
+            let extra_patterns_in_b = shared.iter().any(|vertex| {
+                vertex.match_kind == VertexMatchKind::ExtraPatterns
+            });
             let b_is_subset = only_in_b.is_empty()
                 && width_mismatch_count == 0
                 && pattern_mismatch_count == 0

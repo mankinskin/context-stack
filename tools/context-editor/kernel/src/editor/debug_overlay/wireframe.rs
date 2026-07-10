@@ -22,9 +22,18 @@ fn push_wire_cube(
     use crate::render::wireframe_overlay::WIREFRAME_VERTS_PER_CUBE;
 
     const CUBE_EDGES: [(u32, u32); 12] = [
-        (0, 1), (1, 2), (2, 3), (3, 0),
-        (4, 5), (5, 6), (6, 7), (7, 4),
-        (0, 4), (1, 5), (2, 6), (3, 7),
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0),
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
     ];
 
     let base = (index * WIREFRAME_VERTS_PER_CUBE) as u32;
@@ -69,7 +78,12 @@ fn collect_occupied_cubes(
     let mut cubes = Vec::new();
     let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
         std::collections::VecDeque::new();
-    queue.push_back((voxel_world.root_index as usize, 0, Vec3::ZERO, root_extent));
+    queue.push_back((
+        voxel_world.root_index as usize,
+        0,
+        Vec3::ZERO,
+        root_extent,
+    ));
 
     while let Some((idx, depth, origin, extent)) = queue.pop_front() {
         if idx >= voxel_world.nodes.len() {
@@ -131,7 +145,12 @@ fn collect_full_grid_cubes(
     let mut cubes = Vec::new();
     let mut queue: std::collections::VecDeque<(usize, u32, Vec3, f32)> =
         std::collections::VecDeque::new();
-    queue.push_back((voxel_world.root_index as usize, 0, Vec3::ZERO, root_extent));
+    queue.push_back((
+        voxel_world.root_index as usize,
+        0,
+        Vec3::ZERO,
+        root_extent,
+    ));
 
     while let Some((idx, depth, origin, extent)) = queue.pop_front() {
         if cubes.len() >= max_cubes {
@@ -147,7 +166,12 @@ fn collect_full_grid_cubes(
             } else {
                 for slot in 0..8usize {
                     let child_origin = octant_child_origin(origin, half, slot);
-                    queue.push_back((usize::MAX, depth + 1, child_origin, half));
+                    queue.push_back((
+                        usize::MAX,
+                        depth + 1,
+                        child_origin,
+                        half,
+                    ));
                 }
             }
             continue;
@@ -169,7 +193,12 @@ fn collect_full_grid_cubes(
             let child_origin = octant_child_origin(origin, half, slot);
             if mask & (1 << slot) == 0 {
                 if depth + 1 <= full_grid_cap {
-                    queue.push_back((usize::MAX, depth + 1, child_origin, half));
+                    queue.push_back((
+                        usize::MAX,
+                        depth + 1,
+                        child_origin,
+                        half,
+                    ));
                 }
             } else {
                 queue.push_back((first + slot, depth + 1, child_origin, half));
@@ -209,7 +238,13 @@ pub(super) fn draw_svo_wireframe(
             .single()
             .map(|transform| transform.translation)
             .unwrap_or(Vec3::ZERO);
-        collect_occupied_cubes(&voxel_world, target, root_extent, MAX_CUBES, cam_pos)
+        collect_occupied_cubes(
+            &voxel_world,
+            target,
+            root_extent,
+            MAX_CUBES,
+            cam_pos,
+        )
     } else {
         collect_full_grid_cubes(&voxel_world, target, root_extent, MAX_CUBES)
     };

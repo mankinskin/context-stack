@@ -168,7 +168,10 @@ fn execute_inspection_command(
             let display = manager.show_vertex(&workspace, index)?;
             Ok(CommandResult::GraphDisplay { display })
         },
-        Command::RenderAsciiGraph { workspace, ascii_dag } => {
+        Command::RenderAsciiGraph {
+            workspace,
+            ascii_dag,
+        } => {
             let display = manager.render_ascii_graph(&workspace, ascii_dag)?;
             Ok(CommandResult::GraphDisplay { display })
         },
@@ -224,17 +227,22 @@ fn execute_log_command(
             limit,
         } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let (entries, total) = logs::query_log(&log_dir, &filename, &query, limit)
-                .map_err(ApiError::Log)?;
+            let (entries, total) =
+                logs::query_log(&log_dir, &filename, &query, limit)
+                    .map_err(ApiError::Log)?;
             Ok(CommandResult::LogQueryResult {
                 query,
                 matches: total,
                 entries,
             })
         },
-        Command::AnalyzeLog { workspace, filename } => {
+        Command::AnalyzeLog {
+            workspace,
+            filename,
+        } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let analysis = logs::analyze_log(&log_dir, &filename).map_err(ApiError::Log)?;
+            let analysis = logs::analyze_log(&log_dir, &filename)
+                .map_err(ApiError::Log)?;
             Ok(CommandResult::LogAnalysis(analysis))
         },
         Command::SearchLogs {
@@ -243,15 +251,19 @@ fn execute_log_command(
             limit_per_file,
         } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let (results, files_with_matches) = logs::search_logs(&log_dir, &query, limit_per_file)
-                .map_err(ApiError::Log)?;
+            let (results, files_with_matches) =
+                logs::search_logs(&log_dir, &query, limit_per_file)
+                    .map_err(ApiError::Log)?;
             Ok(CommandResult::LogSearchResult {
                 query,
                 files_with_matches,
                 results,
             })
         },
-        Command::DeleteLog { workspace, filename } => {
+        Command::DeleteLog {
+            workspace,
+            filename,
+        } => {
             let log_dir = manager.log_dir(&workspace)?;
             logs::delete_log(&log_dir, &filename).map_err(ApiError::Log)?;
             Ok(CommandResult::Ok)
@@ -261,7 +273,8 @@ fn execute_log_command(
             older_than_days,
         } => {
             let log_dir = manager.log_dir(&workspace)?;
-            let result = logs::delete_logs(&log_dir, older_than_days).map_err(ApiError::Log)?;
+            let result = logs::delete_logs(&log_dir, older_than_days)
+                .map_err(ApiError::Log)?;
             Ok(CommandResult::LogDeleteResult(result))
         },
         _ => unreachable!("log command expected"),
@@ -294,7 +307,9 @@ fn execute_integration_command(
             path,
             overwrite,
         } => {
-            let info = export_import::import_workspace(manager, &name, &path, overwrite)?;
+            let info = export_import::import_workspace(
+                manager, &name, &path, overwrite,
+            )?;
             Ok(CommandResult::WorkspaceInfo(info))
         },
         Command::CompareWorkspaces {
@@ -333,7 +348,8 @@ pub fn execute(
         | Command::CloseWorkspace { .. }
         | Command::SaveWorkspace { .. }
         | Command::ListWorkspaces
-        | Command::DeleteWorkspace { .. } => execute_workspace_command(manager, cmd),
+        | Command::DeleteWorkspace { .. } =>
+            execute_workspace_command(manager, cmd),
         Command::AddAtom { .. }
         | Command::AddAtoms { .. }
         | Command::GetAtom { .. }
@@ -355,7 +371,8 @@ pub fn execute(
         | Command::ValidateGraph { .. }
         | Command::ShowGraph { .. }
         | Command::ShowVertex { .. }
-        | Command::RenderAsciiGraph { .. } => execute_inspection_command(manager, cmd),
+        | Command::RenderAsciiGraph { .. } =>
+            execute_inspection_command(manager, cmd),
         Command::ListLogs { .. }
         | Command::GetLog { .. }
         | Command::QueryLog { .. }
@@ -366,7 +383,8 @@ pub fn execute(
         Command::ExportWorkspace { .. }
         | Command::ImportWorkspace { .. }
         | Command::CompareWorkspaces { .. }
-        | Command::CompareVertices { .. } => execute_integration_command(manager, cmd),
+        | Command::CompareVertices { .. } =>
+            execute_integration_command(manager, cmd),
     }
 }
 

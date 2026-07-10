@@ -519,7 +519,11 @@ fn parse_query_pairs(input: &str) -> impl Iterator<Item = (&str, &str)> {
     })
 }
 
-fn set_correlation_id(ids: &mut ReplayCorrelationIds, key: &str, value: &str) {
+fn set_correlation_id(
+    ids: &mut ReplayCorrelationIds,
+    key: &str,
+    value: &str,
+) {
     match key {
         "operation_id" => ids.operation_id = Some(value.to_string()),
         "run_id" => ids.run_id = Some(value.to_string()),
@@ -537,7 +541,8 @@ fn set_correlation_id_if_missing(
     match key {
         "operation_id" if ids.operation_id.is_none() =>
             ids.operation_id = Some(value.to_string()),
-        "run_id" if ids.run_id.is_none() => ids.run_id = Some(value.to_string()),
+        "run_id" if ids.run_id.is_none() =>
+            ids.run_id = Some(value.to_string()),
         "session_id" if ids.session_id.is_none() =>
             ids.session_id = Some(value.to_string()),
         "journal_id" if ids.journal_id.is_none() =>
@@ -546,7 +551,10 @@ fn set_correlation_id_if_missing(
     }
 }
 
-fn apply_query_correlation_ids(ids: &mut ReplayCorrelationIds, path_id: &str) {
+fn apply_query_correlation_ids(
+    ids: &mut ReplayCorrelationIds,
+    path_id: &str,
+) {
     if let Some((_, query)) = path_id.split_once('?') {
         for (key, value) in parse_query_pairs(query) {
             if !value.is_empty() {
@@ -556,7 +564,10 @@ fn apply_query_correlation_ids(ids: &mut ReplayCorrelationIds, path_id: &str) {
     }
 }
 
-fn apply_semicolon_correlation_ids(ids: &mut ReplayCorrelationIds, path_id: &str) {
+fn apply_semicolon_correlation_ids(
+    ids: &mut ReplayCorrelationIds,
+    path_id: &str,
+) {
     if path_id.contains(';') {
         for segment in path_id.split(';').skip(1) {
             if let Some((key, value)) = segment.split_once('=') {
@@ -697,7 +708,9 @@ impl GraphOpEvent {
 
         GraphReplayEnvelope {
             schema_version: GRAPH_REPLAY_SCHEMA_V1.to_string(),
-            operation_id: ids.operation_id.unwrap_or_else(|| self.path_id.clone()),
+            operation_id: ids
+                .operation_id
+                .unwrap_or_else(|| self.path_id.clone()),
             path_id: self.path_id.clone(),
             op_type: self.op_type,
             run_id: ids.run_id,
@@ -924,18 +937,13 @@ mod tests {
 
     #[test]
     fn replay_envelope_preserves_optional_mutation_payload() {
-        let mutation = GraphMutation::single(DeltaOp::AddNode {
-            index: 9,
-            width: 3,
-        });
+        let mutation =
+            GraphMutation::single(DeltaOp::AddNode { index: 9, width: 3 });
         let event = GraphOpEvent {
             step: 1,
             op_type: OperationType::Insert,
             transition: Transition::CreateRoot {
-                node: PathNode {
-                    index: 9,
-                    width: 3,
-                },
+                node: PathNode { index: 9, width: 3 },
             },
             location: LocationInfo::default(),
             query: QueryInfo::default(),

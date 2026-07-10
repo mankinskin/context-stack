@@ -173,7 +173,10 @@ fn paint_stone_tower_walls(
                 let is_wall = dx <= -7 || dx >= 7 || dz <= -7 || dz >= 7;
                 let is_door = dz <= -7 && dx.abs() <= 1 && y <= fy + 12;
                 if is_wall && !is_door {
-                    voxel_world.set_voxel(IVec3::new(tower_x + dx, y, tower_z + dz), stone);
+                    voxel_world.set_voxel(
+                        IVec3::new(tower_x + dx, y, tower_z + dz),
+                        stone,
+                    );
                 }
             }
         }
@@ -220,15 +223,24 @@ fn paint_stone_arch(
     for y in (fy + 1)..=(fy + 24) {
         for t in 0..4 {
             for w in 0..4 {
-                voxel_world.set_voxel(IVec3::new(arch_x - 8 + t, y, arch_z + w), stone);
-                voxel_world.set_voxel(IVec3::new(arch_x + 5 + t, y, arch_z + w), stone);
+                voxel_world.set_voxel(
+                    IVec3::new(arch_x - 8 + t, y, arch_z + w),
+                    stone,
+                );
+                voxel_world.set_voxel(
+                    IVec3::new(arch_x + 5 + t, y, arch_z + w),
+                    stone,
+                );
             }
         }
     }
     for dx in -8..=8 {
         for t in 0..4 {
             for w in 0..4 {
-                voxel_world.set_voxel(IVec3::new(arch_x + dx, fy + 25 + t, arch_z + w), stone);
+                voxel_world.set_voxel(
+                    IVec3::new(arch_x + dx, fy + 25 + t, arch_z + w),
+                    stone,
+                );
             }
         }
     }
@@ -246,7 +258,8 @@ fn paint_sand_pyramid(
         let y = fy + 1 + layer;
         for dx in -r..=r {
             for dz in -r..=r {
-                voxel_world.set_voxel(IVec3::new(pyr_x + dx, y, pyr_z + dz), sand);
+                voxel_world
+                    .set_voxel(IVec3::new(pyr_x + dx, y, pyr_z + dz), sand);
             }
         }
     }
@@ -262,7 +275,10 @@ fn paint_water_pool(
     for dx in -12..=12 {
         for dz in -12..=12 {
             for dy in 0..8 {
-                voxel_world.set_voxel(IVec3::new(pool_x + dx, fy - dy, pool_z + dz), water);
+                voxel_world.set_voxel(
+                    IVec3::new(pool_x + dx, fy - dy, pool_z + dz),
+                    water,
+                );
             }
         }
     }
@@ -280,7 +296,8 @@ fn paint_window_wall(
         for y in (fy + 1)..=(fy + 20) {
             let rel_x = (x - (cx - 60)) % 24;
             let rel_y = y - fy;
-            let is_window = (rel_x >= 8 && rel_x <= 15) && (rel_y >= 9 && rel_y <= 16);
+            let is_window =
+                (rel_x >= 8 && rel_x <= 15) && (rel_y >= 9 && rel_y <= 16);
             if !is_window {
                 for w in 0..4 {
                     voxel_world.set_voxel(IVec3::new(x, y, wall_z + w), stone);
@@ -324,7 +341,10 @@ fn paint_showcase_voxels(
     for dy in 1..=4 {
         for dx in -3_i32..=3 {
             for dz in 0..3_i32 {
-                voxel_world.set_voxel(IVec3::new(cx - 8 + dx, fy + dy, cz + 30 + dz), sphere_mat);
+                voxel_world.set_voxel(
+                    IVec3::new(cx - 8 + dx, fy + dy, cz + 30 + dz),
+                    sphere_mat,
+                );
             }
         }
     }
@@ -340,7 +360,10 @@ fn paint_showcase_voxels(
     for dy in 1..=4 {
         for dx in -3_i32..=3 {
             for dz in 0..3_i32 {
-                voxel_world.set_voxel(IVec3::new(cx + 8 + dx, fy + dy, cz + 30 + dz), torus_mat);
+                voxel_world.set_voxel(
+                    IVec3::new(cx + 8 + dx, fy + dy, cz + 30 + dz),
+                    torus_mat,
+                );
             }
         }
     }
@@ -356,7 +379,10 @@ fn paint_showcase_voxels(
     for dy in 1..=14 {
         for dx in -8_i32..=8 {
             for dz in 0..2_i32 {
-                voxel_world.set_voxel(IVec3::new(cx + dx, fy + dy, cz + 18 + dz), metallic_mat);
+                voxel_world.set_voxel(
+                    IVec3::new(cx + dx, fy + dy, cz + 18 + dz),
+                    metallic_mat,
+                );
             }
         }
     }

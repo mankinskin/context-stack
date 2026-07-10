@@ -215,7 +215,9 @@ impl SplitVertexCache {
         self.positions
             .keys()
             .enumerate()
-            .filter_map(|(index, pos)| target_positions.contains(pos).then_some(index))
+            .filter_map(|(index, pos)| {
+                target_positions.contains(pos).then_some(index)
+            })
             .collect_vec()
     }
 
@@ -274,7 +276,8 @@ impl SplitVertexCache {
         ),
         ErrorReason,
     > {
-        let missing = || ErrorReason::MissingCacheEntry(ctx.index.vertex_index());
+        let missing =
+            || ErrorReason::MissingCacheEntry(ctx.index.vertex_index());
 
         match root_mode {
             RootMode::Infix => Ok(Self::add_inner_offsets(
@@ -321,14 +324,16 @@ impl SplitVertexCache {
             "root_augmentation"
         );
 
-        let (splits, next) = self.root_mode_inner_splits(ctx.clone(), root_mode)?;
+        let (splits, next) =
+            self.root_mode_inner_splits(ctx.clone(), root_mode)?;
         debug!(
             inner_offsets = ?splits.keys().collect_vec(),
             "After add_inner_offsets"
         );
         self.positions.extend(splits);
 
-        let wrapper_splits = self.root_mode_wrapper_splits(ctx.clone(), root_mode);
+        let wrapper_splits =
+            self.root_mode_wrapper_splits(ctx.clone(), root_mode);
 
         debug!(
             wrapper_offsets = ?wrapper_splits.keys().collect_vec(),
@@ -343,11 +348,13 @@ impl SplitVertexCache {
         debug!(?toi, "target offset indices");
 
         let num_offsets = self.positions.len();
-        let target_range = Self::target_partition_range(root_mode, &toi, num_offsets);
+        let target_range =
+            Self::target_partition_range(root_mode, &toi, num_offsets);
 
         debug!(?target_range, "calculated target_range");
 
-        let wrapper_range = Self::wrapper_partition_range(root_mode, num_offsets);
+        let wrapper_range =
+            Self::wrapper_partition_range(root_mode, num_offsets);
 
         debug!(?wrapper_range, "calculated wrapper_range");
 
@@ -414,7 +421,9 @@ impl SplitVertexCache {
             if right_boundary_unperfect || left_boundary_unperfect {
                 required.add(wrapper_range.clone());
                 if right_boundary_unperfect && target_end > target_start {
-                    required.add(PartitionRange::new(target_start..=(target_end - 1)));
+                    required.add(PartitionRange::new(
+                        target_start..=(target_end - 1),
+                    ));
                 }
                 if right_boundary_unperfect {
                     Self::add_partition_if_valid(
@@ -589,16 +598,29 @@ impl SplitVertexCache {
                 };
 
                 let child_index = trace_pos.sub_index;
-                let wrapper_start_offset = Self::wrapper_start_offset(pattern, child_index);
+                let wrapper_start_offset =
+                    Self::wrapper_start_offset(pattern, child_index);
                 debug!(wrapper_start_offset, child_index, wrapper_child = ?pattern[child_index], "Wrapper child info");
 
                 if wrapper_start_offset > 0 {
-                    self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_start_offset);
+                    self.insert_wrapper_split(
+                        &ctx,
+                        &mut wrapper_splits,
+                        wrapper_start_offset,
+                    );
                 }
 
-                let intermediate_offset = wrapper_start_offset + inner_offset.get();
-                debug!(?inner_offset, intermediate_offset, "Found inner offset in wrapper");
-                self.insert_wrapper_split(&ctx, &mut wrapper_splits, intermediate_offset);
+                let intermediate_offset =
+                    wrapper_start_offset + inner_offset.get();
+                debug!(
+                    ?inner_offset,
+                    intermediate_offset, "Found inner offset in wrapper"
+                );
+                self.insert_wrapper_split(
+                    &ctx,
+                    &mut wrapper_splits,
+                    intermediate_offset,
+                );
             }
         }
 
@@ -627,9 +649,14 @@ impl SplitVertexCache {
                 }
 
                 let child_index = trace_pos.sub_index;
-                let wrapper_end_offset = Self::wrapper_end_offset(pattern, child_index);
+                let wrapper_end_offset =
+                    Self::wrapper_end_offset(pattern, child_index);
                 if wrapper_end_offset < Self::root_width(pattern) {
-                    self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_end_offset);
+                    self.insert_wrapper_split(
+                        &ctx,
+                        &mut wrapper_splits,
+                        wrapper_end_offset,
+                    );
                 }
             }
         }
@@ -664,7 +691,11 @@ impl SplitVertexCache {
                     let wrapper_end_offset =
                         Self::wrapper_end_offset(pattern, trace_pos.sub_index);
                     if wrapper_end_offset < Self::root_width(pattern) {
-                        self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_end_offset);
+                        self.insert_wrapper_split(
+                            &ctx,
+                            &mut wrapper_splits,
+                            wrapper_end_offset,
+                        );
                     }
                 }
             }
@@ -678,9 +709,14 @@ impl SplitVertexCache {
                     };
 
                     let child_index = trace_pos.sub_index;
-                    let wrapper_start_offset = Self::wrapper_start_offset(pattern, child_index);
+                    let wrapper_start_offset =
+                        Self::wrapper_start_offset(pattern, child_index);
                     if wrapper_start_offset > 0 {
-                        self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_start_offset);
+                        self.insert_wrapper_split(
+                            &ctx,
+                            &mut wrapper_splits,
+                            wrapper_start_offset,
+                        );
                     }
 
                     self.insert_wrapper_split(
@@ -689,9 +725,14 @@ impl SplitVertexCache {
                         wrapper_start_offset + inner_offset.get(),
                     );
 
-                    let wrapper_end_offset = Self::wrapper_end_offset(pattern, child_index);
+                    let wrapper_end_offset =
+                        Self::wrapper_end_offset(pattern, child_index);
                     if wrapper_end_offset < Self::root_width(pattern) {
-                        self.insert_wrapper_split(&ctx, &mut wrapper_splits, wrapper_end_offset);
+                        self.insert_wrapper_split(
+                            &ctx,
+                            &mut wrapper_splits,
+                            wrapper_end_offset,
+                        );
                     }
                 }
             }

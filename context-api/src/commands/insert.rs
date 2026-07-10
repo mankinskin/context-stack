@@ -21,8 +21,10 @@ mod tests;
 use std::collections::HashSet;
 
 use context_search::Find;
-use context_trace::graph::vertex::atom::Atom;
-use context_trace::graph::vertex::pattern::Pattern;
+use context_trace::graph::vertex::{
+    atom::Atom,
+    pattern::Pattern,
+};
 use tracing::debug;
 
 use crate::{
@@ -76,9 +78,13 @@ impl WorkspaceManager {
 
         let pattern = Pattern::from(tokens);
 
-        let exact_match = graph_ref.find_ancestor(pattern.clone()).ok().filter(
-            |response| response.is_entire_root() && response.query_exhausted(),
-        );
+        let exact_match =
+            graph_ref
+                .find_ancestor(pattern.clone())
+                .ok()
+                .filter(|response| {
+                    response.is_entire_root() && response.query_exhausted()
+                });
 
         let already_existed = exact_match.is_some();
 
@@ -162,14 +168,19 @@ impl WorkspaceManager {
                 graph_ref
                     .get_atom_index(Atom::Element(ch))
                     .map(|index| context_trace::Token::new(index, 1))
-                    .unwrap_or_else(|_| graph_ref.insert_atom(Atom::Element(ch)))
+                    .unwrap_or_else(|_| {
+                        graph_ref.insert_atom(Atom::Element(ch))
+                    })
             })
             .collect::<Vec<_>>();
 
         let atom_pattern = Pattern::from(atoms);
-        let token = if let Some(response) = graph_ref.find_ancestor(atom_pattern.clone()).ok().filter(
-            |response| response.is_entire_root() && response.query_exhausted(),
-        ) {
+        let token = if let Some(response) = graph_ref
+            .find_ancestor(atom_pattern.clone())
+            .ok()
+            .filter(|response| {
+                response.is_entire_root() && response.query_exhausted()
+            }) {
             response.root_token()
         } else {
             graph_ref.insert_pattern(atom_pattern)

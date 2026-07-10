@@ -184,7 +184,10 @@ where
         self.viz_path.root_exit_edge = None;
     }
 
-    fn emit_parent_visit(&mut self, node_index: usize) {
+    fn emit_parent_visit(
+        &mut self,
+        node_index: usize,
+    ) {
         let push_from = if let Some(current_root_node) = self.viz_path.root {
             current_root_node.index
         } else if let Some(top) = self.viz_path.start_path.last() {
@@ -893,7 +896,9 @@ where
         // BfsStepResult carries node_index and is_parent for event emission.
         let matched_state = loop {
             let step_result = self.matches.pop_and_process_one();
-            let Some((node_index, is_parent)) = Self::step_metadata(&step_result) else {
+            let Some((node_index, is_parent)) =
+                Self::step_metadata(&step_result)
+            else {
                 trace!("no more matches found");
                 return None;
             };

@@ -12,11 +12,11 @@ use context_api::{
     types::{
         AtomInfo,
         DiffVerdict,
+        DiffVertexEntry,
         GraphDiffResult,
         GraphStatistics,
         InsertResult,
         LogAnalysis,
-        DiffVertexEntry,
         LogDeleteResult,
         LogEntryInfo,
         LogFileInfo,
@@ -75,7 +75,8 @@ fn print_info_result(result: &CommandResult) {
         },
         CommandResult::AtomInfo(info) => print_atom_info(info),
         CommandResult::AtomInfoList { atoms } => print_atom_info_list(atoms),
-        CommandResult::OptionalAtomInfo { atom } => print_optional_atom_info(atom),
+        CommandResult::OptionalAtomInfo { atom } =>
+            print_optional_atom_info(atom),
         CommandResult::PatternInfo(info) => print_pattern_info(info),
         CommandResult::OptionalVertexInfo { vertex } => {
             print_optional_vertex_info(vertex);
@@ -94,19 +95,20 @@ fn print_graph_operation_result(result: &CommandResult) {
             print_insert_result_list(results);
         },
         CommandResult::ReadResult(result) => print_read_result(result),
-        _ => unreachable!("non-graph result passed to print_graph_operation_result"),
+        _ => unreachable!(
+            "non-graph result passed to print_graph_operation_result"
+        ),
     }
 }
 
 fn print_misc_result(result: &CommandResult) {
     match result {
         CommandResult::Text { text } => println!("{text}"),
-        CommandResult::Snapshot(snapshot) => {
+        CommandResult::Snapshot(snapshot) =>
             match serde_json::to_string_pretty(snapshot) {
                 Ok(json) => println!("{json}"),
                 Err(error) => eprintln!("Error serializing snapshot: {error}"),
-            }
-        },
+            },
         CommandResult::Statistics(stats) => print_statistics(stats),
         CommandResult::ValidationReport(report) => {
             print_validation_report(report);
@@ -114,7 +116,8 @@ fn print_misc_result(result: &CommandResult) {
         CommandResult::GraphDisplay { display } => println!("{display}"),
         CommandResult::Ok => println!("Ok."),
         CommandResult::GraphDiff(result) => print_graph_diff(result),
-        CommandResult::ExportData { data, format } => print_export_data(data, format),
+        CommandResult::ExportData { data, format } =>
+            print_export_data(data, format),
         _ => unreachable!("non-misc result passed to print_misc_result"),
     }
 }
@@ -288,14 +291,24 @@ fn print_only_in_a_vertices(
     workspace_a: &str,
     vertices: &[DiffVertexEntry],
 ) {
-    print_exclusive_vertices(workspace_a, "A", vertices, print_only_in_a_vertex);
+    print_exclusive_vertices(
+        workspace_a,
+        "A",
+        vertices,
+        print_only_in_a_vertex,
+    );
 }
 
 fn print_only_in_b_vertices(
     workspace_b: &str,
     vertices: &[DiffVertexEntry],
 ) {
-    print_exclusive_vertices(workspace_b, "B", vertices, print_only_in_b_vertex);
+    print_exclusive_vertices(
+        workspace_b,
+        "B",
+        vertices,
+        print_only_in_b_vertex,
+    );
 }
 
 fn print_exclusive_vertices(

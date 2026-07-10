@@ -28,7 +28,9 @@ fn text_result(text: impl Into<String>) -> CallToolResult {
     CallToolResult::success(vec![Content::text(text.into())])
 }
 
-fn json_result<T: serde::Serialize>(value: &T) -> Result<CallToolResult, McpError> {
+fn json_result<T: serde::Serialize>(
+    value: &T
+) -> Result<CallToolResult, McpError> {
     let json = serde_json::to_string(value).map_err(|e| {
         McpError::internal_error(format!("Serialization failed: {e}"), None)
     })?;
@@ -54,7 +56,9 @@ fn command_help_result(
     cmd_name: &str,
 ) -> Result<CallToolResult, McpError> {
     let needle = cmd_name.to_lowercase();
-    if let Some(command) = commands.iter().find(|command| command.name == needle) {
+    if let Some(command) =
+        commands.iter().find(|command| command.name == needle)
+    {
         return json_result(command);
     }
 
@@ -125,8 +129,11 @@ fn category_help_result(
 ) -> CallToolResult {
     let needle = cat_name.to_lowercase();
     let categories = all_categories();
-    let Some(category) = categories.iter().find(|category| category.name == needle) else {
-        let valid: Vec<&str> = categories.iter().map(|category| category.name).collect();
+    let Some(category) =
+        categories.iter().find(|category| category.name == needle)
+    else {
+        let valid: Vec<&str> =
+            categories.iter().map(|category| category.name).collect();
         return text_result(format!(
             "Unknown category '{}'. Valid categories: {}",
             cat_name,
@@ -159,7 +166,10 @@ fn overview_help_result(commands: &[super::CommandHelp]) -> CallToolResult {
         ));
         text.push_str("| Command | Summary |\n|---------|----------|\n");
         for command in &category_commands {
-            text.push_str(&format!("| `{}` | {} |\n", command.name, command.summary));
+            text.push_str(&format!(
+                "| `{}` | {} |\n",
+                command.name, command.summary
+            ));
         }
         text.push('\n');
     }

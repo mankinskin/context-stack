@@ -159,16 +159,17 @@ impl WorkspaceManager {
             return self.read_pattern(ws_name, token.index.0);
         }
 
-        let insert = self.insert_sequence(ws_name, text).map_err(|error| {
-            match error {
-                crate::error::InsertError::WorkspaceNotOpen { workspace } => {
-                    ReadError::WorkspaceNotOpen { workspace }
+        let insert =
+            self.insert_sequence(ws_name, text).map_err(
+                |error| match error {
+                    crate::error::InsertError::WorkspaceNotOpen {
+                        workspace,
+                    } => ReadError::WorkspaceNotOpen { workspace },
+                    other => ReadError::InternalError(format!(
+                        "insert_sequence failed while reading {text:?}: {other}"
+                    )),
                 },
-                other => ReadError::InternalError(format!(
-                    "insert_sequence failed while reading {text:?}: {other}"
-                )),
-            }
-        })?;
+            )?;
 
         self.read_pattern(ws_name, insert.token.index)
     }

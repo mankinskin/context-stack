@@ -150,7 +150,8 @@ pub fn current_correlation_fields() -> CorrelationFields {
             return;
         };
 
-        if let Some(ext_fields) = span_ref.extensions().get::<CorrelationFields>()
+        if let Some(ext_fields) =
+            span_ref.extensions().get::<CorrelationFields>()
         {
             fields = ext_fields.clone();
         }

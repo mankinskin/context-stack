@@ -93,7 +93,8 @@ fn physics_displacement(
         ctrl.vertical_velocity = 0.0;
     }
 
-    move_dir * speed * delta_secs + Vec3::Y * ctrl.vertical_velocity * delta_secs
+    move_dir * speed * delta_secs
+        + Vec3::Y * ctrl.vertical_velocity * delta_secs
 }
 
 // ---------------------------------------------------------------------------
@@ -185,22 +186,12 @@ fn character_movement(
 
         let displacement = if is_free_fly_enabled() {
             free_fly_displacement(
-                &keys,
-                &mut ctrl,
-                move_dir,
-                speed,
-                delta_secs,
-                up,
+                &keys, &mut ctrl, move_dir, speed, delta_secs, up,
             )
         } else {
             let grounded = output.map_or(false, |o| o.grounded);
             physics_displacement(
-                &keys,
-                &mut ctrl,
-                move_dir,
-                speed,
-                delta_secs,
-                grounded,
+                &keys, &mut ctrl, move_dir, speed, delta_secs, grounded,
             )
         };
 

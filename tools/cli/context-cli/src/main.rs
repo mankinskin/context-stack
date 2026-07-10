@@ -510,60 +510,75 @@ fn map_import_export_command(cmd: CliCommand) -> Result<Command, CliCommand> {
 
 fn map_edit_command(cmd: CliCommand) -> Result<Command, CliCommand> {
     match cmd {
-        CliCommand::AddAtom { workspace, ch } => Ok(Command::AddAtom { workspace, ch }),
+        CliCommand::AddAtom { workspace, ch } =>
+            Ok(Command::AddAtom { workspace, ch }),
         CliCommand::AddAtoms { workspace, chars } => Ok(Command::AddAtoms {
             workspace,
             chars: chars.chars().collect(),
         }),
-        CliCommand::AddPattern { workspace, atoms } => Ok(Command::AddSimplePattern {
-            workspace,
-            atoms: atoms.chars().collect(),
-        }),
-        CliCommand::SearchSequence { workspace, text } => {
-            Ok(Command::SearchSequence { workspace, text })
-        },
-        CliCommand::SearchPattern { workspace, query } => Ok(Command::SearchPattern {
-            workspace,
-            query: parse_token_refs(&query),
-        }),
-        CliCommand::InsertSequence { workspace, text } => {
-            Ok(Command::InsertSequence { workspace, text })
-        },
-        CliCommand::InsertFirstMatch { workspace, query } => {
+        CliCommand::AddPattern { workspace, atoms } =>
+            Ok(Command::AddSimplePattern {
+                workspace,
+                atoms: atoms.chars().collect(),
+            }),
+        CliCommand::SearchSequence { workspace, text } =>
+            Ok(Command::SearchSequence { workspace, text }),
+        CliCommand::SearchPattern { workspace, query } =>
+            Ok(Command::SearchPattern {
+                workspace,
+                query: parse_token_refs(&query),
+            }),
+        CliCommand::InsertSequence { workspace, text } =>
+            Ok(Command::InsertSequence { workspace, text }),
+        CliCommand::InsertFirstMatch { workspace, query } =>
             Ok(Command::InsertFirstMatch {
                 workspace,
                 query: parse_token_refs(&query),
-            })
-        },
-        CliCommand::InsertSequences { workspace, texts } => Ok(Command::InsertSequences {
-            workspace,
-            texts: texts.into_iter().collect::<HashSet<_>>(),
-        }),
+            }),
+        CliCommand::InsertSequences { workspace, texts } =>
+            Ok(Command::InsertSequences {
+                workspace,
+                texts: texts.into_iter().collect::<HashSet<_>>(),
+            }),
         other => Err(other),
     }
 }
 
 fn map_query_command(cmd: CliCommand) -> Result<Command, CliCommand> {
     match cmd {
-        CliCommand::GetVertex { workspace, index } => Ok(Command::GetVertex { workspace, index }),
-        CliCommand::ListVertices { workspace } => Ok(Command::ListVertices { workspace }),
-        CliCommand::ListAtoms { workspace } => Ok(Command::ListAtoms { workspace }),
+        CliCommand::GetVertex { workspace, index } =>
+            Ok(Command::GetVertex { workspace, index }),
+        CliCommand::ListVertices { workspace } =>
+            Ok(Command::ListVertices { workspace }),
+        CliCommand::ListAtoms { workspace } =>
+            Ok(Command::ListAtoms { workspace }),
         other => map_read_display_command(other),
     }
 }
 
 fn map_read_display_command(cmd: CliCommand) -> Result<Command, CliCommand> {
     match cmd {
-        CliCommand::ReadPattern { workspace, index } => Ok(Command::ReadPattern { workspace, index }),
-        CliCommand::ReadAsText { workspace, index } => Ok(Command::ReadAsText { workspace, index }),
-        CliCommand::ReadSequence { workspace, text } => Ok(Command::ReadSequence { workspace, text }),
-        CliCommand::ReadFile { workspace, path } => Ok(Command::ReadFile { workspace, path }),
-        CliCommand::Validate { workspace } => Ok(Command::ValidateGraph { workspace }),
-        CliCommand::Snapshot { workspace } => Ok(Command::GetSnapshot { workspace }),
-        CliCommand::Stats { workspace } => Ok(Command::GetStatistics { workspace }),
+        CliCommand::ReadPattern { workspace, index } =>
+            Ok(Command::ReadPattern { workspace, index }),
+        CliCommand::ReadAsText { workspace, index } =>
+            Ok(Command::ReadAsText { workspace, index }),
+        CliCommand::ReadSequence { workspace, text } =>
+            Ok(Command::ReadSequence { workspace, text }),
+        CliCommand::ReadFile { workspace, path } =>
+            Ok(Command::ReadFile { workspace, path }),
+        CliCommand::Validate { workspace } =>
+            Ok(Command::ValidateGraph { workspace }),
+        CliCommand::Snapshot { workspace } =>
+            Ok(Command::GetSnapshot { workspace }),
+        CliCommand::Stats { workspace } =>
+            Ok(Command::GetStatistics { workspace }),
         CliCommand::Show { workspace } => Ok(Command::ShowGraph { workspace }),
-        CliCommand::ShowVertex { workspace, index } => Ok(Command::ShowVertex { workspace, index }),
-        CliCommand::RenderGraph { workspace, ascii_dag } => Ok(Command::RenderAsciiGraph {
+        CliCommand::ShowVertex { workspace, index } =>
+            Ok(Command::ShowVertex { workspace, index }),
+        CliCommand::RenderGraph {
+            workspace,
+            ascii_dag,
+        } => Ok(Command::RenderAsciiGraph {
             workspace,
             ascii_dag,
         }),
@@ -600,17 +615,26 @@ fn map_log_command(cmd: CliCommand) -> Result<Command, CliCommand> {
             query,
             limit: 100,
         }),
-        CliCommand::AnalyzeLog { workspace, filename } => {
-            Ok(Command::AnalyzeLog { workspace, filename })
-        },
-        CliCommand::SearchLogs { workspace, query } => Ok(Command::SearchLogs {
+        CliCommand::AnalyzeLog {
             workspace,
-            query,
-            limit_per_file: 10,
+            filename,
+        } => Ok(Command::AnalyzeLog {
+            workspace,
+            filename,
         }),
-        CliCommand::DeleteLog { workspace, filename } => {
-            Ok(Command::DeleteLog { workspace, filename })
-        },
+        CliCommand::SearchLogs { workspace, query } =>
+            Ok(Command::SearchLogs {
+                workspace,
+                query,
+                limit_per_file: 10,
+            }),
+        CliCommand::DeleteLog {
+            workspace,
+            filename,
+        } => Ok(Command::DeleteLog {
+            workspace,
+            filename,
+        }),
         CliCommand::DeleteLogs {
             workspace,
             older_than_days,
@@ -630,8 +654,18 @@ fn run_compare_workspaces(
     format: String,
 ) {
     let compare_mode = parse_compare_mode(&mode);
-    let _ = execute(manager, Command::OpenWorkspace { name: workspace_a.clone() });
-    let _ = execute(manager, Command::OpenWorkspace { name: workspace_b.clone() });
+    let _ = execute(
+        manager,
+        Command::OpenWorkspace {
+            name: workspace_a.clone(),
+        },
+    );
+    let _ = execute(
+        manager,
+        Command::OpenWorkspace {
+            name: workspace_b.clone(),
+        },
+    );
     let cmd = Command::CompareWorkspaces {
         workspace_a,
         workspace_b,
@@ -679,7 +713,13 @@ fn handle_special_command(
             mode,
             format,
         } => {
-            run_compare_workspaces(manager, workspace_a, workspace_b, mode, format);
+            run_compare_workspaces(
+                manager,
+                workspace_a,
+                workspace_b,
+                mode,
+                format,
+            );
             Err(())
         },
         CliCommand::CompareVertex {
@@ -701,7 +741,9 @@ fn handle_special_command(
                 .or_else(map_edit_command)
                 .or_else(map_query_command)
                 .or_else(map_log_command)
-                .unwrap_or_else(|_| unreachable!("unhandled CLI command variant")),
+                .unwrap_or_else(|_| {
+                    unreachable!("unhandled CLI command variant")
+                }),
         )),
     }
 }
@@ -768,7 +810,12 @@ fn execute_subcommand(
         Ok(None) => unreachable!("special command handler returned no command"),
     };
 
-    if try_execute_traced(manager, api_cmd.clone(), trace, ws_name_owned.clone()) {
+    if try_execute_traced(
+        manager,
+        api_cmd.clone(),
+        trace,
+        ws_name_owned.clone(),
+    ) {
         return;
     }
 

@@ -119,15 +119,17 @@ fn extract_associated_types(
             collect_associated_types_from_path(type_path, result);
             collect_associated_types_from_path_generics(type_path, result);
         },
-        _ => {
+        _ =>
             for nested in nested_types(ty) {
                 extract_associated_types(nested, result);
-            }
-        },
+            },
     }
 }
 
-fn push_unique(result: &mut Vec<String>, assoc_name: String) {
+fn push_unique(
+    result: &mut Vec<String>,
+    assoc_name: String,
+) {
     if !result.contains(&assoc_name) {
         result.push(assoc_name);
     }

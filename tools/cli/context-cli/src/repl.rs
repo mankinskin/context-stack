@@ -72,12 +72,8 @@ enum ReplInput {
     Break,
 }
 
-type ReplHandler = fn(
-    &mut WorkspaceManager,
-    &mut Option<String>,
-    &mut bool,
-    &[&str],
-);
+type ReplHandler =
+    fn(&mut WorkspaceManager, &mut Option<String>, &mut bool, &[&str]);
 
 struct ReplCommandDef {
     names: &'static [&'static str],
@@ -350,8 +346,13 @@ fn execute_and_activate_workspace(
     command: Command,
     name: &str,
 ) {
-    if execute_and_print(manager, command, tracing_enabled, current_ws.as_deref())
-        .is_ok()
+    if execute_and_print(
+        manager,
+        command,
+        tracing_enabled,
+        current_ws.as_deref(),
+    )
+    .is_ok()
     {
         activate_workspace(current_ws, name);
     }
@@ -410,9 +411,7 @@ fn parse_compare_mode(parts: &[&str]) -> context_api::types::CompareMode {
                 mode = mode_str
                     .parse::<context_api::types::CompareMode>()
                     .unwrap_or_else(|error| {
-                        eprintln!(
-                            "Warning: {error}. Defaulting to 'full'."
-                        );
+                        eprintln!("Warning: {error}. Defaulting to 'full'.");
                         context_api::types::CompareMode::Full
                     });
                 index += 2;
@@ -461,7 +460,9 @@ fn handle_create_ngrams(
     let mut text_start = 2usize;
     if parts.get(2) == Some(&"--timeout") {
         let Some(timeout_str) = parts.get(3) else {
-            eprintln!("Usage: create-ngrams <name> [--timeout <seconds>] <text>");
+            eprintln!(
+                "Usage: create-ngrams <name> [--timeout <seconds>] <text>"
+            );
             return;
         };
         match timeout_str.parse::<u64>() {
@@ -712,7 +713,10 @@ fn handle_search(
         } else {
             Command::SearchPattern {
                 workspace: ws,
-                query: parts[1..].iter().map(|part| parse_token_ref(part)).collect(),
+                query: parts[1..]
+                    .iter()
+                    .map(|part| parse_token_ref(part))
+                    .collect(),
             }
         }
     });
@@ -753,7 +757,10 @@ fn handle_insert_match(
     execute_in_current_workspace(manager, current_ws, *tracing_enabled, |ws| {
         Command::InsertFirstMatch {
             workspace: ws,
-            query: parts[1..].iter().map(|part| parse_token_ref(part)).collect(),
+            query: parts[1..]
+                .iter()
+                .map(|part| parse_token_ref(part))
+                .collect(),
         }
     });
 }
@@ -774,7 +781,10 @@ fn handle_insert_bulk(
     execute_in_current_workspace(manager, current_ws, *tracing_enabled, |ws| {
         Command::InsertSequences {
             workspace: ws,
-            texts: parts[1..].iter().map(|part| part.to_string()).collect::<HashSet<_>>(),
+            texts: parts[1..]
+                .iter()
+                .map(|part| part.to_string())
+                .collect::<HashSet<_>>(),
         }
     });
 }
@@ -799,12 +809,15 @@ fn handle_read(
             eprintln!("Usage: read --file <path>");
             return;
         };
-        execute_in_current_workspace(manager, current_ws, *tracing_enabled, |ws| {
-            Command::ReadFile {
+        execute_in_current_workspace(
+            manager,
+            current_ws,
+            *tracing_enabled,
+            |ws| Command::ReadFile {
                 workspace: ws,
                 path: path.to_string(),
-            }
-        });
+            },
+        );
         return;
     }
 
@@ -928,7 +941,9 @@ fn handle_workspace_status(
 ) {
     match current_ws {
         Some(name) => println!("Current workspace: {name}"),
-        None => println!("No workspace is currently active. Use 'create' or 'open'."),
+        None => println!(
+            "No workspace is currently active. Use 'create' or 'open'."
+        ),
     }
 }
 
@@ -947,7 +962,10 @@ fn handle_use(
         *current_ws = Some(name.to_string());
         println!("Switched to workspace '{}'", name);
     } else {
-        eprintln!("Workspace '{}' is not open. Use 'open {}' first.", name, name);
+        eprintln!(
+            "Workspace '{}' is not open. Use 'open {}' first.",
+            name, name
+        );
     }
 }
 
@@ -971,7 +989,9 @@ fn handle_trace(
             println!("Tracing is {status}.");
         },
         Some(other) => {
-            eprintln!("Unknown trace option: '{other}'. Use: trace on|off|status");
+            eprintln!(
+                "Unknown trace option: '{other}'. Use: trace on|off|status"
+            );
         },
     }
 }
@@ -1100,7 +1120,8 @@ fn handle_clean_logs(
     tracing_enabled: &mut bool,
     parts: &[&str],
 ) {
-    let older_than_days = parts.get(1).and_then(|value| value.parse::<u32>().ok());
+    let older_than_days =
+        parts.get(1).and_then(|value| value.parse::<u32>().ok());
     execute_in_current_workspace(manager, current_ws, *tracing_enabled, |ws| {
         Command::DeleteLogs {
             workspace: ws,
@@ -1116,7 +1137,9 @@ fn handle_compare(
     parts: &[&str],
 ) {
     if parts.len() < 3 {
-        eprintln!("Usage: compare <workspace-a> <workspace-b> [--mode full|subset]");
+        eprintln!(
+            "Usage: compare <workspace-a> <workspace-b> [--mode full|subset]"
+        );
         return;
     }
 

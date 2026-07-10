@@ -50,7 +50,11 @@ fn grammar_layout(
         .collect();
     leaf_labels.sort();
 
-    let token_width = labels.iter().map(|label| label.len() + 2).max().unwrap_or(0);
+    let token_width = labels
+        .iter()
+        .map(|label| label.len() + 2)
+        .max()
+        .unwrap_or(0);
     let mut out = String::new();
     out.push_str("Grammar layout (aligned)\n");
     if !leaf_labels.is_empty() {
@@ -71,7 +75,8 @@ fn append_grammar_line(
     patterns_by_parent: &BTreeMap<String, Vec<Vec<String>>>,
     token_width: usize,
 ) {
-    let mut patterns = patterns_by_parent.get(label).cloned().unwrap_or_default();
+    let mut patterns =
+        patterns_by_parent.get(label).cloned().unwrap_or_default();
     patterns.sort();
 
     if patterns.is_empty() {

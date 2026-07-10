@@ -155,9 +155,8 @@ fn try_tokenize_symbol(
 
     flush_buf(buf, tokens);
     let kind = match ch {
-        '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^' | '%' => {
-            TokenKind::Operator
-        },
+        '+' | '-' | '*' | '=' | '!' | '<' | '>' | '&' | '|' | '^' | '%' =>
+            TokenKind::Operator,
         _ => TokenKind::Punctuation,
     };
     tokens.push(SyntaxToken {
@@ -177,8 +176,13 @@ pub fn tokenize_rust_line(line: &str) -> Vec<SyntaxToken> {
     let mut buf = String::new();
 
     while let Some(&ch) = chars.peek() {
-        if ch == '/' && try_tokenize_comment_or_slash(&mut chars, &mut buf, &mut tokens) {
-            if tokens.last().is_some_and(|token| token.kind == TokenKind::Comment) {
+        if ch == '/'
+            && try_tokenize_comment_or_slash(&mut chars, &mut buf, &mut tokens)
+        {
+            if tokens
+                .last()
+                .is_some_and(|token| token.kind == TokenKind::Comment)
+            {
                 return tokens;
             }
             continue;

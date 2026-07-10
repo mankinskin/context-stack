@@ -386,7 +386,9 @@ impl VizPathGraph {
                 }
                 self.root_tentative = false;
             },
-            _ => unreachable!("non-root transition passed to apply_transition_root_phase"),
+            _ => unreachable!(
+                "non-root transition passed to apply_transition_root_phase"
+            ),
         }
 
         Ok(())
@@ -403,7 +405,9 @@ impl VizPathGraph {
             | Transition::ChildMismatch { cursor_pos, .. } => {
                 self.set_cursor_pos(*cursor_pos);
             },
-            _ => unreachable!("non-cursor transition passed to apply_transition_cursor_update"),
+            _ => unreachable!(
+                "non-cursor transition passed to apply_transition_cursor_update"
+            ),
         }
     }
 
@@ -429,15 +433,16 @@ impl VizPathGraph {
             },
             Transition::VisitChild {
                 to, edge, replace, ..
-            } => {
+            } =>
                 if *replace {
-                    self.replace_child(*to, *edge)
-                        .map_err(|_| "VisitChild replace on empty end_path".to_string())?;
+                    self.replace_child(*to, *edge).map_err(|_| {
+                        "VisitChild replace on empty end_path".to_string()
+                    })?;
                 } else {
                     self.push_child(*to, *edge);
-                }
-            },
-            Transition::ChildMatch { .. } | Transition::ChildMismatch { .. } => {
+                },
+            Transition::ChildMatch { .. }
+            | Transition::ChildMismatch { .. } => {
                 self.apply_transition_cursor_update(transition);
             },
             Transition::Done { success, .. } => {

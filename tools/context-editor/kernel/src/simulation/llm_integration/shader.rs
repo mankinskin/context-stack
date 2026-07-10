@@ -61,13 +61,17 @@ pub enum ShaderValidation {
     TooComplex { instruction_count: usize },
 }
 
-fn find_sd_custom_body(trimmed: &str) -> Result<(&str, &str), ShaderValidation> {
+fn find_sd_custom_body(
+    trimmed: &str
+) -> Result<(&str, &str), ShaderValidation> {
     let Some(fn_start) = trimmed.find("fn sd_custom") else {
         return Err(ShaderValidation::MissingEntryPoint);
     };
     let after_fn = &trimmed[fn_start..];
     let Some(body_start) = after_fn.find('{') else {
-        return Err(ShaderValidation::ParseError("Missing function body".into()));
+        return Err(ShaderValidation::ParseError(
+            "Missing function body".into(),
+        ));
     };
 
     let body_region = &after_fn[body_start..];
