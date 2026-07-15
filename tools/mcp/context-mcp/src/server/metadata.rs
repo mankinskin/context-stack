@@ -1,6 +1,7 @@
 use rmcp::{
     ServerHandler,
     model::{
+        Implementation,
         ServerCapabilities,
         ServerInfo,
     },
@@ -13,6 +14,11 @@ use super::ContextServer;
 impl ServerHandler for ContextServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
+            server_info: Implementation {
+                name: env!("CARGO_PKG_NAME").to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                ..Default::default()
+            },
             instructions: Some(
                 "Context Engine MCP Server — manages hypergraph workspaces.\n\n\
                  **Start here:** Call the `help` tool to discover available commands,\n\
