@@ -4,8 +4,8 @@ use std::collections::HashMap;
 #[test]
 fn ticket_state_roundtrip() {
     for state in [
-        TicketState::New,
-        TicketState::Ready,
+        TicketState::Open,
+        TicketState::Planned,
         TicketState::InImplementation,
         TicketState::InReview,
         TicketState::Done,
@@ -19,20 +19,20 @@ fn ticket_state_roundtrip() {
 fn ticket_state_terminal() {
     assert!(TicketState::Done.is_terminal());
     assert!(TicketState::Cancelled.is_terminal());
-    assert!(!TicketState::New.is_terminal());
+    assert!(!TicketState::Open.is_terminal());
     assert!(!TicketState::InImplementation.is_terminal());
 }
 
 #[test]
 fn ticket_state_tint_distinct() {
-    let new_tint = TicketState::New.tint_color();
+    let new_tint = TicketState::Open.tint_color();
     let done_tint = TicketState::Done.tint_color();
     assert_ne!(new_tint, done_tint);
 }
 
 #[test]
 fn ticket_state_unknown_defaults_new() {
-    assert_eq!(TicketState::from_str("bogus"), TicketState::New);
+    assert_eq!(TicketState::from_str("bogus"), TicketState::Open);
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn store_upsert_and_get() {
     store.upsert(TicketData {
         id: "abc".into(),
         title: "Test ticket".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::High,
         ticket_type: "bug".into(),
         description: "A test".into(),
@@ -96,7 +96,7 @@ fn store_upsert_overwrites() {
     store.upsert(TicketData {
         id: "abc".into(),
         title: "v1".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "task".into(),
         description: "".into(),
@@ -120,7 +120,7 @@ fn store_remove() {
     store.upsert(TicketData {
         id: "abc".into(),
         title: "t".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "task".into(),
         description: "".into(),
@@ -137,7 +137,7 @@ fn store_edges_and_neighbors() {
     store.upsert(TicketData {
         id: "a".into(),
         title: "A".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "task".into(),
         description: "".into(),
@@ -145,7 +145,7 @@ fn store_edges_and_neighbors() {
     store.upsert(TicketData {
         id: "b".into(),
         title: "B".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "task".into(),
         description: "".into(),
@@ -168,7 +168,7 @@ fn store_by_state() {
     store.upsert(TicketData {
         id: "a".into(),
         title: "A".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "task".into(),
         description: "".into(),
@@ -184,12 +184,12 @@ fn store_by_state() {
     store.upsert(TicketData {
         id: "c".into(),
         title: "C".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "task".into(),
         description: "".into(),
     });
-    assert_eq!(store.by_state(TicketState::New).len(), 2);
+    assert_eq!(store.by_state(TicketState::Open).len(), 2);
     assert_eq!(store.by_state(TicketState::Done).len(), 1);
     assert_eq!(store.by_state(TicketState::Cancelled).len(), 0);
 }
@@ -200,7 +200,7 @@ fn store_state_counts() {
     store.upsert(TicketData {
         id: "a".into(),
         title: "A".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "t".into(),
         description: "".into(),
@@ -208,7 +208,7 @@ fn store_state_counts() {
     store.upsert(TicketData {
         id: "b".into(),
         title: "B".into(),
-        state: TicketState::New,
+        state: TicketState::Open,
         priority: Priority::None,
         ticket_type: "t".into(),
         description: "".into(),
@@ -222,7 +222,7 @@ fn store_state_counts() {
         description: "".into(),
     });
     let counts = store.state_counts();
-    assert_eq!(*counts.get(&TicketState::New).unwrap(), 2);
+    assert_eq!(*counts.get(&TicketState::Open).unwrap(), 2);
     assert_eq!(*counts.get(&TicketState::Done).unwrap(), 1);
 }
 
