@@ -1,12 +1,15 @@
 id = "978ce8a5-3936-467b-aca8-822eeecd1eb0"
 created_at = "2026-03-21T01:38:27.224861600+00:00"
 title = "Plan: Expansion loop redesign — cursor-advancing decomposition"
-state = "in-implementation"
+state = "planned"
 acceptance_criteria = "ExpansionCtx drives insert_next_match correctly; overlap detection passes all tests"
 component = "context-read"
 doc_category = "plan"
 effort = "1200"
+parts = [{ id = "ddda8337-1928-4285-af82-da14af86ab4c", kind = "objective", path = "parts/ddda8337-1928-4285-af82-da14af86ab4c.md", frozen = true, created_at = "2026-07-30T21:02:30.001743900Z" }, { id = "0535c513-9f99-414b-bbbf-c2d7067481c7", kind = "review", path = "parts/0535c513-9f99-414b-bbbf-c2d7067481c7.md", frozen = false, created_at = "2026-07-30T21:02:30.005755600Z" }, { id = "51d55ce6-1b4a-4a0d-94e5-5dd75fae4fdd", kind = "requirements", path = "parts/51d55ce6-1b4a-4a0d-94e5-5dd75fae4fdd.md", frozen = true, created_at = "2026-07-31T07:35:09.039310700Z" }, { id = "73043412-21ab-48ed-9031-a7bf77b2d933", kind = "design", path = "parts/73043412-21ab-48ed-9031-a7bf77b2d933.md", frozen = true, created_at = "2026-07-31T07:35:09.039947400Z" }, { id = "25b7b256-3751-44c0-9e89-9f52e6345383", kind = "examples", path = "parts/25b7b256-3751-44c0-9e89-9f52e6345383.md", frozen = true, created_at = "2026-07-31T07:35:09.040348700Z" }, { id = "904bc04e-1b0d-446d-8ca0-c667ed38a5e4", kind = "acceptance_criteria", path = "parts/904bc04e-1b0d-446d-8ca0-c667ed38a5e4.md", frozen = true, created_at = "2026-07-31T07:35:09.040584800Z" }]
+plan_revision = 1
 risk_level = "high"
+status_summary = "Triage 2026-07-31: no implementation work landed; returned to planned for re-scoping."
 type = "tracker-improvement"
 validation_status = "needs-follow-up"
 validation_summary = "Review finding on 2026-05-22: this plan ticket is not review-ready because the description frontmatter references design and parent plan files that are not present in the workspace, the ticket records no validation results despite test-oriented acceptance criteria, and the manifest does not capture any implementation or review summary. Required follow-up: restore or relink the referenced design artifacts, clarify whether this ticket is a planning artifact or implementation tracker, and record focused validation before returning to review. Minimum expected validation: cargo test -p context-read overlapping -- --nocapture and cargo test -p context-api insert_overlapping_sequences_shares_subpatterns -- --nocapture, or equivalent documented focused checks for the cursor-advancing overlap path."
