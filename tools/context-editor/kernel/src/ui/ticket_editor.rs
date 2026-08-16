@@ -98,8 +98,8 @@ impl TicketState {
     /// Glass tint color for this state.
     pub fn tint_color(&self) -> (f32, f32, f32) {
         match self {
-            Self::Open => (0.3, 0.5, 1.0),               // Blue
-            Self::Planned => (0.3, 0.8, 0.5),             // Teal-green
+            Self::Open => (0.3, 0.5, 1.0),              // Blue
+            Self::Planned => (0.3, 0.8, 0.5),           // Teal-green
             Self::InImplementation => (1.0, 0.85, 0.2), // Yellow
             Self::InReview => (1.0, 0.6, 0.2),          // Orange
             Self::Done => (0.2, 0.9, 0.3),              // Green
