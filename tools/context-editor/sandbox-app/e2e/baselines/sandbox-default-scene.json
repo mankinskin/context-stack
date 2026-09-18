@@ -1,0 +1,10 @@
+{
+  "sha256": "f96be91fd0025e78e638a65e6c787e10f88edac87781c552f5b069293335afbe",
+  "viewport": {
+    "width": 960,
+    "height": 640
+  },
+  "settleFrames": 30,
+  "capturedAt": "2026-09-18T20:02:38.209Z",
+  "comparisonMethod": "exact-sha256-of-png-bytes"
+}

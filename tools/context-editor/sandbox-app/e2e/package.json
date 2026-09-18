@@ -1,0 +1,11 @@
+{
+  "name": "sandbox-app-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "verify-visual-baseline": "node verify-visual-baseline.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}
