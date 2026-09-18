@@ -11,7 +11,7 @@ use std::collections::{
 use bevy::prelude::*;
 
 use crate::{
-    editor::{
+    editor::core::{
         EditorState,
         HitInfo,
         VoxelHit,

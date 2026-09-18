@@ -46,8 +46,8 @@ pub use multiplayer::{
     net as multiplayer_net,
 };
 
-// editor/ — core and ux items are re-exported via editor/mod.rs wildcard;
-// the sub-modules themselves are also re-exported for direct access.
+// editor/ — sub-modules re-exported for direct access; `core` items are
+// reached via `crate::editor::core::*` (no wildcard shim).
 pub use editor::{
     advanced_tools,
     debug_overlay,
@@ -258,7 +258,7 @@ pub fn build_kernel_app() -> bevy::prelude::App {
     app.add_plugins(crate::physics::PhysicsPlugin);
     app.add_plugins(crate::svo::upload::SvoUploadPlugin);
     app.add_plugins(crate::ui_bridge::UiBridgePlugin);
-    app.add_plugins(crate::editor::EditorPlugin);
+    app.add_plugins(crate::editor::core::EditorPlugin);
     app.add_plugins(crate::force_compute::ForceComputePlugin);
     app.add_plugins(crate::world_panel::WorldPanelPlugin);
     app.add_plugins(crate::particle_splat::ParticleSplatPlugin);

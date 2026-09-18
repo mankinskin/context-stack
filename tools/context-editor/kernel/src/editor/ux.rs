@@ -3,7 +3,7 @@
 //! Extends the core [`EditorState`] with a productive editing workflow.
 
 use crate::{
-    editor::{
+    editor::core::{
         EditorState,
         VoxelHit,
     },
