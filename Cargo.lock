@@ -2102,6 +2102,7 @@ dependencies = [
  "bevy",
  "bevy_rapier3d",
  "bytemuck",
+ "criterion",
  "dioxus",
  "futures-timer",
  "spacetimedb-sdk",
