@@ -190,3 +190,20 @@ fn collect_occ_only_skips_empty() {
         "empty world should produce no occupied cubes"
     );
 }
+
+#[test]
+fn wireframe_data_resource_is_initialized_by_plugin() {
+    // Pre-fix: this resource was never init_resource'd anywhere in the app,
+    // so upload_wireframe_data's `Option<Res<WireframeData>>` was always
+    // `None` and index_count stayed 0 forever, regardless of the Wireframe
+    // Enable toggle (see plugin.rs comment; W6 defect-evidence).
+    let mut app = App::new();
+    app.add_plugins(super::DebugOverlayPlugin);
+    assert!(
+        app.world()
+            .get_resource::<crate::render::wireframe_overlay::WireframeData>()
+            .is_some(),
+        "WireframeData must be initialized by DebugOverlayPlugin so the \
+         Wireframe Grid overlay can ever produce a non-zero index_count"
+    );
+}
