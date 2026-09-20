@@ -1,0 +1,8 @@
+id = "cc8e9a36-6fd7-4fb9-adc2-d5456917de34"
+created_at = "2026-07-05T19:02:56.976242600+00:00"
+title = "[audit-roadmap][ticket_graph][batch-5] context-stack/context-editor/misc stores (6)"
+state = "done"
+depends_on = ["4e68dc40-a953-45e5-a1aa-e0aecdbcf696", "6fceddbd-5e5e-4944-8af2-a4e9288b3285", "712097d7-f8d2-4e95-a697-59808c34f653", "978ce8a5-3936-467b-aca8-822eeecd1eb0", "9ef831d0-0f1d-46db-88bb-e537a37b9606", "febe05b2-ab03-4309-9d84-39aae471e27a"]
+effort = "400"
+type = "tracker-improvement"
+component = "context-stack"

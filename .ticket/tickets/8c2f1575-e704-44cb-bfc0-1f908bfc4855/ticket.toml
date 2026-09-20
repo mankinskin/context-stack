@@ -1,0 +1,12 @@
+id = "8c2f1575-e704-44cb-bfc0-1f908bfc4855"
+created_at = "2026-04-01T13:36:29.713545600+00:00"
+title = "[context-editor][SVO-RM] Phase 2b: Secondary Rays -- Reflections, Refractions, Shadows"
+state = "planning"
+component = "context-editor"
+effort = "1200"
+parts = [{ id = "20eae8ff-b083-4a94-8c3b-ae121df3c117", kind = "objective", path = "parts/20eae8ff-b083-4a94-8c3b-ae121df3c117.md", frozen = false, created_at = "2026-07-30T20:40:38.365499400Z" }, { id = "898b2ce9-9317-4d43-880b-c122e13d42f1", kind = "requirements", path = "parts/898b2ce9-9317-4d43-880b-c122e13d42f1.md", frozen = false, created_at = "2026-07-30T20:40:38.365764400Z" }, { id = "10f6ef41-4ba7-4c79-94cb-5a348c45906f", kind = "design", path = "parts/10f6ef41-4ba7-4c79-94cb-5a348c45906f.md", frozen = false, created_at = "2026-07-30T20:40:38.366145100Z" }, { id = "f53a150b-47e5-479e-8db1-23014fd128f4", kind = "examples", path = "parts/f53a150b-47e5-479e-8db1-23014fd128f4.md", frozen = false, created_at = "2026-07-30T20:40:38.366525400Z" }, { id = "cad4995d-fcec-49b0-bd52-82da272ad67d", kind = "acceptance_criteria", path = "parts/cad4995d-fcec-49b0-bd52-82da272ad67d.md", frozen = false, created_at = "2026-07-30T20:40:38.366825100Z" }]
+phase = "svo-ray-march"
+plan_revision = 1
+type = "tracker-improvement"
+validation_status = "needs-follow-up"
+validation_summary = "Review finding on 2026-05-22: this ticket is not review-ready because the manifest still lacks acceptance_criteria, spec_refs, implementation_summary, and recorded validation; the description names Phase 1b as a dependency but the ticket graph does not encode it; and there is no context-editor spec traceability attached to the work. Required follow-up: promote the Phase 2b acceptance criteria into ticket fields, add the missing dependency/spec linkage, and record focused validation before returning to review. Minimum expected validation: cargo check --manifest-path context-stack/tools/context-editor/kernel/Cargo.toml, cargo check --manifest-path context-stack/tools/context-editor/sandbox-app/Cargo.toml, and targeted shader or visual verification covering reflections, refractions, and shadows."

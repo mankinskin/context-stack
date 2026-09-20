@@ -1,0 +1,8 @@
+id = "936cdd9f-5736-468e-a41d-fa3da20b7e3d"
+created_at = "2026-07-05T19:02:58.663953700+00:00"
+title = "[audit-roadmap][file_length][batch-2] context-stack (39)"
+state = "planning"
+depends_on = ["c991d769-27b4-4567-b9d1-95173af02c5a"]
+effort = "1200"
+type = "tracker-improvement"
+component = "context-stack"

@@ -1,0 +1,5 @@
+{"rev":1,"ts":"2026-05-31T15:14:12.873801100+00:00","fields":{"priority":"high","state":"open","title":"[repo] Keep submodules on main instead of detached HEADs","type":"tracker-improvement"}}
+{"rev":2,"ts":"2026-05-31T15:14:44.666186800+00:00","fields":{"priority":"high","state":"planned","title":"[repo] Keep submodules on main instead of detached HEADs","type":"tracker-improvement"}}
+{"rev":3,"ts":"2026-05-31T15:14:44.800240400+00:00","fields":{"priority":"high","state":"in-implementation","title":"[repo] Keep submodules on main instead of detached HEADs","type":"tracker-improvement"}}
+{"rev":4,"ts":"2026-05-31T15:19:25.691297800+00:00","fields":{"priority":"high","state":"in-review","title":"[repo] Keep submodules on main instead of detached HEADs","type":"tracker-improvement"}}
+{"rev":5,"ts":"2026-05-31T15:19:25.815841300+00:00","fields":{"priority":"high","state":"done","title":"[repo] Keep submodules on main instead of detached HEADs","type":"tracker-improvement"}}

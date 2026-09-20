@@ -1,0 +1,8 @@
+id = "f23c9450-1999-4fa2-9751-c67faa63fe00"
+created_at = "2026-07-05T19:02:55.972043500+00:00"
+title = "[audit-roadmap][file_length] Split oversized files"
+state = "planning"
+depends_on = ["1abda9df-bb74-4c84-8b92-2a38d8731949", "5f7b2051-e577-4655-a9f8-02d0ea8b588c", "5f9542bf-483a-4da6-9c78-fcbe588af973", "7fbe52b5-ab69-4b3c-adaa-21d42cf26de8", "936cdd9f-5736-468e-a41d-fa3da20b7e3d", "c991d769-27b4-4567-b9d1-95173af02c5a"]
+effort = "1200"
+type = "tracker-improvement"
+component = "context-stack"

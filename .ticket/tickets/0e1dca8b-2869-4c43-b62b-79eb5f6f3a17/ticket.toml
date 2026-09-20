@@ -1,0 +1,7 @@
+id = "0e1dca8b-2869-4c43-b62b-79eb5f6f3a17"
+created_at = "2026-05-31T15:14:12.766006100+00:00"
+title = "[repo] Keep submodules on main instead of detached HEADs"
+state = "done"
+priority = "high"
+type = "tracker-improvement"
+component = "context-stack"

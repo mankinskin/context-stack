@@ -1,0 +1,10 @@
+id = "5f9542bf-483a-4da6-9c78-fcbe588af973"
+created_at = "2026-07-05T19:02:55.834802300+00:00"
+title = "[audit-roadmap][static_complexity] Reduce complexity findings"
+state = "planning"
+depends_on = ["15cf86fd-66ef-483e-b934-1f7c72352f67", "1c9e7b3e-32e8-4233-8fd4-0244c3d9aab0", "3661f22c-ebc8-4f6d-ab66-6bada28d6f03", "409a3919-296e-4a62-bd1a-77a8212bf43f", "7cfc8996-3dbc-49c5-b359-be493c094a4a", "819f2e97-4cd4-410b-af3b-f196ba80d720", "99bdcf44-58de-480d-ab9d-a1951c053400", "a8721506-7528-468b-a756-1e21f210fbbe", "ac990dfe-083d-413c-ba4a-7cfbbda677b0", "d1ef4001-a2a3-4ef4-a1a1-bdfac49c68e2", "e179f11a-52b5-432e-a13a-330bb3fc5c92", "ebf4b601-0f9e-471c-9283-1390cda1eb41"]
+effort = "1200"
+parts = [{ id = "356d7d76-6185-4133-901a-3a03400de82e", kind = "objective", path = "parts/356d7d76-6185-4133-901a-3a03400de82e.md", frozen = false, created_at = "2026-07-31T07:53:22.584135800Z" }, { id = "352c90f6-de69-41e8-81b2-1bc8b6667b42", kind = "requirements", path = "parts/352c90f6-de69-41e8-81b2-1bc8b6667b42.md", frozen = false, created_at = "2026-07-31T07:53:22.584358200Z" }, { id = "c58d9a1e-bdbb-4def-a2cf-78f131515c1c", kind = "design", path = "parts/c58d9a1e-bdbb-4def-a2cf-78f131515c1c.md", frozen = false, created_at = "2026-07-31T07:53:22.584658200Z" }, { id = "d155c20b-79d4-4aea-9555-f693eda11f2f", kind = "examples", path = "parts/d155c20b-79d4-4aea-9555-f693eda11f2f.md", frozen = false, created_at = "2026-07-31T07:53:22.584860800Z" }, { id = "d515a085-a86c-4fe4-b75d-db6f15c746c0", kind = "acceptance_criteria", path = "parts/d515a085-a86c-4fe4-b75d-db6f15c746c0.md", frozen = false, created_at = "2026-07-31T07:53:22.585034800Z" }]
+plan_revision = 1
+type = "tracker-improvement"
+component = "context-stack"

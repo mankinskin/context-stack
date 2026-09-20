@@ -1,0 +1,8 @@
+id = "02622207-e102-4fae-b705-ca1cb12704ba"
+created_at = "2026-07-05T20:23:57.668051800+00:00"
+title = "[audit-roadmap][ticket_graph][retro] Infra, CI, install and viewer-tooling work stream"
+state = "planning"
+depends_on = ["06e00e0b-42ce-4a74-aea2-392302dd68f7", "122cd156-3b25-4c36-8eb9-fc658f1bbedf", "2fb3adb0-fa3a-41a6-8fd6-38096635a38b", "64a7cb3a-b35f-4953-9368-0d7afc89fb53", "8d6895a5-dce8-47c1-98ce-212fd0ae2e08", "a98ea0e1-d3e8-47e4-aa28-b6a39296cd45", "aaa810f0-cc14-4226-b7d0-d81a38f856e7", "c79e2630-3d49-454b-998f-fb52c24303f4", "cf77062c-f663-4ed4-beca-9303795cf973", "d30e13e1-3304-4128-9653-be7c47679f9f", "f2afb9ab-e15e-4943-a5d8-c0c9b5628eb0"]
+effort = "1200"
+type = "tracker-improvement"
+component = "context-stack"

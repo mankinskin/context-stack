@@ -1,0 +1,5 @@
+{"rev":1,"ts":"2026-07-06T13:59:15.731873400+00:00","fields":{"state":"open","title":"[audit-roadmap][static_complexity][batch-1 follow-up] context-insert vertex cluster (4)","type":"tracker-improvement"}}
+{"rev":2,"ts":"2026-07-06T14:00:53.210516200+00:00","fields":{"effort":"3k","state":"open","title":"[audit-roadmap][static_complexity][batch-1 follow-up] context-insert vertex cluster (4)","type":"tracker-improvement"},"author":"copilot-gpt5.4"}
+{"rev":3,"ts":"2026-07-06T16:05:59.845396400+00:00","fields":{"effort":"3k","state":"in-review","title":"[audit-roadmap][static_complexity][batch-1 follow-up] context-insert vertex cluster (4)","type":"tracker-improvement"},"author":"copilot-gpt54"}
+{"rev":4,"ts":"2026-07-06T16:06:00.541763+00:00","fields":{"effort":"3k","state":"in-review","title":"[audit-roadmap][static_complexity][batch-1 follow-up] context-insert vertex cluster (4)","type":"tracker-improvement"},"author":"copilot-gpt54"}
+{"rev":5,"ts":"2026-07-06T17:09:20.469455800+00:00","fields":{"effort":"3k","state":"done","title":"[audit-roadmap][static_complexity][batch-1 follow-up] context-insert vertex cluster (4)","type":"tracker-improvement"}}

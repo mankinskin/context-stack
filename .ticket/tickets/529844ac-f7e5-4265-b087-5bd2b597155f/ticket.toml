@@ -1,0 +1,9 @@
+id = "529844ac-f7e5-4265-b087-5bd2b597155f"
+created_at = "2026-07-04T06:07:07.264323200+00:00"
+title = "[observability][contract] Define cross-store correlation-id contract"
+state = "done"
+component = "context-stack"
+effort = "1k tokens"
+parts = [{ id = "4c007ca7-16f1-44a2-a6d8-477c9dc74382", kind = "objective", path = "parts/4c007ca7-16f1-44a2-a6d8-477c9dc74382.md", frozen = false, created_at = "2026-07-30T21:02:28.865432600Z" }, { id = "8608f3f8-61c7-46db-8b21-e9a36334a4de", kind = "validation", path = "parts/8608f3f8-61c7-46db-8b21-e9a36334a4de.md", frozen = false, created_at = "2026-07-30T21:02:28.869233900Z" }, { id = "ed54df74-1b64-4ee0-a10d-7fa3959cfc43", kind = "objective", path = "parts/ed54df74-1b64-4ee0-a10d-7fa3959cfc43.md", frozen = false, created_at = "2026-07-30T21:02:28.872776500Z" }]
+priority = "high"
+type = "tracker-improvement"

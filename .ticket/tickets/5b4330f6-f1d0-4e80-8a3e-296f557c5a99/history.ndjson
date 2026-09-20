@@ -1,0 +1,2 @@
+{"rev":1,"ts":"2026-05-03T17:12:42.599495700+00:00","fields":{"state":"open","title":"[LOG-2b] Add context-trace JSON format compatibility test against log-viewer parser","type":"tracker-improvement"}}
+{"rev":2,"ts":"2026-07-23T13:33:19.579089300+00:00","fields":{"depends_on":["12197242-b7b4-4212-83a8-4b0b65a4bd7b"],"effort":"1200","state":"open","title":"[LOG-2b] Add context-trace JSON format compatibility test against log-viewer parser","type":"tracker-improvement"},"author":"github-copilot"}

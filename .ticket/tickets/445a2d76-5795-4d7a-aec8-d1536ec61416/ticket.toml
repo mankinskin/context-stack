@@ -1,0 +1,6 @@
+id = "445a2d76-5795-4d7a-aec8-d1536ec61416"
+created_at = "2026-07-25T18:34:50.944063900+00:00"
+title = "Model price awareness: enforce orchestrator mode for expensive models"
+state = "done"
+type = "feature"
+component = "context-stack"

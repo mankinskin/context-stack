@@ -1,0 +1,7 @@
+id = "7cfc8996-3dbc-49c5-b359-be493c094a4a"
+created_at = "2026-07-06T13:59:15.284211200+00:00"
+title = "[audit-roadmap][static_complexity][batch-1 follow-up] context-cli repl cluster (2)"
+state = "done"
+effort = "1.5k"
+type = "tracker-improvement"
+component = "context-stack"

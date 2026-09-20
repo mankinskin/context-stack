@@ -1,0 +1,8 @@
+id = "1c9e7b3e-32e8-4233-8fd4-0244c3d9aab0"
+created_at = "2026-07-05T19:02:57.540453300+00:00"
+title = "[audit-roadmap][static_complexity][batch-1] context-stack (38)"
+state = "done"
+effort = "9k"
+linked = ["15cf86fd-66ef-483e-b934-1f7c72352f67", "3661f22c-ebc8-4f6d-ab66-6bada28d6f03", "409a3919-296e-4a62-bd1a-77a8212bf43f", "7cfc8996-3dbc-49c5-b359-be493c094a4a", "a8721506-7528-468b-a756-1e21f210fbbe", "ebf4b601-0f9e-471c-9283-1390cda1eb41"]
+type = "tracker-improvement"
+component = "context-stack"

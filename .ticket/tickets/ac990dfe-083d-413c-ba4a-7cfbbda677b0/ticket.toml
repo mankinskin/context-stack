@@ -1,0 +1,7 @@
+id = "ac990dfe-083d-413c-ba4a-7cfbbda677b0"
+created_at = "2026-07-05T19:02:55.699881300+00:00"
+title = "[audit-roadmap][stability] Clear compiler/test/coverage findings"
+state = "done"
+depends_on = ["1a2b326d-cf0c-4935-83a7-b80cf0ff0f32", "1ff5c55a-d279-45a6-9451-7dbfb191c0e7", "9347c9f8-f3f0-49e7-8ca1-df77a0cca499", "f2d8f807-447e-41a2-80db-2fca03d5b9ee"]
+type = "tracker-improvement"
+component = "context-stack"
