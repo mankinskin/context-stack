@@ -1,0 +1,10 @@
+id = "e4ff45b1-996c-4de5-889c-d694c757708c"
+created_at = "2026-09-18T16:01:34.221939600+00:00"
+title = "context-editor: feasibility gate and stretch prototype exploration (voxel editing, skeletons, selection/light tools, entity editor)"
+state = "planning"
+component = "context-editor"
+depends_on = ["17100339-4786-4044-aa40-cebaa3019099", "26105679-6b9b-4e0f-b950-87fcf743e492", "9d754852-42f7-49cd-a631-d399699ca9d0"]
+effort = "400"
+parts = [{ id = "e98d90ed-f8fd-4c11-9a0a-e818015e5c05", kind = "objective", path = "parts/e98d90ed-f8fd-4c11-9a0a-e818015e5c05.md", frozen = false, created_at = "2026-09-18T16:03:53.834596900Z" }, { id = "d5d27af6-26bc-4957-bc3e-ca23e6fc7a03", kind = "acceptance_criteria", path = "parts/d5d27af6-26bc-4957-bc3e-ca23e6fc7a03.md", frozen = false, created_at = "2026-09-18T16:03:59.379017800Z" }, { id = "6420a42e-2bc4-4633-b774-cfeb9a52d0e6", kind = "requirements", path = "parts/6420a42e-2bc4-4633-b774-cfeb9a52d0e6.md", frozen = false, created_at = "2026-09-18T16:04:05.285765400Z" }]
+priority = "medium"
+type = "task"

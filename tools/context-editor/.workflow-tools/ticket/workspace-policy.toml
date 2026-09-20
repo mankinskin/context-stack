@@ -1,0 +1,9 @@
+include_descendants = true
+include_ancestors = false
+deny_external_paths = true
+ignore_workspaces = []
+include_overrides = []
+ignore_markers = [
+    ".ticket-ignore",
+    ".workspace-ignore",
+]

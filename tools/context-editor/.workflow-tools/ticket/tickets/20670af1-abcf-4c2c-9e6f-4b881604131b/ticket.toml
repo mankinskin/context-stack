@@ -1,0 +1,9 @@
+id = "20670af1-abcf-4c2c-9e6f-4b881604131b"
+created_at = "2026-09-18T20:58:36.526275+00:00"
+title = "context-editor: add camera resolution controls and resize plumbing"
+state = "planning"
+component = "context-editor"
+depends_on = ["9d754852-42f7-49cd-a631-d399699ca9d0"]
+effort = "300"
+priority = "medium"
+type = "task"

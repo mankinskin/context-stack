@@ -1,0 +1,11 @@
+id = "d320e80d-1430-4f66-a3e3-520825262de9"
+created_at = "2026-09-18T16:01:11.650897400+00:00"
+title = "context-editor: stand up Criterion benchmark and visual-regression capture harness"
+state = "done"
+component = "context-editor"
+depends_on = ["7205c1e1-273e-46f8-afd1-bf599a50e344"]
+effort = "800"
+parts = [{ id = "a3bfda48-4e14-4c0b-9767-15ca66ee765e", kind = "requirements", path = "parts/a3bfda48-4e14-4c0b-9767-15ca66ee765e.md", frozen = true, created_at = "2026-09-18T16:03:02.968201600Z" }, { id = "3832436e-65da-4872-9552-e30e85dd8251", kind = "objective", path = "parts/3832436e-65da-4872-9552-e30e85dd8251.md", frozen = true, created_at = "2026-09-18T16:03:19.599722Z" }, { id = "c9aba0b1-1a8d-4296-8be8-9f0cc6d7438e", kind = "acceptance_criteria", path = "parts/c9aba0b1-1a8d-4296-8be8-9f0cc6d7438e.md", frozen = true, created_at = "2026-09-18T16:03:25.117830100Z" }, { id = "437c4bb5-dc04-41ca-89cd-6e906588b53b", kind = "design", path = "parts/437c4bb5-dc04-41ca-89cd-6e906588b53b.md", frozen = true, created_at = "2026-09-18T19:50:07.107850300Z" }, { id = "65f59acd-b750-4495-b2e7-40bec7f8ae4f", kind = "examples", path = "parts/65f59acd-b750-4495-b2e7-40bec7f8ae4f.md", frozen = true, created_at = "2026-09-18T19:50:07.108191900Z" }, { id = "bf35cd68-96de-4cb8-ae6b-5d54714932c8", kind = "review", path = "parts/bf35cd68-96de-4cb8-ae6b-5d54714932c8.md", frozen = false, created_at = "2026-09-18T20:06:58.634346900Z" }]
+plan_revision = 1
+priority = "critical"
+type = "task"

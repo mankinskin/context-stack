@@ -1,0 +1,8 @@
+id = "95416cf9-41c2-4dc3-8a2f-3a8999271908"
+created_at = "2026-09-18T22:48:04.993773700+00:00"
+title = "context-editor: generic voxel/entity selection and group-editing tooling"
+state = "planning"
+component = "context-editor"
+effort = "700"
+priority = "high"
+type = "task"

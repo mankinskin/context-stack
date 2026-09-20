@@ -1,0 +1,11 @@
+id = "26105679-6b9b-4e0f-b950-87fcf743e492"
+created_at = "2026-09-18T16:01:22.941561400+00:00"
+title = "context-editor: evidence-driven architecture restructure of kernel module boundaries"
+state = "done"
+component = "context-editor"
+depends_on = ["7205c1e1-273e-46f8-afd1-bf599a50e344", "d320e80d-1430-4f66-a3e3-520825262de9"]
+effort = "900"
+parts = [{ id = "28c5c0bb-3c29-4ed5-9a36-a8703dfdc55c", kind = "requirements", path = "parts/28c5c0bb-3c29-4ed5-9a36-a8703dfdc55c.md", frozen = true, created_at = "2026-09-18T16:03:42.969306Z" }, { id = "869015b8-588e-4f53-8cee-ecc54b0f9758", kind = "acceptance_criteria", path = "parts/869015b8-588e-4f53-8cee-ecc54b0f9758.md", frozen = true, created_at = "2026-09-18T16:03:48.441112200Z" }, { id = "3b2219f8-c313-4e6c-85b9-be7d297af7e8", kind = "objective", path = "parts/3b2219f8-c313-4e6c-85b9-be7d297af7e8.md", frozen = true, created_at = "2026-09-18T16:04:33.617454100Z" }, { id = "561a87f9-43ce-4c76-ab61-317cfcaf952c", kind = "design", path = "parts/561a87f9-43ce-4c76-ab61-317cfcaf952c.md", frozen = true, created_at = "2026-09-18T20:20:19.545801400Z" }, { id = "8355821e-a977-426c-bd16-c29dd6ad58d2", kind = "examples", path = "parts/8355821e-a977-426c-bd16-c29dd6ad58d2.md", frozen = true, created_at = "2026-09-18T20:20:19.546057Z" }, { id = "efffb3cd-9a08-4718-83f6-9e235bdd00f1", kind = "restructure-evidence", path = "parts/efffb3cd-9a08-4718-83f6-9e235bdd00f1.md", frozen = false, created_at = "2026-09-18T20:25:33.083984900Z" }]
+plan_revision = 1
+priority = "high"
+type = "task"

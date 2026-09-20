@@ -1,0 +1,2 @@
+{"rev":1,"ts":"2026-09-18T22:47:53.374334500+00:00","fields":{"component":"context-editor","effort":"500","priority":"medium","state":"planning","title":"context-editor: transform gizmo for selected entities","type":"task"}}
+{"rev":2,"ts":"2026-09-18T22:48:17.374973200+00:00","fields":{"component":"context-editor","depends_on":["95416cf9-41c2-4dc3-8a2f-3a8999271908"],"effort":"500","priority":"medium","state":"planning","title":"context-editor: transform gizmo for selected entities","type":"task"}}

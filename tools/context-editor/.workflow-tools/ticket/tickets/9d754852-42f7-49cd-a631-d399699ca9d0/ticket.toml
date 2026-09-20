@@ -1,0 +1,11 @@
+id = "9d754852-42f7-49cd-a631-d399699ca9d0"
+created_at = "2026-09-18T16:01:39.845716+00:00"
+title = "context-editor: capture and fix reported sandbox-app visual defects (voxel overlap, interior visibility, lighting, sliders)"
+state = "in-implementation"
+component = "context-editor"
+depends_on = ["26105679-6b9b-4e0f-b950-87fcf743e492", "d320e80d-1430-4f66-a3e3-520825262de9"]
+effort = "700"
+parts = [{ id = "8fe1a694-4d79-4964-9013-48eb107e86c3", kind = "objective", path = "parts/8fe1a694-4d79-4964-9013-48eb107e86c3.md", frozen = true, created_at = "2026-09-18T16:03:08.552978500Z" }, { id = "0c0c586a-59a1-4a99-9764-064b5d228206", kind = "requirements", path = "parts/0c0c586a-59a1-4a99-9764-064b5d228206.md", frozen = true, created_at = "2026-09-18T16:04:22.457422500Z" }, { id = "28d217fc-bb0f-41c1-9263-fd86f43a49c4", kind = "acceptance_criteria", path = "parts/28d217fc-bb0f-41c1-9263-fd86f43a49c4.md", frozen = true, created_at = "2026-09-18T16:04:39.348807800Z" }, { id = "1035f43c-07e5-4af7-8fd2-14cf92fc88d7", kind = "design", path = "parts/1035f43c-07e5-4af7-8fd2-14cf92fc88d7.md", frozen = true, created_at = "2026-09-18T20:29:38.371410900Z" }, { id = "5179e7b2-30bc-4a05-9faf-4000fa6262fc", kind = "examples", path = "parts/5179e7b2-30bc-4a05-9faf-4000fa6262fc.md", frozen = true, created_at = "2026-09-18T20:29:38.371692500Z" }, { id = "3ba9b51b-e0a5-48bb-92d7-0a4ce971d091", kind = "defect-evidence", path = "parts/3ba9b51b-e0a5-48bb-92d7-0a4ce971d091.md", frozen = false, created_at = "2026-09-18T20:52:02.501378500Z" }, { id = "6473a60a-16a0-4dad-a54c-88a69f96191c", kind = "review", path = "parts/6473a60a-16a0-4dad-a54c-88a69f96191c.md", frozen = false, created_at = "2026-09-18T20:58:42.117084300Z" }]
+plan_revision = 1
+priority = "high"
+type = "task"

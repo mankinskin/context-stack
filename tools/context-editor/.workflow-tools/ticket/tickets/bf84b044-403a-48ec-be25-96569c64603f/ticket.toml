@@ -1,0 +1,8 @@
+id = "bf84b044-403a-48ec-be25-96569c64603f"
+created_at = "2026-09-18T22:47:47.088320+00:00"
+title = "context-editor: camera projection controls and alternate orbit camera mode"
+state = "planning"
+component = "context-editor"
+effort = "500"
+priority = "medium"
+type = "task"

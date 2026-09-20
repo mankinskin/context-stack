@@ -1,0 +1,38 @@
+{
+  "id": "af4e3b56-287a-44e3-a4af-59aa5aff9e72",
+  "entity_ids": [
+    "22801e4f-36bd-43fc-b765-6e456b2bc63a",
+    "8c2f1575-e704-44cb-bfc0-1f908bfc4855",
+    "9ef831d0-0f1d-46db-88bb-e537a37b9606",
+    "febe05b2-ab03-4309-9d84-39aae471e27a"
+  ],
+  "source_store_root": "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket",
+  "target_store_root": "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket",
+  "entity_journal_ids": {
+    "22801e4f-36bd-43fc-b765-6e456b2bc63a": "6f176320-bf15-4861-8658-60a650268723",
+    "8c2f1575-e704-44cb-bfc0-1f908bfc4855": "8d7c8113-cfc3-4883-b322-b0991b085483",
+    "9ef831d0-0f1d-46db-88bb-e537a37b9606": "6ad613b0-913c-4c45-91da-35227fede488",
+    "febe05b2-ab03-4309-9d84-39aae471e27a": "7f365404-c082-49b1-b638-858ddd5ec69c"
+  },
+  "lock_paths": [
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/move-locks/entity-22801e4f-36bd-43fc-b765-6e456b2bc63a.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/move-locks/entity-8c2f1575-e704-44cb-bfc0-1f908bfc4855.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/move-locks/entity-9ef831d0-0f1d-46db-88bb-e537a37b9606.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/move-locks/entity-febe05b2-ab03-4309-9d84-39aae471e27a.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/move-locks/store.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/move-locks/entity-22801e4f-36bd-43fc-b765-6e456b2bc63a.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/move-locks/entity-8c2f1575-e704-44cb-bfc0-1f908bfc4855.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/move-locks/entity-9ef831d0-0f1d-46db-88bb-e537a37b9606.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/move-locks/entity-febe05b2-ab03-4309-9d84-39aae471e27a.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/move-locks/store.lock"
+  ],
+  "phase": "Validated",
+  "created_at": "2026-09-20T15:16:51.834462300Z",
+  "updated_at": "2026-09-20T15:16:52.286923400Z",
+  "completed_entity_ids": [
+    "22801e4f-36bd-43fc-b765-6e456b2bc63a",
+    "8c2f1575-e704-44cb-bfc0-1f908bfc4855",
+    "9ef831d0-0f1d-46db-88bb-e537a37b9606",
+    "febe05b2-ab03-4309-9d84-39aae471e27a"
+  ]
+}

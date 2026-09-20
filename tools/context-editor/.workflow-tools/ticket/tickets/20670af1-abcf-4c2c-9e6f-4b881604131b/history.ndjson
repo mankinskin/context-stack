@@ -1,0 +1,2 @@
+{"rev":1,"ts":"2026-09-18T20:58:36.683254500+00:00","fields":{"component":"context-editor","effort":"300","priority":"medium","state":"planning","title":"context-editor: add camera resolution controls and resize plumbing","type":"task"}}
+{"rev":2,"ts":"2026-09-18T20:58:53.243112600+00:00","fields":{"component":"context-editor","depends_on":["9d754852-42f7-49cd-a631-d399699ca9d0"],"effort":"300","priority":"medium","state":"planning","title":"context-editor: add camera resolution controls and resize plumbing","type":"task"}}

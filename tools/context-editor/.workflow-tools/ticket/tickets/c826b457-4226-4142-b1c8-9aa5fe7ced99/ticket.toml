@@ -1,0 +1,9 @@
+id = "c826b457-4226-4142-b1c8-9aa5fe7ced99"
+created_at = "2026-09-18T22:47:53.323021700+00:00"
+title = "context-editor: transform gizmo for selected entities"
+state = "planning"
+component = "context-editor"
+depends_on = ["95416cf9-41c2-4dc3-8a2f-3a8999271908"]
+effort = "500"
+priority = "medium"
+type = "task"

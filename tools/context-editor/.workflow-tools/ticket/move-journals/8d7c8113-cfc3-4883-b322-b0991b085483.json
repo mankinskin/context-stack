@@ -1,0 +1,44 @@
+{
+  "id": "8d7c8113-cfc3-4883-b322-b0991b085483",
+  "entity_id": "8c2f1575-e704-44cb-bfc0-1f908bfc4855",
+  "source_store_root": "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket",
+  "target_store_root": "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket",
+  "source_entity_path": "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/tickets/8c2f1575-e704-44cb-bfc0-1f908bfc4855",
+  "destination_entity_path": "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/tickets/8c2f1575-e704-44cb-bfc0-1f908bfc4855",
+  "phase": "Validated",
+  "created_at": "2026-09-20T15:16:51.849128700Z",
+  "updated_at": "2026-09-20T15:16:52.286197900Z",
+  "steps": [
+    "created move journal",
+    "source/target store locks already held by the enclosing move-set operation",
+    "moved entity folder",
+    "scanned source store",
+    "scanned target store",
+    "deferred set ownership validation",
+    "validated move ownership in set"
+  ],
+  "rollback_steps": [
+    "rename destination entity folder back to source path",
+    "restore migrated board history rows to source store",
+    "scan source and target stores"
+  ],
+  "lock_paths": [
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/move-locks/entity-8c2f1575-e704-44cb-bfc0-1f908bfc4855.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/.ticket/move-locks/store.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/move-locks/entity-8c2f1575-e704-44cb-bfc0-1f908bfc4855.lock",
+    "C:/Users/linus/git/3/meta-workspace/context-engine/context-stack/tools/context-editor/.workflow-tools/ticket/move-locks/store.lock"
+  ],
+  "migrated_board_entries": [],
+  "rewritten_path_files": [],
+  "manual_followups": [],
+  "phase_timings_ms": {
+    "lock_acquisition_ms": 0,
+    "migrate_board_history_ms": 0,
+    "rename_entity_ms": 0,
+    "rewrite_path_refs_ms": 0,
+    "scan_source_ms": 0,
+    "scan_target_ms": 0
+  },
+  "failure": null,
+  "next_recovery_step": null
+}
