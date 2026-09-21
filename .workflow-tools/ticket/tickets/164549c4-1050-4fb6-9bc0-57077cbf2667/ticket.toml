@@ -1,0 +1,13 @@
+id = "164549c4-1050-4fb6-9bc0-57077cbf2667"
+created_at = "2026-03-21T02:00:40.949089600+00:00"
+title = "Plan: position-annotated paths — path structures with position metadata"
+state = "planning"
+acceptance_criteria = "Position-annotated path structures designed and wired into context-trace"
+component = "context-stack"
+doc_category = "plan"
+effort = "1200"
+parts = [{ id = "4608398c-ab77-4f43-a8da-a5f7eb353b1e", kind = "objective", path = "parts/4608398c-ab77-4f43-a8da-a5f7eb353b1e.md", frozen = false, created_at = "2026-07-30T21:02:30.575093400Z" }, { id = "fad92ac9-2471-4f7f-b4e0-d123c03db451", kind = "validation", path = "parts/fad92ac9-2471-4f7f-b4e0-d123c03db451.md", frozen = false, created_at = "2026-07-30T21:02:30.579161600Z" }, { id = "5a35e613-0e51-4c1b-96a8-7b536b735e18", kind = "objective", path = "parts/5a35e613-0e51-4c1b-96a8-7b536b735e18.md", frozen = false, created_at = "2026-07-30T21:02:30.583647600Z" }]
+risk_level = "medium"
+source_agent_files = "plans/20251121_PLAN_position_annotated_paths.md"
+tags = "#plan,#context-trace,#context-search,#debugging,#testing,#performance"
+type = "tracker-improvement"

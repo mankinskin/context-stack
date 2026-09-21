@@ -1,0 +1,13 @@
+id = "a25e3cad-5bf2-4432-9c89-3a6dd67ee774"
+created_at = "2026-03-21T02:00:40.599141800+00:00"
+title = "Plan: ngrams oracle validation — compare ngrams against oracle"
+state = "planning"
+acceptance_criteria = "Ngrams oracle validation passes all comparison tests"
+component = "context-stack"
+doc_category = "plan"
+effort = "1200"
+parts = [{ id = "c639a630-f264-4576-98cf-5232e204ec55", kind = "objective", path = "parts/c639a630-f264-4576-98cf-5232e204ec55.md", frozen = false, created_at = "2026-07-30T21:02:30.138182100Z" }, { id = "0c750258-d3fd-460e-bbb7-0c6b742f7d7c", kind = "validation", path = "parts/0c750258-d3fd-460e-bbb7-0c6b742f7d7c.md", frozen = false, created_at = "2026-07-30T21:02:30.142472300Z" }, { id = "4cb7daf9-c857-4308-8c64-d78fb688ddd9", kind = "objective", path = "parts/4cb7daf9-c857-4308-8c64-d78fb688ddd9.md", frozen = false, created_at = "2026-07-30T21:02:30.146586500Z" }]
+risk_level = "medium"
+source_agent_files = "plans/20260315_PLAN_NGRAMS_ORACLE_VALIDATION.md"
+tags = "#plan,#testing,#validation,#ngrams,#context-read,#context-api,#integration"
+type = "tracker-improvement"

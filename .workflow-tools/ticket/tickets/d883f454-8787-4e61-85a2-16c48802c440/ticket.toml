@@ -1,0 +1,10 @@
+id = "d883f454-8787-4e61-85a2-16c48802c440"
+created_at = "2026-07-09T17:42:08.732519800+00:00"
+title = "[workflow-policy][tracing][log-api] Research and define tracing instrumentation and log execution policy"
+state = "planning"
+component = "context-stack"
+effort = "1200"
+parts = [{ id = "dd0499f9-4def-4cc2-8748-6ef98359a84e", kind = "objective", path = "parts/dd0499f9-4def-4cc2-8748-6ef98359a84e.md", frozen = false, created_at = "2026-07-30T21:02:30.024851800Z" }, { id = "d699bfb8-d9d6-4869-bf6b-e90ca6557591", kind = "validation", path = "parts/d699bfb8-d9d6-4869-bf6b-e90ca6557591.md", frozen = false, created_at = "2026-07-30T21:02:30.028675800Z" }]
+priority = "high"
+risk_level = "high"
+type = "tracker-improvement"

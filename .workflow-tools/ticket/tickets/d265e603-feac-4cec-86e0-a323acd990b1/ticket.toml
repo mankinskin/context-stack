@@ -1,0 +1,13 @@
+id = "d265e603-feac-4cec-86e0-a323acd990b1"
+created_at = "2026-03-21T02:00:38.790136300+00:00"
+title = "Plan: search event refactoring — PathNode, IntoTransition, tentative root"
+state = "planning"
+acceptance_criteria = "PathNode and IntoTransition traits introduced; query stream emitting events"
+component = "context-stack"
+doc_category = "plan"
+effort = "1200"
+parts = [{ id = "e10084be-4a54-4398-8e9d-d91f71ebf71a", kind = "objective", path = "parts/e10084be-4a54-4398-8e9d-d91f71ebf71a.md", frozen = false, created_at = "2026-07-30T21:02:30.047043700Z" }, { id = "eb9ec75b-9542-4b37-aa81-c74ee805a885", kind = "validation", path = "parts/eb9ec75b-9542-4b37-aa81-c74ee805a885.md", frozen = false, created_at = "2026-07-30T21:02:30.050942900Z" }, { id = "0217960f-c5cd-4800-b17a-3c0012b67637", kind = "objective", path = "parts/0217960f-c5cd-4800-b17a-3c0012b67637.md", frozen = false, created_at = "2026-07-30T21:02:30.054751200Z" }]
+risk_level = "medium"
+source_agent_files = "plans/20260303_PLAN_SEARCH_EVENT_REFACTORING.md"
+tags = "#plan,#refactoring,#visualization,#events,#search"
+type = "tracker-improvement"
