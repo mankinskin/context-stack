@@ -11,9 +11,9 @@ context-stack is the standalone repository for the extracted graph, search, inse
 | [context-search](context-search/README.md) | Search and traversal layers built on the trace crate. | [context-search/README.md](context-search/README.md) |
 | [context-insert](context-insert/README.md) | Insert and mutation workflows for the graph structures. | [context-insert/README.md](context-insert/README.md) |
 | [context-read](context-read/README.md) | Read and expansion workflows on top of the shared graph stack. | [context-read/README.md](context-read/README.md) |
-| [deps/petgraph](deps/petgraph/README.md) | Vendored dependency source used by this repository. | [deps/petgraph/README.md](deps/petgraph/README.md) |
+| `deps/petgraph/README.md` | Vendored dependency source used by this repository. | `deps/petgraph/README.md` |
 
-Additional folders without repository-level READMEs yet include `context-trace-macros` and `ngrams`; the submodule wiring for the dependency folders is tracked in [.gitmodules](.gitmodules).
+Additional folders without repository-level READMEs yet include `context-trace-macros` and `ngrams`; the submodule wiring for the dependency folders is tracked in `.gitmodules`.
 
 ## Installable Content
 

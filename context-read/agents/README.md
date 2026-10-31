@@ -92,9 +92,9 @@ pub enum SegmentResult { Unknown { .. }, Known { .. }, Mixed { .. } }
 
 | Document | Location |
 |----------|----------|
-| Expansion loop redesign plan | [../../agents/plans/20260315_PLAN_EXPANSION_LOOP_REDESIGN.md](../../agents/plans/20260315_PLAN_EXPANSION_LOOP_REDESIGN.md) |
-| UX improvement parent plan | [../../agents/plans/20260314_PLAN_CONTEXT_READ_UX_IMPROVEMENT.md](../../agents/plans/20260314_PLAN_CONTEXT_READ_UX_IMPROVEMENT.md) |
-| context-read completion plan | [../../agents/plans/20260218_PLAN_CONTEXT_READ_COMPLETION.md](../../agents/plans/20260218_PLAN_CONTEXT_READ_COMPLETION.md) |
-| Block-iter overlap expansion guide | [../../agents/guides/20260207_BLOCK_ITER_OVERLAP_EXPANSION.md](../../agents/guides/20260207_BLOCK_ITER_OVERLAP_EXPANSION.md) |
-| Band-chain overlap links guide | [../../agents/guides/20260211_BANDCHAIN_OVERLAP_LINKS_GUIDE.md](../../agents/guides/20260211_BANDCHAIN_OVERLAP_LINKS_GUIDE.md) |
-| Root update design | [../../agents/designs/20260315_DESIGN_ROOT_UPDATE_STEPS.md](../../agents/designs/20260315_DESIGN_ROOT_UPDATE_STEPS.md) |
+| Expansion loop redesign plan | `../../agents/plans/20260315_PLAN_EXPANSION_LOOP_REDESIGN.md` |
+| UX improvement parent plan | `../../agents/plans/20260314_PLAN_CONTEXT_READ_UX_IMPROVEMENT.md` |
+| context-read completion plan | `../../agents/plans/20260218_PLAN_CONTEXT_READ_COMPLETION.md` |
+| Block-iter overlap expansion guide | `../../agents/guides/20260207_BLOCK_ITER_OVERLAP_EXPANSION.md` |
+| Band-chain overlap links guide | `../../agents/guides/20260211_BANDCHAIN_OVERLAP_LINKS_GUIDE.md` |
+| Root update design | `../../agents/designs/20260315_DESIGN_ROOT_UPDATE_STEPS.md` |
