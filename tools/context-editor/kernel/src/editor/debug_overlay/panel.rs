@@ -8,6 +8,50 @@ use crate::ui::{
 };
 
 #[component]
+fn RangeInput(
+    min: u32,
+    max: u32,
+    step: u32,
+    value: u32,
+    class: String,
+    oninput: EventHandler<u32>,
+) -> Element {
+    #[cfg(all(not(target_arch = "wasm32"), feature = "native-ui"))]
+    return rsx! {
+        div { class: "flex justify-between gap-2 {class}",
+            button {
+                disabled: value <= min,
+                onclick: move |_| oninput.call(value.saturating_sub(step).max(min)),
+                "-"
+            }
+            span { class: "font-mono", "{value}" }
+            button {
+                disabled: value >= max,
+                onclick: move |_| oninput.call(value.saturating_add(step).min(max)),
+                "+"
+            }
+        }
+    };
+
+    #[cfg(not(all(not(target_arch = "wasm32"), feature = "native-ui")))]
+    rsx! {
+        input {
+            r#type: "range",
+            min: "{min}",
+            max: "{max}",
+            step: "{step}",
+            value: "{value}",
+            class,
+            oninput: move |evt| {
+                if let Ok(value) = evt.value().parse::<u32>() {
+                    oninput.call(value);
+                }
+            }
+        }
+    }
+}
+
+#[component]
 pub fn DebugPanel() -> Element {
     let mut tick = use_signal(|| 0u32);
     let _ = *tick.read();
@@ -191,18 +235,15 @@ pub fn DebugPanel() -> Element {
                                     span { "Threshold (px)" }
                                     span { class: "font-mono", "{*lod_thresh.read() as f32 / 1000.0:.1}" }
                                 }
-                                input {
-                                    r#type: "range",
-                                    min: "500",
-                                    max: "64000",
-                                    step: "500",
-                                    value: "{lod_thresh}",
+                                RangeInput {
+                                    min: 500,
+                                    max: 64000,
+                                    step: 500,
+                                    value: *lod_thresh.read(),
                                     class: "w-full accent-yellow-400",
-                                    oninput: move |evt| {
-                                        if let Ok(v) = evt.value().parse::<u32>() {
-                                            lod_thresh.set(v);
-                                            LOD_THRESHOLD_X1000.store(v, Ordering::Relaxed);
-                                        }
+                                    oninput: move |v| {
+                                        lod_thresh.set(v);
+                                        LOD_THRESHOLD_X1000.store(v, Ordering::Relaxed);
                                     }
                                 }
                             }
@@ -211,18 +252,15 @@ pub fn DebugPanel() -> Element {
                                     span { "Softness (px)" }
                                     span { class: "font-mono", "{*lod_soft.read() as f32 / 1000.0:.1}" }
                                 }
-                                input {
-                                    r#type: "range",
-                                    min: "100",
-                                    max: "8000",
-                                    step: "100",
-                                    value: "{lod_soft}",
+                                RangeInput {
+                                    min: 100,
+                                    max: 8000,
+                                    step: 100,
+                                    value: *lod_soft.read(),
                                     class: "w-full accent-yellow-400",
-                                    oninput: move |evt| {
-                                        if let Ok(v) = evt.value().parse::<u32>() {
-                                            lod_soft.set(v);
-                                            LOD_SOFTNESS_X1000.store(v, Ordering::Relaxed);
-                                        }
+                                    oninput: move |v| {
+                                        lod_soft.set(v);
+                                        LOD_SOFTNESS_X1000.store(v, Ordering::Relaxed);
                                     }
                                 }
                             }
@@ -247,17 +285,15 @@ pub fn DebugPanel() -> Element {
                                 span { "Depth  (F4 / F5)" }
                                 span { class: "font-mono", "{depth}" }
                             }
-                            input {
-                                r#type: "range",
-                                min: "0",
-                                max: "11",
-                                value: "{depth}",
+                            RangeInput {
+                                min: 0,
+                                max: 11,
+                                step: 1,
+                                value: *depth.read(),
                                 class: "w-full accent-green-400",
-                                oninput: move |evt| {
-                                    if let Ok(v) = evt.value().parse::<u32>() {
-                                        depth.set(v);
-                                        WIREFRAME_DEPTH.store(v, Ordering::Relaxed);
-                                    }
+                                oninput: move |v| {
+                                    depth.set(v);
+                                    WIREFRAME_DEPTH.store(v, Ordering::Relaxed);
                                 }
                             }
                         }

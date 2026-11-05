@@ -1,10 +1,10 @@
 # Context Editor Sandbox App
 
-This project is a browser-hosted sandbox for the `context-editor-kernel` crate. It combines a Bevy-based voxel/render engine with a Dioxus UI shell so the editor kernel can be demonstrated, exercised, and validated in a web environment.
+This project hosts the `context-editor-kernel` in a browser or a native desktop window. It combines a Bevy-based voxel/render engine with a Dioxus UI shell.
 
 ## Overview
 
-The sandbox app is the WASM entry point for the context editor toolchain. It:
+The sandbox app is the entry point for the context editor toolchain. It:
 
 - loads the kernel runtime and world implementation
 - registers voxel world presets and startup behavior
@@ -31,7 +31,43 @@ The implementation is intentionally small and acts as a host for the more substa
 - Trunk (`cargo install trunk` or the repository's usual tool bootstrap)
 - A browser with GPU/WebGPU support for visual rendering checks
 
-## Run locally
+## Run natively (Linux / WSL2)
+
+From the repository root:
+
+```bash
+cargo run -p sandbox-app
+```
+
+The scene and Dioxus controls share one Bevy window. The native host renders the
+UI with Blitz and Vello CPU into a transparent texture; the 3D scene uses Bevy's
+GPU renderer. No browser, Trunk, GTK, or WebKit is required.
+
+On Ubuntu, install the window-system dependencies:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libwayland-dev libxkbcommon-dev libxkbcommon-x11-0
+```
+
+WSL2 also needs a working WSLg session. `DISPLAY` and/or `WAYLAND_DISPLAY` must
+point to a reachable display, with `XDG_RUNTIME_DIR` configured for Wayland.
+Restart the WSL session after enabling WSLg. Native builds support both Wayland
+and X11.
+
+- Use WASD / arrow keys to move, hold the left mouse button in the scene to look
+  around, and Shift to sprint.
+- UI panels capture their mouse input; typing into the terminal does not move
+  the camera. Click back into the scene to return keyboard control.
+- The same debug settings, presets, theme switch (`T`), and terminal callbacks
+  are available. Native numeric controls use `-` / `+` buttons instead of
+  browser range sliders.
+- Native styling is bundled locally and does not require the Tailwind CDN.
+- Check the startup `AdapterInfo` log: `llvmpipe` means software rendering and
+  can be very slow. WSLg display support alone does not guarantee a
+  hardware-accelerated Vulkan adapter.
+
+## Run in the browser
 
 From this directory:
 
@@ -55,6 +91,12 @@ From the `context-engine` root:
 cargo test -p context-editor-kernel
 ```
 
+For the native UI adapter (including headless input and texture rendering tests):
+
+```bash
+cargo test -p context-editor-kernel --features native-ui --lib
+```
+
 ## Visual verification
 
 The project includes a deterministic visual baseline check. From the `context-engine` root:
@@ -67,7 +109,7 @@ This is used to compare the current browser-rendered output against the recorded
 
 ## Notes
 
-- The app targets `wasm32` and uses the browser runtime for the Bevy render loop.
+- Browser builds target `wasm32`; native builds enable the kernel's `native-ui` feature automatically.
 - Some headless or constrained environments cannot initialize WebGPU, which can prevent visual validation from running in the same way as a full desktop/browser setup.
 - The sandbox is designed for demonstration and validation, not as the final production editor surface.
 

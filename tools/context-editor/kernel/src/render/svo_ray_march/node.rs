@@ -4,7 +4,7 @@ use super::*;
 /// 1. Dispatches the SVO ray march compute shader.
 /// 2. Blits the result to the current `ViewTarget`.
 pub struct SvoRayMarchNode {
-    view_query: bevy::ecs::query::QueryState<&'static ViewTarget>,
+    view_query: bevy::ecs::query::QueryState<&'static ViewTarget, With<Camera3d>>,
 }
 
 impl FromWorld for SvoRayMarchNode {
@@ -101,6 +101,7 @@ impl Node for SvoRayMarchNode {
                     occlusion_query_set: None,
                 });
             render_pass.set_pipeline(blit_pipeline);
+            render_pass.set_bind_group(0, &blit_bg.1, &[]);
             render_pass.set_bind_group(1, &blit_bg.0, &[]);
             render_pass.draw(0..3, 0..1);
         }

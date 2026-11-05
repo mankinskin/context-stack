@@ -1,13 +1,13 @@
 use super::*;
 
 pub struct WireframeOverlayNode {
-    view_query: QueryState<&'static ViewTarget>,
+    view_query: QueryState<&'static ViewTarget, With<Camera3d>>,
 }
 
 impl FromWorld for WireframeOverlayNode {
     fn from_world(world: &mut World) -> Self {
         Self {
-            view_query: world.query(),
+            view_query: world.query_filtered(),
         }
     }
 }

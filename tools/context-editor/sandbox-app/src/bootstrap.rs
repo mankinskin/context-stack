@@ -499,6 +499,7 @@ fn sync_clear_color(
 }
 
 fn mark_runtime_ready() {
+    #[cfg(target_arch = "wasm32")]
     if let Some(window) = web_sys::window() {
         if let Some(document) = window.document() {
             if let Some(body) = document.body() {

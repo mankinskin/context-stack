@@ -5,14 +5,11 @@ edition = "2021"
 
 [dependencies]
 context-editor-kernel = { path = "../kernel" }
-dioxus = { version = "0.7", features = ["web"] }
+dioxus = { version = "0.7" }
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 
-# getrandom 0.3.x requires both the Cargo feature and a --cfg rustflag
-# (set in ../.cargo/config.toml) to use Web Crypto on wasm32-unknown-unknown.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.3", features = ["wasm_js"] }
+# Keep Bevy visible to derive macros on all targets.
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_render",
     "bevy_core_pipeline",
@@ -23,4 +20,12 @@ bevy = { version = "0.18", default-features = false, features = [
 ] }
 bevy_ecs = { version = "0.18" }
 bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+context-editor-kernel = { path = "../kernel", features = ["native-ui"] }
+
+# getrandom 0.3.x also requires the wasm_js cfg rustflag.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+dioxus = { version = "0.7", features = ["web"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 web-sys = { version = "0.3", features = ["Window", "Document", "HtmlElement"] }

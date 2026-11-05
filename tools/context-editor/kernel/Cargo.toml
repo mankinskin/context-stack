@@ -7,25 +7,53 @@ edition = "2021"
 # Enable SpacetimeDB multiplayer support. Disabled by default because it pulls
 # in native-tls/openssl-sys which cannot compile to wasm32-unknown-unknown.
 multiplayer = ["dep:spacetimedb-sdk"]
+native-ui = [
+    "bevy/bevy_winit",
+    "bevy/x11",
+    "bevy/wayland",
+    "bevy/bevy_sprite_render",
+    "bevy/bevy_log",
+    "dep:anyrender",
+    "dep:anyrender_vello_cpu",
+    "dep:blitz-dom",
+    "dep:blitz-paint",
+    "dep:blitz-traits",
+    "dep:dioxus-native-dom",
+    "dep:keyboard-types",
+]
 
 [dependencies]
 wgpu = { version = "27.0.1", default-features = false, features = ["webgpu", "webgl"] }
+bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
+bytemuck = { version = "1", features = ["derive"] }
+dioxus = { version = "0.7" }
+futures-timer = { version = "3.0.3", features = ["wasm-bindgen"] }
+spacetimedb-sdk = { version = "1.12", optional = true }
+
+# Bevy's derive macros require this entry in the top-level dependencies.
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_render",
     "bevy_core_pipeline",
     "bevy_asset",
     "bevy_pbr",
-    "bevy_winit",
     "bevy_window",
     "bevy_gizmos",
 ] }
-bevy_rapier3d = { version = "0.33", default-features = false, features = ["dim3"] }
-bytemuck = { version = "1", features = ["derive"] }
-dioxus = { version = "0.7", features = ["web"] }
-futures-timer = { version = "3.0.3", features = ["wasm-bindgen"] }
-spacetimedb-sdk = { version = "1.12", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_winit"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+anyrender = { version = "0.6", optional = true }
+anyrender_vello_cpu = { version = "0.8.1", optional = true }
+blitz-dom = { version = "0.2.4", default-features = false, features = ["system_fonts"], optional = true }
+blitz-paint = { version = "0.2", default-features = false, optional = true }
+blitz-traits = { version = "0.2", optional = true }
+dioxus-native-dom = { version = "0.7", optional = true }
+keyboard-types = { version = "0.7", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+dioxus = { version = "0.7", features = ["web"] }
 web-sys = { version = "0.3.92", features = ["Window", "Document", "Element", "HtmlElement", "console"] }
 
 [dev-dependencies]

@@ -77,11 +77,12 @@ pub use simulation::{
 
 use std::sync::{
     Arc,
+    Mutex,
     OnceLock,
 };
 
-#[cfg(target_arch = "wasm32")]
-use std::sync::Mutex;
+#[cfg(all(not(target_arch = "wasm32"), feature = "native-ui"))]
+mod native_ui;
 
 // ---------------------------------------------------------------------------
 // World preset registry
@@ -92,10 +93,8 @@ use std::sync::Mutex;
 /// The function receives exclusive world access so it can read any resource
 /// (e.g. [`ThemePalette`](crate::world::theme::ThemePalette)) while mutating
 /// [`VoxelWorld`](crate::svo::VoxelWorld).
-#[cfg(target_arch = "wasm32")]
 pub type WorldPresetFn = Arc<dyn Fn(&mut bevy::prelude::World) + Send + Sync>;
 
-#[cfg(target_arch = "wasm32")]
 static PRESET_REGISTRY: Mutex<Vec<(String, WorldPresetFn)>> =
     Mutex::new(Vec::new());
 
@@ -103,7 +102,6 @@ static PRESET_REGISTRY: Mutex<Vec<(String, WorldPresetFn)>> =
 ///
 /// Each entry is `(name, fn)`. Index 0 is the default scene shown on startup.
 /// Presets appear in the debug panel in registration order.
-#[cfg(target_arch = "wasm32")]
 pub fn register_world_presets(
     presets: impl IntoIterator<
         Item = (
@@ -118,19 +116,7 @@ pub fn register_world_presets(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn register_world_presets(
-    _presets: impl IntoIterator<
-        Item = (
-            impl Into<String>,
-            impl Fn(&mut bevy::prelude::World) + Send + Sync + 'static,
-        ),
-    >
-) {
-}
-
 /// Returns the names of all registered presets (in registration order).
-#[cfg(target_arch = "wasm32")]
 pub fn world_preset_names() -> Vec<String> {
     PRESET_REGISTRY
         .lock()
@@ -140,15 +126,9 @@ pub fn world_preset_names() -> Vec<String> {
         .collect()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn world_preset_names() -> Vec<String> {
-    Vec::new()
-}
-
 /// Resets [`VoxelWorld`](crate::svo::VoxelWorld) and applies preset `index`.
 ///
 /// Called by the `apply_world_preset` exclusive system in `debug_overlay`.
-#[cfg(target_arch = "wasm32")]
 pub fn apply_registered_preset(
     index: u32,
     world: &mut bevy::prelude::World,
@@ -162,13 +142,6 @@ pub fn apply_registered_preset(
         drop(reg);
         f(world);
     }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn apply_registered_preset(
-    _index: u32,
-    _world: &mut bevy::prelude::World,
-) {
 }
 
 pub struct WorldEvent {
@@ -198,7 +171,6 @@ pub trait SandboxWorld: 'static + Send + Sync {
     /// The app already contains all kernel plugins. Typical overrides add the
     /// world's `VoxelWorld` resource, a scene bootstrap plugin, and any
     /// startup systems before forwarding to `app.run()`.
-    #[cfg(target_arch = "wasm32")]
     fn run_bevy_app(
         &self,
         mut app: bevy::prelude::App,
@@ -217,7 +189,9 @@ pub fn world() -> &'static Arc<dyn SandboxWorld> {
     WORLD.get().expect("context_editor_kernel::launch() must be called before accessing the world")
 }
 
-/// Initialise the kernel with the given world type and start the Dioxus web app.
+/// Initialise the world and start Bevy with the Dioxus interface.
+///
+/// Native hosts must enable the `native-ui` feature.
 ///
 /// # Panics
 /// Panics if called more than once.
@@ -227,16 +201,17 @@ pub fn launch<W: SandboxWorld + Default>() {
         .map_err(|_| "launch() called twice")
         .expect("context_editor_kernel::launch() must only be called once");
 
+    #[cfg(target_arch = "wasm32")]
     dioxus::launch(ui::root_app);
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-ui"))]
     {
-        // Start Bevy (this will "unwind" using an exception in Winit's run, so it
-        // won't return, which means we must call Dioxus launch first).
-        // build_kernel_app() contains all kernel plugins; the sandbox-app's
-        // run_bevy_app() adds world-specific resources and calls app.run().
+        // On WASM, Dioxus must start before Winit takes over the browser event loop.
         crate::world().run_bevy_app(build_kernel_app());
     }
+
+    #[cfg(all(not(target_arch = "wasm32"), not(feature = "native-ui")))]
+    panic!("native launch requires the context-editor-kernel/native-ui feature");
 }
 
 /// Build a Bevy [`App`](bevy::prelude::App) pre-loaded with all kernel plugins.
@@ -244,7 +219,7 @@ pub fn launch<W: SandboxWorld + Default>() {
 /// The returned app has no world-specific resources; the sandbox-app is
 /// responsible for calling `app.insert_resource(VoxelWorld::new(...))`,
 /// adding scene plugins, and invoking `app.run()`.
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", feature = "native-ui"))]
 pub fn build_kernel_app() -> bevy::prelude::App {
     use bevy::prelude::*;
 
@@ -252,6 +227,9 @@ pub fn build_kernel_app() -> bevy::prelude::App {
 
     // Standard Bevy plugins (injecting the canvas config)
     app.add_plugins(DefaultPlugins.set(render::canvas_window_plugin()));
+
+    #[cfg(all(not(target_arch = "wasm32"), feature = "native-ui"))]
+    app.add_plugins(native_ui::NativeUiPlugin);
 
     // Kernel plugins
     app.add_plugins(crate::render::ContextEditorRenderPlugin);

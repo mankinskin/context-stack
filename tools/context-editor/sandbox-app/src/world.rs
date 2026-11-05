@@ -39,7 +39,6 @@ impl SandboxWorld for ContextWorld {
         rsx! {}
     }
 
-    #[cfg(target_arch = "wasm32")]
     fn run_bevy_app(
         &self,
         mut app: bevy::prelude::App,

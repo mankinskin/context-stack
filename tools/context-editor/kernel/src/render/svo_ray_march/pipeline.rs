@@ -116,8 +116,9 @@ pub struct SvoRayMarchBlitPipeline(pub CachedRenderPipelineId);
 pub struct SvoRayMarchComputeBindGroup(pub BindGroup);
 
 /// Pre-built blit bind group (rebuilt each frame because buffers can resize).
+/// Holds group 1 followed by the required empty group 0.
 #[derive(Resource)]
-pub struct SvoRayMarchBlitBindGroup(pub BindGroup);
+pub struct SvoRayMarchBlitBindGroup(pub BindGroup, pub BindGroup);
 
 /// Queue both pipelines for compilation (runs once at startup).
 pub fn queue_ray_march_pipelines(
@@ -265,6 +266,16 @@ pub fn rebuild_ray_march_bind_groups(
                 },
             ],
         );
-        commands.insert_resource(SvoRayMarchBlitBindGroup(bind_group));
+        let empty_layout =
+            pipeline_cache.get_bind_group_layout(&blit_dummy_group0_layout());
+        let empty_group = device.create_bind_group(
+            "bg_svo_blit_group0_empty",
+            &empty_layout,
+            &[],
+        );
+        commands.insert_resource(SvoRayMarchBlitBindGroup(
+            bind_group,
+            empty_group,
+        ));
     }
 }
