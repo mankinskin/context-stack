@@ -1,8 +1,5 @@
 use context_insert::*;
-use context_trace::{
-    graph::vertex::location::pattern::PatternLocation,
-    *,
-};
+use context_trace::*;
 use derive_more::{
     Deref,
     DerefMut,
@@ -10,448 +7,69 @@ use derive_more::{
 use derive_new::new;
 use tracing::debug;
 
-use crate::expansion::chain::BandState;
-
-#[derive(Debug, Clone, Deref, DerefMut, new)]
+#[derive(Debug, Deref, DerefMut, new)]
 pub(crate) struct RootManager {
     #[deref]
     #[deref_mut]
     pub(crate) graph: HypergraphRef,
     /// Materialized token covering everything committed so far.
-    ///
-    /// This is the running root for the current read, not a promise that the
-    /// token has only one decomposition.
     #[new(default)]
     pub(crate) root: Option<Token>,
-    /// The last token committed by `commit_state`: T2 for `WithOverlap`, the
-    /// single token for `Single`.  The next overlap search uses this as its
-    /// left-side context.
+    /// Only containers allocated by this sink may be extended in place.
     #[new(default)]
-    pub(crate) anchor: Option<Token>,
-    /// `true` while the root is a flat, work-in-progress container built
-    /// exclusively by `append_token` / `append_pattern` (unknown-atom path).
-    /// Such a root may be extended in-place without invalidating semantic
-    /// compound tokens. Cleared to `false` by every overlap-aware
-    /// `commit_state` call.
-    #[new(default)]
-    pub(crate) flat_root: bool,
+    owns_root: bool,
 }
 
 impl RootManager {
-    pub(crate) fn anchor(&self) -> Option<Token> {
-        self.anchor
-    }
-
-    /// `true` when the root has exactly one child pattern and no parents,
-    /// AND appending `token` would not create a self-referential pattern.
-    pub(crate) fn can_extend_with(
+    fn can_extend_with(
         &self,
         token: Token,
     ) -> bool {
         let Some(root) = self.root else {
             return false;
         };
-        if token.vertex_index() == root.vertex_index() {
+        if !self.owns_root || token.vertex_index() == root.vertex_index() {
             return false;
         }
         let vertex = root.vertex(&self.graph);
         vertex.child_patterns().len() == 1 && vertex.parents().is_empty()
     }
 
-    /// `true` when the root has exactly one child pattern and no parents.
-    pub(crate) fn can_extend(&self) -> bool {
-        let Some(root) = self.root else {
-            return false;
-        };
-        let vertex = root.vertex(&self.graph);
-        vertex.child_patterns().len() == 1 && vertex.parents().is_empty()
-    }
-
-    // -------------------------------------------------------------------------
-    // Primitive root mutations
-    // -------------------------------------------------------------------------
-
-    pub(crate) fn set_root(
+    /// Append a finalized span without modifying an adopted semantic token.
+    ///
+    /// Known spans and unknown atoms have the same accumulation policy.
+    /// Overlap resolution belongs to the block, not to this sink.
+    pub(crate) fn append_completed(
         &mut self,
         token: Token,
     ) {
-        self.root = Some(token);
-    }
-
-    /// Append `token` to the root in-place (requires `can_extend_with(token)`).
-    pub(crate) fn extend_root(
-        &mut self,
-        token: Token,
-    ) {
-        let root = self.root.expect("extend_root requires an existing root");
-        let vertex = root.vertex(&self.graph);
-        let (&pid, _) = vertex.expect_any_child_pattern();
-        let new_root = self.graph.append_to_owned_pattern(root, pid, token);
-        self.root = Some(new_root);
-    }
-
-    /// Wrap the current root together with `token` into a new compound:
-    /// `insert_pattern([root, token])`.
-    pub(crate) fn wrap_root(
-        &mut self,
-        token: Token,
-    ) {
-        let root = self.root.expect("wrap_root requires an existing root");
-        let new_root = self.graph.insert_pattern(vec![root, token]);
-        self.root = Some(new_root);
-    }
-
-    /// Replace the last child of the root's pattern with `replacement`.
-    ///
-    /// When the root is extendable in-place (`can_extend_with(replacement)`)
-    /// the replacement is done via `replace_in_pattern` followed by a
-    /// re-read of the updated token.  Otherwise the root is rebuilt as a
-    /// fresh `insert_pattern` call with the last element swapped.
-    pub(crate) fn replace_last_child(
-        &mut self,
-        replacement: Token,
-    ) {
-        let root = self
-            .root
-            .expect("replace_last_child requires an existing root");
-
-        if self.can_extend_with(replacement) {
-            let vertex = root.vertex(&self.graph);
-            let (&pid, pattern) = vertex.expect_any_child_pattern();
-            let last_idx = pattern.len() - 1;
-            let loc = PatternLocation::new(root, pid);
-            self.graph.replace_in_pattern(
-                loc,
-                last_idx..last_idx + 1,
-                vec![replacement],
-            );
-            let updated = root.vertex(&self.graph).to_token();
-            self.root = Some(updated);
-        } else {
-            let vertex = root.vertex(&self.graph);
-            let (&_pid, pattern) = vertex.expect_any_child_pattern();
-            let mut new_pat: Vec<Token> = pattern.iter().copied().collect();
-            new_pat.pop();
-            new_pat.push(replacement);
-            let new_root = self.graph.insert_pattern(new_pat);
-            self.root = Some(new_root);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // commit_state — dispatch over BandState variants
-    // -------------------------------------------------------------------------
-
-    /// Materialize one expansion step into the running root.
-    ///
-    /// `BandState::Single` handles the no-overlap case for the current step.
-    /// `BandState::WithOverlap` handles the overlap bundle produced by the
-    /// expansion logic. In both cases the commit happens immediately so the next
-    /// overlap search sees up-to-date graph state and anchor context.
-    ///
-    /// This method does not define a canonical ordering over child patterns.
-    /// It only updates the root/anchor state needed to continue the left-to-
-    /// right read.
-
-    pub(crate) fn commit_state(
-        &mut self,
-        state: BandState,
-    ) {
-        match state {
-            BandState::Single { band } => {
-                let token = *band
-                    .pattern
-                    .first()
-                    .expect("Single band must have at least one token");
-
-                debug!(
-                    token = ?token,
-                    has_root = self.root.is_some(),
-                    can_extend = self.can_extend(),
-                    flat_root = self.flat_root,
-                    "commit_state Single"
-                );
-
-                if self.try_extend_tail_with(token) {
-                    return;
-                }
-
-                match self.root {
-                    None => {
-                        debug!("commit_state Single: no root — set_root");
-                        self.set_root(token);
-                        self.flat_root = false;
-                    },
-                    Some(_)
-                        if self.flat_root && self.can_extend_with(token) =>
-                    {
-                        debug!("commit_state Single: flat root — extend_root");
-                        self.extend_root(token);
-                        // flat_root remains true
-                    },
-                    Some(_) => {
-                        debug!(
-                            "commit_state Single: semantic root — wrap_root"
-                        );
-                        self.wrap_root(token);
-                        self.flat_root = false;
-                    },
-                }
-
-                self.anchor = self.root;
+        debug!(token = ?token, root = ?self.root, owns_root = self.owns_root, "append_completed");
+        match self.root {
+            None => {
+                self.root = Some(token);
+                self.owns_root = false;
             },
-
-            BandState::WithOverlap { ref overlap, .. } => {
-                let t2 = *overlap
-                    .pattern
-                    .last()
-                    .expect("overlap pattern must have at least one token");
-
-                debug!(
-                    t2 = ?t2,
-                    has_root = self.root.is_some(),
-                    anchor = ?self.anchor,
-                    "commit_state WithOverlap"
-                );
-
-                let bundled_pattern = state.collapse(&mut self.graph);
-                debug_assert!(
-                    bundled_pattern.len() == 1,
-                    "collapse() of WithOverlap should yield exactly one bundled token, got {}",
-                    bundled_pattern.len()
-                );
-                let bundled = bundled_pattern[0];
-
-                debug!(bundled = ?bundled, "WithOverlap collapsed");
-
-                match self.root {
-                    None => {
-                        debug!("commit_state WithOverlap: no root — set_root(bundled)");
-                        self.set_root(bundled);
-                    },
-                    Some(t1) if Some(t1) == self.anchor => {
-                        debug!("commit_state WithOverlap: root==anchor — set_root(bundled)");
-                        self.set_root(bundled);
-                    },
-                    Some(_) => {
-                        debug!("commit_state WithOverlap: accumulated root — replace_last_child(bundled)");
-                        self.replace_last_child(bundled);
-                    },
-                }
-
-                self.anchor = Some(t2);
+            Some(root) if self.can_extend_with(token) => {
+                let vertex = root.vertex(&self.graph);
+                let (&pattern_id, _) = vertex.expect_any_child_pattern();
+                self.root = Some(self.graph.append_to_owned_pattern(
+                    root, pattern_id, token,
+                ));
+            },
+            Some(root) => {
+                self.root = Some(self.graph.insert_pattern(vec![root, token]));
+                self.owns_root = true;
             },
         }
     }
 
-    /// When the root is a semantic compound (not a flat unknown-atom container)
-    /// and both its last child and the incoming `token` are single atoms, combine
-    /// them into a wider compound and rebuild the root with the combined token as
-    /// its new last child.
-    ///
-    /// Returns `true` and updates `self.root` / `self.anchor` when the extension
-    /// was applied; returns `false` when the preconditions are not met.
-    ///
-    /// Example: root = `[[aa, b]]`, token = `b` (atom)
-    ///   last_child = `b` (atom), combined = `bb = [[b, b]]`
-    ///   new root = `[[aa, bb]]`
-    ///
-    /// Symmetric-pattern rule (`aaa` family):
-    ///   When `old_root`'s own child pattern equals `[last_child, token]`, the
-    ///   two-atom span IS the old root. In that case we reuse `old_root` as the
-    ///   `combined` token (no new vertex allocated) and record the additional
-    ///   valid adjacent decomposition `[old_root, token]` alongside the pattern
-    ///   produced by the root rebuild.
-    ///
-    ///   Example: old_root = `aa = [[a, a]]`, last_child = `a`, token = `a`
-    ///     old_root pattern == [last_child, token] → reuse old_root as combined
-    ///     rebuilt pattern : `[a, aa]`
-    ///     added peer path : `[aa, a]`
-    ///
-    ///   This avoids creating a duplicate `aa` vertex (which `insert_pattern`
-    ///   would do because it always allocates a fresh vertex).
-    fn try_extend_tail_with(
-        &mut self,
-        token: Token,
-    ) -> bool {
-        if self.flat_root || *token.width() != 1 {
-            return false;
-        }
-        let last_child = match self.last_child_token() {
-            Some(t) if *t.width() == 1 => t,
-            _ => return false,
-        };
-
-        // Capture old_root before any mutation.
-        let old_root = self.root;
-
-        // Check whether old_root IS already the two-atom span [last_child, token].
-        // When true we reuse the existing vertex as `combined` instead of calling
-        // insert_pattern, which would allocate a duplicate vertex.
-        //
-        // Example (aaa): old_root = aa = [[a, a]], last_child = a, token = a
-        //   → old_root_is_span = true  → combined = aa (reused, no new vertex)
-        let old_root_is_span = old_root.is_some_and(|or| {
-            or.vertex(&self.graph).child_patterns().values().any(|pat| {
-                pat.len() == 2
-                    && pat[0].vertex_index() == last_child.vertex_index()
-                    && pat[1].vertex_index() == token.vertex_index()
-            })
-        });
-
-        // Resolve the combined token: reuse old_root when it already represents
-        // [last_child, token]; otherwise create it via insert_pattern.
-        let combined = if old_root_is_span {
-            old_root.expect("old_root_is_span implies old_root is Some")
-        } else {
-            self.graph.insert_pattern(vec![last_child, token])
-        };
-
-        if *combined.width() <= *last_child.width() {
-            return false;
-        }
-
-        // Rebuild the root pattern with `last_child` replaced by `combined`.
-        // We rebuild via insert_pattern rather than replace_in_pattern to avoid
-        // a vertex-width mismatch when the replacement is wider than the original.
-        let new_root = if let Some(root) = old_root {
-            let vertex = root.vertex(&self.graph);
-            let (_pid, pattern) = vertex.expect_any_child_pattern();
-            let mut new_pat: Vec<Token> = pattern.iter().copied().collect();
-            new_pat.pop();
-            new_pat.push(combined);
-            self.graph.insert_pattern(new_pat)
-        } else {
-            combined
-        };
-
-        debug!(
-            last_child = ?last_child,
-            token = ?token,
-            combined = ?combined,
-            old_root_is_span,
-            new_root = ?new_root,
-            "commit_state: tail extension — rebuilt root"
-        );
-
-        // Additional adjacent-pattern insertion (`aaa` family):
-        //
-        // When old_root IS the two-atom span (detected above), the new root has
-        // another valid adjacent binary decomposition `[old_root, token]` in
-        // addition to the rebuilt pattern added above.
-        //
-        // Because combined == old_root in this branch, the added pattern is
-        // exactly `[combined, token]`.
-        if old_root_is_span {
-            if let Some(or) = old_root {
-                let symmetric_pat =
-                    context_trace::graph::vertex::pattern::Pattern::from(vec![
-                        or, token,
-                    ]);
-                debug!(
-                    old_root = ?or,
-                    token = ?token,
-                    new_root = ?new_root,
-                    "commit_state: adding symmetric pattern [old_root, token]"
-                );
-                self.graph.add_pattern_with_update(new_root, symmetric_pat);
-            }
-        }
-
-        self.root = Some(new_root);
-        self.flat_root = false;
-        self.anchor = self.root;
-        true
-    }
-
-    // -------------------------------------------------------------------------
-    // Unknown-atom append helpers
-    // -------------------------------------------------------------------------
-
-    /// Append a pattern of new atom indices to the root.
-    ///
-    /// Used exclusively by the unknown-atom segment path; not called from the
-    /// overlap-expansion loop. This path may keep the root flat and extendable
-    /// until the read reaches a semantic overlap/materialization step.
+    /// Append unknown atoms through the same sink as completed known spans.
     pub(crate) fn append_pattern(
         &mut self,
-        new: Pattern,
+        atoms: Pattern,
     ) {
-        match new.len() {
-            0 => {},
-            1 => self.append_token(new.first().unwrap()),
-            _ =>
-                if let Some(root) = &mut self.root {
-                    let vertex = (*root).vertex(&self.graph);
-                    let can_extend_inplace = self.flat_root
-                        && vertex.child_patterns().len() == 1
-                        && vertex.parents().is_empty();
-                    *root = if can_extend_inplace {
-                        let (&pid, _) = vertex.expect_any_child_pattern();
-                        self.graph.append_to_owned_pattern(*root, pid, new)
-                    } else {
-                        let new = new.into_pattern();
-                        let new_root = self.graph.insert_pattern(
-                            [&[*root], new.as_slice()].concat(),
-                        );
-                        self.flat_root = false;
-                        new_root
-                    };
-                } else {
-                    let c = self.graph.insert_pattern(new);
-                    self.root = Some(c);
-                    self.flat_root = true;
-                },
-        }
-
-        if self.root.is_some() {
-            self.anchor = self.root;
-        }
-    }
-
-    /// Append a single token to the root.
-    ///
-    /// Used exclusively by the unknown-atom segment path. Extends the root
-    /// in-place only when `flat_root` is `true`; otherwise wraps the semantic
-    /// root in a new compound via `insert_pattern`.
-    #[context_trace::instrument_sig(skip(self, token))]
-    pub(crate) fn append_token(
-        &mut self,
-        token: impl ToToken,
-    ) {
-        let token = token.to_token();
-        if let Some(root) = &mut self.root {
-            let vertex = (*root).vertex(&self.graph);
-            let can_extend_inplace = self.flat_root
-                && token.vertex_index() != root.vertex_index()
-                && vertex.child_patterns().len() == 1
-                && vertex.parents().is_empty();
-
-            *root = if can_extend_inplace {
-                let (&pid, _) = vertex.expect_any_child_pattern();
-                self.graph.append_to_owned_pattern(*root, pid, token)
-            } else {
-                let new_root = self.graph.insert_pattern(vec![*root, token]);
-                self.flat_root = false;
-                new_root
-            };
-        } else {
-            self.root = Some(token);
-            self.flat_root = true;
-        }
-
-        self.anchor = self.root;
-    }
-
-    /// Returns the rightmost token in the root's pattern, or the root itself
-    /// when the root is atomic.
-    pub(crate) fn last_child_token(&self) -> Option<Token> {
-        let root = self.root?;
-        let vertex = root.vertex(&self.graph);
-        if let Some((&_pid, pattern)) = vertex.child_patterns().iter().next() {
-            pattern.last().copied()
-        } else {
-            Some(root)
+        for token in atoms {
+            self.append_completed(token);
         }
     }
 }

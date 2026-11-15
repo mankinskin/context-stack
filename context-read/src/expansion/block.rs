@@ -8,44 +8,42 @@ use tracing::debug;
 /// Context for block-based expansion of a known-atom pattern.
 ///
 /// Owns the `RootManager` and drives the `ExpansionCtx` cursor loop,
-/// committing each yielded `BandState` to the root before advancing.
+/// appending each finalized token to the root before advancing.
 #[derive(Debug)]
 pub(crate) struct BlockExpansionCtx {
-    root: RootManager,
+    sink: RootManager,
     ctx: ExpansionCtx,
 }
 
 impl BlockExpansionCtx {
     pub(crate) fn new(
-        root: RootManager,
+        sink: RootManager,
         known: Pattern,
     ) -> Self {
         debug!(known_len = known.len(), known = ?known, "BlockExpansionCtx::new");
 
-        let anchor = root.anchor();
         let atoms: Vec<Token> = known.iter().copied().collect();
         let expansion_ctx =
-            ExpansionCtx::new(root.graph.clone(), atoms, anchor);
+            ExpansionCtx::new(sink.graph.clone(), atoms);
 
         Self {
-            root,
+            sink,
             ctx: expansion_ctx,
         }
     }
 
-    /// Drive the expansion loop: commit each `BandState` immediately and
-    /// refresh the anchor so the next step sees the updated left-side context.
+    /// Append each finalized span immediately so the next search sees the
+    /// updated graph, without using the accumulation root as a local anchor.
     pub(crate) fn process(&mut self) {
-        debug!(anchor = ?self.ctx.anchor, "BlockExpansionCtx::process start");
+        debug!("BlockExpansionCtx::process start");
 
-        while let Some(state) = self.ctx.next() {
-            self.root.commit_state(state);
-            self.ctx.anchor = self.root.anchor();
+        while let Some(token) = self.ctx.next() {
+            self.sink.append_completed(token);
 
             debug!(
-                new_anchor = ?self.ctx.anchor,
+                root = ?self.sink.root,
                 cursor = self.ctx.cursor,
-                "BlockExpansionCtx::process: committed, anchor refreshed"
+                "BlockExpansionCtx::process: appended completed span"
             );
         }
 
@@ -56,6 +54,6 @@ impl BlockExpansionCtx {
     }
 
     pub(crate) fn finish(self) -> RootManager {
-        self.root
+        self.sink
     }
 }

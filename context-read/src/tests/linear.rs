@@ -388,11 +388,8 @@ fn repetition_abcxyzabc() {
 ///   (aabb)     -> [a, a, b, b]     (flat atom pattern — no repeated substrings in "aabb")
 ///   (aabbaabb) -> [aabb, aabb]
 ///
-/// context-read's `insert_next_match` pipeline creates `aabb` via the split+join
-/// pipeline, which may build `aab` as an intermediate compound.  The tightest
-/// decomposition of the root is still [aabb, aabb].  The exact internal structure
-/// of `aabb` itself is an implementation detail of the insert pipeline and is
-/// intentionally not asserted here beyond the root-level decomposition.
+/// The owned accumulation container grows into a flat `aabb`, which is then
+/// reused twice without retaining intermediate compound vertices.
 #[test]
 fn repetition_aabbaabb() {
     let mut graph = HypergraphRef::<BaseGraphKind>::default();
@@ -406,11 +403,12 @@ fn repetition_aabbaabb() {
     let root = result.expect("should have root");
     assert_eq!(root.width(), TokenWidth(8));
 
-    // Root must be [aabb, aabb] regardless of aabb's internal decomposition.
     assert_patterns!(
         graph,
+        aabb => [[a, a, b, b]],
         root => [[aabb, aabb]]
     );
+    assert_eq!(graph.vertex_count(), 4, "only two atoms and two compounds");
 }
 
 /// Test "abcabc" - "abc" repeated twice, adjacent.

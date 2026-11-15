@@ -45,6 +45,23 @@ let cursor = expansion::cursor::new(start_position);
 - **Block Iteration**: Efficient sequence processing in blocks
 - **Complement Operations**: Graph complement calculations
 
+### Block expansion and accumulation
+
+`ExpansionCtx` searches a known-atom block using block-local anchors. It expands
+postfixes only into the remaining atoms of that same block and resolves connected
+overlaps before yielding a finalized token.
+
+`BlockExpansionCtx` immediately sends each finalized token to
+`RootManager::append_completed`. The root manager accumulates committed input,
+extending an owned container when safe or constructing a new root without
+mutating existing semantic tokens. It does not own or supply an overlap anchor.
+Ownership is independent of known/unknown block boundaries. A newly allocated
+accumulation container remains growable until it is shared or structurally
+ineligible for extension; adopted tokens are never modified. Appending the root
+to itself creates a new container instead of a self-reference.
+Each subsequent expansion search sees the sink's graph updates, but cannot
+search across a block boundary for overlaps.
+
 ## Dependencies
 - **context-trace**: Core graph structures and operations
 - Standard Rust collections and iterators

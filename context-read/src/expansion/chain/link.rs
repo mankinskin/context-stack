@@ -8,7 +8,7 @@ use context_trace::*;
 
 /// Represents the overlap between two tokens in a decomposition.
 ///
-/// When a postfix of the current root expands into remaining pattern, it creates
+/// When a postfix of a block-local anchor expands into remaining input, it creates
 /// an overlap region that can be viewed from two perspectives:
 ///
 /// 1. From the first token's view: `child_path` - a top-down path from the starting
@@ -28,13 +28,9 @@ pub(crate) struct OverlapLink {
     /// This represents the overlap region token from the second token's perspective.
     pub(crate) search_path: IndexStartPath,
 
-    /// Position where the overlap starts in the input sequence.
+    /// Position where the overlap starts within the known block.
     #[allow(dead_code)]
     pub(crate) start_bound: usize,
-
-    /// True when the overlap expansion returned the anchor token itself
-    /// (repetition pattern like "abcabcabc").
-    pub(crate) self_overlap: bool,
 }
 
 /// Terminal node of a resolved overlap chain.

@@ -27,6 +27,13 @@
 //! - **Repeated tokens**: Same token appearing multiple times in input
 //! - **Edge cases**: Single token, empty patterns
 
+use crate::{
+    expansion::{
+        block::BlockExpansionCtx,
+        ExpansionCtx,
+    },
+    pipeline::root::RootManager,
+};
 use context_insert::ToInsertCtx;
 use context_search::ErrorState;
 use context_trace::{
@@ -546,4 +553,168 @@ fn cursor_accumulated_width_multiple() {
 
     // TODO: When pattern creation is fixed:
     // assert_eq!(*token.width(), 3, "ab+c has width 3");
+}
+
+#[test]
+fn expansion_sink_updates_graph_before_next_span() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b] =
+        graph.insert_atoms([Atom::Element('a'), Atom::Element('b')])[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(a);
+    sink.append_completed(a);
+    sink.append_pattern(Pattern::from(vec![b]));
+    let before = sink.root.unwrap();
+    let mut expansion =
+        ExpansionCtx::new(graph.clone(), vec![b, a, a, b, b]);
+
+    assert_eq!(expansion.next(), Some(b));
+    sink.append_completed(b);
+    let aabb = sink.root.expect("sink must contain the committed atom");
+    assert_eq!(aabb.width(), TokenWidth(4));
+    assert_eq!(before.vertex_index(), aabb.vertex_index());
+    assert_patterns!(graph, aabb => [[a, a, b, b]]);
+
+    assert_eq!(expansion.next(), Some(aabb));
+    sink.append_completed(aabb);
+    let root = sink.root.unwrap();
+    assert_patterns!(graph, root => [[aabb, aabb]]);
+    assert_eq!(graph.vertex_count(), 4);
+    assert_eq!(expansion.next(), None);
+}
+
+#[test]
+fn expansion_sink_preserves_adopted_unshared_token() {
+    let (graph, a, b, c, ab) = setup_abc_ab();
+    let _tracing = init_test_tracing!(&graph);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(ab);
+    sink.append_completed(c);
+    let root = sink.root.unwrap();
+
+    assert_eq!(ab.vertex(&graph).to_token().width(), TokenWidth(2));
+    assert_patterns!(graph, ab => [[a, b]], root => [[ab, c]]);
+}
+
+#[test]
+fn expansion_sink_stops_extending_a_shared_container() {
+    let (graph, a) = setup_single_atom();
+    let _tracing = init_test_tracing!(&graph);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(a);
+    sink.append_completed(a);
+    let aa = sink.root.unwrap();
+    let parent = graph.insert_pattern(vec![aa, a]);
+
+    sink.append_completed(a);
+    let root = sink.root.unwrap();
+
+    assert_ne!(root.vertex_index(), aa.vertex_index());
+    assert_eq!(aa.vertex(&graph).to_token().width(), TokenWidth(2));
+    assert_patterns!(
+        graph,
+        aa => [[a, a]],
+        parent => [[aa, a]],
+        root => [[aa, a]]
+    );
+}
+
+#[test]
+fn expansion_block_does_not_overlap_the_accumulation_root() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c, x] = graph.insert_atoms([
+        Atom::Element('a'),
+        Atom::Element('b'),
+        Atom::Element('c'),
+        Atom::Element('x'),
+    ])[..] else {
+        panic!("insert_atoms failed");
+    };
+    let ab = graph.insert_pattern(vec![a, b]);
+    let bc = graph.insert_pattern(vec![b, c]);
+    let shared_parent = graph.insert_pattern(vec![x, ab]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(ab);
+    let mut block = BlockExpansionCtx::new(sink, Pattern::from(vec![c]));
+
+    block.process();
+    let root = block.finish().root.expect("block must append its atom");
+
+    assert_eq!(root.width(), TokenWidth(3));
+    assert_eq!(ab.vertex(&graph).to_token().width(), TokenWidth(2));
+    assert_patterns!(
+        graph,
+        root => [[ab, c]],
+        ab => [[a, b]],
+        bc => [[b, c]],
+        shared_parent => [[x, ab]]
+    );
+}
+
+#[test]
+fn expansion_resolves_local_overlap_before_emitting() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c] = graph.insert_atoms([
+        Atom::Element('a'),
+        Atom::Element('b'),
+        Atom::Element('c'),
+    ])[..] else {
+        panic!("insert_atoms failed");
+    };
+    let ab = graph.insert_pattern(vec![a, b]);
+    let bc = graph.insert_pattern(vec![b, c]);
+    let mut expansion = ExpansionCtx::new(graph.clone(), vec![a, b, c]);
+
+    let abc = expansion.next().expect("local overlap must produce a span");
+
+    assert_eq!(abc.width(), TokenWidth(3));
+    assert_patterns!(graph, abc => [[ab, c], [a, bc]]);
+    assert_eq!(expansion.next(), None);
+}
+
+#[test]
+fn expansion_keeps_overlap_chain_local_until_finalized() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c, d] = graph.insert_atoms([
+        Atom::Element('a'),
+        Atom::Element('b'),
+        Atom::Element('c'),
+        Atom::Element('d'),
+    ])[..] else {
+        panic!("insert_atoms failed");
+    };
+    graph.insert_pattern(vec![a, b]);
+    graph.insert_pattern(vec![b, c]);
+    let cd = graph.insert_pattern(vec![c, d]);
+    let mut expansion = ExpansionCtx::new(graph.clone(), vec![a, b, c, d]);
+
+    let abcd = expansion.next().expect("chain must emit a single final span");
+
+    assert_eq!(abcd.width(), TokenWidth(4));
+    let patterns = graph.expect_child_patterns(abcd);
+    assert!(
+        patterns.values().any(|pattern| pattern.last() == Some(&cd)),
+        "the second overlap must extend the local tail, not the global root"
+    );
+    assert!(
+        patterns
+            .values()
+            .all(|pattern| pattern_width(pattern) == abcd.width()),
+        "all decompositions must cover the same input span"
+    );
+    for pattern in patterns.values() {
+        let text: String = pattern
+            .iter()
+            .map(|token| graph.index_string(*token))
+            .collect();
+        assert_eq!(text, "abcd");
+    }
+    assert_eq!(expansion.next(), None);
 }

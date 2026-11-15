@@ -230,7 +230,7 @@ pub fn bundle_overlap(
 ///
 /// This is the token represented by all siblings to the **left** of the leaf
 /// reached by `path`, preserving the hierarchy described by the path.
-pub(crate) fn left_partition_from_postfix_path(
+pub fn left_partition_from_postfix_path(
     graph: &HypergraphRef,
     path: &IndexEndPath,
 ) -> Result<PartitionOutcome, ErrorReason> {
@@ -242,7 +242,7 @@ pub(crate) fn left_partition_from_postfix_path(
 ///
 /// This is the token represented by all siblings to the **right** of the leaf
 /// reached by `path`, preserving the hierarchy described by the path.
-pub(crate) fn right_partition_from_prefix_path(
+pub fn right_partition_from_prefix_path(
     graph: &HypergraphRef,
     path: &IndexStartPath,
 ) -> Result<PartitionOutcome, ErrorReason> {

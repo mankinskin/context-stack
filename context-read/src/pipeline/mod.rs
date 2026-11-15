@@ -73,8 +73,8 @@ impl SegmentResult {
 /// Context for reading sequences and building the hypergraph.
 ///
 /// `ReadCtx` is the top-level orchestrator of the read pipeline. It owns a
-/// `RootManager` (which tracks the running root token, overlap anchor, and
-/// flat-root state) and a `SegmentIter` (which partitions the input atom stream
+/// `RootManager` (which tracks the accumulation root and its ownership)
+/// and a `SegmentIter` (which partitions the input atom stream
 /// into alternating unknown/known chunks).
 ///
 /// ## Eager vs Lazy
@@ -89,7 +89,7 @@ impl SegmentResult {
 /// when atom resolution occurs.
 #[derive(Debug)]
 pub struct ReadCtx {
-    /// The mutable root/anchor state for the read currently in progress.
+    /// The accumulation sink for the read currently in progress.
     ///
     /// Stored as `Option` so ownership can be temporarily transferred into
     /// `BlockExpansionCtx` during known-block expansion.
@@ -188,7 +188,7 @@ impl ReadCtx {
     /// Read the full sequence, consuming all segments.
     ///
     /// Unknown runs are appended directly. Known runs are expanded one
-    /// materialized overlap step at a time until the whole input has been
+    /// finalized block-local span at a time until the whole input has been
     /// committed into the running root.
     ///
     /// Returns the final root token after all segments have been processed, or
@@ -203,7 +203,7 @@ impl ReadCtx {
     ///
     /// A segment may contain only new atoms, only known atoms, or an unknown
     /// prefix followed by a known run. Known runs are delegated to
-    /// `BlockExpansionCtx`, which materializes every overlap-expansion step
+    /// `BlockExpansionCtx`, which resolves local overlaps and appends final spans
     /// before returning control.
     ///
     /// Returns `None` when all segments have been consumed.
@@ -283,7 +283,7 @@ impl ReadCtx {
 
         if !known.is_empty() {
             // Process known pattern through BlockExpansionCtx
-            // process() commits the chain to the root manager internally
+            // process() appends finalized spans to the root manager internally
             let mut block_ctx = BlockExpansionCtx::new(root, known);
             block_ctx.process();
             root = block_ctx.finish();

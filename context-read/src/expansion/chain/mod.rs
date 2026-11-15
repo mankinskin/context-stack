@@ -2,9 +2,9 @@ pub(crate) mod band;
 pub(crate) mod link;
 
 use band::Band;
-use context_insert::{
-    OverlapBundleInput,
-    ToInsertCtx,
+use context_insert::overlap::{
+    left_partition_from_postfix_path,
+    right_partition_from_prefix_path,
 };
 use context_trace::*;
 use tracing::debug;
@@ -24,9 +24,9 @@ pub(crate) enum BandState {
         band: Band,
     },
     WithOverlap {
-        /// Primary band: sequential expansion (appended tokens).
+        /// Pending span of the current known block.
         primary: Band,
-        /// Overlap band: `[complement, expansion]` decomposition.
+        /// Postfix expansion extending the pending span.
         overlap: Band,
         /// Paths needed to build overlap bundles during collapse.
         link: OverlapLink,
@@ -46,17 +46,6 @@ impl Default for BandState {
 }
 
 impl BandState {
-    /// Create a `Single` state for a single token.
-    pub(crate) fn new(index: Token) -> Self {
-        let band = Band {
-            pattern: Pattern::from(vec![index]),
-            start_bound: 0.into(),
-            end_bound: index.width().0.into(),
-        };
-        debug!(initial_band = ?band, "New BandState");
-        BandState::Single { band }
-    }
-
     pub(crate) fn primary(&self) -> &Band {
         match self {
             BandState::Single { band, .. } => band,
@@ -160,9 +149,8 @@ impl BandState {
     /// Collapse the band state into a single-element pattern.
     ///
     /// - `Single`: returns the band's pattern unchanged.
-    /// - `WithOverlap`: delegates structural overlap bundling to
-    ///   `context-insert` and returns a one-element pattern containing the
-    ///   bundled token.
+    /// - `WithOverlap`: joins a pending local span and its overlapping
+    ///   expansion, counting the shared postfix exactly once.
     pub(crate) fn collapse(
         self,
         graph: &mut HypergraphRef,
@@ -181,32 +169,36 @@ impl BandState {
                     primary = ?primary.pattern,
                     overlap = ?overlap.pattern,
                     link = ?link,
-                    "Collapsing WithOverlap bands via context-insert bundle_overlap"
+                    "Collapsing block-local overlap"
                 );
 
-                let t1 = *primary.pattern.last().expect(
-                    "primary pattern must contain the sequential token",
+                let pending = *primary.pattern.last().expect(
+                    "primary pattern must contain the pending span",
                 );
-                let t2 = *overlap
+                let expansion = *overlap
                     .pattern
                     .last()
                     .expect("overlap pattern must contain the expanded token");
 
-                let bundled =
-                    <HypergraphRef as ToInsertCtx<Token>>::bundle_overlap(
-                        graph,
-                        {
-                            let mut input = OverlapBundleInput::new(
-                                link.child_path,
-                                link.search_path,
-                                t1,
-                                t2,
-                            );
-                            input.self_overlap = link.self_overlap;
-                            input
-                        },
-                    )
-                    .expect("bundle_overlap should succeed for WithOverlap collapse");
+                let left =
+                    left_partition_from_postfix_path(graph, &link.child_path)
+                        .expect("local overlap must have a valid left partition")
+                        .token()
+                        .expect("a true postfix must have a left complement");
+                let right =
+                    right_partition_from_prefix_path(graph, &link.search_path)
+                        .expect("local overlap must have a valid right partition")
+                        .token()
+                        .expect("an expanded postfix must have a right complement");
+                assert_eq!(
+                    pending.width().0 + right.width().0,
+                    left.width().0 + expansion.width().0,
+                    "local overlap decompositions must cover the same span"
+                );
+                let bundled = graph.insert_patterns(vec![
+                    vec![pending, right],
+                    vec![left, expansion],
+                ]);
 
                 debug!(bundled = ?bundled, "Created bundled token");
                 Pattern::from(vec![bundled])
