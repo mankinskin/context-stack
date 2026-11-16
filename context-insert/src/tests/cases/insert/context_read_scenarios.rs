@@ -88,6 +88,36 @@ fn single_token_mismatch_at_start() {
 // Repeat Pattern Scenarios
 // ============================================================================
 
+#[test]
+fn nested_repeat_interval_within_one_child() {
+    let graph = HypergraphRef::default();
+    let _tracing = context_trace::init_test_tracing!(&graph);
+    insert_atoms!(graph, {a, b, c});
+    let ab = graph.insert_pattern(vec![a, b]);
+    let abab = graph.insert_pattern(vec![ab, ab]);
+    let ababab =
+        graph.insert_patterns(vec![vec![ab, abab], vec![abab, ab]]);
+    let root = graph.insert_pattern(vec![ab, c, ababab]);
+
+    let abcaba: Token = graph
+        .insert(vec![ab, c, a, b, a])
+        .expect("prefix insertion must resolve the nested interval");
+
+    assert_eq!(abcaba.width(), TokenWidth(6));
+    assert_indices!(graph, ba);
+    assert_patterns!(graph, ba => [[b, a]]);
+    context_trace::tests::macros::string_repr::assert_token_string_repr(
+        graph.graph(),
+        abcaba,
+        "abcaba",
+    );
+    context_trace::tests::macros::string_repr::assert_token_string_repr(
+        graph.graph(),
+        root,
+        "abcababab",
+    );
+}
+
 /// Test: Simulates "ababab" reading which triggers cache/root mismatch
 ///
 /// This test reproduces the exact scenario from validate_triple_repeat:

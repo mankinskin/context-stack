@@ -50,6 +50,10 @@ let result = graph.insert_or_get_complete(pattern)?;
 ## Key Concepts
 - **Split-Join Architecture**: Safe graph modification through splitting and joining
 - **Interval Management**: State tracking during complex insertions
+- **Same-Child Intervals**: Bottom-up joins retain materialized intervals by
+  child token and half-open atom offsets. When both boundaries lie inside one
+  child, the parent reuses that interval instead of concatenating overlapping
+  suffix and prefix fragments.
 - **Multi-Phase Processing**: Pre/in/post visit modes for insertion stages
 - **Result Extraction**: Different modes for handling insertion results
 

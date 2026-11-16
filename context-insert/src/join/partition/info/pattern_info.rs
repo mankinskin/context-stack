@@ -83,6 +83,11 @@ where
     ) -> Result<PatternRangeInfo<R>, Token> {
         let perfect = borders.perfect();
         let range = borders.outer_range();
+        let children = if perfect.all_perfect() {
+            None
+        } else {
+            borders.get_child_splits(ctx)?
+        };
         //let offsets = borders.offsets();
         let inner = borders.inner_info(ctx);
         let pctx = ctx.pattern_trace_context();
@@ -96,8 +101,6 @@ where
             .unwrap_or(0);
         let pat = pctx.pattern.get(range.clone().into()).unwrap().to_vec();
         let pid = pctx.loc.pattern_id;
-        let children = (!perfect.all_perfect())
-            .then(|| borders.get_child_splits(ctx).unwrap());
         match (pat.len(), children) {
             // Empty range: This can happen when a partition range has been absorbed
             // by a previous merge. Return the token at the boundary position.

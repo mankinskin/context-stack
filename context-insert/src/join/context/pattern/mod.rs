@@ -15,6 +15,9 @@ use context_trace::*;
 
 pub(crate) mod borders;
 
+/// Materialized child intervals, keyed by token and half-open atom offsets.
+pub(crate) type IntervalMap = HashMap<(Token, usize, usize), Token>;
+
 /// Pattern join context that owns its data.
 ///
 /// With interior mutability, we can't hold references across lock boundaries,
@@ -27,6 +30,8 @@ pub(crate) struct PatternJoinCtx {
     pub(crate) ctx: PatternTraceCtx,
     #[derivative(Hash = "ignore", PartialEq = "ignore")]
     pub(crate) splits: SplitMap,
+    #[derivative(Hash = "ignore", PartialEq = "ignore")]
+    pub(crate) intervals: IntervalMap,
 }
 
 impl HasPatternTraceCtx for PatternJoinCtx {

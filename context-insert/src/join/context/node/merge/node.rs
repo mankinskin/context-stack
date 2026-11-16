@@ -42,6 +42,25 @@ impl<'a> MergeCtx<'a> {
         let mut split_result = LinkedHashMap::new();
         let merges = result.range_map;
 
+        for (range, &token) in &merges.map {
+            let start = if *range.start() == 0 {
+                0
+            } else {
+                offsets[*range.start() - 1].1.get()
+            };
+            let end = if *range.end() == len {
+                index.width().0
+            } else {
+                offsets[*range.end()].1.get()
+            };
+            assert_eq!(
+                token.width().0,
+                end - start,
+                "Materialized interval width mismatch for {index:?} at {start}..{end}"
+            );
+            self.ctx.intervals.insert((index, start, end), token);
+        }
+
         for (i, offset) in offsets {
             // Left partition: from start (0) to current offset position (i)
             // Right partition: from after current offset (i+1) to end (len)

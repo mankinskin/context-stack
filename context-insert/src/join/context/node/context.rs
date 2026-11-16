@@ -4,7 +4,10 @@ use crate::{
     interval::IntervalGraph,
     join::context::{
         frontier::FrontierSplitIterator,
-        pattern::PatternJoinCtx,
+        pattern::{
+            IntervalMap,
+            PatternJoinCtx,
+        },
     },
     split::{
         SplitMap,
@@ -37,6 +40,7 @@ pub(crate) struct LockedFrontierCtx<'a> {
     pub(crate) trav: &'a Hypergraph,
     pub(crate) interval: &'a IntervalGraph,
     pub(crate) splits: &'a mut SplitMap,
+    pub(crate) intervals: &'a mut IntervalMap,
 }
 impl<'a> LockedFrontierCtx<'a> {
     pub(crate) fn new(ctx: &'a mut FrontierSplitIterator) -> Self {
@@ -44,6 +48,7 @@ impl<'a> LockedFrontierCtx<'a> {
             trav: &*ctx.trav,
             interval: &ctx.frontier.interval,
             splits: &mut ctx.splits,
+            intervals: &mut ctx.intervals,
         }
     }
 }
@@ -101,6 +106,7 @@ impl GetPatternCtx for NodeJoinCtx<'_> {
         PatternJoinCtx {
             ctx,
             splits: self.splits.clone(),
+            intervals: self.intervals.clone(),
         }
     }
 }

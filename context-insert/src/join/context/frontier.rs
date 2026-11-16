@@ -3,12 +3,15 @@ use linked_hash_set::LinkedHashSet;
 
 use crate::{
     interval::IntervalGraph,
-    join::context::node::{
-        context::NodeJoinCtx,
-        merge::context::{
-            MergeCtx,
-            MergeMode,
+    join::context::{
+        node::{
+            context::NodeJoinCtx,
+            merge::context::{
+                MergeCtx,
+                MergeMode,
+            },
         },
+        pattern::IntervalMap,
     },
     split::{
         SplitMap,
@@ -57,6 +60,7 @@ impl Iterator for FrontierIterator {
 pub(crate) struct FrontierSplitIterator {
     pub(crate) frontier: FrontierIterator,
     pub(crate) splits: SplitMap,
+    pub(crate) intervals: IntervalMap,
     pub(crate) trav: HypergraphRef,
 }
 
@@ -144,6 +148,7 @@ impl From<(HypergraphRef, IntervalGraph)> for FrontierSplitIterator {
                 interval,
             },
             splits: Default::default(),
+            intervals: Default::default(),
             trav,
         }
     }
