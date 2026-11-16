@@ -311,6 +311,7 @@ pub use graph::vertex::traversal::{
     PostfixIterator,
     PrefixExpandingPolicy,
     PrefixIterator,
+    boundary_target,
 };
 
 // Re-export new consolidated accessor traits

@@ -982,13 +982,14 @@ fn closure_preserves_entire_last_child_and_canonical_complement() {
 fn closure_replaces_whole_tail_without_allocating_a_token() {
     let graph = HypergraphRef::default();
     let _tracing = init_test_tracing!(&graph);
-    let [x, a, b, c] =
-        graph.insert_atoms("xabc".chars().map(Atom::Element))[..]
+    let [x, a, b, c, d] =
+        graph.insert_atoms("xabcd".chars().map(Atom::Element))[..]
     else {
         panic!("insert_atoms failed");
     };
     let ab = graph.insert_pattern(vec![a, b]);
-    let abc = graph.insert_pattern(vec![ab, c]);
+    // Resolving the unused right complement would allocate a new `cd` token.
+    let abcd = graph.insert_pattern(vec![ab, c, d]);
     let mut sink = RootManager::new(graph.clone());
     sink.append_completed(x);
     sink.append_completed(ab);
@@ -996,18 +997,18 @@ fn closure_replaces_whole_tail_without_allocating_a_token() {
     let path = closure::boundary_path(&graph, root, ab, false).unwrap();
     let count = graph.vertex_count();
     let span =
-        closure::prepare(&graph, &sink, root, ab, &path, abc).apply(&graph);
+        closure::prepare(&graph, &sink, root, ab, &path, abcd).apply(&graph);
     assert_eq!(
         span,
         Span::ReplaceTail {
             previous: root,
             old: ab,
-            token: abc
+            token: abcd
         }
     );
     sink.commit(span);
     let root = sink.root.unwrap();
-    assert_patterns!(graph, root => [[x, abc]]);
+    assert_patterns!(graph, root => [[x, abcd]], abcd => [[ab, c, d]]);
     assert_eq!(graph.vertex_count(), count);
     crate::tests::assert_graph_invariants(&graph);
 }

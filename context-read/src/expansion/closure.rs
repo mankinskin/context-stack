@@ -26,29 +26,32 @@ use context_search::Find;
 use context_trace::*;
 
 /// Validated structural closure and its intended root integration operation.
-pub(crate) enum ClosurePlan {
-    /// Replace an entire editable tail by its expansion without a closure token.
-    Tail {
-        root: Token,
-        old: Token,
-        token: Token,
-    },
-    /// Materialize or reuse a factored closure around the selected scope.
-    Closed {
-        root: Token,
-        /// `X`: entire last child for a tail edit, otherwise the accumulated root.
-        scope: Token,
-        /// Integrate by replacing the root's tail rather than adopting a new root.
-        tail: bool,
-        /// `P`: the shared overlap token.
-        shared: Token,
-        /// `E = P + T`: the accepted expansion.
-        expansion: Token,
-        /// Ascending postfix tokens `S1 < ... < Sk = X` wider than `P`.
-        chain: Vec<Token>,
-        /// `|T| = |E| - |P|`.
-        right_width: usize,
-    },
+pub(crate) struct ClosurePlan {
+    integration: Integration,
+    /// `P`: the shared overlap token.
+    shared: Token,
+    /// `E = P + T`: the accepted expansion.
+    expansion: Token,
+    /// Ascending postfix tokens `S1 < ... < Sk = X`; empty when `X = P`.
+    chain: Vec<Token>,
+}
+
+enum Integration {
+    Tail { root: Token, old: Token },
+    Root { previous: Token },
+}
+
+impl Integration {
+    fn into_span(self, token: Token) -> Span {
+        match self {
+            Self::Tail { root, old } => Span::ReplaceTail {
+                previous: root,
+                old,
+                token,
+            },
+            Self::Root { previous } => Span::ReplaceRoot { previous, token },
+        }
+    }
 }
 
 impl ClosurePlan {
@@ -68,48 +71,35 @@ impl ClosurePlan {
         self,
         graph: &HypergraphRef,
     ) -> Span {
-        match self {
-            Self::Tail { root, old, token } => Span::ReplaceTail {
-                previous: root,
-                old,
-                token,
-            },
-            Self::Closed {
-                root,
-                scope,
-                tail,
-                shared,
-                expansion,
-                chain,
-                right_width,
-            } => {
-                let offset = shared.width().0;
-                let right = complement(graph, expansion, offset, right_width);
-                assert_eq!(
-                    find_represented(graph, expansion, offset, right_width),
-                    Some(right),
-                    "right complement is not connected inside the expansion"
-                );
-                let (mut closed, mut inner) = (expansion, shared);
-                for outer in chain {
-                    closed = close_step(graph, outer, inner, closed, right);
-                    inner = outer;
-                }
-                if tail {
-                    Span::ReplaceTail {
-                        previous: root,
-                        old: scope,
-                        token: closed,
-                    }
-                } else {
-                    Span::ReplaceRoot {
-                        previous: root,
-                        token: closed,
-                    }
-                }
-            }
-        }
+        let token = close_nested(graph, self.shared, self.expansion, self.chain);
+        self.integration.into_span(token)
     }
+}
+
+fn close_nested(
+    graph: &HypergraphRef,
+    shared: Token,
+    expansion: Token,
+    chain: Vec<Token>,
+) -> Token {
+    // An entire-tail expansion needs no complements or graph mutations.
+    if chain.is_empty() {
+        return expansion;
+    }
+    let offset = shared.width().0;
+    let right_width = expansion.width().0 - offset;
+    let right = complement(graph, expansion, offset, right_width);
+    assert_eq!(
+        find_represented(graph, expansion, offset, right_width),
+        Some(right),
+        "right complement is not connected inside the expansion"
+    );
+    let (mut closed, mut inner) = (expansion, shared);
+    for outer in chain {
+        closed = close_step(graph, outer, inner, closed, right);
+        inner = outer;
+    }
+    closed
 }
 
 /// Close one chain step: `C = [outer,right] = [left,closed]`.
@@ -185,7 +175,7 @@ fn close_step(
 ///
 /// # Panics
 ///
-/// Panics on missing or disconnected boundary paths, empty complements, or
+/// Panics on missing or disconnected boundary paths, or
 /// if the shared token is not on the scope's widest-postfix chain.
 pub(crate) fn prepare(
     graph: &HypergraphRef,
@@ -214,46 +204,42 @@ pub(crate) fn prepare(
     } else {
         (root, root_path)
     };
-    if editable && scope == postfix {
-        return ClosurePlan::Tail {
-            root,
-            old: scope,
-            token: expansion,
-        };
-    }
     validate_path(graph, scope, postfix, path, false);
-    boundary_path(graph, expansion, postfix, true)
-        .expect("expansion must represent the overlap prefix");
-    let right_width = expansion.width().0 - postfix.width().0;
-    assert!(
-        scope.width() > postfix.width() && right_width > 0,
-        "closure requires proper complements"
-    );
     let chain = if expansion.vertex_index() == scope.vertex_index() {
         vec![scope]
     } else {
         postfix_chain(graph, scope, postfix)
     };
-    ClosurePlan::Closed {
-        root,
-        scope,
-        tail: editable,
+    if !chain.is_empty() {
+        boundary_path(graph, expansion, postfix, true)
+            .expect("expansion must represent the overlap prefix");
+    }
+    let integration = if editable {
+        Integration::Tail { root, old: scope }
+    } else {
+        Integration::Root { previous: root }
+    };
+    ClosurePlan {
+        integration,
         shared: postfix,
         expansion,
         chain,
-        right_width,
     }
 }
 
 /// Collect the widest-postfix chain of `scope` strictly wider than `shared`.
 ///
-/// Returns tokens in ascending width ending with `scope`. Boundary witnesses
-/// may skip intermediate postfixes, so the widest terminal child is followed.
+/// Returns tokens in ascending width ending with `scope`, or an empty chain
+/// when `scope == shared`. Boundary witnesses may skip intermediate postfixes,
+/// so the widest terminal child is followed.
 fn postfix_chain(
     graph: &HypergraphRef,
     scope: Token,
     shared: Token,
 ) -> Vec<Token> {
+    if scope == shared {
+        return Vec::new();
+    }
     let mut chain = vec![scope];
     for (_, postfix) in scope.postfix_iter(graph.clone()) {
         if postfix.width() <= shared.width() {
@@ -403,16 +389,9 @@ pub(crate) fn validate_path(
     path: &[ChildLocation],
     prefix: bool,
 ) {
-    let mut parent = root;
-    for location in path {
-        assert_eq!(location.parent, parent, "disconnected overlap path");
-        let pattern = graph.expect_pattern_at(*location);
-        assert_eq!(
-            location.sub_index,
-            if prefix { 0 } else { pattern.len() - 1 },
-            "overlap path is not at a boundary"
-        );
-        parent = pattern[location.sub_index];
-    }
-    assert_eq!(parent, target, "overlap path does not reach shared token");
+    assert_eq!(
+        boundary_target(graph, root, path, prefix),
+        target,
+        "overlap path does not reach shared token"
+    );
 }

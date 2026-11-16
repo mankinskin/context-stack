@@ -10,6 +10,59 @@ use crate::{
 use std::fs;
 
 #[test]
+fn boundary_target_validates_nested_paths_in_both_directions() {
+    use crate::*;
+    let graph = Hypergraph::<BaseGraphKind>::default();
+    insert_atoms!(graph, {a, b, c, d});
+    let (ab, ab_id) = graph.insert_pattern_with_id(vec![a, b]);
+    let (cd, cd_id) = graph.insert_pattern_with_id(vec![c, d]);
+    let (root, root_id) = graph.insert_pattern_with_id(vec![ab, cd]);
+    let root_id = root_id.unwrap();
+    for (prefix, index, child, child_id, target) in [
+        (true, 0, ab, ab_id.unwrap(), a),
+        (false, 1, cd, cd_id.unwrap(), d),
+    ] {
+        let path = [
+            ChildLocation::new(root, root_id, index),
+            ChildLocation::new(child, child_id, index),
+        ];
+        assert_eq!(boundary_target(&graph, root, &path, prefix), target);
+        assert_eq!(boundary_target(&graph, root, &[], prefix), root);
+    }
+}
+
+#[test]
+#[should_panic(expected = "disconnected boundary path")]
+fn boundary_target_rejects_disconnected_path() {
+    use crate::*;
+    let graph = Hypergraph::<BaseGraphKind>::default();
+    insert_atoms!(graph, {a, b, c});
+    let (ab, ab_id) = graph.insert_pattern_with_id(vec![a, b]);
+    let root = graph.insert_pattern(vec![ab, c]);
+    boundary_target(
+        &graph,
+        root,
+        &[ChildLocation::new(ab, ab_id.unwrap(), 0)],
+        true,
+    );
+}
+
+#[test]
+#[should_panic(expected = "boundary path leaves the scope boundary")]
+fn boundary_target_rejects_interior_child() {
+    use crate::*;
+    let graph = Hypergraph::<BaseGraphKind>::default();
+    insert_atoms!(graph, {a, b, c});
+    let (root, root_id) = graph.insert_pattern_with_id(vec![a, b, c]);
+    boundary_target(
+        &graph,
+        root,
+        &[ChildLocation::new(root, root_id.unwrap(), 1)],
+        true,
+    );
+}
+
+#[test]
 fn postfix_chain_keeps_alternative_descendants_connected() {
     use crate::*;
     let graph = Hypergraph::<BaseGraphKind>::default();

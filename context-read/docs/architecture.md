@@ -71,9 +71,12 @@ repeat sequences inside a child of the other decomposition, e.g.
 `visu=[vis,u]=[v,i,su]` repeats `[v,i]` inside `vis`. The correct closure is
 `vi=[v,i]`, `vis=[vi,s]`, `visu=[vis,u]=[vi,su]`.
 
-Preparation is read-only: it selects the scope, detects direct tail
-replacement and collects the chain tokens. Application resolves `T`, then per
-step resolves `Li`, re-derives the `Si -> S(i-1)` and `C(i-1) -> S(i-1)` paths
+Preparation is read-only: it selects the scope, records the intended tail or
+root integration, and collects the chain tokens. Structural application
+returns a token independently of integration; the integration operation then
+wraps it in the appropriate sink span. For a nonempty chain, application
+resolves `T`, then per step resolves `Li`, re-derives the `Si -> S(i-1)` and
+`C(i-1) -> S(i-1)` paths
 (insertion may rewrite decompositions), validates the complement occurrences
 and creates `Ci` or adds its missing decompositions to an existing canonical
 `Ci` (content lookup of `[Si] + atoms(T)`), whose decompositions may equal but
@@ -81,8 +84,13 @@ must not share planned boundaries `{|Si|}` or `{|Li|}`. Only the final `C` is
 committed to the sink. The expansion step then asserts that the root is
 unchanged and, for tail replacement, still editable.
 
+Scoped insertion and closure share `context_trace::boundary_target` to validate
+connected prefix/postfix paths. Closure additionally checks that the returned
+token is the expected overlap token.
+
 If `P` is the entire editable last child and `E` is not the root, replace that
-child directly with `E`, without constructing `C`.
+child directly with `E`: the same structural executor receives an empty chain
+and returns `E` without resolving complements or mutating the graph.
 
 ## Sink protocol
 

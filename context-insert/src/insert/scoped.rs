@@ -21,6 +21,12 @@
 //! inside a child of an alternative decomposition are materialized first,
 //! because the join cannot resolve partitions strictly inside unsplit
 //! children.
+//!
+//! Prefix and postfix entry points share boundary-width validation, narrowing,
+//! wrapper completion and insertion; only boundary geometry and cache seeding
+//! depend on the selected side.
+//! Path-based adapters validate their witnesses with
+//! [`context_trace::boundary_target`], also used by expansion closure.
 
 use crate::{
     insert::context::InsertCtx,
@@ -69,28 +75,6 @@ pub fn find_represented(
     None
 }
 
-/// Assert that `path` connects `scope` to its prefix (`prefix`) or postfix
-/// boundary token and return that token.
-fn boundary_target(
-    graph: &Hypergraph,
-    scope: Token,
-    path: &[ChildLocation],
-    prefix: bool,
-) -> Token {
-    let mut parent = scope;
-    for location in path {
-        assert_eq!(location.parent, parent, "disconnected boundary path");
-        let pattern = graph.expect_pattern_at(*location);
-        assert_eq!(
-            location.sub_index,
-            if prefix { 0 } else { pattern.len() - 1 },
-            "boundary path leaves the scope boundary"
-        );
-        parent = pattern[location.sub_index];
-    }
-    parent
-}
-
 /// Locate the child of `pattern` containing atom `offset`.
 ///
 /// Returns the child index and its start offset.
@@ -136,74 +120,7 @@ pub fn insert_scope_prefix_width(
     scope: Token,
     width: usize,
 ) -> Result<Token, ErrorState> {
-    assert!(
-        width > 0 && width <= scope.width().0,
-        "invalid scoped prefix width"
-    );
-    let token = scoped_prefix(graph, scope, width, true)?;
-    assert_eq!(token.width().0, width, "scoped prefix width differs");
-    assert_eq!(
-        find_represented(graph, scope, 0, width),
-        Some(token),
-        "scoped prefix is not represented inside the scope"
-    );
-    Ok(token)
-}
-
-fn scoped_prefix(
-    graph: &HypergraphRef,
-    scope: Token,
-    width: usize,
-    wrap: bool,
-) -> Result<Token, ErrorState> {
-    if let Some(token) = find_represented(graph, scope, 0, width) {
-        return Ok(token);
-    }
-    let patterns = graph.expect_child_patterns(scope);
-    if let Some(&first) = patterns
-        .values()
-        .map(|pattern| &pattern[0])
-        .find(|first| first.width().0 > width)
-    {
-        return scoped_prefix(graph, first, width, true);
-    }
-    if wrap {
-        // Wrapper ends of patterns splitting a non-last child.
-        let wrapper = patterns
-            .values()
-            .filter_map(|pattern| {
-                let (index, start) = child_at(pattern, width - 1);
-                let end = start + pattern[index].width().0;
-                (end > width && index + 1 < pattern.len()).then_some(end)
-            })
-            .filter(|&end| splits_child(&patterns, end))
-            .max();
-        if let Some(end) = wrapper {
-            scoped_prefix(graph, scope, end, true)?;
-            return scoped_prefix(graph, scope, width, false);
-        }
-    }
-    let (pattern_id, pattern) = patterns
-        .iter()
-        .next()
-        .map(|(id, pattern)| (*id, pattern.clone()))
-        .expect("scope must have a child pattern");
-    let (exit, offset) = child_at(&pattern, width - 1);
-    let pos = DownPosition(offset.into());
-    let mut cache = TraceCache::new(pattern[0]);
-    cache.add_state(NewTraceEdge::<TopDown>::new(
-        DownKey::new(scope, pos),
-        DownKey::new(pattern[exit], pos),
-        ChildLocation::new(scope, pattern_id, exit),
-    ));
-    InsertCtx::<Token>::from(graph.clone()).insert_init(
-        (),
-        InitInterval {
-            root: scope,
-            cache,
-            end_bound: width.into(),
-        },
-    )
+    insert_scope_boundary(graph, scope, width, Boundary::Prefix)
 }
 
 /// Return the canonical token for the last `width` atoms of `scope`,
@@ -220,53 +137,174 @@ pub fn insert_scope_postfix_width(
     scope: Token,
     width: usize,
 ) -> Result<Token, ErrorState> {
+    insert_scope_boundary(graph, scope, width, Boundary::Postfix)
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Boundary {
+    Prefix,
+    Postfix,
+}
+
+impl Boundary {
+    fn start(
+        self,
+        total: usize,
+        width: usize,
+    ) -> usize {
+        match self {
+            Self::Prefix => 0,
+            Self::Postfix => total - width,
+        }
+    }
+
+    fn split_offset(
+        self,
+        total: usize,
+        width: usize,
+    ) -> usize {
+        match self {
+            Self::Prefix => width,
+            Self::Postfix => total - width,
+        }
+    }
+
+    fn split_atom(
+        self,
+        total: usize,
+        width: usize,
+    ) -> usize {
+        match self {
+            Self::Prefix => width - 1,
+            Self::Postfix => total - width,
+        }
+    }
+
+    fn child(
+        self,
+        pattern: &Pattern,
+    ) -> Token {
+        match self {
+            Self::Prefix => pattern[0],
+            Self::Postfix => *pattern.last().unwrap(),
+        }
+    }
+
+    fn wrapper_width(
+        self,
+        pattern: &Pattern,
+        total: usize,
+        width: usize,
+    ) -> Option<usize> {
+        let (index, start) = child_at(pattern, self.split_atom(total, width));
+        match self {
+            Self::Prefix => {
+                let end = start + pattern[index].width().0;
+                (end > width && index + 1 < pattern.len()).then_some(end)
+            }
+            Self::Postfix => {
+                (start < total - width && index > 0).then_some(total - start)
+            }
+        }
+    }
+
+    fn seed(
+        self,
+        scope: Token,
+        pattern_id: PatternId,
+        pattern: &Pattern,
+        width: usize,
+    ) -> InitInterval {
+        let total = scope.width().0;
+        let (index, offset) = child_at(pattern, self.split_atom(total, width));
+        let child = pattern[index];
+        let location = ChildLocation::new(scope, pattern_id, index);
+        let cache = match self {
+            Self::Prefix => {
+                let pos = DownPosition(offset.into());
+                let mut cache = TraceCache::new(pattern[0]);
+                cache.add_state(NewTraceEdge::<TopDown>::new(
+                    DownKey::new(scope, pos),
+                    DownKey::new(child, pos),
+                    location,
+                ));
+                cache
+            }
+            Self::Postfix => {
+                // Width of the entry child at or after the split position.
+                let pos = UpPosition(
+                    (offset + child.width().0 - (total - width)).into(),
+                );
+                let mut cache = TraceCache::new(child);
+                cache.add_state(NewTraceEdge::<BottomUp>::new(
+                    UpKey::new(child, pos),
+                    UpKey::new(scope, pos),
+                    location,
+                ));
+                cache
+            }
+        };
+        InitInterval {
+            root: scope,
+            cache,
+            end_bound: width.into(),
+        }
+    }
+}
+
+fn insert_scope_boundary(
+    graph: &HypergraphRef,
+    scope: Token,
+    width: usize,
+    boundary: Boundary,
+) -> Result<Token, ErrorState> {
     assert!(
         width > 0 && width <= scope.width().0,
-        "invalid scoped postfix width"
+        "invalid scoped {:?} width",
+        boundary
     );
-    let start = scope.width().0 - width;
-    let token = scoped_postfix(graph, scope, start, true)?;
-    assert_eq!(token.width().0, width, "scoped postfix width differs");
+    let start = boundary.start(scope.width().0, width);
+    let token = scoped_boundary(graph, scope, width, boundary, true)?;
+    assert_eq!(token.width().0, width, "scoped boundary width differs");
     assert_eq!(
         find_represented(graph, scope, start, width),
         Some(token),
-        "scoped postfix is not represented inside the scope"
+        "scoped boundary is not represented inside the scope"
     );
     Ok(token)
 }
 
-fn scoped_postfix(
+fn scoped_boundary(
     graph: &HypergraphRef,
     scope: Token,
-    start: usize,
+    width: usize,
+    boundary: Boundary,
     wrap: bool,
 ) -> Result<Token, ErrorState> {
     let total = scope.width().0;
-    if let Some(token) = find_represented(graph, scope, start, total - start) {
+    let start = boundary.start(total, width);
+    if let Some(token) = find_represented(graph, scope, start, width) {
         return Ok(token);
     }
     let patterns = graph.expect_child_patterns(scope);
-    if let Some(&last) = patterns
+    if let Some(child) = patterns
         .values()
-        .map(|pattern| pattern.last().unwrap())
-        .find(|last| last.width().0 > total - start)
+        .map(|pattern| boundary.child(pattern))
+        .find(|child| child.width().0 > width)
     {
-        let offset = total - last.width().0;
-        return scoped_postfix(graph, last, start - offset, true);
+        return scoped_boundary(graph, child, width, boundary, true);
     }
     if wrap {
-        // Wrapper starts of patterns splitting a non-first child.
         let wrapper = patterns
             .values()
-            .filter_map(|pattern| {
-                let (index, offset) = child_at(pattern, start);
-                (offset < start && index > 0).then_some(offset)
+            .filter_map(|pattern| boundary.wrapper_width(pattern, total, width))
+            .filter(|&width| {
+                splits_child(&patterns, boundary.split_offset(total, width))
             })
-            .filter(|&offset| splits_child(&patterns, offset))
-            .min();
-        if let Some(offset) = wrapper {
-            scoped_postfix(graph, scope, offset, true)?;
-            return scoped_postfix(graph, scope, start, false);
+            .max();
+        if let Some(wrapper_width) = wrapper {
+            scoped_boundary(graph, scope, wrapper_width, boundary, true)?;
+            return scoped_boundary(graph, scope, width, boundary, false);
         }
     }
     let (pattern_id, pattern) = patterns
@@ -274,23 +312,9 @@ fn scoped_postfix(
         .next()
         .map(|(id, pattern)| (*id, pattern.clone()))
         .expect("scope must have a child pattern");
-    let (entry, offset) = child_at(&pattern, start);
-    let child = pattern[entry];
-    // Width of the entry child at or after the split position.
-    let pos = UpPosition((offset + child.width().0 - start).into());
-    let mut cache = TraceCache::new(child);
-    cache.add_state(NewTraceEdge::<BottomUp>::new(
-        UpKey::new(child, pos),
-        UpKey::new(scope, pos),
-        ChildLocation::new(scope, pattern_id, entry),
-    ));
     InsertCtx::<Token>::from(graph.clone()).insert_init(
         (),
-        InitInterval {
-            root: scope,
-            cache,
-            end_bound: (total - start).into(),
-        },
+        boundary.seed(scope, pattern_id, &pattern, width),
     )
 }
 

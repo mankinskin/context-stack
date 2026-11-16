@@ -20,6 +20,33 @@ use itertools::{
 };
 use std::collections::VecDeque;
 
+/// Validate a path through first (`prefix`) or last children and return its leaf.
+///
+/// An empty path returns `scope`.
+///
+/// # Panics
+///
+/// Panics if a location is missing, disconnected, or off the selected boundary.
+pub fn boundary_target<G: GraphKind>(
+    graph: &Hypergraph<G>,
+    scope: Token,
+    path: &[ChildLocation],
+    prefix: bool,
+) -> Token {
+    let mut parent = scope;
+    for location in path {
+        assert_eq!(location.parent, parent, "disconnected boundary path");
+        let pattern = graph.expect_pattern_at(*location);
+        assert_eq!(
+            location.sub_index,
+            if prefix { 0 } else { pattern.len() - 1 },
+            "boundary path leaves the scope boundary"
+        );
+        parent = pattern[location.sub_index];
+    }
+    parent
+}
+
 // ── Policies ─────────────────────────────────────────────────────────────────
 
 pub trait BandExpandingPolicy<G: HasGraph> {
