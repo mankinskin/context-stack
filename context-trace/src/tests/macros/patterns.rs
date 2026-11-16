@@ -119,11 +119,44 @@ macro_rules! assert_patterns {
 
         let g = $graph.graph();
         $(
-            let pats: $crate::HashSet<_> =
+            let found: $crate::HashSet<_> =
                 $crate::HasVertexData::vertex(&$name, &g).child_pattern_set().into_iter().collect();
-            assert_eq!(pats, ::std::iter::FromIterator::from_iter([$($crate::Pattern::from(vec![$($pat),*])),*]));
+            let expected = ::std::iter::FromIterator::from_iter([
+                $($crate::Pattern::from(vec![$($pat),*])),*
+            ]);
+            assert!(
+                found == expected,
+                "pattern mismatch for `{}`\nfound: {:#?}\nexpected: {:#?}",
+                stringify!($name),
+                found,
+                expected
+            );
         )*
         #[allow(dropping_references)]
         drop(g);
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{HypergraphRef, insert_atoms, trace::has_graph::HasGraph};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    #[test]
+    fn assertion_failure_labels_found_and_expected_patterns() {
+        let graph = HypergraphRef::default();
+        insert_atoms!(graph, {a, b});
+        insert_patterns!(graph, pair => [a, b]);
+
+        let panic = catch_unwind(AssertUnwindSafe(|| {
+            assert_patterns!(graph, pair => [[a]]);
+        }))
+        .expect_err("assert_patterns! should fail for mismatched patterns");
+        let message = panic
+            .downcast_ref::<String>()
+            .expect("assertion should include a formatted panic message");
+
+        assert!(message.contains("found:"));
+        assert!(message.contains("expected:"));
+    }
 }
