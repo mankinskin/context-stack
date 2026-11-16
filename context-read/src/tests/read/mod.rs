@@ -264,11 +264,11 @@ fn read_infix2() {
     assert_patterns! {
         graph,
         su => [[s, u]],
-        subvisu => [[su, b, v, i, su]],
+        vi => [[v, i]],
+        subvisu => [[sub, visu]],
         sub => [[su, b]],
         visu => [[vi, su]],
-        visub => [[visu, b], [vi, sub]],
-        subvisu => [[visu, b], [vi, sub]]
+        visub => [[visu, b], [vi, sub]]
     };
 }
 
