@@ -40,6 +40,7 @@ use crate::{
 };
 use context_trace::{
     HasVertexIndex,
+    SubLocation,
     Token,
     graph::getters::ErrorReason,
 };
@@ -53,6 +54,17 @@ use std::{
     num::NonZeroUsize,
 };
 use tracing::debug;
+
+/// Result of augmenting the root split positions.
+pub(crate) struct RootAugmentation {
+    pub(crate) next: Vec<SplitTraceState>,
+    pub(crate) target_range: PartitionRange,
+    pub(crate) required: RequiredPartitions,
+    /// Offsets added to complete the target's inner ranges.
+    pub(crate) inner_offsets: Vec<NonZeroUsize>,
+    /// Offsets added for wrapper boundaries.
+    pub(crate) wrapper_offsets: Vec<NonZeroUsize>,
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut)]
 pub struct SplitVertexCache {
@@ -95,57 +107,6 @@ impl SplitVertexCache {
                     .all(|pos| pos.inner_offset.is_none())
             })
             .unwrap_or(true) // If no split at this index, consider it "perfect"
-    }
-
-    /// Apply delta adjustments to positions after a merge.
-    ///
-    /// This handles three categories of positions:
-    /// 1. Positions INSIDE the merged region (partition_start..partition_end):
-    ///    - These need sub_index adjustment AND inner_offset set
-    /// 2. The right boundary position (at partition_end):
-    ///    - This needs sub_index adjustment only
-    /// 3. Positions AFTER the merged region (> partition_end):
-    ///    - These need sub_index adjustment only
-    ///
-    /// The inner_offsets parameter provides the offset within the merged token
-    /// for each position inside the merged region, keyed by enumerate index.
-    pub(crate) fn apply_deltas_with_inner_offsets(
-        &mut self,
-        deltas: &PatternSubDeltas,
-        partition_start: usize,
-        partition_end: usize,
-        inner_offsets: &std::collections::BTreeMap<
-            usize,
-            std::num::NonZeroUsize,
-        >,
-    ) {
-        for (idx, pos_cache) in self.positions.values_mut().enumerate() {
-            if idx >= partition_start && idx < partition_end {
-                // Position is INSIDE the merged region
-                if let Some(&inner_offset) = inner_offsets.get(&idx) {
-                    debug!(
-                        idx,
-                        ?deltas,
-                        ?inner_offset,
-                        "Applying delta and inner_offset to inside position"
-                    );
-                    pos_cache
-                        .apply_delta_with_inner_offset(deltas, inner_offset);
-                } else {
-                    // No inner offset info, just apply delta
-                    debug!(
-                        idx,
-                        ?deltas,
-                        "Applying delta to inside position (no inner_offset)"
-                    );
-                    *pos_cache -= deltas;
-                }
-            } else if idx >= partition_end {
-                // Position is at or after the right boundary
-                debug!(idx, ?deltas, "Applying delta to position");
-                *pos_cache -= deltas;
-            }
-        }
     }
 
     /// Apply delta adjustments to positions AT OR AFTER a given offset index.
@@ -314,10 +275,7 @@ impl SplitVertexCache {
         &mut self,
         ctx: NodeTraceCtx,
         root_mode: RootMode,
-    ) -> Result<
-        (Vec<SplitTraceState>, PartitionRange, RequiredPartitions),
-        ErrorReason,
-    > {
+    ) -> Result<RootAugmentation, ErrorReason> {
         let target_positions = self.positions.keys().cloned().collect_vec();
         debug!(?root_mode, ?target_positions,
             root_patterns = ?ctx.patterns,
@@ -330,6 +288,11 @@ impl SplitVertexCache {
             inner_offsets = ?splits.keys().collect_vec(),
             "After add_inner_offsets"
         );
+        let inner_offsets = splits
+            .keys()
+            .filter(|o| !self.positions.contains_key(o))
+            .cloned()
+            .collect_vec();
         self.positions.extend(splits);
 
         let wrapper_splits =
@@ -339,6 +302,11 @@ impl SplitVertexCache {
             wrapper_offsets = ?wrapper_splits.keys().collect_vec(),
             "After add_wrapper_offsets"
         );
+        let wrapper_offsets = wrapper_splits
+            .keys()
+            .filter(|o| !self.positions.contains_key(o))
+            .cloned()
+            .collect_vec();
         self.positions.extend(wrapper_splits);
 
         debug!(final_positions=?self.positions.keys().collect::<Vec<_>>(), "Final positions");
@@ -362,7 +330,13 @@ impl SplitVertexCache {
             self.compute_required_partitions(&target_range, &wrapper_range);
         debug!(required = ?required.iter().collect::<Vec<_>>(), "computed required partitions");
 
-        Ok((next, target_range, required))
+        Ok(RootAugmentation {
+            next,
+            target_range,
+            required,
+            inner_offsets,
+            wrapper_offsets,
+        })
     }
 
     fn boundary_requires_wrapper(
@@ -564,6 +538,10 @@ impl SplitVertexCache {
                                 index: pattern[pos.sub_index],
                                 offset: inner_offset,
                                 prev: key,
+                                via: Some(SubLocation::new(
+                                    *pid,
+                                    pos.sub_index,
+                                )),
                             }
                         })
                     })

@@ -19,10 +19,12 @@ use crate::{
     join::{
         context::pattern::PatternJoinCtx,
         partition::Join,
+        plan::{
+            JoinRef,
+            RefPosKey,
+        },
     },
-    split::cache::position::PosKey,
 };
-use context_trace::Token;
 
 pub(crate) trait JoinBorders<R: RangeRole<Mode = Join>>:
     TraceBorders<R>
@@ -31,33 +33,36 @@ pub(crate) trait JoinBorders<R: RangeRole<Mode = Join>>:
     fn get_child_splits(
         &self,
         ctx: &PatternJoinCtx,
-    ) -> Result<Option<ModeChildrenOf<R>>, Token>;
+    ) -> Result<Option<ModeChildrenOf<R>>, JoinRef>;
+}
+
+fn expect_split(
+    ctx: &PatternJoinCtx,
+    key: RefPosKey,
+) -> &crate::split::Split<JoinRef> {
+    ctx.splits.get(&key).unwrap_or_else(|| {
+        panic!(
+            "Split not found for {:?} in splits map. Pattern: {:?}",
+            key, ctx.pattern
+        )
+    })
 }
 
 impl JoinBorders<Post<Join>> for BorderInfo {
     fn get_child_splits(
         &self,
         ctx: &PatternJoinCtx,
-    ) -> Result<Option<ChildrenOf<Post<Join>>>, Token> {
+    ) -> Result<Option<ChildrenOf<Post<Join>>>, JoinRef> {
         Ok(self.inner_offset.map(|o| {
-            let token = ctx.pattern[self.sub_index];
-            let key = PosKey::new(token, o);
+            let child = ctx.pattern[self.sub_index];
             tracing::debug!(
-                ?token,
-                ?key,
+                ?child,
                 sub_index = self.sub_index,
                 pattern_len = ctx.pattern.len(),
                 ?o,
-                splits_keys = ?ctx.splits.keys().collect::<Vec<_>>(),
                 "Post<Join>::get_child_splits lookup"
             );
-            ctx.splits
-                .get(&key)
-                .unwrap_or_else(|| panic!(
-                    "Split not found for {:?} in splits map. Pattern: {:?}, sub_index: {}, inner_offset: {:?}",
-                    key, ctx.pattern, self.sub_index, o
-                ))
-                .right
+            expect_split(ctx, RefPosKey::new(child, o)).right
         }))
     }
 }
@@ -66,11 +71,9 @@ impl JoinBorders<Pre<Join>> for BorderInfo {
     fn get_child_splits(
         &self,
         ctx: &PatternJoinCtx,
-    ) -> Result<Option<ChildrenOf<Pre<Join>>>, Token> {
+    ) -> Result<Option<ChildrenOf<Pre<Join>>>, JoinRef> {
         Ok(self.inner_offset.map(|o| {
-            ctx.splits
-                .get(&PosKey::new(ctx.pattern[self.sub_index], o))
-                .unwrap()
+            expect_split(ctx, RefPosKey::new(ctx.pattern[self.sub_index], o))
                 .left
         }))
     }
@@ -80,7 +83,7 @@ impl JoinBorders<In<Join>> for (BorderInfo, BorderInfo) {
     fn get_child_splits(
         &self,
         ctx: &PatternJoinCtx,
-    ) -> Result<Option<ChildrenOf<In<Join>>>, Token> {
+    ) -> Result<Option<ChildrenOf<In<Join>>>, JoinRef> {
         tracing::debug!(
             pattern_len = ctx.pattern.len(),
             left_sub_index = self.0.sub_index,
@@ -95,7 +98,7 @@ impl JoinBorders<In<Join>> for (BorderInfo, BorderInfo) {
         {
             let (start, end) = (left.get(), right.get());
             assert!(
-                start < end && end < lc.width.0,
+                start < end && end < lc.width(),
                 "Invalid child interval for {lc:?}: {start}..{end}"
             );
             let token = *ctx
@@ -110,14 +113,14 @@ impl JoinBorders<In<Join>> for (BorderInfo, BorderInfo) {
         }
         Ok(match (self.0.inner_offset, self.1.inner_offset) {
             (Some(l), Some(r)) => Some(InfixChildren::Both(
-                ctx.splits.get(&PosKey::new(lc, l)).unwrap().right,
-                ctx.splits.get(&PosKey::new(rc, r)).unwrap().left,
+                expect_split(ctx, RefPosKey::new(lc, l)).right,
+                expect_split(ctx, RefPosKey::new(rc, r)).left,
             )),
             (None, Some(r)) => Some(InfixChildren::Right(
-                ctx.splits.get(&PosKey::new(rc, r)).unwrap().left,
+                expect_split(ctx, RefPosKey::new(rc, r)).left,
             )),
             (Some(l), None) => Some(InfixChildren::Left(
-                ctx.splits.get(&PosKey::new(lc, l)).unwrap().right,
+                expect_split(ctx, RefPosKey::new(lc, l)).right,
             )),
             (None, None) => None,
         })

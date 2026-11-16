@@ -1,14 +1,11 @@
 use crate::{
-    interval::partition::{
-        delta::PatternSubDeltas,
-        info::{
-            PartitionInfo,
-            border::perfect::{
-                BorderPerfect,
-                SinglePerfect,
-            },
-            range::role::RangeRole,
+    interval::partition::info::{
+        PartitionInfo,
+        border::perfect::{
+            BorderPerfect,
+            SinglePerfect,
         },
+        range::role::RangeRole,
     },
     join::{
         context::{
@@ -22,16 +19,17 @@ use crate::{
                 pattern_info::JoinPatternInfo,
             },
         },
+        plan::JoinRef,
     },
 };
 use context_trace::*;
 
+/// Joined decompositions of a partition, one per original node pattern.
 #[derive(Debug)]
 pub(crate) struct JoinedPatterns<R: RangeRole> {
-    pub(crate) patterns: Vec<Pattern>,
+    pub(crate) patterns: Vec<(PatternId, Vec<JoinRef>)>,
     pub(crate) perfect: R::Perfect,
     pub(crate) range: Option<R::PatternRange>,
-    pub(crate) delta: PatternSubDeltas,
 }
 
 impl<'a, R: RangeRole<Mode = Join> + 'a> JoinedPatterns<R>
@@ -42,9 +40,6 @@ where
         info: JoinPartitionInfo<R>,
         ctx: &'b mut NodeJoinCtx<'a>,
     ) -> Self {
-        // assert: no complete perfect token
-        // todo: index inner ranges and get token splits
-        //
         // index inner range
         // cases:
         // - (token, inner, token)
@@ -58,77 +53,17 @@ where
             None
         };
         let perfect = info.perfect.clone();
-        let (delta, patterns) = PartitionInfo::from(info)
+        let patterns = PartitionInfo::from(info)
             .patterns
             .into_iter()
             .map(|(pid, pinfo): (PatternId, JoinPatternInfo<_>)| {
-                ((pid, pinfo.delta), pinfo.join_pattern(ctx, &pid))
+                (pid, pinfo.join_pattern(ctx, &pid))
             })
-            .unzip();
+            .collect();
         Self {
             patterns,
             perfect,
             range,
-            delta,
         }
     }
-    //pub(crate) fn to_joined_partition(
-    //    self,
-    //    ctx: &'b mut NodeJoinCtx<'a>,
-    //) -> JoinedPartition<R> {
-    //    JoinedPartition::from_joined_patterns(self, ctx)
-    //}
 }
-//#[derive(Debug)]
-//pub(crate) enum JoinedPattern {
-//    Trigram([Token; 3]),
-//    Bigram([Token; 2]),
-//}
-//impl From<BorderChildren<JoinedRangeInfoKind>> for JoinedPattern {
-//    fn from(borders: BorderChildren<JoinedRangeInfoKind>) -> Self {
-//        match borders {
-//            BorderChildren::Infix(left, right, None) =>
-//                JoinedPattern::Bigram([left, right]),
-//            BorderChildren::Infix(left, right, Some(inner)) =>
-//                JoinedPattern::Trigram([left, inner, right]),
-//            BorderChildren::Prefix(inner, right) =>
-//                JoinedPattern::Bigram([inner, right]),
-//            BorderChildren::Postfix(left, inner) =>
-//                JoinedPattern::Bigram([left, inner]),
-//        }
-//    }
-//}
-//impl<'p> Borrow<[Token]> for &'p JoinedPattern {
-//    fn borrow(&self) -> &[Token] {
-//        match self {
-//            JoinedPattern::Trigram(p) => p.borrow(),
-//            JoinedPattern::Bigram(p) => p.borrow(),
-//        }
-//    }
-//}
-//impl<'p> IntoIterator for &'p JoinedPattern {
-//    type Item = &'p Token;
-//    type IntoIter = std::slice::Iter<'p, Token>;
-//    fn into_iter(self) -> Self::IntoIter {
-//        match self {
-//            JoinedPattern::Trigram(p) => p.into_iter(),
-//            JoinedPattern::Bigram(p) => p.into_iter(),
-//        }
-//    }
-//}
-//impl Deref for JoinedPattern {
-//    type Target = [Token];
-//    fn deref(&self) -> &Self::Target {
-//        match self {
-//            Self::Trigram(p) => p,
-//            Self::Bigram(p) => p,
-//        }
-//    }
-//}
-//impl<'p> From<&[Token]> for JoinedPattern {
-//    fn from(value: &[Token]) -> Self {
-//        JoinedPattern::Bigram(
-//            value.try_into().expect("unmerged partition without inner range not a bigram")
-//        )
-//    }
-//}

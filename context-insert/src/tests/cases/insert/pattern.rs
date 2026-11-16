@@ -214,3 +214,87 @@ fn insert_pattern2() {
         "aby"
     );
 }
+
+/// Nested and disjoint replacements proposed for one original pattern are
+/// composed from original index ranges at publication.
+#[test]
+fn publish_composes_replacements_in_one_pattern() {
+    use crate::join::plan::{
+        JoinPlan,
+        JoinRef,
+        PatternOrigin,
+        PlanEdit,
+        ProposedPattern,
+        publish,
+    };
+    use context_trace::{
+        HypergraphRef,
+        assert_parents,
+        graph::vertex::parent::PatternIndex,
+        insert_atoms,
+    };
+
+    let graph = HypergraphRef::default();
+    insert_atoms!(graph, {a, b, c, d, e, f});
+    let (root, pid) = graph.insert_pattern_with_id(vec![a, b, c, d, e, f]);
+    let pid = pid.unwrap();
+
+    let joined = |refs: Vec<JoinRef>| {
+        vec![ProposedPattern {
+            refs,
+            origin: PatternOrigin::Joined { source: pid },
+        }]
+    };
+    let ex = JoinRef::Existing;
+    let mut plan = JoinPlan::default();
+    let x = plan.propose(root, joined(vec![ex(b), ex(c)]));
+    let y = plan.propose(root, joined(vec![x, ex(d)]));
+    let z = plan.propose(root, joined(vec![ex(e), ex(f)]));
+    // proposal order of planning: inner before outer, then a later range
+    for (range, replacement) in [(1..3, x), (1..4, y), (4..6, z)] {
+        plan.push_edit(PlanEdit::ReplaceRange {
+            target: root,
+            pattern_id: pid,
+            range,
+            replacement,
+            origin: PatternOrigin::PerfectReplacement,
+        });
+    }
+    plan.target = Some(y);
+
+    let y = publish(&graph, plan);
+    let g = graph.graph();
+
+    let root_patterns = g.expect_child_patterns(root);
+    assert_eq!(root_patterns.len(), 1, "no duplicate root patterns");
+    let pattern = root_patterns[&pid].clone();
+    let z = pattern[2];
+    assert_eq!(pattern, Pattern::from(vec![a, y, z]));
+    let y_patterns = g.expect_child_patterns(y);
+    assert_eq!(y_patterns.len(), 1);
+    let (y_pid, y_pattern) = y_patterns.into_iter().next().unwrap();
+    let x = y_pattern[0];
+    assert_eq!(y_pattern, Pattern::from(vec![x, d]));
+    assert_eq!(
+        g.expect_child_patterns(x).into_values().collect::<Vec<_>>(),
+        vec![Pattern::from(vec![b, c])]
+    );
+    assert_eq!(
+        g.expect_child_patterns(z).into_values().collect::<Vec<_>>(),
+        vec![Pattern::from(vec![e, f])]
+    );
+    assert_eq!(
+        (y.width(), x.width(), z.width(), root.width()),
+        (3.into(), 2.into(), 2.into(), 6.into())
+    );
+    assert_eq!(g.vertex_count(), 10);
+
+    assert_parents(g, a, root, [PatternIndex::new(pid, 0)]);
+    assert_parents(g, y, root, [PatternIndex::new(pid, 1)]);
+    assert_parents(g, z, root, [PatternIndex::new(pid, 2)]);
+    assert_parents(g, x, y, [PatternIndex::new(y_pid, 0)]);
+    assert_parents(g, d, y, [PatternIndex::new(y_pid, 1)]);
+    let x_pid = *g.expect_child_patterns(x).keys().next().unwrap();
+    assert_parents(g, b, x, [PatternIndex::new(x_pid, 0)]);
+    assert_parents(g, c, x, [PatternIndex::new(x_pid, 1)]);
+}

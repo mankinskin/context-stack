@@ -13,10 +13,9 @@ use crate::{
             Join,
             JoinPartition,
         },
+        plan::JoinRef,
     },
-    split::vertex::node::AsNodeTraceCtx,
 };
-use context_trace::*;
 use derive_more::derive::{
     Deref,
     DerefMut,
@@ -36,18 +35,15 @@ impl<R: RangeRole<Mode = Join>> JoinInnerRangeInfo<R>
 where
     R::Borders: JoinBorders<R>,
 {
-    pub(crate) fn insert_pattern_inner<'a: 'b, 'b: 'c, 'c>(
+    pub(crate) fn plan_pattern_inner<'a: 'b, 'b: 'c, 'c>(
         &self,
         ctx: &'c mut NodeJoinCtx<'a>,
-    ) -> Token
+    ) -> JoinRef
     where
         Self: 'a,
     {
-        match self
-            .offsets
-            .as_splits(ctx.as_trace_context())
-            .join_partition(ctx)
-        {
+        let splits = self.offsets.as_splits_of(ctx.overlay.iter());
+        match splits.join_partition(ctx) {
             Ok(inner) => inner.index,
             Err(p) => p,
         }

@@ -1,47 +1,47 @@
 use derivative::Derivative;
-use derive_more::derive::{
-    Deref,
-    DerefMut,
-};
 
-use crate::split::{
-    SplitMap,
-    vertex::pattern::{
-        HasPatternTraceCtx,
-        PatternTraceCtx,
+use crate::{
+    join::plan::JoinRef,
+    split::{
+        SplitMap,
+        vertex::pattern::PatternElems,
     },
 };
 use context_trace::*;
 
 pub(crate) mod borders;
 
-/// Materialized child intervals, keyed by token and half-open atom offsets.
-pub(crate) type IntervalMap = HashMap<(Token, usize, usize), Token>;
+/// Materialized child intervals, keyed by host and half-open atom offsets.
+pub(crate) type IntervalMap = HashMap<(JoinRef, usize, usize), JoinRef>;
 
 /// Pattern join context that owns its data.
 ///
-/// With interior mutability, we can't hold references across lock boundaries,
-/// so this struct owns the pattern and split map data.
-#[derive(Debug, Clone, Deref, DerefMut, Derivative)]
+/// `pattern` is the node decomposition as seen through the operation-local
+/// overlay (original children with proposed replacements applied).
+#[derive(Debug, Clone, Derivative)]
 #[derivative(Hash, PartialEq, Eq)]
 pub(crate) struct PatternJoinCtx {
-    #[deref]
-    #[deref_mut]
-    pub(crate) ctx: PatternTraceCtx,
+    pub(crate) loc: PatternLocation,
+    #[derivative(Hash = "ignore", PartialEq = "ignore")]
+    pub(crate) pattern: Vec<JoinRef>,
     #[derivative(Hash = "ignore", PartialEq = "ignore")]
     pub(crate) splits: SplitMap,
     #[derivative(Hash = "ignore", PartialEq = "ignore")]
     pub(crate) intervals: IntervalMap,
 }
 
-impl HasPatternTraceCtx for PatternJoinCtx {
-    fn pattern_trace_context(&self) -> PatternTraceCtx {
-        self.ctx.clone()
+impl PatternElems for PatternJoinCtx {
+    type Elem = JoinRef;
+    fn pattern_id(&self) -> PatternId {
+        self.loc.pattern_id
+    }
+    fn elems(&self) -> &[JoinRef] {
+        &self.pattern
     }
 }
 
 impl From<PatternJoinCtx> for PatternId {
     fn from(value: PatternJoinCtx) -> Self {
-        Self::from(value.ctx)
+        value.loc.pattern_id
     }
 }

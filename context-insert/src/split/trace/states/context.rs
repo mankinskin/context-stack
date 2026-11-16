@@ -6,6 +6,7 @@ use derive_more::derive::{
 };
 
 use crate::{
+    split::provenance::SplitProvenance,
     split::cache::{
         position::{
             PosKey,
@@ -23,6 +24,7 @@ pub(crate) struct SplitTraceStatesCtx<G: HasGraph> {
     #[deref_mut]
     pub(crate) ctx: SplitTraceCtx<G>,
     pub(crate) states: SplitStates,
+    pub(crate) provenance: SplitProvenance,
 }
 impl<G: HasGraph> SplitTraceStatesCtx<G> {
     pub(crate) fn new(
@@ -37,6 +39,7 @@ impl<G: HasGraph> SplitTraceStatesCtx<G> {
                 end_bound,
             },
             states: SplitStates::default(),
+            provenance: SplitProvenance::default(),
         }
     }
     pub(crate) fn new_split_vertex(

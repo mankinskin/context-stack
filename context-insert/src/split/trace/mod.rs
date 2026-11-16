@@ -20,6 +20,8 @@ pub struct SplitTraceState {
     pub(crate) index: Token,
     pub(crate) offset: Offset,
     pub(crate) prev: PosKey,
+    /// Parent decomposition location the child was reached through.
+    pub(crate) via: Option<SubLocation>,
 }
 
 #[derive(Debug, Deref, DerefMut)]

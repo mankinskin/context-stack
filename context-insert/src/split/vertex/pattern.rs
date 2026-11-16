@@ -3,7 +3,10 @@ use derivative::Derivative;
 use context_trace::*;
 use derive_new::new;
 
-use crate::split::vertex::node::NodeTraceCtx;
+use crate::{
+    join::plan::ElemWidth,
+    split::vertex::node::NodeTraceCtx,
+};
 
 /// Pattern trace context that owns its data.
 ///
@@ -23,14 +26,25 @@ impl From<PatternTraceCtx> for PatternId {
     }
 }
 
-pub(crate) trait HasPatternTraceCtx {
-    fn pattern_trace_context(&self) -> PatternTraceCtx;
+/// Pattern context giving access to the pattern id and its elements.
+///
+/// Elements are graph tokens during split tracing and join references
+/// during join planning.
+pub(crate) trait PatternElems {
+    type Elem: ElemWidth;
+    fn pattern_id(&self) -> PatternId;
+    fn elems(&self) -> &[Self::Elem];
 }
-impl HasPatternTraceCtx for PatternTraceCtx {
-    fn pattern_trace_context(&self) -> PatternTraceCtx {
-        self.clone()
+impl PatternElems for PatternTraceCtx {
+    type Elem = Token;
+    fn pattern_id(&self) -> PatternId {
+        self.loc.pattern_id
+    }
+    fn elems(&self) -> &[Token] {
+        &self.pattern
     }
 }
+
 pub(crate) trait GetPatternTraceCtx {
     fn get_pattern_trace_context(
         &self,
@@ -38,7 +52,7 @@ pub(crate) trait GetPatternTraceCtx {
     ) -> PatternTraceCtx;
 }
 pub(crate) trait GetPatternCtx {
-    type PatternCtx: HasPatternTraceCtx;
+    type PatternCtx: PatternElems;
     fn get_pattern_context(
         &self,
         pattern_id: &PatternId,

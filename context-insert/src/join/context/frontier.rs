@@ -13,6 +13,11 @@ use crate::{
         },
         pattern::IntervalMap,
     },
+    join::plan::{
+        JoinPlan,
+        JoinRef,
+        RefPosKey,
+    },
     split::{
         SplitMap,
         cache::position::PosKey,
@@ -61,6 +66,7 @@ pub(crate) struct FrontierSplitIterator {
     pub(crate) frontier: FrontierIterator,
     pub(crate) splits: SplitMap,
     pub(crate) intervals: IntervalMap,
+    pub(crate) plan: JoinPlan,
     pub(crate) trav: HypergraphRef,
 }
 
@@ -72,12 +78,24 @@ impl FrontierSplitIterator {
         NodeJoinCtx::new(index, self)
     }
 }
+impl FrontierSplitIterator {
+    /// Run the frontier to completion and return the plan with its target.
+    ///
+    /// Does not mutate the graph.
+    pub(crate) fn plan(mut self) -> JoinPlan {
+        let target = self
+            .find_map(|joined| joined)
+            .expect("frontier must yield a target");
+        self.plan.target = Some(target);
+        self.plan
+    }
+}
 impl Iterator for FrontierSplitIterator {
-    type Item = Option<Token>;
+    type Item = Option<JoinRef>;
     fn next(&mut self) -> Option<Self::Item> {
         Some(match self.frontier.next() {
             Some(Some(key)) => {
-                if !self.splits.contains_key(&key) {
+                if !self.splits.contains_key(&RefPosKey::from(key)) {
                     let node_idx = key.index.index.0;
 
                     // Emit event for processing this node
@@ -141,6 +159,7 @@ impl Iterator for FrontierSplitIterator {
 }
 impl From<(HypergraphRef, IntervalGraph)> for FrontierSplitIterator {
     fn from((trav, interval): (HypergraphRef, IntervalGraph)) -> Self {
+        let plan = JoinPlan::new(interval.provenance.clone());
         let leaves = interval.states.leaves.iter().cloned().rev();
         FrontierSplitIterator {
             frontier: FrontierIterator {
@@ -149,6 +168,7 @@ impl From<(HypergraphRef, IntervalGraph)> for FrontierSplitIterator {
             },
             splits: Default::default(),
             intervals: Default::default(),
+            plan,
             trav,
         }
     }

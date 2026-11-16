@@ -1,6 +1,7 @@
 pub mod cache;
 pub(crate) mod context;
 pub(crate) mod pattern;
+pub(crate) mod provenance;
 pub(crate) mod run;
 pub(crate) mod trace;
 pub(crate) mod vertex;
@@ -11,12 +12,19 @@ use std::{
     num::NonZeroUsize,
 };
 
-use cache::position::PosKey;
 use context_trace::*;
 use derive_new::new;
 use vertex::VertexSplits;
 
-use crate::*;
+use crate::{
+    join::plan::{
+        AsElems,
+        ElemWidth,
+        JoinRef,
+        RefPosKey,
+    },
+    *,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, new)]
 pub struct TokenTracePos {
@@ -36,12 +44,6 @@ impl HasSubIndex for TokenTracePos {
 impl HasSubIndexMut for TokenTracePos {
     fn sub_index_mut(&mut self) -> &mut usize {
         &mut self.sub_index
-    }
-}
-impl TokenTracePos {
-    /// Get mutable reference to inner_offset
-    pub(crate) fn inner_offset_mut(&mut self) -> &mut Option<NonZeroUsize> {
-        &mut self.inner_offset
     }
 }
 impl From<(usize, Option<NonZeroUsize>)> for TokenTracePos {
@@ -124,8 +126,31 @@ impl TraceSide for TraceFront {
     }
 }
 
-pub(crate) fn position_splits<'a>(
-    patterns: impl IntoIterator<Item = (&'a PatternId, &'a Pattern)>,
+/// `TraceBack::trace_child_pos` over any pattern element with a width.
+pub(crate) fn trace_back_pos<W: ElemWidth>(
+    pattern: &[W],
+    offset: NonZeroUsize,
+) -> Option<TokenTracePos> {
+    let mut offset = offset.get();
+    pattern
+        .iter()
+        .enumerate()
+        .find_map(|(i, c)| match c.elem_width().cmp(&offset) {
+            Ordering::Less => {
+                offset -= c.elem_width();
+                None
+            },
+            Ordering::Equal => {
+                offset = 0;
+                None
+            },
+            Ordering::Greater => Some((i, NonZeroUsize::new(offset))),
+        })
+        .map(Into::into)
+}
+
+pub(crate) fn position_splits<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
+    patterns: impl IntoIterator<Item = (&'a PatternId, P)>,
     pos: NonZeroUsize,
 ) -> VertexSplits {
     VertexSplits {
@@ -133,21 +158,21 @@ pub(crate) fn position_splits<'a>(
         splits: patterns
             .into_iter()
             .map(|(pid, pat)| {
-                let pos = TraceBack::trace_child_pos(pat, pos).unwrap();
+                let pos = trace_back_pos(pat.as_elems(), pos).unwrap();
                 (*pid, pos)
             })
             .collect(),
     }
 }
 
-pub(crate) fn range_splits<'a>(
-    patterns: impl Iterator<Item = (&'a PatternId, &'a Pattern)>,
+pub(crate) fn range_splits<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
+    patterns: impl Iterator<Item = (&'a PatternId, P)>,
     parent_range: (NonZeroUsize, NonZeroUsize),
 ) -> (VertexSplits, VertexSplits) {
     let (ls, rs) = patterns
         .map(|(pid, pat)| {
-            let lpos = TraceBack::trace_child_pos(pat, parent_range.0).unwrap();
-            let rpos = TraceBack::trace_child_pos(pat, parent_range.1).unwrap();
+            let lpos = trace_back_pos(pat.as_elems(), parent_range.0).unwrap();
+            let rpos = trace_back_pos(pat.as_elems(), parent_range.1).unwrap();
             ((*pid, lpos), (*pid, rpos))
         })
         .unzip();
@@ -186,7 +211,8 @@ pub(crate) trait SplitInner: Debug + Clone {}
 
 impl<T: Debug + Clone> SplitInner for T {}
 
-pub(crate) type SplitMap = HashMap<PosKey, Split>;
+/// Splits of (existing or planned) tokens produced while joining.
+pub(crate) type SplitMap = HashMap<RefPosKey, Split<JoinRef>>;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Split<T: SplitInner = Token> {

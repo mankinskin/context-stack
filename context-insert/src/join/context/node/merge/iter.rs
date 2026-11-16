@@ -4,15 +4,7 @@
 //! and merging partitions within a `MergeCtx`. It encapsulates the state
 //! needed during partition iteration, including the range map and target tracking.
 
-use std::{
-    collections::BTreeMap,
-    num::NonZeroUsize,
-};
-
 use context_trace::{
-    Pattern,
-    Token,
-    VertexSet,
     graph::visualization::{
         DeltaOp,
         GraphMutation,
@@ -33,14 +25,22 @@ use super::{
     partition::MergeResult,
 };
 use crate::{
-    PatternSubDeltas,
     RootMode,
     interval::partition::info::range::role::{
         In,
         Post,
         Pre,
     },
-    join::partition::Join,
+    join::{
+        partition::Join,
+        plan::{
+            JoinRef,
+            PatternOrigin,
+            PlanEdit,
+            ProposedPattern,
+            SubMergeKind,
+        },
+    },
     visualization::emit_insert_node_with_delta,
 };
 
@@ -58,12 +58,12 @@ pub(crate) struct PartitionMergeIter<'a, 'b> {
     /// The target range we're looking for (None for intermediary nodes)
     target_range: Option<PartitionRange>,
     /// The target token once found
-    target_token: Option<Token>,
+    target_token: Option<JoinRef>,
     /// The operating range for this merge
     operating_range: PartitionRange,
-    /// Whether a perfect pattern replacement occurred during operating range merge.
-    /// When true, `add_root_pattern` should be skipped because the pattern was
-    /// already modified in place by `replace_in_pattern`.
+    /// Whether a perfect pattern replacement was proposed during operating range merge.
+    /// When true, `add_root_pattern` should be skipped because the replacement
+    /// already yields a root decomposition containing the target.
     had_perfect_replacement: bool,
 }
 
@@ -109,7 +109,7 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
 
         debug!(
             node=?self.ctx.ctx.index,
-            patterns=?self.ctx.ctx.patterns(),
+            patterns=?self.ctx.ctx.overlay,
             offsets=?self.ctx.offsets,
             operating_range=?self.operating_range,
             mode=?self.ctx.mode,
@@ -280,9 +280,6 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
             self.had_perfect_replacement = true;
         }
 
-        // Apply deltas to offset cache if needed
-        self.apply_deltas(&partition_range, result.delta.as_ref());
-
         // Track target token if we've reached the target range
         self.track_target_token(&partition_range, result.token);
 
@@ -313,8 +310,7 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
             (_, PartitionType::Full) => {
                 // Full node partition - shouldn't happen in normal flow
                 MergeResult {
-                    token: self.ctx.ctx.index,
-                    delta: None,
+                    token: JoinRef::Existing(self.ctx.ctx.index),
                     had_pattern_replacement: false,
                 }
             },
@@ -345,22 +341,19 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
     /// Merge a full intermediary node partition.
     ///
     /// For intermediary nodes at their full operating range, we use the node
-    /// itself and add any new sub-merge patterns.
+    /// itself and propose any new sub-merge patterns for it.
     fn merge_full_intermediary(
         &mut self,
         partition_range: &PartitionRange,
     ) -> MergeResult {
         debug!(
-            "Merging full partition - adding sub-merge patterns (intermediary node)"
+            "Merging full partition - proposing sub-merge patterns (intermediary node)"
         );
 
         let token = self.ctx.ctx.index;
-        let existing_patterns = self
-            .ctx
-            .ctx
-            .trav
-            .expect_vertex_data(token)
-            .child_pattern_set();
+        let mut existing_patterns = self.ctx.ctx.overlay.pattern_set();
+        existing_patterns
+            .extend(self.ctx.ctx.ctx.plan.added_patterns(token).cloned());
 
         let sub_merges: Vec<_> = self
             .range_map
@@ -373,72 +366,32 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
             debug!(
                 num_sub_merges = sub_merges.len(),
                 ?sub_merges,
-                "Adding sub-merge patterns to full token"
+                "Proposing sub-merge patterns for full token"
             );
-            for merge_pattern in sub_merges {
-                self.ctx
-                    .ctx
-                    .trav
-                    .add_pattern_with_update(token, merge_pattern);
+            for refs in sub_merges {
+                self.ctx.ctx.ctx.plan.push_edit(PlanEdit::AddPattern {
+                    target: token,
+                    pattern: ProposedPattern {
+                        refs,
+                        origin: PatternOrigin::SubMerge(
+                            SubMergeKind::Intermediary,
+                        ),
+                    },
+                });
             }
         }
 
         MergeResult {
-            token,
-            delta: None,
+            token: JoinRef::Existing(token),
             had_pattern_replacement: false,
         }
-    }
-
-    /// Apply deltas to offset cache after a partition merge.
-    fn apply_deltas(
-        &mut self,
-        partition_range: &PartitionRange,
-        delta: Option<&PatternSubDeltas>,
-    ) {
-        let Some(deltas) = delta else { return };
-        if !deltas.iter().any(|(_, &d)| d > 0) {
-            return;
-        }
-
-        let start = *partition_range.start();
-        let end = *partition_range.end();
-
-        debug!(
-            ?deltas,
-            partition_start = start,
-            partition_end = end,
-            "Applying deltas to offset cache"
-        );
-
-        // Compute inner_offsets for positions inside the merged region
-        let inner_offsets: BTreeMap<usize, NonZeroUsize> = (start..end)
-            .filter_map(|partition_idx| {
-                let mut cumulative_width = 0usize;
-                for p in (*partition_range.start())..=partition_idx {
-                    if let Some(token) =
-                        self.range_map.get(&PartitionRange::from(p))
-                    {
-                        cumulative_width += *token.width;
-                    }
-                }
-                NonZeroUsize::new(cumulative_width).map(|o| (partition_idx, o))
-            })
-            .collect();
-
-        self.ctx.offsets.apply_deltas_with_inner_offsets(
-            deltas,
-            start,
-            end,
-            &inner_offsets,
-        );
     }
 
     /// Track the target token when we reach the target range.
     fn track_target_token(
         &mut self,
         partition_range: &PartitionRange,
-        token: Token,
+        token: JoinRef,
     ) {
         if let Some(ref target_range) = self.target_range {
             if partition_range == target_range {
@@ -459,7 +412,7 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
     fn compute_splits(
         &mut self,
         partition_range: &PartitionRange,
-        merged_token: Token,
+        merged_token: JoinRef,
     ) {
         if partition_range.is_empty() {
             return;
@@ -498,7 +451,7 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
             }),
             None => {
                 // For intermediary nodes, the "target" is the full node
-                self.ctx.ctx.index
+                JoinRef::Existing(self.ctx.ctx.index)
             }
         };
 
@@ -513,16 +466,16 @@ impl<'a, 'b> PartitionMergeIter<'a, 'b> {
 /// Result of a partition merge iteration.
 pub(crate) struct MergeIterResult {
     /// The target token that was merged
-    pub(crate) target_token: Token,
+    pub(crate) target_token: JoinRef,
     /// Map of all merged partition ranges to their tokens
     pub(crate) range_map: RangeMap,
-    /// Whether a perfect pattern replacement occurred during the operating range merge
+    /// Whether a perfect pattern replacement was proposed during the operating range merge
     pub(crate) had_perfect_replacement: bool,
 }
 
 /// Extension methods for MergeCtx to add root patterns.
 impl<'a> MergeCtx<'a> {
-    /// Try to extract original child tokens from the root's first pattern
+    /// Try to extract child tokens from the root's first (overlay) pattern
     /// that fall before the given width boundary.
     ///
     /// Returns `Some(tokens)` when the boundary aligns exactly with a child
@@ -530,22 +483,15 @@ impl<'a> MergeCtx<'a> {
     fn try_original_prefix_tokens(
         &self,
         boundary_width: usize,
-    ) -> Option<Vec<Token>> {
-        let root = self.ctx.index;
-        let (_, first_pattern) = self
-            .ctx
-            .trav
-            .expect_child_patterns(root)
-            .into_iter()
-            .next()
-            .expect("root must have at least one child pattern");
+    ) -> Option<Vec<JoinRef>> {
+        let (_, first_pattern) = self.ctx.overlay.first();
         let mut cumulative = 0usize;
         let mut tokens = Vec::new();
         for tok in first_pattern.iter() {
             if cumulative == boundary_width {
                 return Some(tokens);
             }
-            cumulative += tok.width.0;
+            cumulative += tok.width();
             tokens.push(*tok);
         }
         if cumulative == boundary_width {
@@ -555,7 +501,7 @@ impl<'a> MergeCtx<'a> {
         }
     }
 
-    /// Try to extract original child tokens from the root's first pattern
+    /// Try to extract child tokens from the root's first (overlay) pattern
     /// that fall after the given width boundary.
     ///
     /// Returns `Some(tokens)` when the boundary aligns exactly with a child
@@ -563,15 +509,8 @@ impl<'a> MergeCtx<'a> {
     fn try_original_postfix_tokens(
         &self,
         boundary_width: usize,
-    ) -> Option<Vec<Token>> {
-        let root = self.ctx.index;
-        let (_, first_pattern) = self
-            .ctx
-            .trav
-            .expect_child_patterns(root)
-            .into_iter()
-            .next()
-            .expect("root must have at least one child pattern");
+    ) -> Option<Vec<JoinRef>> {
+        let (_, first_pattern) = self.ctx.overlay.first();
         let mut cumulative = 0usize;
         let mut tokens = Vec::new();
         let mut found_boundary = false;
@@ -582,7 +521,7 @@ impl<'a> MergeCtx<'a> {
             if found_boundary {
                 tokens.push(*tok);
             }
-            cumulative += tok.width.0;
+            cumulative += tok.width();
         }
         if found_boundary { Some(tokens) } else { None }
     }
@@ -601,9 +540,9 @@ impl<'a> MergeCtx<'a> {
             .expect("offset index out of bounds")
     }
 
-    /// Add a root pattern that includes the merged operating range token.
+    /// Propose a root pattern that includes the merged operating range token.
     ///
-    /// For Root merge modes, this adds a new pattern to the root node that
+    /// For Root merge modes, this proposes a new pattern for the root node that
     /// decomposes into context + operating_token based on the mode.
     ///
     /// When a split boundary aligns with original child-token boundaries the
@@ -615,7 +554,7 @@ impl<'a> MergeCtx<'a> {
     pub(crate) fn add_root_pattern(
         &mut self,
         range_map: &RangeMap,
-        _target_token: Token,
+        _target_token: JoinRef,
     ) {
         let root = self.ctx.index;
         let num_offsets = self.offsets.len();
@@ -655,12 +594,12 @@ impl<'a> MergeCtx<'a> {
                         });
                     pat.push(*postfix);
                 }
-                Pattern::from(pat)
+                pat
             },
             MergeMode::Root(RootMode::Postfix) => {
                 let boundary = self.offset_width_at_index(0);
                 let prefix_range = PartitionRange::from(0);
-                let mut pat: Vec<Token> = if let Some(prefix_tokens) =
+                let mut pat: Vec<JoinRef> = if let Some(prefix_tokens) =
                     self.try_original_prefix_tokens(boundary)
                 {
                     debug!(?prefix_tokens, "Using original prefix tokens");
@@ -677,7 +616,7 @@ impl<'a> MergeCtx<'a> {
                     vec![*prefix]
                 };
                 pat.push(*operating_token);
-                Pattern::from(pat)
+                pat
             },
             MergeMode::Root(RootMode::Infix) => {
                 let prefix_boundary = self.offset_width_at_index(0);
@@ -686,7 +625,7 @@ impl<'a> MergeCtx<'a> {
                 let prefix_range = PartitionRange::from(0);
                 let postfix_range = PartitionRange::from(num_offsets);
 
-                let mut pat: Vec<Token> = if let Some(prefix_tokens) =
+                let mut pat: Vec<JoinRef> = if let Some(prefix_tokens) =
                     self.try_original_prefix_tokens(prefix_boundary)
                 {
                     debug!(?prefix_tokens, "Using original prefix tokens");
@@ -719,7 +658,7 @@ impl<'a> MergeCtx<'a> {
                         });
                     pat.push(*postfix);
                 }
-                Pattern::from(pat)
+                pat
             },
             MergeMode::Full => {
                 // No root pattern needed for intermediary nodes
@@ -728,15 +667,19 @@ impl<'a> MergeCtx<'a> {
         };
 
         // Check if pattern already exists
-        let existing_patterns =
-            self.ctx.trav.expect_vertex_data(root).child_pattern_set();
+        let mut existing_patterns = self.ctx.overlay.pattern_set();
+        existing_patterns.extend(self.ctx.ctx.plan.added_patterns(root).cloned());
         if existing_patterns.contains(&pattern) {
             debug!(?pattern, "Root pattern already exists, skipping");
             return;
         }
 
-        // Emit CreatePattern event with delta
-        let children: Vec<usize> = pattern.iter().map(|t| t.index.0).collect();
+        // Emit CreatePattern event with delta (planned children only appear
+        // once published, so only existing children are listed here)
+        let children: Vec<usize> = pattern
+            .iter()
+            .filter_map(|r| r.existing().map(|t| t.index.0))
+            .collect();
         let pattern_id = existing_patterns.len();
         let delta_ops: Vec<DeltaOp> = children
             .iter()
@@ -753,14 +696,20 @@ impl<'a> MergeCtx<'a> {
                 children: children.clone(),
             },
             format!(
-                "Creating pattern at root {}: {:?}",
-                root.index.0, children
+                "Proposing pattern at root {}: {:?}",
+                root.index.0, pattern
             ),
             root.index.0,
             GraphMutation::new(delta_ops),
         );
 
-        debug!(?root, ?pattern, "Adding root pattern");
-        self.ctx.trav.add_pattern_with_update(root, pattern);
+        debug!(?root, ?pattern, "Proposing root pattern");
+        self.ctx.ctx.plan.push_edit(PlanEdit::AddPattern {
+            target: root,
+            pattern: ProposedPattern {
+                refs: pattern,
+                origin: PatternOrigin::RootPattern,
+            },
+        });
     }
 }

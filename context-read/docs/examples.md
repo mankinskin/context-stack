@@ -86,12 +86,15 @@ With `wabc=[w,abc]`, `abc=[a,bc]`, `P=bc` and `E=bcdef=[bcde,f]`,
 ```text
 wa      = [w,a]          (inside wabc)
 wabc    = [w,abc] = [wa,bc]
-de      = [d,e]          (inside bcde)
-def     = [de,f]         (inside bcdef)
-bcde    = [bcd,e] = [bc,de]
+def     = [d,e,f]        (inside bcdef)
+bcde    = [bcd,e]
 bcdef   = [bcde,f] = [bc,def]
 wabcdef = [wabc,def] = [wa,bcdef]
 ```
+
+The interval `de` is only needed to resolve the boundary of `def` inside
+`bcde`. Its only evidence parent is `def` and `bcde=[bc,de]` would merely be a
+sub-merge proposal, so insertion inlines it instead of publishing a token.
 
 ## Preserve nested tokens and canonical complements
 

@@ -10,6 +10,10 @@ use std::{
 };
 
 use crate::{
+    join::plan::{
+        AsElems,
+        ElemWidth,
+    },
     interval::partition::info::range::{
         mode::{
             InVisitMode,
@@ -138,35 +142,43 @@ impl<M: PostVisitMode> OffsetIndexRange<Post<M>> for RangeFrom<usize> {
 pub(crate) trait RangeOffsets<R: RangeRole>:
     Debug + Clone + Copy
 {
+    /// Split positions of these offsets in the given patterns.
+    fn as_splits_of<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
+        &self,
+        patterns: impl Iterator<Item = (&'a PatternId, P)>,
+    ) -> R::Splits;
+
     fn as_splits<C: AsNodeTraceCtx>(
         &self,
         ctx: C,
-    ) -> R::Splits;
+    ) -> R::Splits {
+        self.as_splits_of(ctx.as_trace_context().patterns.iter())
+    }
 }
 
 impl<M: InVisitMode> RangeOffsets<In<M>> for (NonZeroUsize, NonZeroUsize) {
-    fn as_splits<C: AsNodeTraceCtx>(
+    fn as_splits_of<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
         &self,
-        ctx: C,
+        patterns: impl Iterator<Item = (&'a PatternId, P)>,
     ) -> <In<M> as RangeRole>::Splits {
-        range_splits(ctx.as_trace_context().patterns.iter(), *self)
+        range_splits(patterns, *self)
     }
 }
 
 impl<M: PreVisitMode> RangeOffsets<Pre<M>> for NonZeroUsize {
-    fn as_splits<C: AsNodeTraceCtx>(
+    fn as_splits_of<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
         &self,
-        ctx: C,
+        patterns: impl Iterator<Item = (&'a PatternId, P)>,
     ) -> <Pre<M> as RangeRole>::Splits {
-        position_splits(ctx.as_trace_context().patterns.iter(), *self)
+        position_splits(patterns, *self)
     }
 }
 
 impl<M: PostVisitMode> RangeOffsets<Post<M>> for NonZeroUsize {
-    fn as_splits<C: AsNodeTraceCtx>(
+    fn as_splits_of<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
         &self,
-        ctx: C,
+        patterns: impl Iterator<Item = (&'a PatternId, P)>,
     ) -> <Post<M> as RangeRole>::Splits {
-        position_splits(ctx.as_trace_context().patterns.iter(), *self)
+        position_splits(patterns, *self)
     }
 }

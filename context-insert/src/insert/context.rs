@@ -6,7 +6,14 @@ use crate::{
         IntervalGraph,
         init::InitInterval,
     },
-    join::context::frontier::FrontierSplitIterator,
+    join::{
+        context::frontier::FrontierSplitIterator,
+        plan::{
+            JoinPlan,
+            publish,
+        },
+        select::select,
+    },
 };
 use context_search::{
     AncestorPolicy,
@@ -83,6 +90,39 @@ impl<R: InsertResult> InsertCtx<R> {
         ext: R::Extract,
         init: InitInterval,
     ) -> Result<R, ErrorState> {
+        use crate::visualization::emit_insert_node_with_delta;
+        use context_trace::graph::visualization::{
+            DeltaOp,
+            GraphMutation,
+            Transition,
+        };
+
+        let plan = self.plan_init(init)?;
+
+        // Single publication boundary: the graph is only mutated here.
+        let joined = publish(&self.graph, select(&self.graph, plan));
+
+        // Emit: Join complete — include delta for the result node
+        emit_insert_node_with_delta(
+            Transition::JoinComplete {
+                result_node: joined.index.0,
+            },
+            format!("Join complete — created token {}", joined.index.0),
+            joined.index.0,
+            GraphMutation::single(DeltaOp::AddNode {
+                index: joined.index.0,
+                width: 0, // width resolved later
+            }),
+        );
+
+        Ok(R::build_with_extract(joined, ext))
+    }
+
+    /// Split and plan an insertion without mutating the graph.
+    pub(crate) fn plan_init(
+        &self,
+        init: InitInterval,
+    ) -> Result<JoinPlan, ErrorState> {
         use crate::visualization::{
             emit_insert_node,
             emit_insert_node_with_delta,
@@ -169,24 +209,7 @@ impl<R: InsertResult> InsertCtx<R> {
             root_idx,
         );
 
-        let mut ctx =
-            FrontierSplitIterator::from((self.graph.clone(), interval));
-        let joined = ctx.find_map(|joined| joined).unwrap();
-
-        // Emit: Join complete — include delta for the result node
-        emit_insert_node_with_delta(
-            Transition::JoinComplete {
-                result_node: joined.index.0,
-            },
-            format!("Join complete — created token {}", joined.index.0),
-            joined.index.0,
-            GraphMutation::single(DeltaOp::AddNode {
-                index: joined.index.0,
-                width: 0, // width resolved later
-            }),
-        );
-
-        Ok(R::build_with_extract(joined, ext))
+        Ok(FrontierSplitIterator::from((self.graph.clone(), interval)).plan())
     }
     fn insert_impl(
         &mut self,

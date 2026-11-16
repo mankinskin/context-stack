@@ -14,6 +14,7 @@ use crate::interval::partition::info::{
         mode::PatternInfoOf,
         role::{
             ModePatternCtxOf,
+            ModeRefOf,
             RangeRole,
         },
     },
@@ -27,7 +28,9 @@ pub(crate) struct PartitionBorders<
 }
 
 impl<R: RangeRole> PartitionBorders<R, ModePatternCtxOf<R>> {
-    pub(crate) fn into_partition_info(self) -> Result<PartitionInfo<R>, Token> {
+    pub(crate) fn into_partition_info(
+        self
+    ) -> Result<PartitionInfo<R>, ModeRefOf<R>> {
         let perfect = self.perfect;
         let patterns: Result<_, _> = self
             .borders

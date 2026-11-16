@@ -9,7 +9,7 @@ use crate::{
             },
         },
     },
-    split::vertex::pattern::HasPatternTraceCtx,
+    split::vertex::pattern::PatternElems,
 };
 
 pub(crate) trait TraceBorders<R: RangeRole>: InfoBorder<R> {
@@ -24,8 +24,7 @@ impl<R: RangeRole> TraceBorders<R> for R::Borders {
         &self,
         ctx: &ModePatternCtxOf<R>,
     ) -> Option<InnerRangeInfo<R>> {
-        let pctx = ctx.pattern_trace_context();
-        self.inner_range_offsets(&pctx.pattern).map(move |offsets| {
+        self.inner_range_offsets(ctx.elems()).map(move |offsets| {
             InnerRangeInfo {
                 range: self.inner_range(),
                 offsets,

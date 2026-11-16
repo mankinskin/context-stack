@@ -9,16 +9,18 @@ use std::{
     num::NonZeroUsize,
 };
 
-use context_trace::*;
 use derive_more::{
     Deref,
     DerefMut,
 };
 
 use super::partition_range::PartitionRange;
-use crate::split::{
-    Split,
-    cache::position::PosKey,
+use crate::{
+    join::plan::{
+        JoinRef,
+        RefPosKey,
+    },
+    split::Split,
 };
 
 /// RangeMap for tracking merged partitions by partition index range.
@@ -38,10 +40,10 @@ use crate::split::{
 pub(crate) struct RangeMap {
     #[deref]
     #[deref_mut]
-    pub(crate) map: HashMap<PartitionRange, Token>,
+    pub(crate) map: HashMap<PartitionRange, JoinRef>,
 }
 
-impl<C: Borrow<Token>, I: IntoIterator<Item = C>> From<I> for RangeMap {
+impl<C: Borrow<JoinRef>, I: IntoIterator<Item = C>> From<I> for RangeMap {
     fn from(iter: I) -> Self {
         let mut map = HashMap::default();
         for (i, part) in iter.into_iter().enumerate() {
@@ -69,7 +71,7 @@ impl RangeMap {
     pub(crate) fn range_sub_merges(
         &self,
         range: &PartitionRange,
-    ) -> impl IntoIterator<Item = Pattern> + '_ {
+    ) -> impl IntoIterator<Item = Vec<JoinRef>> + '_ {
         let (start, end) = (*range.start(), *range.end());
         // Iterate interior split points (start+1..=end)
         // For range 0..=2, this gives [1, 2] producing splits:
@@ -86,7 +88,7 @@ impl RangeMap {
             let left = self.map.get(&left_range)?;
             let right = self.map.get(&right_range)?;
 
-            Some(Pattern::from(vec![*left, *right]))
+            Some(vec![*left, *right])
         })
     }
 
@@ -102,10 +104,10 @@ impl RangeMap {
     /// Returns a vector of (PosKey, Split) pairs that should be added to the SplitMap.
     pub(crate) fn compute_splits_for_merged_token(
         &self,
-        merged_token: Token,
+        merged_token: JoinRef,
         range: &PartitionRange,
         existing_splits: &crate::split::SplitMap,
-    ) -> Vec<(PosKey, Split)> {
+    ) -> Vec<(RefPosKey, Split<JoinRef>)> {
         let (start, end) = (*range.start(), *range.end());
 
         // Single-partition ranges have no internal splits at partition boundaries
@@ -127,13 +129,13 @@ impl RangeMap {
             });
 
             // Inherit splits from this constituent token, translating positions
-            let partition_width = *partition_token.width();
+            let partition_width = partition_token.width();
             for (key, split) in existing_splits.iter() {
                 if key.index == partition_token {
                     // Translate position: add accumulated width to get position in merged token
                     let translated_pos = accumulated_width + key.pos.get();
                     if let Some(pos) = NonZeroUsize::new(translated_pos) {
-                        let new_key = PosKey::new(merged_token, pos);
+                        let new_key = RefPosKey::new(merged_token, pos);
                         splits.push((new_key, split.clone()));
                     }
                 }
@@ -154,7 +156,7 @@ impl RangeMap {
                     (self.map.get(&left_range), self.map.get(&right_range))
                     && let Some(pos) = NonZeroUsize::new(accumulated_width)
                 {
-                    let key = PosKey::new(merged_token, pos);
+                    let key = RefPosKey::new(merged_token, pos);
                     let split = Split::new(left_token, right_token);
                     splits.push((key, split));
                 }

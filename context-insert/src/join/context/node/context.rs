@@ -1,28 +1,27 @@
-use std::borrow::Borrow;
+use std::ops::Range;
 
 use crate::{
     interval::IntervalGraph,
-    join::context::{
-        frontier::FrontierSplitIterator,
-        pattern::{
-            IntervalMap,
-            PatternJoinCtx,
+    join::{
+        context::{
+            frontier::FrontierSplitIterator,
+            pattern::{
+                IntervalMap,
+                PatternJoinCtx,
+            },
+        },
+        plan::{
+            JoinPlan,
+            JoinRef,
+            NodeOverlay,
+            PatternOrigin,
+            PlanEdit,
         },
     },
     split::{
         SplitMap,
         cache::vertex::SplitVertexCache,
-        vertex::{
-            node::{
-                AsNodeTraceCtx,
-                NodeTraceCtx,
-            },
-            pattern::{
-                GetPatternCtx,
-                GetPatternTraceCtx,
-                PatternTraceCtx,
-            },
-        },
+        vertex::pattern::GetPatternCtx,
     },
 };
 use context_trace::*;
@@ -31,16 +30,16 @@ use derive_more::{
     DerefMut,
 };
 
-/// Context for locked frontier operations during join.
+/// Context for frontier operations during join planning.
 ///
-/// With interior mutability, we only need `&Hypergraph` - mutations happen
-/// through per-vertex locks inside the graph.
+/// The graph is only read; proposed structure is recorded in `plan`.
 #[derive(Debug)]
 pub(crate) struct LockedFrontierCtx<'a> {
     pub(crate) trav: &'a Hypergraph,
     pub(crate) interval: &'a IntervalGraph,
     pub(crate) splits: &'a mut SplitMap,
     pub(crate) intervals: &'a mut IntervalMap,
+    pub(crate) plan: &'a mut JoinPlan,
 }
 impl<'a> LockedFrontierCtx<'a> {
     pub(crate) fn new(ctx: &'a mut FrontierSplitIterator) -> Self {
@@ -49,6 +48,7 @@ impl<'a> LockedFrontierCtx<'a> {
             interval: &ctx.frontier.interval,
             splits: &mut ctx.splits,
             intervals: &mut ctx.intervals,
+            plan: &mut ctx.plan,
         }
     }
 }
@@ -58,6 +58,8 @@ pub(crate) struct NodeJoinCtx<'a> {
     #[deref_mut]
     pub(crate) ctx: LockedFrontierCtx<'a>,
     pub(crate) index: Token,
+    /// The node's decompositions with proposed replacements applied.
+    pub(crate) overlay: NodeOverlay,
 }
 impl HasToken for NodeJoinCtx<'_> {
     fn token(&self) -> Token {
@@ -69,30 +71,13 @@ impl<'a> NodeJoinCtx<'a> {
         index: Token,
         ctx: &'a mut FrontierSplitIterator,
     ) -> Self {
+        let overlay =
+            NodeOverlay::new(index, &ctx.trav.expect_child_patterns(index));
         NodeJoinCtx {
             index,
             ctx: LockedFrontierCtx::new(ctx),
+            overlay,
         }
-    }
-}
-impl AsNodeTraceCtx for NodeJoinCtx<'_> {
-    fn as_trace_context(&self) -> NodeTraceCtx {
-        NodeTraceCtx::new(self.patterns(), self.borrow().index)
-    }
-}
-impl GetPatternTraceCtx for NodeJoinCtx<'_> {
-    fn get_pattern_trace_context(
-        &self,
-        pattern_id: &PatternId,
-    ) -> PatternTraceCtx {
-        PatternTraceCtx::new(
-            self.index.to_pattern_location(*pattern_id),
-            self.as_trace_context()
-                .patterns
-                .get(pattern_id)
-                .unwrap()
-                .clone(),
-        )
     }
 }
 impl GetPatternCtx for NodeJoinCtx<'_> {
@@ -102,24 +87,35 @@ impl GetPatternCtx for NodeJoinCtx<'_> {
         &self,
         pattern_id: &PatternId,
     ) -> Self::PatternCtx {
-        let ctx = self.get_pattern_trace_context(pattern_id);
         PatternJoinCtx {
-            ctx,
+            loc: self.index.to_pattern_location(*pattern_id),
+            pattern: self.overlay.pattern(pattern_id).to_vec(),
             splits: self.splits.clone(),
             intervals: self.intervals.clone(),
         }
-    }
-}
-impl NodeJoinCtx<'_> {
-    /// Get the child patterns for the current node.
-    /// Returns owned data since graph access returns owned values now.
-    pub(crate) fn patterns(&self) -> ChildPatterns {
-        self.ctx.trav.expect_child_patterns(self.index)
     }
 }
 
 impl NodeJoinCtx<'_> {
     pub(crate) fn vertex_cache(&self) -> &SplitVertexCache {
         self.interval.cache.get(&self.index.vertex_index()).unwrap()
+    }
+
+    /// Propose replacing the overlay range `range` of `pid` by `replacement`.
+    pub(crate) fn propose_replacement(
+        &mut self,
+        pid: PatternId,
+        range: Range<usize>,
+        replacement: JoinRef,
+    ) {
+        let original = self.overlay.replace(pid, range, replacement);
+        let target = self.index;
+        self.ctx.plan.push_edit(PlanEdit::ReplaceRange {
+            target,
+            pattern_id: pid,
+            range: original,
+            replacement,
+            origin: PatternOrigin::PerfectReplacement,
+        });
     }
 }

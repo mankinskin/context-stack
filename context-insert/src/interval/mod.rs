@@ -13,21 +13,27 @@ use crate::{
                 SplitPositionCache,
             },
         },
+        provenance::SplitProvenance,
         trace::states::SplitStates,
     },
 };
+use derivative::Derivative;
 use context_trace::*;
 
 pub mod init;
 pub(crate) mod partition;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq, Eq)]
 pub struct IntervalGraph {
     pub(crate) states: SplitStates,
     pub(crate) cache: SplitCache,
     pub(crate) root: Token,
     pub(crate) target_range: PartitionRange, // range of target partition indices in root
     pub(crate) required: RequiredPartitions, // required partition ranges for selective merge
+    /// Why positions were required and how children were reached.
+    #[derivative(PartialEq = "ignore")]
+    pub(crate) provenance: SplitProvenance,
 }
 impl IntervalGraph {
     pub(crate) fn get(

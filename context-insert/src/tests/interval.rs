@@ -265,6 +265,7 @@ fn interval_graph1() {
             cache: build_split_cache1(env),
             target_range: PartitionRange::from(0..=0),
             required: expected_required,
+            provenance: Default::default(),
         }
     );
 }

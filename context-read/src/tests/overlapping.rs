@@ -89,6 +89,7 @@ fn repetition_xyzxyzxyz() {
 /// (ababcaba)      -> { [ab, abcaba], [abab, caba] }
 /// (abababcaba)    -> { [ab, ababcaba], [ababab, caba] }
 /// (abcabababcaba) -> { [abc, abababcaba], [abcababab, caba] }
+#[cfg(test)]
 pub(super) fn expected_abcabababcaba() -> HypergraphRef {
     let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});

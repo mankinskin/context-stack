@@ -2,6 +2,7 @@ use std::num::NonZeroUsize;
 
 use crate::{
     TokenTracePos,
+    join::plan::ElemWidth,
     interval::partition::info::{
         border::{
             BorderInfo,
@@ -25,7 +26,6 @@ use crate::{
         },
     },
 };
-use context_trace::*;
 
 pub(crate) trait InfoBorder<R: RangeRole>:
     Sized + PartitionBorder<R>
@@ -39,15 +39,15 @@ pub(crate) trait InfoBorder<R: RangeRole>:
     /// Create border info from pattern and splits.
     /// The atom_pos parameter allows recalculating sub_index from the current pattern,
     /// which is necessary when the pattern may have been modified after tracing.
-    fn info_border(
-        pattern: &Pattern,
+    fn info_border<W: ElemWidth>(
+        pattern: &[W],
         splits: &Self::Splits,
         atom_pos: Self::AtomPos,
     ) -> Self;
 
-    fn inner_range_offsets(
+    fn inner_range_offsets<W: ElemWidth>(
         &self,
-        pattern: &Pattern,
+        pattern: &[W],
     ) -> Option<OffsetsOf<R>>;
     fn inner_range(&self) -> PatternRangeOf<R>;
     fn outer_range(&self) -> PatternRangeOf<R>;
@@ -63,21 +63,21 @@ impl<M: PostVisitMode> InfoBorder<Post<M>> for BorderInfo {
     type Splits = TokenTracePos;
     type AtomPos = NonZeroUsize;
 
-    fn info_border(
-        pattern: &Pattern,
+    fn info_border<W: ElemWidth>(
+        pattern: &[W],
         splits: &Self::Splits,
         _atom_pos: Self::AtomPos,
     ) -> Self {
         // Use splits (delta-adjusted) instead of atom_pos to handle modified patterns
         Self::new_from_trace_pos(pattern, splits)
     }
-    fn inner_range_offsets(
+    fn inner_range_offsets<W: ElemWidth>(
         &self,
-        pattern: &Pattern,
+        pattern: &[W],
     ) -> Option<OffsetsOf<Post<M>>> {
         (self.inner_offset.is_some() && pattern.len() - self.sub_index > 1)
             .then(|| {
-                let w = *pattern[self.sub_index].width();
+                let w = pattern[self.sub_index].elem_width();
                 self.start_offset.map(|o| o.get() + w).unwrap_or(w)
             })
             .and_then(NonZeroUsize::new)
@@ -100,17 +100,17 @@ impl<M: PreVisitMode> InfoBorder<Pre<M>> for BorderInfo {
     type Splits = TokenTracePos;
     type AtomPos = NonZeroUsize;
 
-    fn info_border(
-        pattern: &Pattern,
+    fn info_border<W: ElemWidth>(
+        pattern: &[W],
         splits: &Self::Splits,
         _atom_pos: Self::AtomPos,
     ) -> Self {
         // Use splits (delta-adjusted) instead of atom_pos to handle modified patterns
         Self::new_from_trace_pos(pattern, splits)
     }
-    fn inner_range_offsets(
+    fn inner_range_offsets<W: ElemWidth>(
         &self,
-        _pattern: &Pattern,
+        _pattern: &[W],
     ) -> Option<OffsetsOf<Pre<M>>> {
         (self.inner_offset.is_some() && self.sub_index > 0)
             .then_some(self.start_offset)
@@ -134,8 +134,8 @@ impl<M: InVisitMode> InfoBorder<In<M>> for (BorderInfo, BorderInfo) {
     );
     type AtomPos = (NonZeroUsize, NonZeroUsize);
 
-    fn info_border(
-        pattern: &Pattern,
+    fn info_border<W: ElemWidth>(
+        pattern: &[W],
         splits: &Self::Splits,
         _atom_pos: Self::AtomPos,
     ) -> Self {
@@ -147,9 +147,9 @@ impl<M: InVisitMode> InfoBorder<In<M>> for (BorderInfo, BorderInfo) {
         )
     }
 
-    fn inner_range_offsets(
+    fn inner_range_offsets<W: ElemWidth>(
         &self,
-        pattern: &Pattern,
+        pattern: &[W],
     ) -> Option<OffsetsOf<In<M>>> {
         let a = InfoBorder::<Post<M>>::inner_range_offsets(&self.0, pattern);
         let b = InfoBorder::<Pre<M>>::inner_range_offsets(&self.1, pattern);

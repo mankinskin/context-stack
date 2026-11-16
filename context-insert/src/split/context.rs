@@ -1,7 +1,14 @@
 use crate::split::{
+    provenance::{
+        IncidencePath,
+        RequirementOrigin,
+    },
     cache::{
         SplitCache,
-        position::SplitPositionCache,
+        position::{
+            PosKey,
+            SplitPositionCache,
+        },
         vertex::SplitVertexCache,
     },
     trace::{
@@ -73,6 +80,12 @@ impl<G: HasGraph> SplitCacheCtx<G> {
                 })
                 .collect(),
         };
+        for offset in root_vertex.positions.keys() {
+            states_ctx.provenance.require(
+                PosKey::new(states_ctx.ctx.root, *offset),
+                RequirementOrigin::Target,
+            );
+        }
         let cache = SplitCache::new(
             root_mode,
             FromIterator::from_iter([(states_ctx.ctx.root.index, root_vertex)]),
@@ -88,7 +101,24 @@ impl<G: HasGraph> SplitCacheCtx<G> {
             index,
             offset,
             prev,
+            ref via,
         } = state;
+        let via = via.as_ref().map(|loc| {
+            self.states_ctx.provenance.record_incidence(
+                index,
+                offset,
+                IncidencePath {
+                    parent: prev.index,
+                    pattern_id: loc.pattern_id(),
+                    sub_index: loc.sub_index(),
+                    child_start: prev.pos.get() - offset.get(),
+                },
+            )
+        });
+        self.states_ctx.provenance.require(
+            PosKey::new(index, offset),
+            RequirementOrigin::Propagated { from: prev, via },
+        );
         if let Some(ve) = self.cache.get_mut(&index.vertex_index()) {
             ve.positions
                 .entry(offset)

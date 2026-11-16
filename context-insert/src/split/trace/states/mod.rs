@@ -53,6 +53,7 @@ impl SplitStates {
                                 index: *index,
                                 pos: parent_offset,
                             },
+                            via: Some(sub.location.clone()),
                         }
                     ).ok_or_else(||
                         (len == 1).then(||

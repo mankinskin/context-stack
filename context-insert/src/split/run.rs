@@ -8,7 +8,12 @@ use crate::{
         RequiredPartitions,
     },
     split::{
+        cache::{
+            position::PosKey,
+            vertex::RootAugmentation,
+        },
         context::SplitCacheCtx,
+        provenance::RequirementOrigin,
         trace::SplitTraceState,
     },
 };
@@ -32,10 +37,29 @@ impl<G: HasGraph> SplitRun<G> {
         (Vec<SplitTraceState>, PartitionRange, RequiredPartitions),
         ErrorReason,
     > {
-        self.ctx.cache.augment_root(
-            &self.ctx.states_ctx.trav,
-            self.ctx.states_ctx.ctx.root,
-        )
+        let root = self.ctx.states_ctx.ctx.root;
+        let RootAugmentation {
+            next,
+            target_range,
+            required,
+            inner_offsets,
+            wrapper_offsets,
+        } = self
+            .ctx
+            .cache
+            .augment_root(&self.ctx.states_ctx.trav, root)?;
+        let provenance = &mut self.ctx.states_ctx.provenance;
+        for offset in inner_offsets {
+            provenance.require(
+                PosKey::new(root, offset),
+                RequirementOrigin::InnerAugmentation,
+            );
+        }
+        for offset in wrapper_offsets {
+            provenance
+                .require(PosKey::new(root, offset), RequirementOrigin::Wrapper);
+        }
+        Ok((next, target_range, required))
     }
     pub(crate) fn finish(mut self) -> SplitCacheCtx<G> {
         self.ctx
@@ -87,6 +111,7 @@ impl<G: HasGraph> TryFrom<SplitRun<G>> for IntervalGraph {
         debug!("SplitRun::try_from - finish done, creating IntervalGraph");
         Ok(Self {
             root: cache.states_ctx.ctx.root,
+            provenance: cache.states_ctx.provenance,
             states: cache.states_ctx.states,
             cache: cache.cache,
             target_range,

@@ -54,6 +54,21 @@ let result = graph.insert_or_get_complete(pattern)?;
   child token and half-open atom offsets. When both boundaries lie inside one
   child, the parent reuses that interval instead of concatenating overlapping
   suffix and prefix fragments.
+- **Planned Joins**: The join phase builds an operation-local `JoinPlan`
+  (`join/plan.rs`) instead of mutating the graph: candidate vertices
+  (`CandidateId`, never vertex indices) with origin-tagged decompositions,
+  proposed edits to existing vertices, and split provenance
+  (`split/provenance.rs`). Nodes are read through an overlay of proposed
+  replacements recorded against original child ranges. `select`
+  (`join/select.rs`) and `publish` form the single point where the plan is
+  materialized.
+- **Local Retention**: `select` keeps only locally justified structure.
+  Evidence decompositions (joined, perfect replacement, root pattern) count as
+  parents; binary sub-merges are proposals, accepted only when all children
+  are retained independently and they add a new border. A candidate with one
+  evidence parent and one decomposition is inlined into that parent (unless
+  that would make decompositions share a border); one without parents is
+  dropped. Overlap wrappers (two or more evidence decompositions) are kept.
 - **Multi-Phase Processing**: Pre/in/post visit modes for insertion stages
 - **Result Extraction**: Different modes for handling insertion results
 

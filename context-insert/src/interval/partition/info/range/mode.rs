@@ -3,7 +3,10 @@ use std::{
     hash::Hash,
 };
 
-use context_trace::HasToken;
+use context_trace::{
+    HasToken,
+    Token,
+};
 
 use crate::{
     interval::partition::info::range::{
@@ -18,14 +21,10 @@ use crate::{
         },
     },
     split::vertex::{
-        node::{
-            AsNodeTraceCtx,
-            NodeTraceCtx,
-        },
+        node::NodeTraceCtx,
         pattern::{
             GetPatternCtx,
-            GetPatternTraceCtx,
-            HasPatternTraceCtx,
+            PatternElems,
             PatternTraceCtx,
         },
     },
@@ -51,18 +50,18 @@ impl<R: RangeRole<Mode = Self>> ModeInfo<R> for Trace {
 /// Uses GATs (Generic Associated Types) to allow contexts to have lifetimes
 /// while the trait itself doesn't require them upfront.
 pub(crate) trait ModeCtx {
-    type NodeCtx<'a>: AsNodeTraceCtx
-        + GetPatternCtx<PatternCtx = Self::PatternResult>
-        + GetPatternTraceCtx
-        + HasToken
+    type NodeCtx<'a>: GetPatternCtx<PatternCtx = Self::PatternResult> + HasToken
     where
         Self: 'a;
-    type PatternResult: HasPatternTraceCtx + Hash + Eq + Clone;
+    type PatternResult: PatternElems + Hash + Eq + Clone;
+    /// Reference to an existing (or, when joining, planned) token.
+    type Ref: Clone + Debug;
 }
 
 impl ModeCtx for Trace {
     type NodeCtx<'a> = NodeTraceCtx;
     type PatternResult = PatternTraceCtx;
+    type Ref = Token;
 }
 
 pub(crate) trait ModeChildren<R: RangeRole> {

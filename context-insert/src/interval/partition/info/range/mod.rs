@@ -7,6 +7,7 @@ use mode::{
 use role::{
     BordersOf,
     ModePatternCtxOf,
+    ModeRefOf,
     RangeRole,
 };
 
@@ -17,7 +18,7 @@ use crate::{
         info::InfoBorder,
         trace::TraceBorders,
     },
-    split::vertex::pattern::HasPatternTraceCtx,
+    split::vertex::pattern::PatternElems,
 };
 
 pub(crate) mod role;
@@ -42,7 +43,7 @@ pub(crate) trait ModeRangeInfo<R: RangeRole>: Debug {
     fn info_pattern_range(
         borders: BordersOf<R>,
         ctx: &ModePatternCtxOf<R>,
-    ) -> Result<PatternRangeInfo<R>, Token>;
+    ) -> Result<PatternRangeInfo<R>, ModeRefOf<R>>;
 }
 
 impl<R: RangeRole<Mode = Trace>> ModeRangeInfo<R> for TraceRangeInfo<R> {
@@ -52,9 +53,8 @@ impl<R: RangeRole<Mode = Trace>> ModeRangeInfo<R> for TraceRangeInfo<R> {
     ) -> Result<PatternRangeInfo<R>, Token> {
         let range = borders.outer_range();
         let inner = borders.inner_info(ctx);
-        let pctx = ctx.pattern_trace_context();
-        let pat = pctx.pattern.get(range.clone().into()).unwrap().to_vec();
-        let pid = pctx.loc.pattern_id();
+        let pat = ctx.elems().get(range.clone().into()).unwrap().to_vec();
+        let pid = ctx.pattern_id();
         if pat.len() != 1 {
             Ok(PatternRangeInfo {
                 pattern_id: pid,

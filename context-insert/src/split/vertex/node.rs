@@ -26,13 +26,6 @@ impl HasToken for NodeTraceCtx {
     }
 }
 impl NodeTraceCtx {
-    pub(crate) fn new(
-        patterns: ChildPatterns,
-        index: Token,
-    ) -> Self {
-        Self { patterns, index }
-    }
-
     pub(crate) fn from_index<K: GraphKind>(
         graph: &Hypergraph<K>,
         index: Token,

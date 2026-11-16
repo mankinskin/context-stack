@@ -23,13 +23,15 @@ use crate::{
         joined::partition::JoinedPartition,
     },
 };
-use context_trace::*;
 use info::{
     JoinPartitionInfo,
     pattern_info::JoinPatternInfo,
 };
 
-use crate::join::context::pattern::PatternJoinCtx;
+use crate::join::{
+    context::pattern::PatternJoinCtx,
+    plan::JoinRef,
+};
 
 pub(crate) trait JoinPartition<R: RangeRole<Mode = Join>>:
     InfoPartition<R>
@@ -39,7 +41,7 @@ where
     fn join_partition<'a: 'b, 'b: 'c, 'c>(
         self,
         ctx: &'c mut NodeJoinCtx<'a>,
-    ) -> Result<JoinedPartition<R>, Token>
+    ) -> Result<JoinedPartition<R>, JoinRef>
     where
         Self: 'c,
         R: 'a,
@@ -63,6 +65,7 @@ pub(crate) struct Join;
 impl ModeCtx for Join {
     type NodeCtx<'a> = NodeJoinCtx<'a>;
     type PatternResult = PatternJoinCtx;
+    type Ref = JoinRef;
 }
 
 impl<R: RangeRole<Mode = Join>> ModeChildren<R> for Join {

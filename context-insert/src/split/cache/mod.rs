@@ -1,10 +1,13 @@
 use crate::{
-    join::context::node::merge::{
-        PartitionRange,
-        RequiredPartitions,
-    },
     split::{
-        cache::vertex::SplitVertexCache,
+        cache::{
+            position::PosKey,
+            vertex::{
+                RootAugmentation,
+                SplitVertexCache,
+            },
+        },
+        provenance::RequirementOrigin,
         trace::{
             SplitTraceState,
             states::context::SplitTraceStatesCtx,
@@ -56,10 +59,7 @@ impl SplitCache {
         &mut self,
         trav: impl HasGraph,
         root: Token,
-    ) -> Result<
-        (Vec<SplitTraceState>, PartitionRange, RequiredPartitions),
-        ErrorReason,
-    > {
+    ) -> Result<RootAugmentation, ErrorReason> {
         let graph = trav.graph();
         let ctx = NodeTraceCtx::from_index(&graph, root);
         let index = root.vertex_index();
@@ -75,7 +75,19 @@ impl SplitCache {
     ) {
         debug!("augment_nodes");
         for c in nodes {
+            let before = self
+                .get(&c.vertex_index())
+                .map(|v| v.positions.keys().cloned().collect::<Vec<_>>())
+                .unwrap_or_default();
             let new = self.augment_node(&ctx.trav, c);
+            for offset in self[&c.vertex_index()].positions.keys() {
+                if !before.contains(offset) {
+                    ctx.provenance.require(
+                        PosKey::new(c, *offset),
+                        RequirementOrigin::InnerAugmentation,
+                    );
+                }
+            }
             // todo: force order
             ctx.states.queue.extend(new.into_iter());
         }

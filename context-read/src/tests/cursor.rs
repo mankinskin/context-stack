@@ -1024,23 +1024,19 @@ fn closure_represents_nested_complements_inside_their_scopes() {
         .values()
         .find(|pattern| pattern[0] == wabc)
         .expect("closure must start with the scope")[1];
-    let de = graph
-        .expect_child_patterns(def)
-        .values()
-        .next()
-        .expect("def must be a composite token")[0];
+    // `de` would only have the parent `def` and the speculative regrouping
+    // `bcde=[bc,de]`, so insertion inlines it
     assert_patterns!(
         graph,
         wabcdef => [[wabc, def], [wa, bcdef]],
         wa => [[w, a]],
         wabc => [[w, abc], [wa, bc]],
-        de => [[d, e]],
-        def => [[de, f]],
-        bcde => [[bcd, e], [bc, de]],
+        def => [[d, e, f]],
+        bcde => [[bcd, e]],
         bcdef => [[bcde, f], [bc, def]],
         root => [[x, wabcdef]]
     );
-    assert_eq!(graph.vertex_count(), 19);
+    assert_eq!(graph.vertex_count(), 18);
     crate::tests::assert_graph_invariants(&graph);
 }
 

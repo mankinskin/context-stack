@@ -62,21 +62,18 @@ impl<'a> MergeCtx<'a> {
         ctx: NodeJoinCtx<'a>,
         mode: MergeMode,
     ) -> Self {
+        // Offsets are stable atom positions; per-pattern sub indices are
+        // re-derived from the node overlay whenever a partition is built.
         let offsets = ctx.vertex_cache().clone();
-        Self {
-            ctx,
-            offsets, // clone the cache for processing and modification
-            // in the future this may be a mutable reference into IntervalGraph.SplitCache, if we want to reuse the interval cache after insertion
-            mode,
-        }
+        Self { ctx, offsets, mode }
     }
 
     /// Add a split to the shared splits map.
     /// This makes splits for merged tokens available to subsequent pattern operations.
     pub(crate) fn add_split(
         &mut self,
-        key: crate::split::cache::position::PosKey,
-        split: crate::split::Split,
+        key: crate::join::plan::RefPosKey,
+        split: crate::split::Split<crate::join::plan::JoinRef>,
     ) {
         self.ctx.splits.insert(key, split);
     }

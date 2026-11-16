@@ -222,11 +222,13 @@ Separate tasks, outside this refactor:
 - [ ] **context-insert occurrence completeness:** insertion of `ab` into
   initially flat `abcd`/`cdab` must represent both occurrences, not rewrite
   only one token.
-- [ ] **context-insert partition retention:** the same-child interval panic is
-  fixed, but intermediary merges still materialize every partition range and
-  retain its binary sub-merges without checking whether the oracle needs them.
-  At `abab` offsets 1 and 3, this retains `ba` and `bab` and adds `[a,ba]` to
-  `aba`.
+- [x] **context-insert partition retention:** `join/select.rs` selects a
+  local subset of the plan: sub-merge regroupings are proposals that never
+  count as parents; single-use, single-decomposition helpers are inlined
+  unless that would make decompositions share a border. `ba`, `bab` and the
+  decompositions using them are no longer published for
+  `complex_abcabababcaba`. Remaining insertion-side difference:
+  pre-existing `ababab=[abab,ab]` (built by an earlier read step).
 - [ ] **context-read nested overlap closure:** the final overlap uses
   `P=ab`, `E=abcaba`, and the entire `R=abcababab`, producing
   `[abcabab,abcaba]`. The oracle instead factors the suffix closure as

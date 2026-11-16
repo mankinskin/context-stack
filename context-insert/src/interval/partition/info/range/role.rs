@@ -47,6 +47,7 @@ use crate::{
         vertex::VertexSplits,
     },
 };
+use crate::join::plan::JoinRef;
 use context_trace::*;
 
 use crate::interval::partition::info::range::splits::OffsetIndexRange;
@@ -68,6 +69,7 @@ pub(crate) type ModeChildrenOf<R> = <ModeOf<R> as ModeChildren<R>>::Result;
 /// Type alias for the pattern context of a given range role's mode.
 pub(crate) type ModePatternCtxOf<R> =
     <<R as RangeRole>::Mode as ModeCtx>::PatternResult;
+pub(crate) type ModeRefOf<R> = <<R as RangeRole>::Mode as ModeCtx>::Ref;
 pub(crate) type ModeNodeCtxOf<'a, R> =
     <<R as RangeRole>::Mode as ModeCtx>::NodeCtx<'a>;
 
@@ -105,7 +107,7 @@ impl<M: PreVisitMode> RangeRole for Pre<M> {
     type OffsetRange = RangeTo<usize>;
     type PatternRange = Range<usize>;
     type Kind = Outer;
-    type Children = Token;
+    type Children = JoinRef;
     type PartitionSplits = ((), VertexSplits);
     type Borders = BorderInfo;
     type Splits = VertexSplits;
@@ -145,7 +147,7 @@ impl<M: PostVisitMode> RangeRole for Post<M> {
     type OffsetRange = RangeFrom<usize>;
     type PatternRange = PostfixRangeFrom;
     type Kind = Outer;
-    type Children = Token;
+    type Children = JoinRef;
     type PartitionSplits = (VertexSplits, ());
     type Borders = BorderInfo;
     type Splits = VertexSplits;

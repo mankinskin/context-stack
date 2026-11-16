@@ -1,5 +1,4 @@
 use crate::{
-    PatternSubDeltas,
     RangeRole,
     interval::partition::{
         Partition,
@@ -29,12 +28,21 @@ use crate::{
             Join,
             info::JoinPartitionInfo,
         },
+        plan::{
+            JoinRef,
+            NodeOverlay,
+            PatternOrigin,
+            ProposedPattern,
+            SubMergeKind,
+        },
     },
-    split::vertex::ToVertexSplits,
-};
-use context_trace::{
-    Token,
-    VertexSet,
+    split::{
+        trace_back_pos,
+        vertex::{
+            ToVertexSplits,
+            VertexSplits,
+        },
+    },
 };
 use tracing::debug;
 
@@ -55,7 +63,7 @@ use tracing::debug;
 ///     &range_map,
 ///     &partition_range,
 /// );
-/// let (token, delta) = ctx.merge();
+/// let token = ctx.merge();
 /// ```
 pub(crate) struct MergePartitionCtx<'a, 'b, R: RangeRole<Mode = Join>>
 where
@@ -74,10 +82,8 @@ where
 /// Result of a partition merge operation.
 pub(crate) struct MergeResult {
     /// The merged token
-    pub(crate) token: Token,
-    /// Pattern deltas (if any sub-indices changed)
-    pub(crate) delta: Option<PatternSubDeltas>,
-    /// Whether replace_in_pattern was called (perfect pattern match)
+    pub(crate) token: JoinRef,
+    /// Whether an in-place replacement was proposed (perfect pattern match)
     pub(crate) had_pattern_replacement: bool,
 }
 
@@ -88,15 +94,15 @@ where
     /// Get partition info for all patterns.
     ///
     /// Returns `Ok(PartitionInfo)` if the partition needs to be created,
-    /// or `Err(Token)` if a token already exists for this exact partition.
-    pub(crate) fn info_partition(&self) -> Result<PartitionInfo<R>, Token> {
+    /// or `Err(JoinRef)` if a token already exists for this exact partition.
+    pub(crate) fn info_partition(&self) -> Result<PartitionInfo<R>, JoinRef> {
         self.partition.info_partition(&self.merge_ctx.ctx)
     }
 
     /// Create a JoinedPartition from partition info.
     ///
-    /// This handles pattern joining, token creation/lookup, and delta computation.
-    /// If `skip_pattern_replacement` is true, patterns won't be modified.
+    /// This handles pattern joining and candidate proposal.
+    /// If `skip_pattern_replacement` is true, no replacement is proposed.
     pub(crate) fn join_partition_with_options(
         &mut self,
         info: PartitionInfo<R>,
@@ -118,39 +124,47 @@ where
         self.join_partition_with_options(info, false)
     }
 
-    /// Add sub-merge patterns to a token if they don't already exist.
+    /// Propose sub-merge patterns for a token if it doesn't have them yet.
     ///
     /// Sub-merge patterns are alternative decompositions of the merged token
     /// that were discovered during the partition merge process.
     pub(crate) fn add_sub_merges(
         &mut self,
-        token: Token,
+        token: JoinRef,
     ) {
-        let existing_patterns = self
-            .merge_ctx
-            .ctx
-            .trav
-            .expect_vertex_data(token)
-            .child_pattern_set();
-
-        let sub_merges: Vec<_> = self
-            .range_map
-            .range_sub_merges(&self.partition_range)
-            .into_iter()
-            .filter(|p| !existing_patterns.contains(p))
-            .collect();
-
-        if !sub_merges.is_empty() {
-            debug!(
-                num_sub_merges = sub_merges.len(),
-                "Adding sub-merge patterns"
-            );
-            for merge_pattern in sub_merges {
-                self.merge_ctx
-                    .ctx
-                    .trav
-                    .add_pattern_with_update(token, merge_pattern);
-            }
+        let sub_merges = self.range_map.range_sub_merges(&self.partition_range);
+        let origin = PatternOrigin::SubMerge(SubMergeKind::Partition);
+        let plan = &mut *self.merge_ctx.ctx.ctx.plan;
+        match token {
+            JoinRef::Candidate(id) => {
+                let existing = plan.candidate_pattern_set(id);
+                for refs in sub_merges {
+                    if !existing.contains(&refs) {
+                        plan.add_candidate_pattern(
+                            id,
+                            ProposedPattern { refs, origin },
+                        );
+                    }
+                }
+            },
+            JoinRef::Existing(target) => {
+                let trav = self.merge_ctx.ctx.ctx.trav;
+                let mut existing: Vec<Vec<JoinRef>> = trav
+                    .expect_child_patterns(target)
+                    .into_values()
+                    .map(|p| p.iter().map(|t| JoinRef::Existing(*t)).collect())
+                    .chain(plan.added_patterns(target).cloned())
+                    .collect();
+                for refs in sub_merges {
+                    if !existing.contains(&refs) {
+                        existing.push(refs.clone());
+                        plan.push_edit(crate::join::plan::PlanEdit::AddPattern {
+                            target,
+                            pattern: ProposedPattern { refs, origin },
+                        });
+                    }
+                }
+            },
         }
     }
 
@@ -178,24 +192,17 @@ where
                 );
 
                 debug!(
-                    token = %joined.index,
-                    ?joined.delta,
+                    token = ?joined.index,
                     had_pattern_replacement = will_have_perfect && !skip_pattern_replacement,
-                    "JoinPartitionInfo succeeded with delta"
+                    "JoinPartitionInfo succeeded"
                 );
 
                 if !skip_pattern_replacement {
                     self.add_sub_merges(joined.index);
                 }
 
-                let delta = if joined.delta.is_empty() {
-                    None
-                } else {
-                    Some(joined.delta)
-                };
                 MergeResult {
                     token: joined.index,
-                    delta,
                     had_pattern_replacement: will_have_perfect
                         && !skip_pattern_replacement,
                 }
@@ -210,24 +217,21 @@ where
                 );
                 MergeResult {
                     token: existing,
-                    delta: None,
                     had_pattern_replacement: false,
                 }
             },
         }
     }
 
-    /// Merge the partition and return (token, delta).
+    /// Merge the partition and return the merged reference.
     ///
     /// This is the main entry point that:
     /// 1. Gets partition info (or returns existing token)
-    /// 2. Creates JoinedPartition with delta computation
-    /// 3. Adds sub-merge patterns
-    /// 4. Returns the token and any pattern deltas
+    /// 2. Proposes a JoinedPartition
+    /// 3. Proposes sub-merge patterns
     #[allow(dead_code)]
-    pub(crate) fn merge(self) -> (Token, Option<PatternSubDeltas>) {
-        let result = self.merge_internal(false);
-        (result.token, result.delta)
+    pub(crate) fn merge(self) -> JoinRef {
+        self.merge_internal(false).token
     }
 
     /// Merge the partition and return full result info.
@@ -242,7 +246,7 @@ where
     /// This is used for edge partitions in ROOT mode where we only need
     /// the token, not pattern modifications. This avoids corrupting the
     /// root pattern when merging edge partitions.
-    pub(crate) fn merge_token_only(self) -> Token {
+    pub(crate) fn merge_token_only(self) -> JoinRef {
         self.merge_internal(true).token
     }
 }
@@ -257,6 +261,7 @@ where
 #[derive(Clone)]
 pub(crate) struct MergePartitionBuilder<'a> {
     offsets: &'a crate::SplitVertexCache,
+    overlay: &'a NodeOverlay,
     partition_range: PartitionRange,
     num_partitions: usize,
 }
@@ -268,9 +273,29 @@ impl<'a> MergePartitionBuilder<'a> {
     ) -> Self {
         Self {
             offsets: &merge_ctx.offsets,
+            overlay: &merge_ctx.ctx.overlay,
             partition_range,
             num_partitions: merge_ctx.num_partitions(),
         }
+    }
+
+    /// Split positions of the offset at `index`, located in the node's
+    /// current overlay patterns from the stable atom offset.
+    fn splits_at(
+        &self,
+        index: usize,
+    ) -> VertexSplits {
+        let VertexSplits { pos, splits } =
+            self.offsets.pos_ctx_by_index(index).to_vertex_splits();
+        let splits = splits
+            .into_keys()
+            .map(|pid| {
+                let trace = trace_back_pos(self.overlay.pattern(&pid), pos)
+                    .expect("offset must lie inside the node");
+                (pid, trace)
+            })
+            .collect();
+        VertexSplits { pos, splits }
     }
 }
 
@@ -283,10 +308,7 @@ impl ToPartition<Pre<Join>> for MergePartitionBuilder<'_> {
             partition_end,
             self.num_partitions
         );
-        let ro = self
-            .offsets
-            .pos_ctx_by_index(partition_end)
-            .to_vertex_splits();
+        let ro = self.splits_at(partition_end);
         Partition { offsets: ro }
     }
 }
@@ -299,10 +321,7 @@ impl ToPartition<Post<Join>> for MergePartitionBuilder<'_> {
             "Postfix partition start {} must be > 0",
             partition_start
         );
-        let lo = self
-            .offsets
-            .pos_ctx_by_index(partition_start - 1) // offset left of partition
-            .to_vertex_splits();
+        let lo = self.splits_at(partition_start - 1); // offset left of partition
         Partition { offsets: lo }
     }
 }
@@ -322,14 +341,8 @@ impl ToPartition<In<Join>> for MergePartitionBuilder<'_> {
             partition_end,
             self.num_partitions
         );
-        let lo = self
-            .offsets
-            .pos_ctx_by_index(partition_start - 1) // offset left of partition
-            .to_vertex_splits();
-        let ro = self
-            .offsets
-            .pos_ctx_by_index(partition_end)
-            .to_vertex_splits();
+        let lo = self.splits_at(partition_start - 1); // offset left of partition
+        let ro = self.splits_at(partition_end);
         Partition { offsets: (lo, ro) }
     }
 }

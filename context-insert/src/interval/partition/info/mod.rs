@@ -18,15 +18,17 @@ use crate::{
         ToPartition,
         info::{
             border::info::InfoBorder,
-            range::role::ModeNodeCtxOf,
+            range::role::{
+                ModeNodeCtxOf,
+                ModeRefOf,
+            },
         },
     },
     split::{
         pattern::PatternSplits,
         vertex::pattern::{
             GetPatternCtx,
-            HasPatternTraceCtx,
-            PatternTraceCtx,
+            PatternElems,
         },
     },
 };
@@ -52,19 +54,18 @@ impl<T: Hash + Eq> PartitionBorderKey for T {}
 pub(crate) trait InfoPartition<R: RangeRole>:
     Sized + Clone + ToPartition<R>
 {
-    fn info_borders(
+    fn info_borders<P: PatternElems>(
         &self,
-        ctx: &PatternTraceCtx,
+        ctx: &P,
     ) -> R::Borders {
         let part = self.clone().to_partition();
         // todo detect if prev offset is in same index (to use inner partition as result)
-        let pctx = ctx.pattern_trace_context();
-        let splits = part.offsets.get(&pctx.loc.pattern_id).unwrap();
+        let splits = part.offsets.get(&ctx.pattern_id()).unwrap();
         // Get atom position for recalculating sub_index from current pattern
         // The AtomPos type is generic: NonZeroUsize for Pre/Post, (NonZeroUsize, NonZeroUsize) for In
         let atom_pos = part.offsets.atom_pos();
 
-        R::Borders::info_border(&pctx.pattern, &splits, atom_pos)
+        R::Borders::info_border(ctx.elems(), &splits, atom_pos)
     }
 
     fn pattern_ctxs<'a>(
@@ -89,9 +90,8 @@ pub(crate) trait InfoPartition<R: RangeRole>:
             .into_values()
             .map(|pctx| {
                 let (perfect, borders) = {
-                    let pctx = pctx.pattern_trace_context();
                     let borders = self.info_borders(&pctx);
-                    (borders.perfect().then_some(pctx.loc.pattern_id), borders)
+                    (borders.perfect().then_some(pctx.pattern_id()), borders)
                 };
                 (perfect, (C::from(pctx), borders))
             })
@@ -101,7 +101,7 @@ pub(crate) trait InfoPartition<R: RangeRole>:
     fn info_partition<'a>(
         &self,
         ctx: &ModeNodeCtxOf<'a, R>,
-    ) -> Result<PartitionInfo<R>, Token> {
+    ) -> Result<PartitionInfo<R>, ModeRefOf<R>> {
         self.partition_borders(ctx).into_partition_info()
     }
 }
