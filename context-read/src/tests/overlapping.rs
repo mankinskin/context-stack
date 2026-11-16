@@ -47,6 +47,7 @@ fn repetition_abcabcabc() {
         abcabc => [[abc, abc]],
         root => [[abcabc, abc], [abc, abcabc]]
     );
+    crate::tests::assert_graph_invariants(&graph);
 }
 
 /// Test "xyzxyzxyz" - "xyz" repeated three times, requires overlap detection.

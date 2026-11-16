@@ -7,10 +7,6 @@
 //! Note: These tests may fail if context-read has bugs. The ngrams algorithm is the reference.
 
 use crate::input::HasReadCtx;
-use context_search::{
-    assert_exhausted_indices,
-    Find,
-};
 use context_trace::{
     graph::{
         vertex::has_vertex_index::HasVertexIndex,
@@ -118,7 +114,7 @@ fn validate_graphs_equivalent(
             // ngrams can fail for certain inputs (e.g., single char, no repeated patterns)
             // In this case we just verify context-read doesn't crash
             return Ok(());
-        },
+        }
     };
 
     let cr_canonical = CanonicalGraph::from_hypergraph(&cr_graph);
@@ -236,24 +232,7 @@ fn validate_complex_short() {
     assert_graphs_equivalent(&graph, "abcabc");
 }
 
-/// Validate that reading "aabb" produces the tightest compound decomposition.
-///
-/// The ngrams oracle is NOT used here because ngrams only creates compound tokens
-/// for substrings that appear more than once.  "aabb" has no repeated substrings
-/// of length ≥ 2, so ngrams produces only the flat atom pattern `[a, a, b, b]`.
-///
-/// context-read's contract is different: it builds compound tokens incrementally
-/// as it processes the input, always using the tightest available decomposition.
-/// After reading "aa", it creates `aa = [[a, a]]`.  When the first `b` is
-/// appended as an unknown atom the root becomes `aab = [[aa, b]]`.  Then when
-/// the second `b` arrives as a known atom, the implementation detects that the
-/// root's last child (`b`) can be extended with the incoming `b` to form
-/// `bb = [[b, b]]`, and replaces the last child — yielding `aabb = [[aa, bb]]`.
-///
-/// Expected final graph:
-///   `aa`   → `[[a, a]]`
-///   `bb`   → `[[b, b]]`
-///   `aabb` → `[[aa, bb]]`
+/// Owned accumulation grows into flat `aabb`, without retaining `aa` or `bb`.
 #[test]
 fn validate_mixed_pattern() {
     use crate::request::ReadRequest;
@@ -265,25 +244,15 @@ fn validate_mixed_pattern() {
     graph.emit_graph_snapshot();
 
     expect_atoms!(graph, {a, b});
-    // Use exhausted-match assertions for aa and bb. Lower-level search may
-    // retain Prefix/Postfix coverage even when the substring token exists,
-    // so this test only requires an exhausted match whose root token is the
-    // expected materialized substring token.
-    // The root token aabb is obtained directly from the ReadRequest result to
-    // avoid a known issue where find_ancestor("aabb") can return the
-    // intermediate aab vertex (which exists as an orphaned compound) instead
-    // of the full aabb token.
-    assert_exhausted_indices!(graph, aa, bb);
-
     let aabb = result.expect("should produce a root token");
     assert_eq!(aabb.width(), TokenWidth(4));
 
     assert_patterns!(
         graph,
-        aa   => [[a, a]],
-        bb   => [[b, b]],
-        aabb => [[aa, bb]]
+        aabb => [[a, a, b, b]]
     );
+    assert_eq!(graph.vertex_count(), 3);
+    crate::tests::assert_graph_invariants(&graph);
 }
 
 #[test]
@@ -403,7 +372,7 @@ fn ngrams_inspect_aabb() {
                 input
             );
             return;
-        },
+        }
     };
 
     let canonical = CanonicalGraph::from_hypergraph(&ngrams_graph);

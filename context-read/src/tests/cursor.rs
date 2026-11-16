@@ -30,9 +30,13 @@
 use crate::{
     expansion::{
         block::BlockExpansionCtx,
+        closure,
         ExpansionCtx,
     },
-    pipeline::root::RootManager,
+    pipeline::root::{
+        RootManager,
+        Span,
+    },
 };
 use context_insert::ToInsertCtx;
 use context_search::ErrorState;
@@ -505,7 +509,7 @@ fn cursor_single_atom() {
                 TokenWidth(1),
                 "Single atom has width 1"
             );
-        },
+        }
         Ok(_) => panic!("Single atom query should return SingleIndex error"),
         Err(other) => panic!("Unexpected error: {:?}", other),
     }
@@ -569,22 +573,93 @@ fn expansion_sink_updates_graph_before_next_span() {
     sink.append_completed(a);
     sink.append_pattern(Pattern::from(vec![b]));
     let before = sink.root.unwrap();
-    let mut expansion =
-        ExpansionCtx::new(graph.clone(), vec![b, a, a, b, b]);
+    let mut expansion = ExpansionCtx::new(graph.clone(), vec![b, a, a, b, b]);
 
-    assert_eq!(expansion.next(), Some(b));
-    sink.append_completed(b);
+    assert_eq!(expansion.next(&sink), Some(Span::Append(b)));
+    expansion.observe_commit(sink.commit(Span::Append(b)));
     let aabb = sink.root.expect("sink must contain the committed atom");
     assert_eq!(aabb.width(), TokenWidth(4));
     assert_eq!(before.vertex_index(), aabb.vertex_index());
     assert_patterns!(graph, aabb => [[a, a, b, b]]);
 
-    assert_eq!(expansion.next(), Some(aabb));
-    sink.append_completed(aabb);
+    assert_eq!(expansion.next(&sink), Some(Span::Append(aabb)));
+    expansion.observe_commit(sink.commit(Span::Append(aabb)));
     let root = sink.root.unwrap();
     assert_patterns!(graph, root => [[aabb, aabb]]);
     assert_eq!(graph.vertex_count(), 4);
-    assert_eq!(expansion.next(), None);
+    assert_eq!(expansion.next(&sink), None);
+}
+
+#[test]
+fn expansion_closes_root_self_overlap_before_replacing_root() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c] = graph.insert_atoms([
+        Atom::Element('a'),
+        Atom::Element('b'),
+        Atom::Element('c'),
+    ])[..] else {
+        panic!("insert_atoms failed");
+    };
+    let abc = graph.insert_pattern(vec![a, b, c]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(abc);
+    let mut expansion =
+        ExpansionCtx::new(graph.clone(), vec![a, b, c, a, b, c]);
+
+    assert_eq!(expansion.next(&sink), Some(Span::Append(abc)));
+    expansion.observe_commit(sink.commit(Span::Append(abc)));
+    let abcabc = sink.root.unwrap();
+    assert_patterns!(graph, abcabc => [[abc, abc]]);
+
+    let Some(Span::ReplaceRoot { previous, token }) = expansion.next(&sink)
+    else {
+        panic!("root overlap must produce a closed replacement");
+    };
+    assert_eq!(previous, abcabc);
+    assert_eq!(sink.root, Some(abcabc));
+    assert_patterns!(
+        graph,
+        abcabc => [[abc, abc]],
+        token => [[abcabc, abc], [abc, abcabc]]
+    );
+    expansion
+        .observe_commit(sink.commit(Span::ReplaceRoot { previous, token }));
+    assert_eq!(sink.root, Some(token));
+    assert_eq!(graph.vertex_count(), 6);
+    assert_eq!(expansion.next(&sink), None);
+}
+
+#[test]
+fn closure_uses_connected_shared_token_paths() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c, d] = graph.insert_atoms([
+        Atom::Element('a'),
+        Atom::Element('b'),
+        Atom::Element('c'),
+        Atom::Element('d'),
+    ])[..] else {
+        panic!("insert_atoms failed");
+    };
+    let ab = graph.insert_pattern(vec![a, b]);
+    let cd = graph.insert_pattern(vec![c, d]);
+    let abcd = graph.insert_pattern(vec![ab, cd]);
+    let cdab = graph.insert_pattern(vec![cd, ab]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(abcd);
+    let path = closure::boundary_path(&graph, abcd, cd, false).unwrap();
+    let span =
+        closure::prepare(&graph, &sink, abcd, cd, &path, cdab).apply(&graph);
+    let result = sink.commit(span).root;
+
+    assert_patterns!(
+        graph,
+        abcd => [[ab, cd]],
+        cdab => [[cd, ab]],
+        ab => [[a, b]],
+        result => [[abcd, ab], [ab, cdab]]
+    );
 }
 
 #[test]
@@ -657,7 +732,7 @@ fn expansion_block_does_not_overlap_the_accumulation_root() {
 }
 
 #[test]
-fn expansion_resolves_local_overlap_before_emitting() {
+fn expansion_commits_forward_match_before_root_overlap() {
     let graph = HypergraphRef::default();
     let _tracing = init_test_tracing!(&graph);
     let [a, b, c] = graph.insert_atoms([
@@ -669,17 +744,25 @@ fn expansion_resolves_local_overlap_before_emitting() {
     };
     let ab = graph.insert_pattern(vec![a, b]);
     let bc = graph.insert_pattern(vec![b, c]);
+    let mut sink = RootManager::new(graph.clone());
     let mut expansion = ExpansionCtx::new(graph.clone(), vec![a, b, c]);
 
-    let abc = expansion.next().expect("local overlap must produce a span");
+    assert_eq!(expansion.next(&sink), Some(Span::Append(ab)));
+    expansion.observe_commit(sink.commit(Span::Append(ab)));
+    let Some(span @ Span::ReplaceRoot { token: abc, .. }) =
+        expansion.next(&sink)
+    else {
+        panic!("root overlap must produce a replacement");
+    };
 
     assert_eq!(abc.width(), TokenWidth(3));
     assert_patterns!(graph, abc => [[ab, c], [a, bc]]);
-    assert_eq!(expansion.next(), None);
+    expansion.observe_commit(sink.commit(span));
+    assert_eq!(expansion.next(&sink), None);
 }
 
 #[test]
-fn expansion_keeps_overlap_chain_local_until_finalized() {
+fn expansion_commits_each_overlap_before_the_next_search() {
     let graph = HypergraphRef::default();
     let _tracing = init_test_tracing!(&graph);
     let [a, b, c, d] = graph.insert_atoms([
@@ -690,18 +773,27 @@ fn expansion_keeps_overlap_chain_local_until_finalized() {
     ])[..] else {
         panic!("insert_atoms failed");
     };
-    graph.insert_pattern(vec![a, b]);
-    graph.insert_pattern(vec![b, c]);
+    let ab = graph.insert_pattern(vec![a, b]);
+    let bc = graph.insert_pattern(vec![b, c]);
     let cd = graph.insert_pattern(vec![c, d]);
+    let mut sink = RootManager::new(graph.clone());
     let mut expansion = ExpansionCtx::new(graph.clone(), vec![a, b, c, d]);
 
-    let abcd = expansion.next().expect("chain must emit a single final span");
+    assert_eq!(expansion.next(&sink), Some(Span::Append(ab)));
+    expansion.observe_commit(sink.commit(Span::Append(ab)));
+    let span = expansion.next(&sink).unwrap();
+    expansion.observe_commit(sink.commit(span));
+    let abc = sink.root.unwrap();
+    assert_patterns!(graph, abc => [[ab, c], [a, bc]]);
+    let span = expansion.next(&sink).unwrap();
+    expansion.observe_commit(sink.commit(span));
+    let abcd = sink.root.unwrap();
 
     assert_eq!(abcd.width(), TokenWidth(4));
     let patterns = graph.expect_child_patterns(abcd);
     assert!(
         patterns.values().any(|pattern| pattern.last() == Some(&cd)),
-        "the second overlap must extend the local tail, not the global root"
+        "the second overlap must be represented by the committed root"
     );
     assert!(
         patterns
@@ -716,5 +808,342 @@ fn expansion_keeps_overlap_chain_local_until_finalized() {
             .collect();
         assert_eq!(text, "abcd");
     }
-    assert_eq!(expansion.next(), None);
+    assert_eq!(expansion.next(&sink), None);
+}
+
+#[test]
+fn expansion_factors_owned_tail_across_successive_overlaps() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [x, y, z, a, b, c, d, e] =
+        graph.insert_atoms("xyzabcde".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let bc = graph.insert_pattern(vec![b, c]);
+    let cd = graph.insert_pattern(vec![c, d]);
+    let abc = graph.insert_pattern(vec![a, bc]);
+    let bcd = graph.insert_patterns(vec![vec![bc, d], vec![b, cd]]);
+    let cde = graph.insert_pattern(vec![cd, e]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_pattern(vec![x, y, z].into());
+    let original = sink.root.unwrap();
+    let mut expansion = ExpansionCtx::new(graph.clone(), vec![a, b, c, d, e]);
+    assert_eq!(expansion.next(&sink), Some(Span::Append(abc)));
+    expansion.observe_commit(sink.commit(Span::Append(abc)));
+    let previous = sink.root.unwrap();
+
+    let span = expansion.next(&sink).unwrap();
+    assert!(
+        matches!(span, Span::ReplaceTail { previous: r, old, .. } if r == previous && old == abc)
+    );
+    expansion.observe_commit(sink.commit(span));
+    let root = sink.root.unwrap();
+    let abcd = *root
+        .vertex(&graph)
+        .expect_any_child_pattern()
+        .1
+        .last()
+        .unwrap();
+    assert_eq!(root.vertex_index(), original.vertex_index());
+    assert_patterns!(graph, abcd => [[abc, d], [a, bcd]], root => [[x, y, z, abcd]]);
+    assert_eq!(graph.vertex_count(), 15);
+    crate::tests::assert_graph_invariants(&graph);
+    assert!(!abc
+        .vertex(&graph)
+        .parents()
+        .contains_key(&root.vertex_index()));
+    for (index, child) in [x, y, z, abcd].iter().enumerate() {
+        let vertex = child.vertex(&graph);
+        let parent = vertex.parents().get(&root.vertex_index()).unwrap();
+        assert_eq!(parent.width(), root.width());
+        assert!(parent
+            .pattern_indices()
+            .iter()
+            .any(|position| position.sub_index() == index));
+    }
+
+    let span = expansion.next(&sink).unwrap();
+    expansion.observe_commit(sink.commit(span));
+    let root = sink.root.unwrap();
+    let abcde = *root
+        .vertex(&graph)
+        .expect_any_child_pattern()
+        .1
+        .last()
+        .unwrap();
+    assert_patterns!(graph, abcde => [[abcd, e], [a, b, cde]], root => [[x, y, z, abcde]]);
+    assert_eq!(graph.vertex_count(), 16);
+    crate::tests::assert_graph_invariants(&graph);
+    assert_eq!(expansion.next(&sink), None);
+}
+
+#[test]
+fn closure_preserves_entire_last_child_and_canonical_complement() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [x, w, a, b, c, d] =
+        graph.insert_atoms("xwabcd".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let wa = graph.insert_pattern(vec![w, a]);
+    let bc = graph.insert_pattern(vec![b, c]);
+    let abc = graph.insert_pattern(vec![a, bc]);
+    let wabc = graph.insert_patterns(vec![vec![w, abc], vec![wa, bc]]);
+    let bcd = graph.insert_pattern(vec![bc, d]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(x);
+    sink.append_completed(wabc);
+    let root = sink.root.unwrap();
+    let path = closure::boundary_path(&graph, root, bc, false).unwrap();
+    let span =
+        closure::prepare(&graph, &sink, root, bc, &path, bcd).apply(&graph);
+    sink.commit(span);
+    let root = sink.root.unwrap();
+    let wabcd = *root
+        .vertex(&graph)
+        .expect_any_child_pattern()
+        .1
+        .last()
+        .unwrap();
+    assert_patterns!(graph, wabcd => [[wabc, d], [wa, bcd]], root => [[x, wabcd]]);
+    assert_eq!(graph.vertex_count(), 13);
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
+fn closure_replaces_whole_tail_without_allocating_a_token() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [x, a, b, c] =
+        graph.insert_atoms("xabc".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let ab = graph.insert_pattern(vec![a, b]);
+    let abc = graph.insert_pattern(vec![ab, c]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(x);
+    sink.append_completed(ab);
+    let root = sink.root.unwrap();
+    let path = closure::boundary_path(&graph, root, ab, false).unwrap();
+    let count = graph.vertex_count();
+    let span =
+        closure::prepare(&graph, &sink, root, ab, &path, abc).apply(&graph);
+    assert_eq!(
+        span,
+        Span::ReplaceTail {
+            previous: root,
+            old: ab,
+            token: abc
+        }
+    );
+    sink.commit(span);
+    let root = sink.root.unwrap();
+    assert_patterns!(graph, root => [[x, abc]]);
+    assert_eq!(graph.vertex_count(), count);
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
+fn closure_reuses_existing_canonical_result() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c] = graph.insert_atoms("abc".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let ab = graph.insert_pattern(vec![a, b]);
+    let bc = graph.insert_pattern(vec![b, c]);
+    let abc = graph.insert_patterns(vec![vec![ab, c], vec![a, bc]]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(ab);
+    let path = closure::boundary_path(&graph, ab, b, false).unwrap();
+    let count = graph.vertex_count();
+    let span = closure::prepare(&graph, &sink, ab, b, &path, bc).apply(&graph);
+    assert_eq!(
+        span,
+        Span::ReplaceRoot {
+            previous: ab,
+            token: abc
+        }
+    );
+    sink.commit(span);
+    assert_eq!(graph.vertex_count(), count);
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
+fn closure_collects_nested_siblings_without_complement_vertices() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [x, w, a, b, c, d, e, f] =
+        graph.insert_atoms("xwabcdef".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let bc = graph.insert_pattern(vec![b, c]);
+    let abc = graph.insert_pattern(vec![a, bc]);
+    let wabc = graph.insert_pattern(vec![w, abc]);
+    let bcd = graph.insert_pattern(vec![bc, d]);
+    let bcde = graph.insert_pattern(vec![bcd, e]);
+    let bcdef = graph.insert_pattern(vec![bcde, f]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(x);
+    sink.append_completed(wabc);
+    let root = sink.root.unwrap();
+    let path = closure::boundary_path(&graph, root, bc, false).unwrap();
+    let span =
+        closure::prepare(&graph, &sink, root, bc, &path, bcdef).apply(&graph);
+    sink.commit(span);
+    let root = sink.root.unwrap();
+    let wabcdef = *root
+        .vertex(&graph)
+        .expect_any_child_pattern()
+        .1
+        .last()
+        .unwrap();
+    assert_patterns!(
+        graph,
+        wabcdef => [[wabc, d, e, f], [w, a, bcdef]],
+        root => [[x, wabcdef]]
+    );
+    assert_eq!(graph.vertex_count(), 16);
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
+fn forward_step_reuses_existing_accumulation_without_sink_search() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c] = graph.insert_atoms("abc".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let ab = graph.insert_pattern(vec![a, b]);
+    let abc = graph.insert_pattern(vec![ab, c]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(ab);
+    let mut expansion = ExpansionCtx::new(graph.clone(), vec![c]);
+    let span = expansion.next(&sink).unwrap();
+    assert_eq!(
+        span,
+        Span::ReplaceRoot {
+            previous: ab,
+            token: abc
+        }
+    );
+    sink.commit(span);
+    assert_eq!(graph.vertex_count(), 5);
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
+fn root_postfix_probing_does_not_materialize_rejected_matches() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c] = graph.insert_atoms("abc".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let ab = graph.insert_pattern(vec![a, b]);
+    let mut sink = RootManager::new(graph.clone());
+    let mut expansion = ExpansionCtx::new(graph.clone(), vec![a, b, c]);
+    let span = expansion.next(&sink).unwrap();
+    expansion.observe_commit(sink.commit(span));
+    let before = graph.expect_child_patterns(ab);
+    let count = graph.vertex_count();
+    assert_eq!(expansion.next(&sink), Some(Span::Append(c)));
+    assert_eq!(graph.vertex_count(), count);
+    assert_eq!(graph.expect_child_patterns(ab), before);
+}
+
+#[test]
+fn accepted_materialization_rechecks_root_editability() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c] = graph.insert_atoms("abc".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let abc = graph.insert_pattern(vec![a, b, c]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(abc);
+    let mut expansion = ExpansionCtx::new(graph.clone(), vec![a, b, c, a]);
+    let span = expansion.next(&sink).unwrap();
+    expansion.observe_commit(sink.commit(span));
+    let previous = sink.root.unwrap();
+    assert!(sink.is_editable(previous));
+    let span = expansion.next(&sink).unwrap();
+    assert!(!sink.is_editable(previous));
+    assert!(
+        matches!(span, Span::ReplaceRoot { previous: root, .. } if root == previous)
+    );
+    expansion.observe_commit(sink.commit(span));
+    let root = sink.root.unwrap();
+    assert_eq!(root.width().0, 7);
+    assert_eq!(graph.index_string(root), "abcabca");
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
+#[should_panic(expected = "stale last child")]
+fn sink_rejects_stale_tail_child() {
+    let graph = HypergraphRef::default();
+    let [a, b] = graph.insert_atoms("ab".chars().map(Atom::Element))[..] else {
+        panic!("insert_atoms failed");
+    };
+    let aa = graph.insert_pattern(vec![a, a]);
+    let mut sink = RootManager::new(graph);
+    sink.append_completed(a);
+    sink.append_completed(b);
+    let root = sink.root.unwrap();
+    sink.commit(Span::ReplaceTail {
+        previous: root,
+        old: a,
+        token: aa,
+    });
+}
+
+#[test]
+#[should_panic(expected = "replacement root is stale")]
+fn sink_rejects_stale_tail_root() {
+    let (graph, a, aa) = setup_aa_pattern();
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(a);
+    sink.commit(Span::ReplaceTail {
+        previous: aa,
+        old: a,
+        token: aa,
+    });
+}
+
+#[test]
+#[should_panic(expected = "replacement root is not editable")]
+fn sink_rejects_adopted_tail_root() {
+    let (graph, a, aa) = setup_aa_pattern();
+    let aaa = graph.insert_pattern(vec![aa, a]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(aa);
+    sink.commit(Span::ReplaceTail {
+        previous: aa,
+        old: a,
+        token: aaa,
+    });
+}
+
+#[test]
+#[should_panic(expected = "self-referential tail")]
+fn sink_rejects_self_referential_tail() {
+    let (graph, a) = setup_single_atom();
+    let mut sink = RootManager::new(graph);
+    sink.append_completed(a);
+    sink.append_completed(a);
+    let root = sink.root.unwrap();
+    sink.commit(Span::ReplaceTail {
+        previous: root,
+        old: a,
+        token: root,
+    });
 }

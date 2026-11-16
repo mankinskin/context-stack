@@ -1,9 +1,6 @@
 //! Parent management operations
 
 use crate::{
-    HashSet,
-    Hypergraph,
-    Wide,
     graph::{
         getters::vertex::VertexSet,
         kind::GraphKind,
@@ -14,17 +11,108 @@ use crate::{
             },
             location::child::ChildLocation,
             pattern::{
-                IntoPattern,
                 id::PatternId,
                 pattern_width,
+                IntoPattern,
             },
             token::Token,
             wide::WideMut,
         },
     },
+    HashSet,
+    Hypergraph,
+    Wide,
 };
 
 impl<G: GraphKind> Hypergraph<G> {
+    /// Replace the last child of an exclusively owned, parentless pattern.
+    ///
+    /// The caller must own the parent; structural guards are checked here.
+    /// Parentlessness also excludes a replacement containing the parent.
+    /// Updates the vertex width and child-parent links, including retained
+    /// children's parent widths. Returns a token with the updated width;
+    /// previously held parent tokens retain their old width.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parent has parents or multiple patterns, the pattern or
+    /// expected tail is missing, the parent or replacement width is stale, the
+    /// replacement does not grow, references the parent, or overflows its width.
+    pub fn replace_owned_tail(
+        &self,
+        parent: Token,
+        pattern_id: PatternId,
+        old: Token,
+        replacement: Token,
+    ) -> Token {
+        let vertex = self.expect_vertex_data(parent);
+        assert_eq!(vertex.width(), parent.width(), "stale parent width");
+        assert!(vertex.parents().is_empty(), "owned tail parent has parents");
+        assert_eq!(
+            vertex.child_patterns().len(),
+            1,
+            "owned tail parent has multiple patterns"
+        );
+        let pattern = vertex.expect_child_pattern(&pattern_id).clone();
+        assert_eq!(pattern.last(), Some(&old), "stale last child");
+        assert!(
+            replacement.width() > old.width(),
+            "tail replacement must grow"
+        );
+        assert_ne!(
+            replacement.vertex_index(),
+            parent.vertex_index(),
+            "self-referential tail"
+        );
+        assert_eq!(
+            self.expect_vertex_data(replacement).width(),
+            replacement.width(),
+            "stale replacement width"
+        );
+
+        let width = crate::TokenWidth(
+            parent
+                .width()
+                .0
+                .checked_add(replacement.width().0 - old.width().0)
+                .expect("tail replacement width overflow"),
+        );
+        let tail_index = pattern.len() - 1;
+        self.with_vertex_mut(old.vertex_index(), |node| {
+            node.remove_parent_index(
+                parent.vertex_index(),
+                pattern_id,
+                tail_index,
+            );
+        })
+        .expect("old tail must exist");
+        self.with_vertex_mut(parent.vertex_index(), |node| {
+            node.expect_child_pattern_mut(&pattern_id)[tail_index] =
+                replacement;
+            *node.width_mut() = width;
+        })
+        .expect("owned parent must exist");
+        for child in pattern
+            .iter()
+            .take(tail_index)
+            .copied()
+            .collect::<HashSet<_>>()
+        {
+            self.with_vertex_mut(child.vertex_index(), |node| {
+                node.expect_parent_mut(parent.vertex_index()).width = width;
+            })
+            .expect("retained child must exist");
+        }
+        let parent = Token::new(parent.vertex_index(), width);
+        self.add_pattern_parent(
+            parent,
+            vec![replacement],
+            pattern_id,
+            tail_index,
+        );
+        parent
+    }
+
     /// Utility: builds total width, indices and tokens for pattern
     pub(super) fn to_width_indices_children(
         &self,

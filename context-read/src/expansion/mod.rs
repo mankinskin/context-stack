@@ -1,38 +1,106 @@
 pub(crate) mod block;
-pub(crate) mod chain;
+pub(crate) mod closure;
 
-use chain::{
-    band::Band,
-    link::OverlapLink,
-    BandState,
+use crate::pipeline::root::{
+    CommitReceipt,
+    RootManager,
+    Span,
 };
 use context_insert::*;
+use context_search::Find;
 use context_trace::*;
-use tracing::debug;
 
-/// Resolves non-overlapping spans of a known-atom block.
+/// Resolves one consuming step against the latest committed graph.
 ///
-/// Each yielded token is final and must be appended to the accumulation sink
-/// before requesting the next span, so subsequent searches see graph updates.
-/// Local overlap anchors never come from the accumulation root.
+/// The committed root is the only overlap anchor. Each yielded span must be
+/// committed and observed before another step is requested.
 #[derive(Debug)]
 pub(crate) struct ExpansionCtx {
     pub(crate) graph: HypergraphRef,
+    /// Known atoms of the current block, not the entire input.
     atoms: Vec<Token>,
+    /// Number of block atoms consumed, also the committed seam width after commit.
     cursor: usize,
+    /// Latest observed root, covering committed input including earlier blocks.
+    root: Option<Token>,
 }
 
-impl Iterator for ExpansionCtx {
-    type Item = Token;
+impl ExpansionCtx {
+    /// Start an unconsumed known-atom block with no committed block seam.
+    pub(crate) fn new(
+        graph: HypergraphRef,
+        atoms: Vec<Token>,
+    ) -> Self {
+        Self {
+            graph,
+            atoms,
+            cursor: 0,
+            root: None,
+        }
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor >= self.atoms.len() {
+    /// Record the sink's root after committing the previously yielded span.
+    pub(crate) fn observe_commit(
+        &mut self,
+        receipt: CommitReceipt,
+    ) {
+        self.root = Some(receipt.root);
+    }
+
+    /// Resolve one extending root overlap, or consume the largest forward match.
+    ///
+    /// Returns `None` when the block is exhausted. Candidate probes are read-only,
+    /// but accepted-match materialization and closure may mutate the graph.
+    /// The caller must commit the returned span and pass its receipt back.
+    ///
+    /// # Panics
+    ///
+    /// Panics on stale root feedback, unexpected search errors, or violated
+    /// occurrence, boundary, or width invariants. Mutations are not rolled back.
+    pub(crate) fn next(
+        &mut self,
+        sink: &RootManager,
+    ) -> Option<Span> {
+        if self.cursor == self.atoms.len() {
             return None;
         }
+        if let Some(root) = self.root {
+            assert_eq!(sink.root, Some(root), "expansion root is stale");
+            if let Some((postfix, path, expansion)) = self.expand_root(root) {
+                let consumed = expansion.width().0 - postfix.width().0;
+                let plan = closure::prepare(
+                    &self.graph,
+                    sink,
+                    root,
+                    postfix,
+                    &path,
+                    expansion,
+                );
+                let span = plan.apply(&self.graph);
+                self.cursor += consumed;
+                return Some(span);
+            }
+        }
+        let token = self.match_forward();
+        self.cursor += token.width().0;
+        if let Some(previous) = sink.root {
+            if let Some(root) = closure::find_complete(
+                &self.graph,
+                &Pattern::from(vec![previous, token]),
+            ) {
+                return Some(Span::ReplaceRoot {
+                    previous,
+                    token: root,
+                });
+            }
+        }
+        Some(Span::Append(token))
+    }
 
-        let span_start = self.cursor;
-        let remaining = &self.atoms[span_start..];
-        let mut anchor = if remaining.len() == 1 {
+    /// Materialize the largest matching prefix of the unconsumed block.
+    fn match_forward(&self) -> Token {
+        let remaining = &self.atoms[self.cursor..];
+        let token = if remaining.len() == 1 {
             remaining[0]
         } else {
             match ToInsertCtx::<IndexWithPath>::insert_next_match(
@@ -41,155 +109,78 @@ impl Iterator for ExpansionCtx {
             ) {
                 Ok(outcome) => outcome.token(),
                 Err(ErrorReason::SingleIndex(index)) => index.index,
-                Err(error) => panic!("block expansion search failed: {:?}", error),
+                Err(error) => {
+                    panic!("block expansion search failed: {:?}", error)
+                }
             }
         };
         assert!(
-            anchor.width().0 > 0 && anchor.width().0 <= remaining.len(),
+            token.width().0 > 0 && token.width().0 <= remaining.len(),
             "block expansion returned an invalid token width: {:?}",
-            anchor
+            token
         );
-        debug!(anchor = ?anchor, cursor = self.cursor, "ExpansionCtx::next: local match");
-
-        self.cursor += anchor.width().0;
-        let mut pending = anchor;
-
-        while anchor.width().0 > 1 && self.cursor < self.atoms.len() {
-            let Some((postfix, expansion, next_cursor)) =
-                self.find_overlap(anchor)
-            else {
-                break;
-            };
-
-            let state =
-                self.build_overlap_state(pending, postfix, expansion);
-            pending = state.collapse(&mut self.graph)[0];
-            self.cursor = next_cursor;
-            anchor = expansion;
-        }
-
-        assert_eq!(
-            pending.width().0,
-            self.cursor - span_start,
-            "finalized span must cover exactly the consumed block atoms"
-        );
-        debug!(token = ?pending, cursor = self.cursor, "ExpansionCtx::next: finalized span");
-        Some(pending)
-    }
-}
-
-impl ExpansionCtx {
-    pub(crate) fn new(
-        graph: HypergraphRef,
-        atoms: Vec<Token>,
-    ) -> Self {
-        debug!(atoms_len = atoms.len(), "New ExpansionCtx");
-        Self {
-            graph,
-            atoms,
-            cursor: 0,
-        }
+        token
     }
 
-    /// Expand a postfix of the local anchor into the unconsumed block suffix.
-    fn find_overlap(
+    /// Find the first extending postfix, largest-first, within the block seam.
+    ///
+    /// Return the shared token, its reconnected root path, and the materialized
+    /// expansion. Rejected probes do not mutate the graph.
+    fn expand_root(
         &self,
-        anchor: Token,
-    ) -> Option<(Token, Token, usize)> {
-        for (_, postfix) in anchor.postfix_iter(self.graph.clone()) {
-            let postfix_width = postfix.width().0;
-            if postfix_width >= anchor.width().0 {
+        root: Token,
+    ) -> Option<(Token, Vec<ChildLocation>, Token)> {
+        if self.cursor == 0 {
+            return None;
+        }
+        let mut path = Vec::new();
+        for (location, postfix) in root.postfix_iter(self.graph.clone()) {
+            path.push(location);
+            if postfix.width().0 > self.cursor {
                 continue;
             }
             let mut query = vec![postfix];
             query.extend_from_slice(&self.atoms[self.cursor..]);
-
-            let result = match ToInsertCtx::<IndexWithPath>::insert_next_match(
-                &self.graph,
-                query,
-            ) {
-                Ok(outcome) => outcome.token(),
-                Err(ErrorReason::SingleIndex(_)) => continue,
-                Err(error) => panic!("block overlap search failed: {:?}", error),
+            let matched = match self.graph.find_ancestor(query.clone()) {
+                Ok(response) => usize::from(response.checkpoint_position()),
+                Err(
+                    ErrorReason::SingleIndex(_)
+                    | ErrorReason::NoParents
+                    | ErrorReason::NotFound,
+                ) => continue,
+                Err(error) => panic!("root postfix search failed: {:?}", error),
             };
-
-            debug!(
-                anchor = ?anchor,
-                postfix = ?postfix,
-                result = ?result,
-                cursor = self.cursor,
-                "find_overlap: checking local postfix"
+            if matched <= postfix.width().0 {
+                continue;
+            }
+            assert!(
+                matched <= postfix.width().0 + self.atoms.len() - self.cursor,
+                "root expansion extends beyond the block"
             );
-
-            if result.width().0 > postfix_width {
-                let next_cursor =
-                    self.cursor + result.width().0 - postfix_width;
-                assert!(
-                    next_cursor <= self.atoms.len(),
-                    "overlap extends beyond the known block"
+            closure::validate_path(&self.graph, root, postfix, &path, false);
+            let expansion =
+                match ToInsertCtx::<IndexWithPath>::insert_next_match(
+                    &self.graph,
+                    query,
+                ) {
+                    Ok(outcome) => outcome.token(),
+                    Err(error) => panic!(
+                        "root expansion materialization failed: {:?}",
+                        error
+                    ),
+                };
+            assert_eq!(
+                expansion.width().0,
+                matched,
+                "materialization changed the accepted match"
+            );
+            // Splitting the accepted match can rewrite the anchor's decomposition.
+            let path =
+                closure::boundary_path(&self.graph, root, postfix, false)
+                    .expect(
+                    "materialized root must still represent the shared postfix",
                 );
-                return Some((postfix, result, next_cursor));
-            }
-        }
-        None
-    }
-
-    fn build_overlap_state(
-        &self,
-        pending: Token,
-        postfix: Token,
-        expansion: Token,
-    ) -> BandState {
-        let postfix_locations = self
-            .boundary_locations(pending, postfix, false)
-            .expect("overlap postfix must be a suffix of the pending span");
-        let mut root_postfix = IndexEndPath::from(postfix_locations[0]);
-        for location in postfix_locations.into_iter().skip(1) {
-            root_postfix.path_append(location);
-        }
-
-        let prefix_locations = self
-            .boundary_locations(expansion, postfix, true)
-            .expect("overlap postfix must be a prefix of its expansion");
-        let mut expansion_prefix = IndexStartPath::from(prefix_locations[0]);
-        for location in prefix_locations.into_iter().skip(1) {
-            expansion_prefix.path_append(location);
-        }
-
-        BandState::WithOverlap {
-            primary: Band::from(pending),
-            overlap: Band::from(expansion),
-            link: OverlapLink {
-                child_path: root_postfix,
-                search_path: expansion_prefix,
-                start_bound: self.cursor - postfix.width().0,
-            },
-        }
-    }
-
-    /// Keep a connected path when a token has alternative decompositions.
-    fn boundary_locations(
-        &self,
-        root: Token,
-        target: Token,
-        prefix: bool,
-    ) -> Option<Vec<ChildLocation>> {
-        let vertex = root.vertex(&self.graph);
-        for (&pattern_id, pattern) in vertex.child_patterns() {
-            let sub_index = if prefix { 0 } else { pattern.len() - 1 };
-            let child = pattern[sub_index];
-            let location = ChildLocation::new(root, pattern_id, sub_index);
-            if child == target {
-                return Some(vec![location]);
-            }
-            if child.width().0 > target.width().0 {
-                if let Some(mut path) =
-                    self.boundary_locations(child, target, prefix)
-                {
-                    path.insert(0, location);
-                    return Some(path);
-                }
-            }
+            return Some((postfix, path, expansion));
         }
         None
     }

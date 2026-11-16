@@ -110,6 +110,12 @@ impl Response {
         self.end.cursor().atom_position
     }
 
+    /// Get the confirmed match position, excluding any unconfirmed
+    /// candidate advance.
+    pub fn checkpoint_position(&self) -> AtomPosition {
+        self.end.cursor.checkpoint().atom_position
+    }
+
     /// Get the collected transitions (event kinds) in emission order.
     ///
     /// Useful for test assertions:

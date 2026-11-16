@@ -357,6 +357,7 @@ fn repetition_aaa_both_decompositions() {
         aa => [[a, a]],
         aaa => [[a, aa], [aa, a]]
     );
+    crate::tests::assert_graph_invariants(&graph);
 }
 
 /// Test "abcxyzabc" - "abc" repeated with different content in between.
@@ -409,6 +410,7 @@ fn repetition_aabbaabb() {
         root => [[aabb, aabb]]
     );
     assert_eq!(graph.vertex_count(), 4, "only two atoms and two compounds");
+    crate::tests::assert_graph_invariants(&graph);
 }
 
 /// Test "abcabc" - "abc" repeated twice, adjacent.

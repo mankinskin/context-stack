@@ -34,6 +34,10 @@ pub trait BandExpandingPolicy<G: HasGraph> {
     }
 }
 
+/// Selects the widest terminal child to follow the canonical postfix chain.
+///
+/// Requires unique token content and connected paths for every occurrence:
+/// under those invariants, all smaller postfixes are reachable inside this child.
 #[derive(Debug)]
 pub struct PostfixExpandingPolicy<D: PatternDirection> {
     _ty: std::marker::PhantomData<D>,
@@ -57,8 +61,9 @@ where
     ) -> Vec<(ChildLocation, Token)> {
         batch
             .into_iter()
-            .sorted_by(|a, b| b.1.width().cmp(&a.1.width()))
-            .collect_vec()
+            .max_by_key(|(_, token)| token.width())
+            .into_iter()
+            .collect()
     }
 }
 
@@ -101,7 +106,7 @@ pub trait BandIterator<'a, G: HasGraph + 'a>:
 
     fn trav(&self) -> &G;
 
-    /// Get all postfixes/prefixes of `index` with their locations.
+    /// Get boundary children selected by the traversal policy.
     fn next_children(
         &self,
         index: Token,
@@ -121,6 +126,7 @@ pub trait BandIterator<'a, G: HasGraph + 'a>:
 
 // ── Type aliases ──────────────────────────────────────────────────────────────
 
+/// Largest-first proper postfix tokens with connected parent-child locations.
 pub type PostfixIterator<'a, G> =
     BandExpandingIterator<'a, G, PostfixExpandingPolicy<TravDir<G>>>;
 
@@ -188,6 +194,10 @@ where
 // ── HasTokenRoleIters trait ───────────────────────────────────────────────────
 
 pub trait HasTokenRoleIters: ToToken {
+    /// Follow the widest terminal child at each level, stopping at an atom.
+    ///
+    /// The root itself is not yielded. Accumulate the returned child locations
+    /// to obtain a connected occurrence path from the root to each postfix.
     fn postfix_iter<'a, G: HasGraph + 'a>(
         &self,
         trav: G,
