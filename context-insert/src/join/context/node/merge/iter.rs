@@ -5,6 +5,7 @@
 //! needed during partition iteration, including the range map and target tracking.
 
 use context_trace::{
+    Wide,
     graph::visualization::{
         DeltaOp,
         GraphMutation,
@@ -491,7 +492,7 @@ impl<'a> MergeCtx<'a> {
             if cumulative == boundary_width {
                 return Some(tokens);
             }
-            cumulative += tok.width();
+            cumulative += *tok.width();
             tokens.push(*tok);
         }
         if cumulative == boundary_width {
@@ -521,7 +522,7 @@ impl<'a> MergeCtx<'a> {
             if found_boundary {
                 tokens.push(*tok);
             }
-            cumulative += tok.width();
+            cumulative += *tok.width();
         }
         if found_boundary { Some(tokens) } else { None }
     }

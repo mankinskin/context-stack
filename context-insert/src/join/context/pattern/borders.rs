@@ -25,6 +25,7 @@ use crate::{
         },
     },
 };
+use context_trace::Wide;
 
 pub(crate) trait JoinBorders<R: RangeRole<Mode = Join>>:
     TraceBorders<R>
@@ -98,7 +99,7 @@ impl JoinBorders<In<Join>> for (BorderInfo, BorderInfo) {
         {
             let (start, end) = (left.get(), right.get());
             assert!(
-                start < end && end < lc.width(),
+                start < end && end < *lc.width(),
                 "Invalid child interval for {lc:?}: {start}..{end}"
             );
             let token = *ctx

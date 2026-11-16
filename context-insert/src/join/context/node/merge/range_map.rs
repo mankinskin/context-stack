@@ -9,6 +9,7 @@ use std::{
     num::NonZeroUsize,
 };
 
+use context_trace::Wide;
 use derive_more::{
     Deref,
     DerefMut,
@@ -129,7 +130,7 @@ impl RangeMap {
             });
 
             // Inherit splits from this constituent token, translating positions
-            let partition_width = partition_token.width();
+            let partition_width = *partition_token.width();
             for (key, split) in existing_splits.iter() {
                 if key.index == partition_token {
                     // Translate position: add accumulated width to get position in merged token

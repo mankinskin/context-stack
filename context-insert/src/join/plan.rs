@@ -53,12 +53,6 @@ pub(crate) enum JoinRef {
 }
 
 impl JoinRef {
-    pub(crate) fn width(&self) -> usize {
-        match self {
-            JoinRef::Existing(token) => *token.width(),
-            JoinRef::Candidate(id) => id.width,
-        }
-    }
     pub(crate) fn existing(&self) -> Option<Token> {
         match self {
             JoinRef::Existing(token) => Some(*token),
@@ -80,20 +74,12 @@ impl From<Token> for JoinRef {
     }
 }
 
-/// Width of a pattern element (graph token or join reference).
-pub(crate) trait ElemWidth: Debug + Clone {
-    fn elem_width(&self) -> usize;
-}
-
-impl ElemWidth for Token {
-    fn elem_width(&self) -> usize {
-        *self.width()
-    }
-}
-
-impl ElemWidth for JoinRef {
-    fn elem_width(&self) -> usize {
-        self.width()
+impl Wide for JoinRef {
+    fn width(&self) -> TokenWidth {
+        match self {
+            JoinRef::Existing(token) => token.width(),
+            JoinRef::Candidate(id) => TokenWidth(id.width),
+        }
     }
 }
 
@@ -260,14 +246,14 @@ impl JoinPlan {
             }
             return JoinRef::Candidate(id);
         }
-        let width = patterns[0].refs.iter().map(JoinRef::width).sum();
+        let width = patterns[0].refs.iter().map(|elem| *elem.width()).sum();
         let id = CandidateId {
             index: self.candidates.len(),
             width,
         };
         for p in &patterns {
             debug_assert_eq!(
-                p.refs.iter().map(JoinRef::width).sum::<usize>(),
+                p.refs.iter().map(|elem| *elem.width()).sum::<usize>(),
                 width,
                 "candidate decompositions must have equal width"
             );

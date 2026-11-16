@@ -1,3 +1,4 @@
+use context_trace::Wide;
 use linked_hash_map::LinkedHashMap;
 use tracing::info;
 
@@ -59,7 +60,7 @@ impl<'a> MergeCtx<'a> {
                 offsets[*range.end()].1.get()
             };
             assert_eq!(
-                token.width(),
+                *token.width(),
                 end - start,
                 "Materialized interval width mismatch for {index:?} at {start}..{end}"
             );

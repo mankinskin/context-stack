@@ -3,10 +3,7 @@ use derivative::Derivative;
 use context_trace::*;
 use derive_new::new;
 
-use crate::{
-    join::plan::ElemWidth,
-    split::vertex::node::NodeTraceCtx,
-};
+use crate::split::vertex::node::NodeTraceCtx;
 
 /// Pattern trace context that owns its data.
 ///
@@ -31,7 +28,7 @@ impl From<PatternTraceCtx> for PatternId {
 /// Elements are graph tokens during split tracing and join references
 /// during join planning.
 pub(crate) trait PatternElems {
-    type Elem: ElemWidth;
+    type Elem: Wide;
     fn pattern_id(&self) -> PatternId;
     fn elems(&self) -> &[Self::Elem];
 }

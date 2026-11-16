@@ -170,7 +170,7 @@ impl<'a> Selector<'a> {
                     self.record(occ, host, offset, self.inline_pattern(id.index));
                 }
             }
-            offset += r.width();
+            offset += *r.width();
         }
     }
 
@@ -447,7 +447,7 @@ fn boundaries(refs: &[JoinRef]) -> Vec<usize> {
     refs.iter()
         .take(refs.len().saturating_sub(1))
         .map(|r| {
-            offset += r.width();
+            offset += *r.width();
             offset
         })
         .collect()

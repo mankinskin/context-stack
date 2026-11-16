@@ -19,7 +19,6 @@ use vertex::VertexSplits;
 use crate::{
     join::plan::{
         AsElems,
-        ElemWidth,
         JoinRef,
         RefPosKey,
     },
@@ -127,7 +126,7 @@ impl TraceSide for TraceFront {
 }
 
 /// `TraceBack::trace_child_pos` over any pattern element with a width.
-pub(crate) fn trace_back_pos<W: ElemWidth>(
+pub(crate) fn trace_back_pos<W: Wide>(
     pattern: &[W],
     offset: NonZeroUsize,
 ) -> Option<TokenTracePos> {
@@ -135,9 +134,9 @@ pub(crate) fn trace_back_pos<W: ElemWidth>(
     pattern
         .iter()
         .enumerate()
-        .find_map(|(i, c)| match c.elem_width().cmp(&offset) {
+        .find_map(|(i, c)| match c.width().cmp(&TokenWidth(offset)) {
             Ordering::Less => {
-                offset -= c.elem_width();
+                offset -= *c.width();
                 None
             },
             Ordering::Equal => {
@@ -149,7 +148,7 @@ pub(crate) fn trace_back_pos<W: ElemWidth>(
         .map(Into::into)
 }
 
-pub(crate) fn position_splits<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
+pub(crate) fn position_splits<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
     patterns: impl IntoIterator<Item = (&'a PatternId, P)>,
     pos: NonZeroUsize,
 ) -> VertexSplits {
@@ -165,7 +164,7 @@ pub(crate) fn position_splits<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
     }
 }
 
-pub(crate) fn range_splits<'a, W: ElemWidth + 'a, P: AsElems<W> + 'a>(
+pub(crate) fn range_splits<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
     patterns: impl Iterator<Item = (&'a PatternId, P)>,
     parent_range: (NonZeroUsize, NonZeroUsize),
 ) -> (VertexSplits, VertexSplits) {

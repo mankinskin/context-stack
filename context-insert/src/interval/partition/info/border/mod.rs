@@ -2,10 +2,7 @@ use std::num::NonZeroUsize;
 
 use perfect::*;
 
-use crate::{
-    join::plan::ElemWidth,
-    *,
-};
+use crate::*;
 use context_trace::*;
 pub(crate) mod perfect;
 
@@ -30,7 +27,7 @@ impl BorderInfo {
     /// We must use the inner_offset calculated from trace_child_pos to get the
     /// correct position within the current pattern structure.
     #[allow(dead_code)]
-    pub(crate) fn new_from_atom_pos<W: ElemWidth>(
+    pub(crate) fn new_from_atom_pos<W: Wide>(
         pattern: &[W],
         atom_pos: NonZeroUsize,
     ) -> Self {
@@ -44,13 +41,13 @@ impl BorderInfo {
     /// Use this when you have delta-adjusted split positions, to avoid
     /// re-tracing from atom positions (which may be invalid after pattern
     /// modifications).
-    pub(crate) fn new_from_trace_pos<W: ElemWidth>(
+    pub(crate) fn new_from_trace_pos<W: Wide>(
         pattern: &[W],
         trace_pos: &crate::TokenTracePos,
     ) -> Self {
         let sub_index = trace_pos.sub_index();
         let offset: usize =
-            pattern[..sub_index].iter().map(ElemWidth::elem_width).sum();
+            pattern[..sub_index].iter().map(|elem| *elem.width()).sum();
         BorderInfo {
             sub_index,
             pattern_len: pattern.len(),
