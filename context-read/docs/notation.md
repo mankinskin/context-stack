@@ -17,7 +17,9 @@ Positions are zero-based atom offsets. `I[x, y)` includes `x` and excludes `y`.
 | `X` | Closure scope: `X1` for an editable root, otherwise `R`. |
 | `L` | Left complement token: `X = L + P`, represented at offset 0 of `X`. |
 | `T` | Right complement token: `E = P + T`, represented at offset `\|P\|` of `E`. |
-| `C` | Closed token: `[X,T] = [L,E]`. |
+| `C` | Closed token: `[X,T] = [L,E]` for a single-step chain. |
+| `Si` | Widest-postfix chain of `X`: `P = S0 < ... < Sk = X`, `Si = Li + S(i-1)`. |
+| `Ci` | Nested closure `[Si,T] = [Li,C(i-1)]` with `C0 = E` and `C = Ck`. |
 
 The **commit seam** is `I[b, c)`: the entire committed part of the block.
 It always starts at `b` and is a postfix of `R`.

@@ -1,11 +1,15 @@
 //! Factored closure of a canonical root-postfix/expansion-prefix overlap.
 //!
-//! For scope `X = L + P` and expansion `E = P + T`, construct the binary
-//! closure `C = [X,T] = [L,E]`. The complements `L` and `T` are canonical
-//! tokens represented inside their smallest scopes: `L` at offset 0 of `X`
-//! and `T` at offset `|P|` of `E`. Existing represented occurrences are
-//! reused; otherwise they are materialized by scope-restricted insertion,
-//! which rewrites the scope's decompositions so the occurrence is connected.
+//! For scope `X = L + P` and expansion `E = P + T`, close the overlap
+//! bottom-up along the widest-postfix chain `P = S0 < S1 < ... < Sk = X`:
+//! `C0 = E` and `Ci = [Si,T] = [Li,C(i-1)]` with `Si = Li + S(i-1)`, so every
+//! existing suffix token of `X` wider than `P` is closed with the expansion.
+//! The complements `Li` and `T` are canonical tokens represented inside their
+//! smallest scopes: `Li` at offset 0 of `Si` and `T` at offset `|P|` of `E`.
+//! `T` is resolved once and reused by every step. Existing represented
+//! occurrences are reused; otherwise they are materialized by scope-restricted
+//! insertion, which rewrites the scope's decompositions so the occurrence is
+//! connected.
 //! Preparation is read-only; applying the plan may mutate the graph but leaves
 //! accumulation updates to the sink. Neither phase provides rollback.
 
@@ -40,27 +44,20 @@ pub(crate) enum ClosurePlan {
         shared: Token,
         /// `E = P + T`: the accepted expansion.
         expansion: Token,
-        /// Connected postfix path `X -> P` at preparation time.
-        scope_path: Vec<ChildLocation>,
-        /// Connected prefix path `E -> P` at preparation time.
-        expansion_path: Vec<ChildLocation>,
-        /// `|L| = |X| - |P|`.
-        left_width: usize,
+        /// Ascending postfix tokens `S1 < ... < Sk = X` wider than `P`.
+        chain: Vec<Token>,
         /// `|T| = |E| - |P|`.
         right_width: usize,
-        /// Canonical token with the closure content, if already represented.
-        existing: Option<Token>,
     },
 }
 
 impl ClosurePlan {
     /// Materialize the prepared closure and return the sink operation.
     ///
-    /// Resolves `L` inside `X`, then `T` inside `E`, re-derives the overlap
-    /// paths (insertion may rewrite decompositions), and adds the missing
-    /// decompositions `[X,T]` and `[L,E]` to an existing canonical result or
-    /// allocates the closure token. Direct tail expansion does not modify the
-    /// graph here.
+    /// Resolves `T` inside `E` once, then closes each chain token `Si`
+    /// bottom-up with the previous closure, adding the decompositions
+    /// `[Si,T]` and `[Li,C(i-1)]` to an existing canonical result or
+    /// allocating it. Direct tail expansion does not modify the graph here.
     ///
     /// # Panics
     ///
@@ -83,65 +80,31 @@ impl ClosurePlan {
                 tail,
                 shared,
                 expansion,
-                scope_path,
-                expansion_path,
-                left_width,
+                chain,
                 right_width,
-                existing,
             } => {
-                validate_path(graph, scope, shared, &scope_path, false);
-                validate_path(graph, expansion, shared, &expansion_path, true);
-                let left = complement(graph, scope, 0, left_width);
                 let offset = shared.width().0;
                 let right = complement(graph, expansion, offset, right_width);
-                // Insertion can rewrite the decompositions along both paths.
-                let scope_path = boundary_path(graph, scope, shared, false)
-                    .expect("scope must still represent the shared postfix");
-                validate_path(graph, scope, shared, &scope_path, false);
-                let expansion_path = boundary_path(
-                    graph, expansion, shared, true,
-                )
-                .expect("expansion must still represent the shared prefix");
-                validate_path(graph, expansion, shared, &expansion_path, true);
-                assert_eq!(
-                    find_represented(graph, scope, 0, left_width),
-                    Some(left),
-                    "left complement is not connected inside the scope"
-                );
                 assert_eq!(
                     find_represented(graph, expansion, offset, right_width),
                     Some(right),
                     "right complement is not connected inside the expansion"
                 );
-                let patterns = [
-                    Pattern::from(vec![scope, right]),
-                    Pattern::from(vec![left, expansion]),
-                ];
-                let token = match existing {
-                    Some(token) => {
-                        for pattern in patterns {
-                            if !graph
-                                .expect_child_patterns(token)
-                                .values()
-                                .any(|p| p == &pattern)
-                            {
-                                graph.add_pattern_with_update(token, pattern);
-                            }
-                        }
-                        token
-                    }
-                    None => graph.insert_patterns(patterns),
-                };
+                let (mut closed, mut inner) = (expansion, shared);
+                for outer in chain {
+                    closed = close_step(graph, outer, inner, closed, right);
+                    inner = outer;
+                }
                 if tail {
                     Span::ReplaceTail {
                         previous: root,
                         old: scope,
-                        token,
+                        token: closed,
                     }
                 } else {
                     Span::ReplaceRoot {
                         previous: root,
-                        token,
+                        token: closed,
                     }
                 }
             }
@@ -149,17 +112,81 @@ impl ClosurePlan {
     }
 }
 
+/// Close one chain step: `C = [outer,right] = [left,closed]`.
+///
+/// `inner` is the next smaller chain token, a postfix of `outer` and the
+/// prefix of `closed`; `left = outer - inner` is resolved inside `outer`.
+fn close_step(
+    graph: &HypergraphRef,
+    outer: Token,
+    inner: Token,
+    closed: Token,
+    right: Token,
+) -> Token {
+    let left_width = outer.width().0 - inner.width().0;
+    let left = complement(graph, outer, 0, left_width);
+    // Insertion can rewrite the decompositions along both paths.
+    let outer_path = boundary_path(graph, outer, inner, false)
+        .expect("chain token must still represent its inner postfix");
+    validate_path(graph, outer, inner, &outer_path, false);
+    let closed_path = boundary_path(graph, closed, inner, true)
+        .expect("closure must still represent the shared prefix");
+    validate_path(graph, closed, inner, &closed_path, true);
+    assert_eq!(
+        find_represented(graph, outer, 0, left_width),
+        Some(left),
+        "left complement is not connected inside the scope"
+    );
+    // Content lookup `[outer] + atoms(right)`; read-only.
+    let mut content = vec![outer];
+    content.extend(atoms(graph, right));
+    let existing = find_complete(graph, &Pattern::from(content));
+    let patterns = [
+        Pattern::from(vec![outer, right]),
+        Pattern::from(vec![left, closed]),
+    ];
+    match existing {
+        Some(token) => {
+            let planned = [
+                std::collections::BTreeSet::from([outer.width().0]),
+                std::collections::BTreeSet::from([left_width]),
+            ];
+            for current in graph.expect_child_patterns(token).values() {
+                let current = boundaries(current);
+                for proposed in &planned {
+                    assert!(
+                        &current == proposed || current.is_disjoint(proposed),
+                        "closure would duplicate an existing boundary"
+                    );
+                }
+            }
+            for pattern in patterns {
+                if !graph
+                    .expect_child_patterns(token)
+                    .values()
+                    .any(|p| p == &pattern)
+                {
+                    graph.add_pattern_with_update(token, pattern);
+                }
+            }
+            token
+        }
+        None => graph.insert_patterns(patterns),
+    }
+}
+
 /// Prepare closure using current ownership and connected overlap paths.
 ///
 /// Call after materializing `expansion` and reconnecting `root_path`.
 /// Editable roots close around their entire last child; non-editable roots
-/// and self-expansions close around the root. This function does not mutate.
+/// and self-expansions close around the root. Self-expansions close the root
+/// in one step; otherwise the widest-postfix chain of the scope down to the
+/// shared token is closed bottom-up. This function does not mutate.
 ///
 /// # Panics
 ///
 /// Panics on missing or disconnected boundary paths, empty complements, or
-/// if an existing closure token shares a planned boundary across distinct
-/// decompositions.
+/// if the shared token is not on the scope's widest-postfix chain.
 pub(crate) fn prepare(
     graph: &HypergraphRef,
     sink: &RootManager,
@@ -195,45 +222,51 @@ pub(crate) fn prepare(
         };
     }
     validate_path(graph, scope, postfix, path, false);
-    let expansion_path = boundary_path(graph, expansion, postfix, true)
+    boundary_path(graph, expansion, postfix, true)
         .expect("expansion must represent the overlap prefix");
-    let left_width = scope.width().0 - postfix.width().0;
     let right_width = expansion.width().0 - postfix.width().0;
     assert!(
-        left_width > 0 && right_width > 0,
+        scope.width() > postfix.width() && right_width > 0,
         "closure requires proper complements"
     );
-    // Content lookup `[X] + atoms(T)`; read-only.
-    let mut content = vec![scope];
-    content.extend_from_slice(&atoms(graph, expansion)[postfix.width().0..]);
-    let existing = find_complete(graph, &Pattern::from(content));
-    if let Some(token) = existing {
-        let planned = [
-            std::collections::BTreeSet::from([scope.width().0]),
-            std::collections::BTreeSet::from([left_width]),
-        ];
-        for current in graph.expect_child_patterns(token).values() {
-            let current = boundaries(current);
-            for proposed in &planned {
-                assert!(
-                    &current == proposed || current.is_disjoint(proposed),
-                    "closure would duplicate an existing boundary"
-                );
-            }
-        }
-    }
+    let chain = if expansion.vertex_index() == scope.vertex_index() {
+        vec![scope]
+    } else {
+        postfix_chain(graph, scope, postfix)
+    };
     ClosurePlan::Closed {
         root,
         scope,
         tail: editable,
         shared: postfix,
         expansion,
-        scope_path: path.to_vec(),
-        expansion_path,
-        left_width,
+        chain,
         right_width,
-        existing,
     }
+}
+
+/// Collect the widest-postfix chain of `scope` strictly wider than `shared`.
+///
+/// Returns tokens in ascending width ending with `scope`. Boundary witnesses
+/// may skip intermediate postfixes, so the widest terminal child is followed.
+fn postfix_chain(
+    graph: &HypergraphRef,
+    scope: Token,
+    shared: Token,
+) -> Vec<Token> {
+    let mut chain = vec![scope];
+    for (_, postfix) in scope.postfix_iter(graph.clone()) {
+        if postfix.width() <= shared.width() {
+            assert_eq!(
+                postfix, shared,
+                "shared token is not on the scope's widest-postfix chain"
+            );
+            chain.reverse();
+            return chain;
+        }
+        chain.push(postfix);
+    }
+    panic!("shared token is not on the scope's widest-postfix chain")
 }
 
 /// Resolve the canonical complement of `width` atoms at `offset` in `scope`.

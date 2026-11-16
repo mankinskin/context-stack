@@ -827,9 +827,16 @@ fn expansion_commits_each_overlap_before_the_next_search() {
 
     assert_eq!(abcd.width(), TokenWidth(4));
     let patterns = graph.expect_child_patterns(abcd);
-    assert!(
-        patterns.values().any(|pattern| pattern.last() == Some(&cd)),
-        "the second overlap must be represented by the committed root"
+    // The nested suffix `bc` of `abc` is closed with `cd` first.
+    let bcd = patterns
+        .values()
+        .find(|pattern| pattern[0] == a)
+        .expect("the second overlap must be represented by the committed root")
+        [1];
+    assert_patterns!(
+        graph,
+        bcd => [[bc, d], [b, cd]],
+        abcd => [[abc, d], [a, bcd]]
     );
     assert!(
         patterns
@@ -908,16 +915,17 @@ fn expansion_factors_owned_tail_across_successive_overlaps() {
         .1
         .last()
         .unwrap();
-    let ab = graph
+    // The tail's nested suffix `bcd` is closed with `cde` first.
+    let bcde = graph
         .expect_child_patterns(abcde)
         .values()
-        .find(|pattern| pattern.last() == Some(&cde))
-        .expect("expansion must close the overlap")[0];
+        .find(|pattern| pattern[0] == a)
+        .expect("expansion must close the overlap")[1];
     assert_patterns!(
         graph,
-        abcde => [[abcd, e], [ab, cde]],
-        ab => [[a, b]],
-        abc => [[a, bc], [ab, c]],
+        abcde => [[abcd, e], [a, bcde]],
+        bcde => [[bcd, e], [b, cde]],
+        abc => [[a, bc]],
         root => [[x, y, z, abcde]]
     );
     assert_eq!(graph.vertex_count(), 17);
@@ -954,8 +962,19 @@ fn closure_preserves_entire_last_child_and_canonical_complement() {
         .1
         .last()
         .unwrap();
-    assert_patterns!(graph, wabcd => [[wabc, d], [wa, bcd]], root => [[x, wabcd]]);
-    assert_eq!(graph.vertex_count(), 13);
+    let abcd = graph
+        .expect_child_patterns(wabcd)
+        .values()
+        .find(|pattern| pattern[0] == w)
+        .expect("closure must close the nested suffix abc")[1];
+    assert_patterns!(
+        graph,
+        abcd => [[abc, d], [a, bcd]],
+        wabcd => [[wabc, d], [w, abcd]],
+        wabc => [[w, abc], [wa, bc]],
+        root => [[x, wabcd]]
+    );
+    assert_eq!(graph.vertex_count(), 14);
     crate::tests::assert_graph_invariants(&graph);
 }
 
@@ -1052,10 +1071,10 @@ fn closure_represents_nested_complements_inside_their_scopes() {
         .last()
         .unwrap();
     let closure = graph.expect_child_patterns(wabcdef);
-    let wa = closure
+    let abcdef = closure
         .values()
-        .find(|pattern| pattern.last() == Some(&bcdef))
-        .expect("closure must end with the expansion")[0];
+        .find(|pattern| pattern[0] == w)
+        .expect("closure must close the nested suffix abc")[1];
     let def = closure
         .values()
         .find(|pattern| pattern[0] == wabc)
@@ -1064,9 +1083,9 @@ fn closure_represents_nested_complements_inside_their_scopes() {
     // `bcde=[bc,de]`, so insertion inlines it
     assert_patterns!(
         graph,
-        wabcdef => [[wabc, def], [wa, bcdef]],
-        wa => [[w, a]],
-        wabc => [[w, abc], [wa, bc]],
+        wabcdef => [[wabc, def], [w, abcdef]],
+        abcdef => [[abc, def], [a, bcdef]],
+        wabc => [[w, abc]],
         def => [[d, e, f]],
         bcde => [[bcd, e]],
         bcdef => [[bcde, f], [bc, def]],

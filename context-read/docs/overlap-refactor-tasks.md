@@ -229,9 +229,15 @@ Separate tasks, outside this refactor:
   decompositions using them are no longer published for
   `complex_abcabababcaba`. Remaining insertion-side difference:
   pre-existing `ababab=[abab,ab]` (built by an earlier read step).
-- [ ] **context-read nested overlap closure:** the final overlap uses
-  `P=ab`, `E=abcaba`, and the entire `R=abcababab`, producing
-  `[abcabab,abcaba]`. The oracle instead factors the suffix closure as
-  `[abc,abababcaba]` alongside `[abcababab,caba]`.
+- [x] **context-read nested overlap closure:** closure now walks the
+  widest-postfix chain `P < Si <= X` bottom-up, so the final overlap
+  (`P=ab`, `E=abcaba`, `R=abcababab`) yields the oracle's
+  `ababcaba`, `abababcaba` and `[abc,abababcaba]` alongside
+  `[abcababab,caba]`.
+- [ ] **context-read affected-host completion:** `complex_abcabababcaba` still
+  lacks `abcabab`/`abcababa` (`abcababab` keeps the wrapper
+  `[abcaba,b,ab]` from materializing `E`), and `read_multiple_overlaps1`
+  lacks `bcdea=[bc,dea]`: enclosing hosts outside the insertion scope are not
+  completed.
 - [ ] **Existing read/search expectations:** investigate the three remaining
   legacy read failures without weakening canonical occurrence/boundary checks.

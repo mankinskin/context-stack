@@ -33,16 +33,27 @@ The search anchor, closure scope and accumulation destination have distinct role
 - When the expansion is the root itself, use whole-root scope, even if it was
   editable before the search.
 
-With `X = L + P` and `E = P + T`, close as:
+With `X = L + P` and `E = P + T`, close bottom-up along the widest-postfix
+chain of `X` (following the widest terminal child at each level):
 
 ```text
-C = [X,T] = [L,E]
+P = S0 < S1 < ... < Sk = X        Si = Li + S(i-1)
+C0 = E
+Ci = [Si,T] = [Li,C(i-1)]         C = Ck
 ```
 
-`C` is always binary. `L` and `T` are canonical **tokens**, each represented
-inside its smallest scope: `L` is reachable at offset 0 of `X` and `T` at offset
-`|P|` of `E`, through connected child patterns. A complement is never scoped
-to a wider range that includes the root prefix.
+Every existing postfix token `S` of `X` with `|P| < |S| <= |X|` occurs left
+of the expansion's overlap and is therefore closed with it, e.g. `abc=[a,bc]`
+and `cd` sharing `c` yield `bcd=[bc,d]=[b,cd]` and `abcd=[abc,d]=[a,bcd]`.
+Postfixes not wider than `P` already lie inside `E`. Boundary witnesses may
+skip chain tokens (`abc -> c`), so the chain follows the widest terminal
+child; `P` must lie on it. Self-expansions close the root in one step.
+
+Each `Ci` is binary. `T` and every `Li` are canonical **tokens**, each
+represented inside its smallest scope: `Li` is reachable at offset 0 of `Si`
+and `T` at offset `|P|` of `E`, through connected child patterns. `T` is
+resolved once; each later step reuses it as the last child of `C(i-1)`. A
+complement is never scoped to a wider range that includes the root prefix.
 
 Resolve each complement in order:
 
@@ -61,13 +72,14 @@ repeat sequences inside a child of the other decomposition, e.g.
 `vi=[v,i]`, `vis=[vi,s]`, `visu=[vis,u]=[vi,su]`.
 
 Preparation is read-only: it selects the scope, detects direct tail
-replacement and preflights an existing canonical `C` (content lookup of
-`[X] + atoms(T)`), whose decompositions may equal but must not share planned
-boundaries `{|X|}` or `{|L|}`. Application resolves `L` then `T`, re-derives
-the `X -> P` and `E -> P` paths (insertion may rewrite decompositions),
-validates the complement occurrences and creates `C` or adds its missing
-decompositions. The expansion step then asserts that the root is unchanged
-and, for tail replacement, still editable.
+replacement and collects the chain tokens. Application resolves `T`, then per
+step resolves `Li`, re-derives the `Si -> S(i-1)` and `C(i-1) -> S(i-1)` paths
+(insertion may rewrite decompositions), validates the complement occurrences
+and creates `Ci` or adds its missing decompositions to an existing canonical
+`Ci` (content lookup of `[Si] + atoms(T)`), whose decompositions may equal but
+must not share planned boundaries `{|Si|}` or `{|Li|}`. Only the final `C` is
+committed to the sink. The expansion step then asserts that the root is
+unchanged and, for tail replacement, still editable.
 
 If `P` is the entire editable last child and `E` is not the root, replace that
 child directly with `E`, without constructing `C`.
