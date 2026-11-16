@@ -207,8 +207,10 @@ that existing insertion output always satisfies its required invariants.
 - `cargo check -p context-trace -p context-read` passes.
 - `cargo test -p context-read --lib`: 99 pass; three previously failing
   test cases remain. Their assertions were not weakened:
-  - `complex_abcabababcaba` reaches an insertion partition panic during root
-    expansion materialization (`insert_next_match`).
+  - `complex_abcabababcaba` now reaches an exact graph comparison. Its shared
+    expected graph is checked against the live ngrams oracle. Insertion retains
+    extra `ba`/`bab` partitions and their decompositions; the reader also misses
+    `abcababa`, `ababcaba`, and `abababcaba`.
   - `read_infix2` now gets past the `vi` lookup but expects `subvisu` to stay
     `[su,b,v,i,su]` although `sub` and `visu` exist; it gets `[sub,visu]`.
     Its expectations are internally inconsistent (`subvisu` is asserted twice
@@ -220,7 +222,14 @@ Separate tasks, outside this refactor:
 - [ ] **context-insert occurrence completeness:** insertion of `ab` into
   initially flat `abcd`/`cdab` must represent both occurrences, not rewrite
   only one token.
-- [ ] **context-insert partition handling:** investigate the
-  `join/partition/info/pattern_info.rs` panic reached by the complex repetition.
+- [ ] **context-insert partition retention:** the same-child interval panic is
+  fixed, but intermediary merges still materialize every partition range and
+  retain its binary sub-merges without checking whether the oracle needs them.
+  At `abab` offsets 1 and 3, this retains `ba` and `bab` and adds `[a,ba]` to
+  `aba`.
+- [ ] **context-read nested overlap closure:** the final overlap uses
+  `P=ab`, `E=abcaba`, and the entire `R=abcababab`, producing
+  `[abcabab,abcaba]`. The oracle instead factors the suffix closure as
+  `[abc,abababcaba]` alongside `[abcababab,caba]`.
 - [ ] **Existing read/search expectations:** investigate the three remaining
   legacy read failures without weakening canonical occurrence/boundary checks.

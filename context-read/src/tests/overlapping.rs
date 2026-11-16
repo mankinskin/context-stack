@@ -19,7 +19,6 @@
 use crate::request::ReadRequest;
 #[cfg(test)]
 use context_search::{
-    assert_exhausted_indices,
     assert_indices,
     Find,
 };
@@ -90,23 +89,10 @@ fn repetition_xyzxyzxyz() {
 /// (ababcaba)      -> { [ab, abcaba], [abab, caba] }
 /// (abababcaba)    -> { [ab, ababcaba], [ababab, caba] }
 /// (abcabababcaba) -> { [abc, abababcaba], [abcababab, caba] }
-#[test]
-fn complex_abcabababcaba() {
-    let mut graph = HypergraphRef::<BaseGraphKind>::default();
-    let _tracing = init_test_tracing!(&graph);
-    let result = ReadRequest::from_text("abcabababcaba").execute(&mut graph);
-    graph.emit_graph_snapshot();
-
-    expect_atoms!(graph, {a, b, c});
-    assert_exhausted_indices!(
-        graph, ab, aba, abab, ababa, ababab, caba, abc, abcaba, abcabab,
-        abcababa, abcababab, ababcaba, abababcaba
-    );
-
-    let root = result.expect("should have root");
-    assert_eq!(root.width(), TokenWidth(13));
-
-    assert_patterns!(
+pub(super) fn expected_abcabababcaba() -> HypergraphRef {
+    let graph = HypergraphRef::<BaseGraphKind>::default();
+    insert_atoms!(graph, {a, b, c});
+    insert_patterns!(
         graph,
         ab         => [[a, b]],
         aba        => [[ab, a]],
@@ -121,6 +107,26 @@ fn complex_abcabababcaba() {
         abcababab  => [[abc, ababab], [abcababa, b]],
         ababcaba   => [[ab, abcaba], [abab, caba]],
         abababcaba => [[ab, ababcaba], [ababab, caba]],
-        root       => [[abc, abababcaba], [abcababab, caba]]
+        _root      => [[abc, abababcaba], [abcababab, caba]]
     );
+    graph
+}
+
+#[test]
+fn complex_abcabababcaba() {
+    use super::ngrams_validation::CanonicalGraph;
+
+    let mut graph = HypergraphRef::<BaseGraphKind>::default();
+    let _tracing = init_test_tracing!(&graph);
+    let result = ReadRequest::from_text("abcabababcaba").execute(&mut graph);
+    graph.emit_graph_snapshot();
+
+    let root = result.expect("should have root");
+    assert_eq!(root.width(), TokenWidth(13));
+    assert_eq!(
+        CanonicalGraph::from_hypergraph(&graph),
+        CanonicalGraph::from_hypergraph(&expected_abcabababcaba()),
+        "reader output must exactly match the ngrams oracle fixture"
+    );
+    crate::tests::assert_graph_invariants(&graph);
 }

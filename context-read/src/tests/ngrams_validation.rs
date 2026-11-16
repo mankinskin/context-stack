@@ -32,14 +32,14 @@ use std::collections::{
 /// Represents a graph structure in a canonical, comparable format.
 /// Uses string representations of vertices and patterns for comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct CanonicalGraph {
+pub(super) struct CanonicalGraph {
     /// Map from vertex string to set of patterns (each pattern is a Vec of child strings)
     vertices: BTreeMap<String, BTreeSet<Vec<String>>>,
 }
 
 impl CanonicalGraph {
     /// Create a canonical representation from a Hypergraph
-    fn from_hypergraph(graph: &Hypergraph) -> Self {
+    pub(super) fn from_hypergraph(graph: &Hypergraph) -> Self {
         let mut vertices = BTreeMap::new();
 
         for key in graph.vertex_keys() {
@@ -419,24 +419,10 @@ fn ngrams_inspect_abcabababcaba() {
     }
     println!("=== end ===\n");
 
-    // Verify all expected tokens are present
-    let vertices = canonical.vertex_strings();
-    for expected in &[
-        "ab",
-        "aba",
-        "abab",
-        "ababa",
-        "ababab",
-        "caba",
-        "abc",
-        "abcaba",
-        "abcabab",
-        "abcababa",
-        "abcababab",
-        "ababcaba",
-        "abababcaba",
-        "abcabababcaba",
-    ] {
-        assert!(vertices.contains(*expected), "missing token: {}", expected);
-    }
+    let expected = super::overlapping::expected_abcabababcaba();
+    assert_eq!(
+        canonical,
+        CanonicalGraph::from_hypergraph(&expected),
+        "complex overlap expectations must exactly match the ngrams oracle"
+    );
 }
