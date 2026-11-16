@@ -27,18 +27,19 @@ impl From<PatternTraceCtx> for PatternId {
 ///
 /// Elements are graph tokens during split tracing and join references
 /// during join planning.
-pub(crate) trait PatternElems {
+pub(crate) trait PatternElems: HasPatternId {
     type Elem: Wide;
-    fn pattern_id(&self) -> PatternId;
     fn elems(&self) -> &[Self::Elem];
 }
 impl PatternElems for PatternTraceCtx {
     type Elem = Token;
-    fn pattern_id(&self) -> PatternId {
-        self.loc.pattern_id
-    }
     fn elems(&self) -> &[Token] {
         &self.pattern
+    }
+}
+impl HasPatternId for PatternTraceCtx {
+    fn pattern_id(&self) -> PatternId {
+        self.loc.pattern_id
     }
 }
 

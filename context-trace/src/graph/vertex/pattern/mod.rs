@@ -78,6 +78,12 @@ impl From<Pattern> for Vec<Token> {
     }
 }
 
+impl AsRef<[Token]> for Pattern {
+    fn as_ref(&self) -> &[Token] {
+        &self.0
+    }
+}
+
 impl Borrow<[Token]> for Pattern {
     fn borrow(&self) -> &[Token] {
         &self.0

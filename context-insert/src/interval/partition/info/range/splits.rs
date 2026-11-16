@@ -10,7 +10,6 @@ use std::{
 };
 
 use crate::{
-    join::plan::AsElems,
     interval::partition::info::range::{
         mode::{
             InVisitMode,
@@ -140,7 +139,7 @@ pub(crate) trait RangeOffsets<R: RangeRole>:
     Debug + Clone + Copy
 {
     /// Split positions of these offsets in the given patterns.
-    fn as_splits_of<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
+    fn as_splits_of<'a, W: Wide + 'a, P: AsRef<[W]> + 'a>(
         &self,
         patterns: impl Iterator<Item = (&'a PatternId, P)>,
     ) -> R::Splits;
@@ -154,7 +153,7 @@ pub(crate) trait RangeOffsets<R: RangeRole>:
 }
 
 impl<M: InVisitMode> RangeOffsets<In<M>> for (NonZeroUsize, NonZeroUsize) {
-    fn as_splits_of<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
+    fn as_splits_of<'a, W: Wide + 'a, P: AsRef<[W]> + 'a>(
         &self,
         patterns: impl Iterator<Item = (&'a PatternId, P)>,
     ) -> <In<M> as RangeRole>::Splits {
@@ -163,7 +162,7 @@ impl<M: InVisitMode> RangeOffsets<In<M>> for (NonZeroUsize, NonZeroUsize) {
 }
 
 impl<M: PreVisitMode> RangeOffsets<Pre<M>> for NonZeroUsize {
-    fn as_splits_of<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
+    fn as_splits_of<'a, W: Wide + 'a, P: AsRef<[W]> + 'a>(
         &self,
         patterns: impl Iterator<Item = (&'a PatternId, P)>,
     ) -> <Pre<M> as RangeRole>::Splits {
@@ -172,7 +171,7 @@ impl<M: PreVisitMode> RangeOffsets<Pre<M>> for NonZeroUsize {
 }
 
 impl<M: PostVisitMode> RangeOffsets<Post<M>> for NonZeroUsize {
-    fn as_splits_of<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
+    fn as_splits_of<'a, W: Wide + 'a, P: AsRef<[W]> + 'a>(
         &self,
         patterns: impl Iterator<Item = (&'a PatternId, P)>,
     ) -> <Post<M> as RangeRole>::Splits {

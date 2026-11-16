@@ -18,7 +18,6 @@ use vertex::VertexSplits;
 
 use crate::{
     join::plan::{
-        AsElems,
         JoinRef,
         RefPosKey,
     },
@@ -148,7 +147,7 @@ pub(crate) fn trace_back_pos<W: Wide>(
         .map(Into::into)
 }
 
-pub(crate) fn position_splits<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
+pub(crate) fn position_splits<'a, W: Wide + 'a, P: AsRef<[W]> + 'a>(
     patterns: impl IntoIterator<Item = (&'a PatternId, P)>,
     pos: NonZeroUsize,
 ) -> VertexSplits {
@@ -157,21 +156,21 @@ pub(crate) fn position_splits<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
         splits: patterns
             .into_iter()
             .map(|(pid, pat)| {
-                let pos = trace_back_pos(pat.as_elems(), pos).unwrap();
+                let pos = trace_back_pos(pat.as_ref(), pos).unwrap();
                 (*pid, pos)
             })
             .collect(),
     }
 }
 
-pub(crate) fn range_splits<'a, W: Wide + 'a, P: AsElems<W> + 'a>(
+pub(crate) fn range_splits<'a, W: Wide + 'a, P: AsRef<[W]> + 'a>(
     patterns: impl Iterator<Item = (&'a PatternId, P)>,
     parent_range: (NonZeroUsize, NonZeroUsize),
 ) -> (VertexSplits, VertexSplits) {
     let (ls, rs) = patterns
         .map(|(pid, pat)| {
-            let lpos = trace_back_pos(pat.as_elems(), parent_range.0).unwrap();
-            let rpos = trace_back_pos(pat.as_elems(), parent_range.1).unwrap();
+            let lpos = trace_back_pos(pat.as_ref(), parent_range.0).unwrap();
+            let rpos = trace_back_pos(pat.as_ref(), parent_range.1).unwrap();
             ((*pid, lpos), (*pid, rpos))
         })
         .unzip();

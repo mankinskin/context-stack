@@ -32,11 +32,13 @@ pub(crate) struct PatternJoinCtx {
 
 impl PatternElems for PatternJoinCtx {
     type Elem = JoinRef;
-    fn pattern_id(&self) -> PatternId {
-        self.loc.pattern_id
-    }
     fn elems(&self) -> &[JoinRef] {
         &self.pattern
+    }
+}
+impl HasPatternId for PatternJoinCtx {
+    fn pattern_id(&self) -> PatternId {
+        self.loc.pattern_id
     }
 }
 

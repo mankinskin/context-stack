@@ -12,14 +12,14 @@ use crate::*;
 use context_trace::*;
 
 #[derive(Clone, Debug, Copy, Hash, Eq, PartialEq)]
-pub struct PosKey {
-    pub(crate) index: Token,
+pub struct PosKey<T = Token> {
+    pub(crate) index: T,
     pub(crate) pos: NonZeroUsize,
 }
 
-impl PosKey {
+impl<T> PosKey<T> {
     pub(crate) fn new<P: TryInto<NonZeroUsize>>(
-        index: Token,
+        index: T,
         pos: P,
     ) -> Self
     where

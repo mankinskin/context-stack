@@ -24,7 +24,6 @@
 
 use std::{
     fmt::Debug,
-    num::NonZeroUsize,
     ops::Range,
 };
 
@@ -83,38 +82,8 @@ impl Wide for JoinRef {
     }
 }
 
-/// Borrowed slice of pattern elements.
-pub(crate) trait AsElems<W> {
-    fn as_elems(&self) -> &[W];
-}
-
-impl AsElems<Token> for &Pattern {
-    fn as_elems(&self) -> &[Token] {
-        self.as_slice()
-    }
-}
-
-impl<W> AsElems<W> for &[W] {
-    fn as_elems(&self) -> &[W] {
-        self
-    }
-}
-
 /// Split position key over join references.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct RefPosKey {
-    pub(crate) index: JoinRef,
-    pub(crate) pos: NonZeroUsize,
-}
-
-impl RefPosKey {
-    pub(crate) fn new(
-        index: JoinRef,
-        pos: NonZeroUsize,
-    ) -> Self {
-        Self { index, pos }
-    }
-}
+pub(crate) type RefPosKey = PosKey<JoinRef>;
 
 impl From<PosKey> for RefPosKey {
     fn from(key: PosKey) -> Self {
