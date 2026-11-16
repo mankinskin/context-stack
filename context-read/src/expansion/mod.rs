@@ -77,6 +77,17 @@ impl ExpansionCtx {
                     expansion,
                 );
                 let span = plan.apply(&self.graph);
+                assert_eq!(
+                    sink.root,
+                    Some(root),
+                    "closure changed the accumulation root"
+                );
+                if matches!(span, Span::ReplaceTail { .. }) {
+                    assert!(
+                        sink.is_editable(root),
+                        "closure made the edited root non-editable"
+                    );
+                }
                 self.cursor += consumed;
                 return Some(span);
             }

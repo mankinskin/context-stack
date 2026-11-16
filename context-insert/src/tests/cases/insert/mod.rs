@@ -7,6 +7,7 @@
 //! - `pattern` - General pattern insertion
 //! - `prefix` - Prefix matching
 //! - `postfix` - Postfix matching
+//! - `scoped` - Scope-restricted complement insertion
 //!
 //! ### Validation & Error Handling
 //! - `validation` - Input validation (empty patterns, invalid InitInterval)
@@ -21,6 +22,7 @@ pub(crate) mod infix;
 pub(crate) mod pattern;
 pub(crate) mod postfix;
 pub(crate) mod prefix;
+pub(crate) mod scoped;
 
 // Validation & edge cases
 pub(crate) mod validation;

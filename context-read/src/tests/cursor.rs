@@ -872,8 +872,19 @@ fn expansion_factors_owned_tail_across_successive_overlaps() {
         .1
         .last()
         .unwrap();
-    assert_patterns!(graph, abcde => [[abcd, e], [a, b, cde]], root => [[x, y, z, abcde]]);
-    assert_eq!(graph.vertex_count(), 16);
+    let ab = graph
+        .expect_child_patterns(abcde)
+        .values()
+        .find(|pattern| pattern.last() == Some(&cde))
+        .expect("expansion must close the overlap")[0];
+    assert_patterns!(
+        graph,
+        abcde => [[abcd, e], [ab, cde]],
+        ab => [[a, b]],
+        abc => [[a, bc], [ab, c]],
+        root => [[x, y, z, abcde]]
+    );
+    assert_eq!(graph.vertex_count(), 17);
     crate::tests::assert_graph_invariants(&graph);
     assert_eq!(expansion.next(&sink), None);
 }
@@ -975,7 +986,7 @@ fn closure_reuses_existing_canonical_result() {
 }
 
 #[test]
-fn closure_collects_nested_siblings_without_complement_vertices() {
+fn closure_represents_nested_complements_inside_their_scopes() {
     let graph = HypergraphRef::default();
     let _tracing = init_test_tracing!(&graph);
     let [x, w, a, b, c, d, e, f] =
@@ -1004,12 +1015,78 @@ fn closure_collects_nested_siblings_without_complement_vertices() {
         .1
         .last()
         .unwrap();
+    let closure = graph.expect_child_patterns(wabcdef);
+    let wa = closure
+        .values()
+        .find(|pattern| pattern.last() == Some(&bcdef))
+        .expect("closure must end with the expansion")[0];
+    let def = closure
+        .values()
+        .find(|pattern| pattern[0] == wabc)
+        .expect("closure must start with the scope")[1];
+    let de = graph
+        .expect_child_patterns(def)
+        .values()
+        .next()
+        .expect("def must be a composite token")[0];
     assert_patterns!(
         graph,
-        wabcdef => [[wabc, d, e, f], [w, a, bcdef]],
+        wabcdef => [[wabc, def], [wa, bcdef]],
+        wa => [[w, a]],
+        wabc => [[w, abc], [wa, bc]],
+        de => [[d, e]],
+        def => [[de, f]],
+        bcde => [[bcd, e], [bc, de]],
+        bcdef => [[bcde, f], [bc, def]],
         root => [[x, wabcdef]]
     );
-    assert_eq!(graph.vertex_count(), 16);
+    assert_eq!(graph.vertex_count(), 19);
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
+fn closure_materializes_left_complement_inside_flat_tail() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [x, v, i, s, u] =
+        graph.insert_atoms("xvisu".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let vis = graph.insert_pattern(vec![v, i, s]);
+    let su = graph.insert_pattern(vec![s, u]);
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(x);
+    sink.append_completed(vis);
+    let root = sink.root.unwrap();
+    let path = closure::boundary_path(&graph, root, s, false).unwrap();
+    let span =
+        closure::prepare(&graph, &sink, root, s, &path, su).apply(&graph);
+    assert!(
+        matches!(span, Span::ReplaceTail { previous, old, .. } if previous == root && old == vis)
+    );
+    sink.commit(span);
+    let root = sink.root.unwrap();
+    let visu = *root
+        .vertex(&graph)
+        .expect_any_child_pattern()
+        .1
+        .last()
+        .unwrap();
+    let vi = graph
+        .expect_child_patterns(visu)
+        .values()
+        .find(|pattern| pattern.last() == Some(&su))
+        .expect("closure must end with the expansion")[0];
+    assert_patterns!(
+        graph,
+        vi => [[v, i]],
+        vis => [[vi, s]],
+        su => [[s, u]],
+        visu => [[vis, u], [vi, su]],
+        root => [[x, visu]]
+    );
+    assert_eq!(graph.vertex_count(), 10);
     crate::tests::assert_graph_invariants(&graph);
 }
 

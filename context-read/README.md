@@ -65,8 +65,10 @@ separate local anchor or pending overlap chain.
 
 After materialization, closure recomputes editability. For an editable root it
 closes around the entire last child; otherwise around the root. With
-`X=L+P` and `E=P+T`, the closed token is `[X,T...] = [L...,E]`.
-Complements are canonical sibling patterns, not newly allocated tokens.
+`X=L+P` and `E=P+T`, the closed token is binary: `[X,T] = [L,E]`.
+Complements `L` and `T` are canonical tokens represented inside their scopes
+(`L` at offset 0 of `X`, `T` at offset `|P|` of `E`); missing ones are created
+by scope-restricted insertion, which rewrites the scope's decompositions.
 Whole-child overlaps can replace the tail directly. Self-overlap freezes the
 root and uses whole-root closure, preventing cycles.
 

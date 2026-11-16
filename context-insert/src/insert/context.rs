@@ -50,6 +50,9 @@ impl<R: InsertResult> From<HypergraphRef> for InsertCtx<R> {
 }
 
 impl<R: InsertResult> InsertCtx<R> {
+    pub(crate) fn graph_ref(&self) -> &HypergraphRef {
+        &self.graph
+    }
     #[context_trace::instrument_sig(level = "info", skip(self))]
     pub fn insert(
         &mut self,

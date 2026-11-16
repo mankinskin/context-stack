@@ -15,9 +15,9 @@ Positions are zero-based atom offsets. `I[x, y)` includes `x` and excludes `y`.
 | `E` | Accepted expansion beginning with `P` and extending into `U`. |
 | `X1` | Last child of an editable root. |
 | `X` | Closure scope: `X1` for an editable root, otherwise `R`. |
-| `L` | Left complement pattern: `X = L + P`. |
-| `T` | Right complement pattern: `E = P + T`. |
-| `C` | Closed token: `[X,T...] = [L...,E]`. |
+| `L` | Left complement token: `X = L + P`, represented at offset 0 of `X`. |
+| `T` | Right complement token: `E = P + T`, represented at offset `\|P\|` of `E`. |
+| `C` | Closed token: `[X,T] = [L,E]`. |
 
 The **commit seam** is `I[b, c)`: the entire committed part of the block.
 It always starts at `b` and is a postfix of `R`.

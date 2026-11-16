@@ -32,11 +32,14 @@ for `I`, `b`, `c`, `e`, `R` and the commit seam `I[b,c)`.
 4. **Whole-child overlap (`P == X1`).** If `E` is not the root vertex, replace
    `X1` by `E` without creating a token. If `E` is the root vertex, freeze the
    root and close at root scope.
-5. **Closure.** With `X = L + P` and `E = P + T`, create
-   `C = [X, T...] = [L..., E]`. Take `L` from the unique decomposition of `X`
-   with a boundary at `|L|`, if present; otherwise use left siblings on the
-   path to `P`. Derive `T` the same way within `E` at `|P|`. Never allocate a
-   token solely for a complement.
+5. **Closure.** With `X = L + P` and `E = P + T`, create the binary closure
+   `C = [X, T] = [L, E]`. `L` and `T` are canonical tokens represented inside
+   their smallest scopes: `L` at offset 0 of `X`, `T` at offset `|P|` of `E`.
+   Reuse a connected occurrence (descending through child patterns); panic if
+   the content has a canonical token without a connected occurrence; otherwise
+   materialize the complement by scoped insertion, which rewrites the scope's
+   decompositions. Never use sibling patterns as complements: they repeat
+   sequences inside a child of the other decomposition.
 6. **Search mutation.** Probe candidates read-only. Materialize only the
    accepted `E`, then recompute root editability from the graph.
 7. **Failure handling.** Compute the closure plan read-only before applying it.
@@ -50,7 +53,8 @@ for `I`, `b`, `c`, `e`, `R` and the commit seam `I[b,c)`.
 | `abcabcabc`, `E` is root `abcabc` | `[abcabc,abc] = [abc,abcabc]` |
 | `aabbaabb`, `b` does not expand | `aabb = [a,a,b,b]`, root `[aabb,aabb]` |
 | editable `[x,y,z,abc]`, `E = bcd` | `abcd = [abc,d] = [a,bcd]`, root `[x,y,z,abcd]` |
-| then `E = cde` | `abcde = [abcd,e] = [a,b,cde]`, root `[x,y,z,abcde]` |
+| then `E = cde` | `abc = [a,bc] = [ab,c]`, `abcde = [abcd,e] = [ab,cde]`, root `[x,y,z,abcde]` |
+| editable `[x,vis]`, `vis = [v,i,s]`, `E = su` | `vis = [vi,s]`, `visu = [vis,u] = [vi,su]`, root `[x,visu]` |
 
 ## Tasks
 
@@ -167,21 +171,48 @@ for `I`, `b`, `c`, `e`, `R` and the commit seam `I[b,c)`.
   the postfix-chain argument and root validity reasoning.
 - [x] Update `context-read/README.md`'s commit protocol description.
 
+### 8. Represented complements
+
+- [x] Add scoped complement insertion to `context-insert`
+  (`insert::scoped`, `ToInsertCtx::insert_scope_prefix`/`insert_scope_postfix`):
+  seed `insert_init` with a root-only trace cache for the scope, narrow into
+  first/last children covering the complement and materialize conflicting
+  wrapper boundaries first.
+- [x] Fix `Hypergraph::validate_expansion`, which required all alternative
+  decompositions to have identical children and rejected any range
+  replacement in a multi-pattern vertex.
+- [x] Replace sibling collection in `closure.rs` with token resolution: reuse a
+  connected occurrence, panic on an unrepresented canonical token, otherwise
+  insert inside the scope.
+- [x] Store `X`, `E`, `P`, both paths and complement widths in `ClosurePlan`;
+  keep `prepare()` read-only with a content-based preflight of an existing `C`.
+- [x] In `apply()`, resolve `L` then `T`, re-derive both paths, validate the
+  complement occurrences and create `[X,T]` and `[L,E]`.
+- [x] Assert after `apply()` that the root is unchanged and still editable for
+  tail replacement.
+- [x] Extend `assert_graph_invariants` to reject sibling runs inside a single
+  child of another decomposition.
+- [x] Update `xyzabcde` and nested closure tests; add the flat `vis` case.
+- [x] `read_infix1` passes.
+
 ## Verification and separate follow-ups
 
 The root-anchor implementation is in place. Passing focused cases do not prove
 that existing insertion output always satisfies its required invariants.
 
 - `cargo test -p context-trace`: 114 unit tests and 6 doc tests pass.
-- `cargo test -p context-insert overlap_bundle`: 9 tests pass.
+- `cargo test -p context-insert`: 47 unit tests pass, including 9
+  `overlap_bundle` and 9 scoped-insertion tests.
 - All nine repetition regressions pass, including exact `aabbaabb` structure.
 - `cargo check -p context-trace -p context-read` passes.
-- `cargo test -p context-read --lib`: 97 pass; four previously failing
-  test cases remain. Their
-  assertions were not weakened:
-  - `complex_abcabababcaba` reaches an insertion partition panic.
-  - `read_infix1` produces a different retained decomposition.
-  - `read_infix2` receives prefix coverage where it expects an entire token.
+- `cargo test -p context-read --lib`: 99 pass; three previously failing
+  test cases remain. Their assertions were not weakened:
+  - `complex_abcabababcaba` reaches an insertion partition panic during root
+    expansion materialization (`insert_next_match`).
+  - `read_infix2` now gets past the `vi` lookup but expects `subvisu` to stay
+    `[su,b,v,i,su]` although `sub` and `visu` exist; it gets `[sub,visu]`.
+    Its expectations are internally inconsistent (`subvisu` is asserted twice
+    with different patterns).
   - `read_multiple_overlaps1` lacks an expected additional decomposition.
 
 Separate tasks, outside this refactor:

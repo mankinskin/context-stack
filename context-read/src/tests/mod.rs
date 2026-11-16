@@ -81,8 +81,34 @@ pub(crate) fn assert_graph_invariants(graph: &context_trace::HypergraphRef) {
             canonical.insert(atoms, *token).is_none(),
             "duplicate token content"
         );
+        let patterns = graph.expect_child_patterns(*token);
+        // No sibling run of one decomposition may lie inside a single child
+        // of another decomposition; it would repeat that child's content.
+        for (id, pattern) in patterns.iter() {
+            for (other_id, other) in patterns.iter() {
+                if id == other_id {
+                    continue;
+                }
+                let mut spans = Vec::new();
+                let mut offset = 0;
+                for child in other.iter() {
+                    spans.push((offset, offset + child.width().0));
+                    offset += child.width().0;
+                }
+                let mut start = 0;
+                for pair in pattern.windows(2) {
+                    let end = start + pair[0].width().0 + pair[1].width().0;
+                    assert!(
+                        !spans.iter().any(|&(s, e)| s <= start && end <= e),
+                        "sibling run of {} repeats a child of another decomposition",
+                        graph.index_string(*token)
+                    );
+                    start += pair[0].width().0;
+                }
+            }
+        }
         let mut boundaries = HashSet::new();
-        for pattern in graph.expect_child_patterns(*token).values() {
+        for pattern in patterns.values() {
             let mut offset = 0;
             for child in pattern.iter().take(pattern.len() - 1) {
                 offset += child.width().0;

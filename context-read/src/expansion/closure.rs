@@ -1,13 +1,22 @@
 //! Factored closure of a canonical root-postfix/expansion-prefix overlap.
 //!
-//! For scope `X = L + P` and expansion `E = P + T`, construct
-//! `[X,T...] = [L...,E]` without allocating complement-only tokens.
+//! For scope `X = L + P` and expansion `E = P + T`, construct the binary
+//! closure `C = [X,T] = [L,E]`. The complements `L` and `T` are canonical
+//! tokens represented inside their smallest scopes: `L` at offset 0 of `X`
+//! and `T` at offset `|P|` of `E`. Existing represented occurrences are
+//! reused; otherwise they are materialized by scope-restricted insertion,
+//! which rewrites the scope's decompositions so the occurrence is connected.
 //! Preparation is read-only; applying the plan may mutate the graph but leaves
 //! accumulation updates to the sink. Neither phase provides rollback.
 
 use crate::pipeline::root::{
     RootManager,
     Span,
+};
+use context_insert::insert::scoped::{
+    find_represented,
+    insert_scope_postfix_width,
+    insert_scope_prefix_width,
 };
 use context_search::Find;
 use context_trace::*;
@@ -23,12 +32,22 @@ pub(crate) enum ClosurePlan {
     /// Materialize or reuse a factored closure around the selected scope.
     Closed {
         root: Token,
-        /// Entire last child for a tail edit, otherwise the accumulated root.
+        /// `X`: entire last child for a tail edit, otherwise the accumulated root.
         scope: Token,
         /// Integrate by replacing the root's tail rather than adopting a new root.
         tail: bool,
-        /// The alternatives `[X,T...]` and `[L...,E]`, respectively.
-        patterns: [Pattern; 2],
+        /// `P`: the shared overlap token.
+        shared: Token,
+        /// `E = P + T`: the accepted expansion.
+        expansion: Token,
+        /// Connected postfix path `X -> P` at preparation time.
+        scope_path: Vec<ChildLocation>,
+        /// Connected prefix path `E -> P` at preparation time.
+        expansion_path: Vec<ChildLocation>,
+        /// `|L| = |X| - |P|`.
+        left_width: usize,
+        /// `|T| = |E| - |P|`.
+        right_width: usize,
         /// Canonical token with the closure content, if already represented.
         existing: Option<Token>,
     },
@@ -37,8 +56,17 @@ pub(crate) enum ClosurePlan {
 impl ClosurePlan {
     /// Materialize the prepared closure and return the sink operation.
     ///
-    /// Adds missing decompositions to an existing canonical result or allocates
-    /// the closure token. Direct tail expansion does not modify the graph here.
+    /// Resolves `L` inside `X`, then `T` inside `E`, re-derives the overlap
+    /// paths (insertion may rewrite decompositions), and adds the missing
+    /// decompositions `[X,T]` and `[L,E]` to an existing canonical result or
+    /// allocates the closure token. Direct tail expansion does not modify the
+    /// graph here.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a canonical complement exists but is not represented inside
+    /// its scope, if scoped insertion fails, or if the overlap paths or
+    /// complement occurrences are disconnected afterwards.
     pub(crate) fn apply(
         self,
         graph: &HypergraphRef,
@@ -53,9 +81,42 @@ impl ClosurePlan {
                 root,
                 scope,
                 tail,
-                patterns,
+                shared,
+                expansion,
+                scope_path,
+                expansion_path,
+                left_width,
+                right_width,
                 existing,
             } => {
+                validate_path(graph, scope, shared, &scope_path, false);
+                validate_path(graph, expansion, shared, &expansion_path, true);
+                let left = complement(graph, scope, 0, left_width);
+                let offset = shared.width().0;
+                let right = complement(graph, expansion, offset, right_width);
+                // Insertion can rewrite the decompositions along both paths.
+                let scope_path = boundary_path(graph, scope, shared, false)
+                    .expect("scope must still represent the shared postfix");
+                validate_path(graph, scope, shared, &scope_path, false);
+                let expansion_path = boundary_path(
+                    graph, expansion, shared, true,
+                )
+                .expect("expansion must still represent the shared prefix");
+                validate_path(graph, expansion, shared, &expansion_path, true);
+                assert_eq!(
+                    find_represented(graph, scope, 0, left_width),
+                    Some(left),
+                    "left complement is not connected inside the scope"
+                );
+                assert_eq!(
+                    find_represented(graph, expansion, offset, right_width),
+                    Some(right),
+                    "right complement is not connected inside the expansion"
+                );
+                let patterns = [
+                    Pattern::from(vec![scope, right]),
+                    Pattern::from(vec![left, expansion]),
+                ];
                 let token = match existing {
                     Some(token) => {
                         for pattern in patterns {
@@ -96,8 +157,9 @@ impl ClosurePlan {
 ///
 /// # Panics
 ///
-/// Panics on missing or disconnected boundary paths, invalid complement widths,
-/// or repeated boundaries in the selected decompositions or existing result.
+/// Panics on missing or disconnected boundary paths, empty complements, or
+/// if an existing closure token shares a planned boundary across distinct
+/// decompositions.
 pub(crate) fn prepare(
     graph: &HypergraphRef,
     sink: &RootManager,
@@ -133,31 +195,28 @@ pub(crate) fn prepare(
         };
     }
     validate_path(graph, scope, postfix, path, false);
-    let prefix_path = boundary_path(graph, expansion, postfix, true)
+    let expansion_path = boundary_path(graph, expansion, postfix, true)
         .expect("expansion must represent the overlap prefix");
-    let left = complement(graph, scope, postfix, path, false);
-    let right = complement(graph, expansion, postfix, &prefix_path, true);
+    let left_width = scope.width().0 - postfix.width().0;
+    let right_width = expansion.width().0 - postfix.width().0;
     assert!(
-        !left.is_empty() && !right.is_empty(),
+        left_width > 0 && right_width > 0,
         "closure requires proper complements"
     );
-    let primary: Pattern = std::iter::once(scope).chain(right).collect();
-    let alternative: Pattern =
-        left.into_iter().chain(std::iter::once(expansion)).collect();
-    assert_eq!(
-        pattern_width(&primary),
-        pattern_width(&alternative),
-        "closure widths differ"
-    );
-    let existing = find_complete(graph, &primary);
+    // Content lookup `[X] + atoms(T)`; read-only.
+    let mut content = vec![scope];
+    content.extend_from_slice(&atoms(graph, expansion)[postfix.width().0..]);
+    let existing = find_complete(graph, &Pattern::from(content));
     if let Some(token) = existing {
-        let patterns = graph.expect_child_patterns(token);
-        for proposed in [&primary, &alternative] {
-            for current in patterns.values() {
+        let planned = [
+            std::collections::BTreeSet::from([scope.width().0]),
+            std::collections::BTreeSet::from([left_width]),
+        ];
+        for current in graph.expect_child_patterns(token).values() {
+            let current = boundaries(current);
+            for proposed in &planned {
                 assert!(
-                    current == proposed
-                        || boundaries(current)
-                            .is_disjoint(&boundaries(proposed)),
+                    &current == proposed || current.is_disjoint(proposed),
                     "closure would duplicate an existing boundary"
                 );
             }
@@ -167,8 +226,66 @@ pub(crate) fn prepare(
         root,
         scope,
         tail: editable,
-        patterns: [primary, alternative],
+        shared: postfix,
+        expansion,
+        scope_path: path.to_vec(),
+        expansion_path,
+        left_width,
+        right_width,
         existing,
+    }
+}
+
+/// Resolve the canonical complement of `width` atoms at `offset` in `scope`.
+///
+/// Reuses a connected occurrence, otherwise materializes it by scoped
+/// insertion. Complements are always prefixes or postfixes of `scope`.
+///
+/// # Panics
+///
+/// Panics if the content already has a canonical token that is not
+/// represented inside `scope`, or if scoped insertion fails.
+fn complement(
+    graph: &HypergraphRef,
+    scope: Token,
+    offset: usize,
+    width: usize,
+) -> Token {
+    if let Some(token) = find_represented(graph, scope, offset, width) {
+        return token;
+    }
+    let content = &atoms(graph, scope)[offset..offset + width];
+    if let Some(token) = find_complete(graph, &Pattern::from(content.to_vec()))
+    {
+        panic!(
+            "canonical complement {} is not represented in {}",
+            graph.index_string(token),
+            graph.index_string(scope)
+        );
+    }
+    let inserted = if offset == 0 {
+        insert_scope_prefix_width(graph, scope, width)
+    } else {
+        assert_eq!(offset + width, scope.width().0, "complement is an infix");
+        insert_scope_postfix_width(graph, scope, width)
+    };
+    inserted.unwrap_or_else(|error| {
+        panic!("scoped complement insertion failed: {:?}", error)
+    })
+}
+
+/// Expand a token to its atoms through any decomposition.
+fn atoms(
+    graph: &HypergraphRef,
+    token: Token,
+) -> Vec<Token> {
+    let patterns = graph.expect_child_patterns(token);
+    match patterns.values().next() {
+        None => vec![token],
+        Some(pattern) => pattern
+            .iter()
+            .flat_map(|child| atoms(graph, *child))
+            .collect(),
     }
 }
 
@@ -266,65 +383,3 @@ pub(crate) fn validate_path(
     }
     assert_eq!(parent, target, "overlap path does not reach shared token");
 }
-
-/// Reuse a boundary decomposition's complement, or collect hierarchical siblings.
-///
-/// `prefix` selects the right complement; otherwise select the left. Nested
-/// right siblings are assembled inner-first to preserve input order.
-fn complement(
-    graph: &HypergraphRef,
-    root: Token,
-    shared: Token,
-    path: &[ChildLocation],
-    prefix: bool,
-) -> Pattern {
-    validate_path(graph, root, shared, path, prefix);
-    let offset = if prefix {
-        shared.width().0
-    } else {
-        root.width().0 - shared.width().0
-    };
-    let vertex = root.vertex(graph);
-    let mut canonical = None;
-    for pattern in vertex.child_patterns().values() {
-        let mut width = 0;
-        for (index, child) in pattern.iter().enumerate().take(pattern.len() - 1)
-        {
-            width += child.width().0;
-            if width == offset {
-                assert!(
-                    canonical.is_none(),
-                    "multiple decompositions share a complement boundary"
-                );
-                canonical = Some(Pattern::from(if prefix {
-                    pattern[index + 1..].to_vec()
-                } else {
-                    pattern[..index + 1].to_vec()
-                }));
-            }
-        }
-    }
-    if let Some(pattern) = canonical {
-        return pattern;
-    }
-    let mut parts = Vec::new();
-    for location in path {
-        let pattern = graph.expect_pattern_at(*location);
-        parts.push(if prefix {
-            pattern[location.sub_index + 1..].to_vec()
-        } else {
-            pattern[..location.sub_index].to_vec()
-        });
-    }
-    if prefix {
-        parts.reverse();
-    }
-    let result: Pattern = parts.into_iter().flatten().collect();
-    assert_eq!(
-        pattern_width(&result).0,
-        root.width().0 - shared.width().0,
-        "complement width differs"
-    );
-    result
-}
-

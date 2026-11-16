@@ -49,15 +49,49 @@ abcd = [abc,d] = [a,bcd]
 R    = [x,y,z,abcd]
 ```
 
-An ensuing `cde` overlap at `cd` similarly produces:
+An ensuing `cde` overlap at `cd` closes around `X=abcd` with `L=ab`, which is
+materialized inside `abcd`'s nested child `abc`:
 
 ```text
-abcde = [abcd,e] = [a,b,cde]
+ab    = [a,b]
+abc   = [a,bc] = [ab,c]
+abcde = [abcd,e] = [ab,cde]
 R     = [x,y,z,abcde]
 ```
 
-The root prefix is not duplicated across alternatives, and no complement-only
-vertex is allocated.
+The root prefix is not duplicated across alternatives. The complement `ab` is
+a token represented inside its scope, not the sibling run `[a,b]`, which would
+repeat content inside `abc`.
+
+## Flat scope: `x` + `vis`, then `su`
+
+With editable `R=[x,vis]`, flat `vis=[v,i,s]` and expansion `E=su=[s,u]`
+overlapping at `P=s`, the left complement `vi` is inserted inside `vis`:
+
+```text
+vi   = [v,i]
+vis  = [vi,s]
+visu = [vis,u] = [vi,su]
+R    = [x,visu]
+```
+
+Collecting siblings instead (`visu=[vis,u]=[v,i,su]`) would repeat `[v,i]`
+inside `vis` and leave `vi` unrepresented.
+
+## Nested complements: `x` + `wabc`, then `bcdef`
+
+With `wabc=[w,abc]`, `abc=[a,bc]`, `P=bc` and `E=bcdef=[bcde,f]`,
+`bcde=[bcd,e]`, `bcd=[bc,d]`, both complements are nested:
+
+```text
+wa      = [w,a]          (inside wabc)
+wabc    = [w,abc] = [wa,bc]
+de      = [d,e]          (inside bcde)
+def     = [de,f]         (inside bcdef)
+bcde    = [bcd,e] = [bc,de]
+bcdef   = [bcde,f] = [bc,def]
+wabcdef = [wabc,def] = [wa,bcdef]
+```
 
 ## Preserve nested tokens and canonical complements
 
@@ -67,8 +101,9 @@ Otherwise the original `wabc` occurrence could disappear.
 When `wa` already exists and `wabc=[w,abc]=[wa,bc]`, reuse its boundary:
 
 ```text
-X = wabc, P = bc, E = bcd, L = [wa], T = [d]
+X = wabc, P = bc, E = bcd, L = wa, T = d
 wabcd = [wabc,d] = [wa,bcd]
 ```
 
-Do not collect `[w,a]` instead of the canonical complement `[wa]`.
+Do not collect `[w,a]` instead of the canonical complement `wa`; single-token
+complements are reused unchanged.

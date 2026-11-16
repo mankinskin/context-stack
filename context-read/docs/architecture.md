@@ -36,12 +36,38 @@ The search anchor, closure scope and accumulation destination have distinct role
 With `X = L + P` and `E = P + T`, close as:
 
 ```text
-C = [X,T...] = [L...,E]
+C = [X,T] = [L,E]
 ```
 
-`L` and `T` are sibling patterns. Prefer the unique existing decomposition with
-the required boundary; otherwise collect siblings along connected paths.
-Do not allocate complement-only tokens. Reuse an existing canonical `C`.
+`C` is always binary. `L` and `T` are canonical **tokens**, each represented
+inside its smallest scope: `L` is reachable at offset 0 of `X` and `T` at offset
+`|P|` of `E`, through connected child patterns. A complement is never scoped
+to a wider range that includes the root prefix.
+
+Resolve each complement in order:
+
+1. Reuse a connected child occurrence of the required width and offset,
+   descending through all child patterns (a single token is used directly).
+2. If no connected occurrence exists but a canonical token with that content
+   does, panic: the occurrence path is missing, which is an insertion bug.
+3. Otherwise materialize it with scoped insertion
+   (`context_insert::insert::scoped`), which splits only the scope and its
+   descendants and rewrites their decompositions so the complement is
+   connected without duplicating boundaries.
+
+Sibling patterns must not be used as complements: `[X,T...] = [L...,E]` would
+repeat sequences inside a child of the other decomposition, e.g.
+`visu=[vis,u]=[v,i,su]` repeats `[v,i]` inside `vis`. The correct closure is
+`vi=[v,i]`, `vis=[vi,s]`, `visu=[vis,u]=[vi,su]`.
+
+Preparation is read-only: it selects the scope, detects direct tail
+replacement and preflights an existing canonical `C` (content lookup of
+`[X] + atoms(T)`), whose decompositions may equal but must not share planned
+boundaries `{|X|}` or `{|L|}`. Application resolves `L` then `T`, re-derives
+the `X -> P` and `E -> P` paths (insertion may rewrite decompositions),
+validates the complement occurrences and creates `C` or adds its missing
+decompositions. The expansion step then asserts that the root is unchanged
+and, for tail replacement, still editable.
 
 If `P` is the entire editable last child and `E` is not the root, replace that
 child directly with `E`, without constructing `C`.

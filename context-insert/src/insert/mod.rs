@@ -14,6 +14,7 @@ pub mod context;
 pub(crate) mod direction;
 pub mod outcome;
 pub mod result;
+pub mod scoped;
 
 pub use outcome::InsertOutcome;
 
@@ -45,6 +46,32 @@ pub trait ToInsertCtx<R: InsertResult = Token>:
     ) -> Result<Token, ErrorState> {
         bundle_overlap(&HypergraphRef::from(self.graph().clone()), input)
             .map_err(ErrorState::from)
+    }
+    /// Canonical token for `scope`'s content before the postfix reached by
+    /// `postfix_path`, represented inside `scope` (see [`scoped`]).
+    fn insert_scope_prefix(
+        &self,
+        scope: Token,
+        postfix_path: &[ChildLocation],
+    ) -> Result<Token, ErrorState> {
+        scoped::insert_scope_prefix(
+            self.insert_context().graph_ref(),
+            scope,
+            postfix_path,
+        )
+    }
+    /// Canonical token for `scope`'s content after the prefix reached by
+    /// `prefix_path`, represented inside `scope` (see [`scoped`]).
+    fn insert_scope_postfix(
+        &self,
+        scope: Token,
+        prefix_path: &[ChildLocation],
+    ) -> Result<Token, ErrorState> {
+        scoped::insert_scope_postfix(
+            self.insert_context().graph_ref(),
+            scope,
+            prefix_path,
+        )
     }
     #[deprecated(
         since = "0.2.0",

@@ -199,25 +199,15 @@ impl<G: GraphKind> Hypergraph<G> {
     pub fn vertex_count(&self) -> usize {
         self.graph.len()
     }
+    /// Validate the child patterns of a vertex after an edit.
+    ///
+    /// Alternative decompositions differ by definition; each must be nonempty,
+    /// span the vertex width, and not share inner boundaries with the others.
     pub fn validate_expansion(
         &self,
         index: impl HasVertexIndex,
     ) {
-        //let root = index.index();
-        let data = self.expect_vertex_data(index.vertex_index());
-        data.children.iter().fold(
-            Vec::new(),
-            |mut acc: Vec<vertex::VertexIndex>, (_pid, p)| {
-                assert!(!p.is_empty());
-                let exp = p.iter().map(|c| c.vertex_index()).collect_vec();
-                if acc.is_empty() {
-                    acc = exp;
-                } else {
-                    assert_eq!(acc, exp);
-                }
-                acc
-            },
-        );
+        self.expect_vertex_data(index.vertex_index()).validate();
     }
 }
 
