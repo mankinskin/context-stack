@@ -663,6 +663,42 @@ fn closure_uses_connected_shared_token_paths() {
 }
 
 #[test]
+fn closure_closes_nested_suffix_before_outer_scope() {
+    let graph = HypergraphRef::default();
+    let _tracing = init_test_tracing!(&graph);
+    let [a, b, c, d] = graph.insert_atoms("abcd".chars().map(Atom::Element))[..]
+    else {
+        panic!("insert_atoms failed");
+    };
+    let bc = graph.insert_pattern(vec![b, c]);
+    let abc = graph.insert_pattern(vec![a, bc]);
+    let cd = graph.insert_pattern(vec![c, d]);
+    crate::tests::assert_graph_invariants(&graph);
+
+    let mut sink = RootManager::new(graph.clone());
+    sink.append_completed(abc);
+    let path = closure::boundary_path(&graph, abc, c, false).unwrap();
+    assert_eq!(path.len(), 2);
+
+    let span = closure::prepare(&graph, &sink, abc, c, &path, cd).apply(&graph);
+    let abcd = sink.commit(span).root;
+    assert_eq!(graph.index_string(abcd), "abcd");
+    crate::tests::assert_graph_invariants(&graph);
+
+    // The overlap at abc -> bc -> c also needs the union of bc with cd.
+    let bcd = context_insert::insert::scoped::find_represented(
+        &graph, abcd, 1, 3,
+    )
+    .expect("closure must represent the nested suffix overlap bcd");
+    assert_patterns!(
+        graph,
+        bcd => [[bc, d], [b, cd]],
+        abcd => [[abc, d], [a, bcd]]
+    );
+    crate::tests::assert_graph_invariants(&graph);
+}
+
+#[test]
 fn expansion_sink_preserves_adopted_unshared_token() {
     let (graph, a, b, c, ab) = setup_abc_ab();
     let _tracing = init_test_tracing!(&graph);
