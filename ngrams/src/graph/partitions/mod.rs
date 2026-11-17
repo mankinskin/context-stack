@@ -247,7 +247,7 @@ impl TraversalPass for PartitionsCtx<'_> {
         Ok(Some(next))
     }
     fn begin_run(&mut self) {
-        println!("Partition Pass");
+        eprintln!("Partition Pass");
     }
 
     fn finish_run(&mut self) -> RunResult<()> {

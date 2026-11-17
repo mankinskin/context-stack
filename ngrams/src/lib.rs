@@ -14,6 +14,7 @@ pub(crate) use {
 pub mod cancellation;
 pub mod config;
 pub mod graph;
+pub mod output;
 #[cfg(not(debug_assertions))]
 mod shared;
 pub(crate) mod storage;

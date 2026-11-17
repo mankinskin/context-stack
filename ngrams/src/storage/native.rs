@@ -70,7 +70,7 @@ impl Storage for NativeStorage {
     ) -> Result<(), StorageError> {
         let path = self.key_to_path(key);
 
-        println!("Write to storage: {}", path.display());
+        eprintln!("Write to storage: {}", path.display());
 
         // Remove existing file if present
         if path.exists() {
@@ -96,7 +96,7 @@ impl Storage for NativeStorage {
     ) -> Result<T, StorageError> {
         let path = self.key_to_path(key);
 
-        println!("Read from storage: {}", path.display());
+        eprintln!("Read from storage: {}", path.display());
 
         if !path.exists() {
             return Err(StorageError::NotFound(key.to_string()));

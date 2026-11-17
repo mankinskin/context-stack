@@ -1,4 +1,6 @@
 pub(crate) mod count;
+#[cfg(test)]
+mod hash_order;
 
 use std::path::Path;
 

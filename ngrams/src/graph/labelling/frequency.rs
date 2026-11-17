@@ -102,7 +102,7 @@ impl TraversalPass for FrequencyCtx<'_> {
         })
     }
     fn begin_run(&mut self) {
-        println!("Frequency Pass");
+        eprintln!("Frequency Pass");
     }
     fn finish_run(&mut self) -> RunResult<()> {
         let bottom = BottomUp::starting_nodes(self.vocab());
@@ -131,7 +131,7 @@ impl FrequencyCtx<'_> {
                 .any(|p| {
                     self.vocab().get_vertex(p).unwrap().count() < entry.count()
                 })
-                .then(|| println!("{}", entry.ngram))
+                .then(|| eprintln!("{}", entry.ngram))
                 .is_some()
         })
     }

@@ -5474,6 +5474,7 @@ name = "ngrams"
 version = "0.1.0"
 dependencies = [
  "ciborium",
+ "clap",
  "context-trace",
  "csv",
  "derivative",
@@ -5489,6 +5490,7 @@ dependencies = [
  "pretty_assertions",
  "range-ext",
  "serde",
+ "serde_json",
  "strum 0.27.2",
  "strum_macros 0.27.2",
  "tap",

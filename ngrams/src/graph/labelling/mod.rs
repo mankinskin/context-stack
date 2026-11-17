@@ -103,7 +103,7 @@ impl LabellingImage {
         if CacheConfig::is_enabled() {
             let key = corpus.name.clone();
             if let Ok(image) = Self::read_from_storage(&key) {
-                println!("Containment Pass already processed.");
+                eprintln!("Containment Pass already processed.");
                 return Ok(image);
             }
         }
@@ -165,7 +165,7 @@ impl LabellingCtx {
             FrequencyCtx::new(&mut *self).run()?;
             let _ = self.image.write_to_target_file();
         } else {
-            println!("Frequency Pass already processed.");
+            eprintln!("Frequency Pass already processed.");
         }
         Ok(())
     }
@@ -174,7 +174,7 @@ impl LabellingCtx {
             WrapperCtx::new(&mut *self).run()?;
             let _ = self.image.write_to_target_file();
         } else {
-            println!("Wrapper Pass already processed.");
+            eprintln!("Wrapper Pass already processed.");
         }
         Ok(())
     }

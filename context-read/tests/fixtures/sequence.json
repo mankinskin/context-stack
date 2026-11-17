@@ -1,0 +1,41 @@
+{
+  "format_version": 2,
+  "corpus": [
+    "hypergraph",
+    "hyper",
+    "graph"
+  ],
+  "vertices": {
+    "a": [],
+    "e": [],
+    "g": [],
+    "graph": [
+      [
+        "g",
+        "r",
+        "a",
+        "p",
+        "h"
+      ]
+    ],
+    "h": [],
+    "hyper": [
+      [
+        "h",
+        "y",
+        "p",
+        "e",
+        "r"
+      ]
+    ],
+    "hypergraph": [
+      [
+        "hyper",
+        "graph"
+      ]
+    ],
+    "p": [],
+    "r": [],
+    "y": []
+  }
+}

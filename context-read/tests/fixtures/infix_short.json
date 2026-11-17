@@ -1,0 +1,54 @@
+{
+  "format_version": 2,
+  "corpus": [
+    "subvisu",
+    "visub"
+  ],
+  "vertices": {
+    "b": [],
+    "i": [],
+    "s": [],
+    "su": [
+      [
+        "s",
+        "u"
+      ]
+    ],
+    "sub": [
+      [
+        "su",
+        "b"
+      ]
+    ],
+    "subvisu": [
+      [
+        "sub",
+        "visu"
+      ]
+    ],
+    "u": [],
+    "v": [],
+    "vi": [
+      [
+        "v",
+        "i"
+      ]
+    ],
+    "visu": [
+      [
+        "vi",
+        "su"
+      ]
+    ],
+    "visub": [
+      [
+        "vi",
+        "sub"
+      ],
+      [
+        "visu",
+        "b"
+      ]
+    ]
+  }
+}

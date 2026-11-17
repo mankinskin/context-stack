@@ -110,6 +110,6 @@ impl TraversalPass for WrapperCtx<'_> {
         Ok(Some(next))
     }
     fn begin_run(&mut self) {
-        println!("Wrapper Pass");
+        eprintln!("Wrapper Pass");
     }
 }

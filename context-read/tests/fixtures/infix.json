@@ -1,0 +1,79 @@
+{
+  "format_version": 2,
+  "corpus": [
+    "subdivision",
+    "visualization"
+  ],
+  "vertices": {
+    "a": [],
+    "b": [],
+    "d": [],
+    "i": [],
+    "ion": [
+      [
+        "i",
+        "o",
+        "n"
+      ]
+    ],
+    "l": [],
+    "n": [],
+    "o": [],
+    "s": [],
+    "su": [
+      [
+        "s",
+        "u"
+      ]
+    ],
+    "subdivision": [
+      [
+        "su",
+        "b",
+        "d",
+        "i",
+        "vis",
+        "ion"
+      ]
+    ],
+    "t": [],
+    "u": [],
+    "v": [],
+    "vi": [
+      [
+        "v",
+        "i"
+      ]
+    ],
+    "vis": [
+      [
+        "v",
+        "i",
+        "s"
+      ]
+    ],
+    "visu": [
+      [
+        "vi",
+        "su"
+      ],
+      [
+        "vis",
+        "u"
+      ]
+    ],
+    "visualization": [
+      [
+        "visu",
+        "a",
+        "l",
+        "i",
+        "z",
+        "a",
+        "t",
+        "ion"
+      ]
+    ],
+    "z": []
+  }
+}

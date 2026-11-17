@@ -29,7 +29,7 @@ data with structural overlap closure and ownership-safe accumulation.
 use context_trace::HypergraphRef;
 
 let graph = HypergraphRef::default();
-let root = context_read::read(&graph, "aabbaabb").unwrap();
+let root = context_read::read(&graph, "aabbaabb".chars()).unwrap();
 ```
 
 ## Key Concepts
@@ -85,6 +85,75 @@ root and uses whole-root closure, preventing cycles.
 - Test framework integration
 
 ## Development
+
+### Tests and oracle fixtures
+
+Reader behavior tests live in [`tests/reader_behavior.rs`](tests/reader_behavior.rs).
+They call only the public `context_read::read` API and compare the **entire**
+graph with checked-in n-gram oracle snapshots: tokens and decompositions must
+match exactly. Extra structure is a failure, as are duplicate-content vertices,
+invalid widths, and decompositions with inconsistent content. Vertex IDs,
+pattern IDs, and map iteration order are not semantic.
+
+[`tests/fixtures/scenarios.json`](tests/fixtures/scenarios.json) defines ordered
+input corpora. Each generated JSON fixture records that corpus and one complete
+final oracle graph in a top-level `vertices` object (format version 2). Tests
+read all inputs in order and compare only the final graph. Cumulative-prefix
+snapshots and oracle-seeded behavioral transition tests have been removed.
+The three `closure_*_seed` scenarios provide independent oracle-backed corpora
+needed by specialized internal mechanism tests.
+
+Generate fixtures explicitly (this can be slow):
+
+```bash
+cargo run -p ngrams -- --help
+cargo run --release -p ngrams -- \
+  --file context-read/tests/fixtures/scenarios.json \
+  --out context-read/tests/fixtures/
+# Generate one corpus to stdout:
+cargo run --release -p ngrams -- "ab" "bc" "abc"
+```
+
+The [ngrams CLI](../ngrams/README.md) calls `ngrams::graph::parse_corpus`, not the reader. Outputs are
+sorted, content-keyed JSON; oracle errors abort generation rather than yielding
+empty or reader-derived expectations. To add a scenario, add its corpus to the
+manifest, register its test in the scenario macro, regenerate, and review the
+JSON diff. Do not edit expected graph data by hand. Normal tests only deserialize
+these files; they never execute the oracle. Empty and single-character API
+contracts are tested directly because the oracle does not support all such
+corpora.
+
+The oracle algorithm is unchanged. Its partition discovery is known to be
+order-dependent; sorting the serialized output does not resolve that issue.
+The checked-in snapshots were regenerated with the unchanged oracle. They
+record one observed final output per corpus, not a uniquely established
+reference graph. Regeneration may disagree with them or between
+runs; oracle correctness must be resolved before treating these snapshots as
+authoritative reader expectations. The active ngrams regression
+`partitions_are_independent_of_root_hash_iteration_order` exercises both root
+iteration orders for `["subdivision", "visualization"]` and exposes this defect.
+Use a release build for generation: even these small corpora can be extremely
+slow in an unoptimized oracle.
+
+Specialized cursor, closure-path, scheduling, and sink precondition contracts
+live in [`src/tests/cursor.rs`](src/tests/cursor.rs), using oracle-backed graph
+seeds. They are **not** alternative specifications of reader graph semantics.
+Malformed graphs occur only in explicitly identified fixture-validator tests.
+The old compound invariant checker is not a substitute for oracle comparison:
+structural policies need independent justification.
+
+Run the suites separately:
+
+```bash
+cargo test -p context-read --test reader_behavior
+cargo test -p context-read --test fixture_validation
+cargo test -p context-read --lib
+```
+
+Oracle mismatches are ordinary failing tests, not ignored tests or permissive
+subset comparisons. A passing internal mechanism test does not override a
+failing behavioral test.
+
 ```bash
 cargo test          # Run tests
 cargo doc --open    # Generate documentation

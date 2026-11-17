@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "corpus": [
+    "wxyz"
+  ],
+  "vertices": {
+    "w": [],
+    "wxyz": [
+      [
+        "w",
+        "x",
+        "y",
+        "z"
+      ]
+    ],
+    "x": [],
+    "y": [],
+    "z": []
+  }
+}

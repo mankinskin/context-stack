@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "corpus": [
+    "abc"
+  ],
+  "vertices": {
+    "a": [],
+    "abc": [
+      [
+        "a",
+        "b",
+        "c"
+      ]
+    ],
+    "b": [],
+    "c": []
+  }
+}

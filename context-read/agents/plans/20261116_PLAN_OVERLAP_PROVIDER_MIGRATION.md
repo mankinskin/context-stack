@@ -20,7 +20,37 @@ Retire the legacy overlap implementation after the new provider is active.
 This is no longer just a relocation of the current closure code. First preserve
 behavior while repairing the dataflow; then address the missing affected-host
 completion and historical-pattern retention under separate, explicit gates.
-Existing graph-shape assertions remain the oracle and must not be weakened.
+Verified n-gram oracle fixtures should be authoritative; hand-written graph-shape
+assertions alone do not justify a semantic requirement. Current snapshots are
+provisional pending oracle correctness, as noted below.
+
+## Test contract correction (2026-11-17)
+
+The test refactor supersedes references below to preserving existing synthetic
+expectations unchanged. Public reader behavior is now checked against generated
+final corpus snapshots in `context-read/tests/fixtures`, through
+`context-read/tests/reader_behavior.rs`. Internal cursor, closure-path,
+scheduling, and sink contracts remain separate in `src/tests/cursor.rs` and use
+oracle-backed graph seeds. Normal reader tests never run the oracle.
+
+Comparisons reject missing **and extra** tokens/decompositions, duplicate
+content, and inconsistent edge metadata. The former occurrence-completeness
+checker was removed; its stronger normalization claims must be justified
+separately. The experimental oracle changes were reverted; the original
+order-dependent algorithm remains. Current snapshots were regenerated with
+that unchanged oracle and record one observed final output per corpus. The
+`ngrams` CLI now generates one top-level `vertices` object per corpus (format
+version 2); cumulative-prefix and oracle-seeded behavioral tests were removed.
+The ngrams hash-order regression exercises both root iteration orders for the
+same corpus and semantic labels. Resolve oracle correctness before treating
+these snapshots as authoritative expectations.
+
+The original regressions are covered by the `complex_overlap` and
+`multiple_overlaps` behavioral scenarios. Other newly exposed mismatches must
+also be resolved against generated expectations, not by accepting the reader's
+current graph. Historical suite counts and commands below describe the earlier
+migration checkpoint; see `context-read/README.md` for current validation and
+fixture regeneration commands.
 
 ## Revision 3: corrections to the previous plan
 
@@ -488,7 +518,7 @@ connect to the intended `P` and required nesting frames are not lost.
 Tests: existing nested regression; nested expansion prefix complements;
 alternative decompositions crossing a boundary; wrapper conflicts; canonical
 result reuse; successive tail closures; direct tail; self-expansion.
-Preserve exact existing graph-shape expectations. Inspect the active call chain
+Preserve exact oracle-verified graph-shape expectations. Inspect the active call chain
 to verify known paths do not feed a width-based discovery loop.
 
 Gate after Phases 1-3: no new failures; the two known failures may remain.
@@ -516,7 +546,7 @@ that pattern, and current selection must not be assumed to prune old patterns.
 If still failing, define a narrowly justified retention/replacement rule using
 the new structural evidence, with tests preserving legitimate decompositions.
 Use the existing planning/selection/publication boundary; do not special-case
-the example's token content. Gate: both original tests pass unchanged and no
+the example's token content. Gate: both original scenarios match generated oracle fixtures and no
 previously passing read/insert/trace test regresses.
 
 ### Phase 6: retire legacy surface and update documentation
@@ -586,7 +616,7 @@ make a symbol count smaller.
       self-expansion initially preserves the existing policy.
 - [ ] Affected hosts are completed through justified scoped occurrences, with
       explicit deduplication/termination and unrelated-host preservation.
-- [ ] Both original failing tests pass unchanged after the correctness phases,
+- [ ] Both original failing scenarios match generated oracle fixtures after the correctness phases,
       including the complex oracle's historical-pattern requirement.
 - [ ] No prior passing tests regress; downstream workspace targets build.
 - [ ] Legacy bundle APIs are retired and directly related docs are updated.
