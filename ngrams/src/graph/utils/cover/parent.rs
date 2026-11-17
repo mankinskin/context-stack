@@ -1,3 +1,8 @@
+//! Unused cover-search variant retained outside the active oracle pipeline.
+//!
+//! Despite its name, this implementation descends into children, like the child
+//! cover search; it does not walk upward through containing parents.
+
 use context_trace::{
     graph::{
         vertex::{
@@ -82,13 +87,18 @@ use crate::graph::{
 
 use super::ChildCover;
 
+/// Standalone downward cover traversal, currently not invoked by corpus parsing.
 #[derive(Debug)]
 pub(crate) struct ParentCoverPass<'a> {
+    /// Vocabulary and current labels used to select descendants.
     pub(crate) ctx: &'a LabellingCtx,
+    /// Vertex whose proper children seed the traversal.
     pub(crate) root: VertexKey,
+    /// Labelled descendants indexed by root-relative character offset.
     pub(crate) cover: ChildCover,
 }
 impl<'a> ParentCoverPass<'a> {
+    /// Initialize an empty cover for a root.
     pub(crate) fn new(
         ctx: &'a LabellingCtx,
         root: VertexKey,
@@ -104,14 +114,17 @@ impl TraversalPass for ParentCoverPass<'_> {
     type Node = (usize, NGramId);
     type NextNode = (usize, NGramId);
     type Queue = LayeredQueue<Self>;
+    /// Borrow the context used by this standalone cover traversal.
     fn ctx(&self) -> &LabellingCtx {
         self.ctx
     }
+    /// Seed positioned children, rather than parents, of the supplied root.
     fn start_queue(&mut self) -> RunResult<Self::Queue> {
         Ok(Self::Queue::from_iter(TopDown::next_nodes(
             &self.ctx.vocab().expect_vertex(&self.root),
         )))
     }
+    /// Prune covered spans, retain labels, and expand other descendants.
     fn on_node(
         &mut self,
         node: &Self::Node,
@@ -134,6 +147,7 @@ impl TraversalPass for ParentCoverPass<'_> {
         })
     }
 
+    /// Drain successive layers with cancellation checks before processing nodes.
     fn run(&mut self) -> RunResult<()> {
         self.begin_run();
         let mut queue = self.start_queue()?;

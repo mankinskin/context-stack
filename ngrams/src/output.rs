@@ -1,28 +1,42 @@
 //! Content-keyed graph interchange, independent of vertex and pattern IDs.
+//!
+//! Ordered maps and sets stabilize serialization of a given graph. They do not
+//! correct order-dependent decompositions produced by the oracle.
 
 use context_trace::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Version of the complete, content-keyed graph format (rather than read steps).
 pub const FORMAT_VERSION: u32 = 2;
 
+/// One named corpus accepted by CLI file mode.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Scenario {
+    /// Output filename stem, validated by the CLI before generation.
     pub name: String,
+    /// Texts processed together as one corpus.
     pub inputs: Vec<String>,
 }
 
+/// Versioned graph document with the input corpus retained for root checks.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GraphSnapshot {
+    /// Must equal `FORMAT_VERSION` for this validator.
     pub format_version: u32,
+    /// Original texts, each of which must have an output vertex.
     pub corpus: Vec<String>,
+    /// Content-keyed graph fields flattened into this document's top level.
     #[serde(flatten)]
     pub graph: GraphData,
 }
 
 impl GraphSnapshot {
+    /// Check the version, nonempty inputs, graph structure, and corpus-root presence.
+    ///
+    /// This does not establish semantic completeness or schedule independence.
     pub fn validate(&self) -> Result<(), String> {
         if self.format_version != FORMAT_VERSION {
             return Err(format!(
@@ -43,12 +57,20 @@ impl GraphSnapshot {
     }
 }
 
+/// ID-free representation of vertices and their alternative decompositions.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct GraphData {
+    /// Content to distinct ordered child sequences; atoms have an empty set.
+    ///
+    /// Keys and alternatives are sorted, but child order within a pattern matters.
     pub vertices: BTreeMap<String, BTreeSet<Vec<String>>>,
 }
 
 impl GraphData {
+    /// Convert a hypergraph, checking widths, content uniqueness, and reciprocal links.
+    ///
+    /// Duplicate decompositions are rejected before insertion could hide them.
+    /// Structural lookup methods can still panic for malformed graph references.
     pub fn from_graph(graph: &Hypergraph) -> Result<Self, String> {
         let mut vertices = BTreeMap::new();
         for key in graph.vertex_keys() {
@@ -85,6 +107,8 @@ impl GraphData {
             if vertices.insert(text.clone(), patterns).is_some() {
                 return Err(format!("duplicate token content: {text:?}"));
             }
+            // Check the reverse direction too: every recorded parent occurrence
+            // must point back to this exact child token.
             for (parent_index, parent) in graph.expect_vertex_data(key).parents() {
                 let data = graph.expect_vertex_data(parent_index);
                 if parent.width() != data.width() || parent.pattern_indices().is_empty() {
@@ -106,6 +130,10 @@ impl GraphData {
         Ok(data)
     }
 
+    /// Check atom/composite shape, exact concatenation, and strictly smaller children.
+    ///
+    /// Strictly decreasing character widths exclude cycles. This checks only
+    /// supplied patterns, not whether the oracle omitted a meaningful alternative.
     pub fn validate(&self) -> Result<(), String> {
         for (text, patterns) in &self.vertices {
             let width = text.chars().count();

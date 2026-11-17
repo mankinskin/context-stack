@@ -1,3 +1,7 @@
+//! Select substrings whose occurrence counts exceed a selected ancestor's count.
+//!
+//! This is a relative frequency criterion, not a configurable minimum count.
+
 use std::collections::VecDeque;
 
 use derive_more::{
@@ -51,8 +55,10 @@ use context_trace::{
     HashSet,
 };
 
+/// Top-down labelling pass using a decreasing-width work queue.
 #[derive(Debug, Deref, new, DerefMut)]
 pub(crate) struct FrequencyCtx<'b> {
+    /// Vocabulary and shared label set updated by this pass.
     #[deref]
     #[deref_mut]
     pub(crate) ctx: &'b mut LabellingCtx,
@@ -62,9 +68,11 @@ impl TraversalPass for FrequencyCtx<'_> {
     type Node = VertexKey;
     type NextNode = NGramId;
     type Queue = SortedQueue;
+    /// Expose the common context to traversal cancellation checks.
     fn ctx(&self) -> &LabellingCtx {
         self.ctx
     }
+    /// Expand roots to seed the queue, then ensure every root is labelled.
     fn start_queue(&mut self) -> RunResult<Self::Queue> {
         let start = TopDown::starting_nodes(self.vocab());
 
@@ -84,6 +92,9 @@ impl TraversalPass for FrequencyCtx<'_> {
         );
         Ok(queue)
     }
+    /// Test an unlabelled candidate and schedule its immediate smaller substrings.
+    ///
+    /// Already-labelled nodes are not expanded by this invocation.
     fn on_node(
         &mut self,
         node: &Self::Node,
@@ -101,9 +112,11 @@ impl TraversalPass for FrequencyCtx<'_> {
             Some(next)
         })
     }
+    /// Announce the stage on stderr without modifying the queue.
     fn begin_run(&mut self) {
         eprintln!("Frequency Pass");
     }
+    /// Retain every atom regardless of its relative occurrence count.
     fn finish_run(&mut self) -> RunResult<()> {
         let bottom = BottomUp::starting_nodes(self.vocab());
         self.labels_mut()
@@ -112,6 +125,7 @@ impl TraversalPass for FrequencyCtx<'_> {
     }
 }
 impl FrequencyCtx<'_> {
+    /// Collect immediate smaller substrings, discarding positional offsets.
     pub(crate) fn entry_next(
         &self,
         entry: &VertexCtx,
@@ -121,6 +135,10 @@ impl FrequencyCtx<'_> {
             .map(|(_, c)| c)
             .collect()
     }
+    /// Whether any ancestor in the occurrence cover has fewer occurrences.
+    ///
+    /// Counts include overlapping positions across the entire corpus. A selected
+    /// candidate is also printed to stderr for diagnostics.
     pub(crate) fn entry_is_frequent(
         &self,
         entry: &VertexCtx,

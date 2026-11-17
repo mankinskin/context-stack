@@ -5,29 +5,31 @@ use std::sync::atomic::{
     Ordering,
 };
 
-/// Global flag for cache file writing (disabled by default)
+/// Process-wide cache flag for native image reads and optional image writes.
+///
+/// Disabled by default; changing it does not clear already stored images.
 static CACHE_ENABLED: AtomicBool = AtomicBool::new(false);
 
-/// Cache configuration for controlling file-based caching behavior
+/// Process-wide switch for optional labelling-image persistence.
 pub struct CacheConfig;
 
 impl CacheConfig {
-    /// Check if cache file writing is enabled
+    /// Whether optional cache access is enabled.
     pub fn is_enabled() -> bool {
         CACHE_ENABLED.load(Ordering::Relaxed)
     }
 
-    /// Enable cache file writing
+    /// Enable native image lookup and optional platform-specific image writes.
     pub fn enable() {
         CACHE_ENABLED.store(true, Ordering::Relaxed);
     }
 
-    /// Disable cache file writing
+    /// Disable optional image reads/writes without removing stored data.
     pub fn disable() {
         CACHE_ENABLED.store(false, Ordering::Relaxed);
     }
 
-    /// Set cache file writing enabled/disabled
+    /// Set the process-wide cache switch without synchronizing an active parse.
     pub fn set_enabled(enabled: bool) {
         CACHE_ENABLED.store(enabled, Ordering::Relaxed);
     }

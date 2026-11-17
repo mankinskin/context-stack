@@ -1,4 +1,6 @@
-//! Native filesystem storage implementation
+//! Native filesystem storage using buffered CBOR files.
+//!
+//! Keys are joined to the base directory as paths, without filename validation.
 
 use super::{
     Storage,
@@ -31,10 +33,12 @@ lazy_static::lazy_static! {
 /// Native filesystem-based storage
 #[derive(Debug, Clone)]
 pub(crate) struct NativeStorage {
+    /// Directory against which storage keys are resolved.
     base_dir: PathBuf,
 }
 
 impl Default for NativeStorage {
+    /// Use the same process-relative cache directory as `new`.
     fn default() -> Self {
         Self::new()
     }
@@ -63,6 +67,9 @@ impl NativeStorage {
 }
 
 impl Storage for NativeStorage {
+    /// Replace the target file with CBOR data, creating parent directories.
+    ///
+    /// Replacement is not atomic: an existing file is removed before writing.
     fn store<T: Serialize>(
         &self,
         key: &str,
@@ -90,6 +97,7 @@ impl Storage for NativeStorage {
         Ok(())
     }
 
+    /// Read and deserialize a CBOR file, reporting a missing key separately.
     fn load<T: DeserializeOwned>(
         &self,
         key: &str,
@@ -109,6 +117,7 @@ impl Storage for NativeStorage {
         Ok(data)
     }
 
+    /// Check path existence without attempting to deserialize its contents.
     fn exists(
         &self,
         key: &str,
@@ -116,6 +125,7 @@ impl Storage for NativeStorage {
         self.key_to_path(key).exists()
     }
 
+    /// Remove the file if present; absence is treated as success.
     fn remove(
         &self,
         key: &str,

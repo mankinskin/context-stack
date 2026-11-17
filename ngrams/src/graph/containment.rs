@@ -1,3 +1,13 @@
+//! Build the exhaustive substring vocabulary and its elementary decompositions.
+//!
+//! The caller processes increasing n-gram lengths so shorter strings already
+//! exist when a new composite is linked to them. Repeated content reuses a
+//! vertex and adds an occurrence rather than creating another vertex.
+//!
+//! Windows and occurrence offsets count characters, but child slicing and root
+//! detection below use byte lengths. These units coincide for ASCII input;
+//! the implementation does not consistently handle multibyte characters.
+
 use std::sync::{
     Arc,
     RwLock,
@@ -48,6 +58,7 @@ use super::{
     StatusHandle,
 };
 
+/// The start of one substring occurrence within the input corpus.
 #[derive(
     Debug,
     Clone,
@@ -62,25 +73,39 @@ use super::{
     Deserialize,
 )]
 pub(crate) struct TextLocation {
+    /// Zero-based index of the input text in the corpus.
     pub(crate) texti: usize,
+    /// Zero-based character offset of the substring within that text.
     pub(crate) x: usize,
 }
 
+/// Corpus-wide inputs and progress reporting shared by containment construction.
 #[derive(Debug, From)]
 pub(crate) struct CorpusCtx<'a> {
+    /// Texts whose substrings are being added to the vocabulary.
     pub(crate) corpus: &'a Corpus,
+    /// Shared progress state, advanced once per enumerated occurrence.
     pub(crate) status: &'a mut StatusHandle,
 }
+/// One input text at one n-gram length in the containment pass.
 #[derive(Debug, Clone, Copy, From, Deref)]
 pub(crate) struct TextLevelCtx<'a> {
+    /// Corpus-wide context, also exposed through dereferencing.
     #[deref]
     pub(crate) corpus_ctx: &'a CorpusCtx<'a>,
+    /// Index of this text, used to identify its occurrences.
     pub(crate) texti: usize,
+    /// Input text over which the character window slides.
     pub(crate) text: &'a String,
+    /// Number of characters in each window.
     pub(crate) n: usize,
 }
 
 impl TextLevelCtx<'_> {
+    /// Record every length-`n` character window, including overlapping windows.
+    ///
+    /// The caller must populate shorter substrings first because creating a
+    /// composite looks up its children in the existing vocabulary.
     pub(crate) fn on_nlevel(
         &self,
         vocab: &mut Vocabulary,
@@ -91,6 +116,7 @@ impl TextLevelCtx<'_> {
             .ngrams(self.n)
             .enumerate()
             .for_each(|(xi, ngrami)| {
+                // Window indices are character offsets, not UTF-8 byte offsets.
                 NGramFrequencyCtx {
                     level_ctx: *self,
                     ngram: &String::from_iter(ngrami),
@@ -101,26 +127,41 @@ impl TextLevelCtx<'_> {
     }
 }
 
+/// A single substring occurrence to merge into the containment vocabulary.
 #[derive(Debug, Clone, Copy, From, Deref)]
 pub(crate) struct NGramFrequencyCtx<'a> {
+    /// Text and window-length context for this occurrence.
     #[deref]
     pub(crate) level_ctx: TextLevelCtx<'a>,
+    /// Content used to look up or create the shared vocabulary vertex.
     pub(crate) ngram: &'a String,
+    /// Position of this particular occurrence in the corpus.
     pub(crate) occurrence: TextLocation,
 }
 
 impl NGramFrequencyCtx<'_> {
+    /// Count this occurrence, creating its vertex only for previously unseen content.
     pub(crate) fn on_ngram(
         &self,
         vocab: &mut Vocabulary,
     ) {
         *self.status.steps_mut() += 1;
         if let Some(ctx) = vocab.get_vertex_mut(self.ngram) {
+            // Occurrence identity includes both the text index and its offset.
             ctx.entry.occurrences.insert(self.occurrence);
         } else {
             self.on_first_ngram(vocab)
         }
     }
+    /// Insert unseen content, its first occurrence, and reciprocal containment links.
+    ///
+    /// Single characters become atoms and leaves; composites receive elementary
+    /// child patterns. Root membership is checked only on this insertion path,
+    /// using the current text's byte length.
+    ///
+    /// # Panics
+    ///
+    /// Panics if required child strings have not already been inserted.
     pub(crate) fn on_first_ngram(
         &self,
         vocab: &mut Vocabulary,
@@ -143,7 +184,7 @@ impl NGramFrequencyCtx<'_> {
         vocab.ids.insert(self.ngram.clone(), id);
         vocab.entries.insert(id.vertex_key(), entry);
         if self.n == 1 {
-            // Store the character as an atom for width=1 vertices
+            // Atom data preserves the character used to reconstruct graph strings.
             let atom = self.ngram.chars().next().unwrap().into();
             vocab.containment.insert_atom_data(atom, data);
             vocab.leaves.insert(id);
@@ -151,9 +192,11 @@ impl NGramFrequencyCtx<'_> {
             vocab.containment.insert_vertex_data(data);
         }
         if self.n == self.level_ctx.text.len() {
+            // Repeated content handled by on_ngram does not reach this check.
             vocab.roots.insert(id);
         }
         for (pid, pat) in children {
+            // Despite the local name, this token is the new parent of pat's nodes.
             let child = Token::new(
                 vocab.containment.expect_index_for_key(&id),
                 id.width(),
@@ -164,20 +207,30 @@ impl NGramFrequencyCtx<'_> {
                 .add_parents_to_pattern_nodes(pat_vec, child, pid);
         }
     }
+    /// Build elementary prefix/suffix decompositions from existing vocabulary nodes.
+    ///
+    /// For ASCII composites longer than two characters, returns
+    /// `[prefix(n - 1), last]` and `[first, suffix(n - 1)]`. A bigram has just
+    /// one `[first, last]` pattern; a single ASCII character has none.
+    ///
+    /// # Panics
+    ///
+    /// Panics for empty content or when a required child is absent. Length and
+    /// slice calculations use bytes even though windows iterate over characters.
     pub(crate) fn find_children(
         &self,
         vocab: &mut Vocabulary,
     ) -> ChildPatterns {
-        /// find direct children
         let ngram = self.ngram.clone();
         let n = ngram.len() - 1;
         ngram
             .chars()
             .ngrams(n)
             .enumerate()
-            // limit number of child patterns to 1 for 2-grams
+            // Both bigram windows would yield the same two-character pattern.
             .take_while(|(i, _)| n != 1 || *i < 1)
             .map(|(i, ni)| {
+                // Surround the window with any nonempty leading/trailing fragment.
                 let f = ngram.get(0..i).filter(|s| !s.is_empty());
                 let x = String::from_iter(ni);
                 let b =

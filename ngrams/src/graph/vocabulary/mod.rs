@@ -1,3 +1,5 @@
+//! Exhaustive substring vocabulary, occurrence metadata, and pass status.
+
 use crate::graph::{
     containment::{
         CorpusCtx,
@@ -70,6 +72,7 @@ use super::{
 
 pub(crate) mod entry;
 
+/// Stable vertex key paired with the substring's character width.
 #[derive(
     Debug,
     Clone,
@@ -85,39 +88,52 @@ pub(crate) mod entry;
     Deserialize,
 )]
 pub(crate) struct NGramId {
+    /// Identity shared by the vocabulary and derived partition graph.
     #[deref]
     pub(crate) key: VertexKey,
+    /// Number of characters represented by the vertex.
     pub(crate) width: usize,
 }
 impl From<NGramId> for VertexKey {
+    /// Drop cached width and retain vertex identity.
     fn from(ngram_id: NGramId) -> Self {
         ngram_id.key
     }
 }
 impl HasVertexKey for NGramId {
+    /// Expose the identity used by graph and label lookups.
     fn vertex_key(&self) -> VertexKey {
         self.key
     }
 }
 impl Wide for NGramId {
+    /// Wrap the cached character width in the graph's width type.
     fn width(&self) -> TokenWidth {
         TokenWidth(self.width)
     }
 }
 
+/// Ordered milestones used for progress reporting and labelling guards.
 #[derive(
     Default, Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize, EnumIter,
 )]
 pub enum ProcessStatus {
+    /// No construction stage has been recorded.
     #[default]
     Empty,
+    /// Enumerating substrings and occurrences.
     Containment,
+    /// Selecting tokens by occurrence frequency.
     Frequency,
+    /// Selecting tokens that enclose overlapping labelled children.
     Wrappers,
+    /// Constructing decompositions in the output graph.
     Partitions,
+    /// Partition construction has completed.
     Finished,
 }
 impl PartialOrd for ProcessStatus {
+    /// Use the same pipeline-stage ordering as the total comparison.
     fn partial_cmp(
         &self,
         other: &Self,
@@ -126,6 +142,7 @@ impl PartialOrd for ProcessStatus {
     }
 }
 impl Ord for ProcessStatus {
+    /// Compare declaration-order discriminants to order pipeline milestones.
     fn cmp(
         &self,
         other: &Self,
@@ -133,21 +150,31 @@ impl Ord for ProcessStatus {
         (*self as usize).cmp(&(*other as usize))
     }
 }
+/// All discovered substring vertices and their corpus positions.
 #[derive(
     Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Deref,
 )]
 pub(crate) struct Vocabulary {
     //#[deref]
+    /// Elementary decompositions and reciprocal containment links.
     pub(crate) containment: Hypergraph,
+    /// Corpus name used as a storage key.
     pub(crate) name: String,
+    /// Unique content-to-handle mapping, exposed through dereferencing.
     #[deref]
     pub(crate) ids: HashMap<String, NGramId>,
+    /// Single-character vertices.
     pub(crate) leaves: HashSet<NGramId>,
+    /// Vertices marked as full texts when first inserted.
+    ///
+    /// Iteration is unsorted; consumers must not assume corpus input order.
     pub(crate) roots: HashSet<NGramId>,
+    /// Occurrence metadata keyed by containment vertex identity.
     pub(crate) entries: HashMap<VertexKey, VocabEntry>,
 }
 
 impl Vocabulary {
+    /// Build a fresh vocabulary without consulting the labelling-image cache.
     pub(crate) fn from_corpus(
         corpus: &Corpus,
         status: &mut StatusHandle,
@@ -158,6 +185,10 @@ impl Vocabulary {
         Ok(vocab)
     }
 
+    /// Enumerate lengths globally from short to long, then each text at that length.
+    ///
+    /// Rejects an empty corpus or a zero maximum byte length. The maximum uses
+    /// bytes while individual windows use characters; see the containment module.
     pub(crate) fn containment_pass(
         &mut self,
         ctx: &CorpusCtx<'_>,
@@ -176,6 +207,7 @@ impl Vocabulary {
             0,
             N * (N - 1),
         );
+        // Length is the outer loop so all proper child strings exist first.
         Itertools::cartesian_product((1..=N), ctx.corpus.iter().enumerate())
             .for_each(|(n, (i, text))| {
                 TextLevelCtx {

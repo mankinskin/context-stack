@@ -1,3 +1,5 @@
+//! Positioned labelled-child covers and occurrence-based ancestor covers.
+
 pub(crate) mod child;
 pub(crate) mod frequency;
 pub(crate) mod parent;
@@ -74,15 +76,23 @@ use crate::graph::{
     },
 };
 
+/// Selected child spans relative to a containing string.
+///
+/// Partially overlapping spans are allowed. Each start offset holds at most
+/// one handle; this is not an enumeration of all possible segmentations.
 #[derive(Debug, Deref, DerefMut, Default, IntoIterator, new)]
 pub(crate) struct ChildCover {
+    /// Character offset to selected child; inserting at an offset replaces it.
     #[into_iterator(owned, ref)]
     #[deref]
     #[deref_mut]
     entries: HashMap<usize, NGramId>,
 }
 impl ChildCover {
-    // find largest labelled children
+    /// Search downward for the largest currently-labelled proper children.
+    ///
+    /// The traversal result is currently discarded, so cancellation can leave
+    /// a partial cover rather than being propagated to this caller.
     pub(crate) fn from_key(
         ctx: &LabellingCtx,
         key: VertexKey,
@@ -91,12 +101,14 @@ impl ChildCover {
         ctx.run();
         ctx.cover
     }
+    /// Convert selected children to half-open character intervals.
     pub(crate) fn as_ranges(&self) -> HashSet<Range<usize>> {
         self.entries
             .iter()
             .map(|(off, id)| *off..(off + id.width().0))
             .collect()
     }
+    /// Whether two distinct selected intervals overlap.
     pub(crate) fn any_intersect(&self) -> bool {
         let ranges = self.as_ranges();
         ranges
@@ -104,6 +116,7 @@ impl ChildCover {
             .cartesian_product(&ranges)
             .any(|(l, r)| l != r && l.does_intersect(r))
     }
+    /// Whether one selected interval wholly contains the proposed child span.
     pub(crate) fn any_covers(
         &self,
         off: usize,

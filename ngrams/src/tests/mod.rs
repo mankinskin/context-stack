@@ -1,3 +1,9 @@
+//! Corpus fixtures, label expectations, and parse smoke tests.
+//!
+//! This module is also compiled outside tests: `TestCorpus` is used as the
+//! production labelling context's image/source wrapper. Only test functions and
+//! explicitly gated modules are test-only.
+
 pub(crate) mod count;
 #[cfg(test)]
 mod hash_order;
@@ -34,12 +40,14 @@ use itertools::Itertools;
 use ngram::NGram;
 use pretty_assertions::assert_eq;
 
+/// Repetition-rich German text fixture used by counting and manual label checks.
 pub(crate) const OTTOS_MOPS_CORPUS: [&str; 4] = [
     "ottos mops trotzt",
     "otto: fort mops fort",
     "ottos mops hopst fort",
     "otto: soso",
 ];
+/// Join the second column of tab-delimited records, panicking on missing/bad data.
 fn read_corpus(file_path: impl AsRef<Path>) -> String {
     //let corpus: String = String::from("fldfjdlsjflskdjflsdfaädüwwrivfokl");
     let mut csv = csv::ReaderBuilder::new()
@@ -49,14 +57,22 @@ fn read_corpus(file_path: impl AsRef<Path>) -> String {
     csv.records().map(|r| r.unwrap()[1].to_string()).join(" ")
 }
 
+/// Source corpus and image, plus independently derived expected roots and atoms.
+///
+/// Despite its name, this wrapper is also used during normal corpus parsing.
 #[derive(Debug)]
 pub(crate) struct TestCorpus {
+    /// Vocabulary and current shared label set.
     pub(crate) image: LabellingImage,
+    /// Original named inputs.
     pub(crate) corpus: Corpus,
+    /// Distinct full input strings expected as containment roots.
     pub(crate) roots_test: HashSet<String>,
+    /// Distinct individual characters expected as leaves.
     pub(crate) leaves_test: HashSet<String>,
 }
 impl TestCorpus {
+    /// Pair an image with its source and derive root/leaf expectations from texts.
     pub(crate) fn new(
         image: LabellingImage,
         corpus: Corpus,
@@ -77,12 +93,17 @@ impl TestCorpus {
             leaves_test,
         }
     }
+    /// Return sorted expected roots for stable assertion diagnostics.
     pub(crate) fn get_roots_test(&self) -> Vec<String> {
         self.roots_test.iter().cloned().sorted().collect()
     }
+    /// Return sorted expected atoms for stable assertion diagnostics.
     pub(crate) fn get_leaves_test(&self) -> Vec<String> {
         self.leaves_test.iter().cloned().sorted().collect()
     }
+    /// Assert root/leaf content and exact concatenation of elementary patterns.
+    ///
+    /// This does not compare the selected output graph or traversal schedules.
     pub(crate) fn test_containment(&self) {
         let Self {
             image: LabellingImage { vocab, .. },
@@ -127,13 +148,18 @@ impl TestCorpus {
         }
     }
 }
+/// Expected additional labels by stage, excluding mandatory roots and atoms.
 #[derive(Debug, new)]
 pub(crate) struct LabelTest {
+    /// Tokens expected to be introduced by frequency selection.
     frequency: HashSet<String>,
+    /// Tokens expected to be introduced by overlap wrapping.
     wrapper: HashSet<String>,
+    /// Tokens expected to be introduced during partition gap discovery.
     partition: HashSet<String>,
 }
 impl LabelTest {
+    /// Assert that stage-specific additions are pairwise disjoint.
     pub(crate) fn validate(&self) {
         for (a, b) in [&self.frequency, &self.wrapper, &self.partition]
             .into_iter()
@@ -147,6 +173,7 @@ impl LabelTest {
         }
     }
 }
+/// Build owned expectation sets and reject overlap between stage categories.
 macro_rules! test_labels {
     ($freq:expr, $wrap:expr,$part:expr$(,)?) => {{
         let frequency = $freq.into_iter().map(ToString::to_string).collect();
@@ -164,14 +191,21 @@ macro_rules! test_labels {
     }};
 }
 
+/// Labelling context paired with expected cumulative stage selections.
 #[derive(Debug, new, Deref, DerefMut)]
 pub(crate) struct TestCase {
+    /// Mutable pipeline state used to execute the scenario.
     #[deref]
     #[deref_mut]
     ctx: LabellingCtx,
+    /// Expected additions grouped by their intended stage.
     labels: LabelTest,
 }
 impl TestCase {
+    /// Run stages and compare labels only when the status equals that stage.
+    ///
+    /// Partition construction currently ends at `Finished`, so its final
+    /// `Partitions` equality guard does not execute the partition-label assertion.
     pub(crate) fn execute(&mut self) {
         // graph of all containment edges between n and n+1
         self.corpus.test_containment();
@@ -200,12 +234,16 @@ impl TestCase {
         }
     }
 }
+/// Borrowed view for comparing current selection against one scenario's expectations.
 #[derive(Debug, new)]
 pub(crate) struct LabelTestCtx<'a> {
+    /// Current label identities to resolve through the vocabulary.
     labels: &'a HashSet<VertexKey>,
+    /// Source, vocabulary, and expected stage additions.
     test: &'a TestCase,
 }
 impl<'a> LabelTestCtx<'a> {
+    /// Assert every expected full input is present in the selected content.
     pub(crate) fn test_roots(&self) {
         let label_strings = self.label_strings_set();
         let roots_test = self.test.corpus.get_roots_test();
@@ -218,6 +256,7 @@ impl<'a> LabelTestCtx<'a> {
             roots_test,
         );
     }
+    /// Assert every expected atom is present in the selected content.
     pub(crate) fn test_leaves(&self) {
         let label_strings = self.label_strings_set();
         let leaves_test = self.test.corpus.get_leaves_test();
@@ -230,6 +269,7 @@ impl<'a> LabelTestCtx<'a> {
             leaves_test,
         );
     }
+    /// Combine sorted roots, atoms, and frequency additions without deduplicating.
     pub(crate) fn get_frequency_test(&self) -> Vec<String> {
         self.test
             .corpus
@@ -241,6 +281,7 @@ impl<'a> LabelTestCtx<'a> {
             .cloned()
             .collect()
     }
+    /// Extend frequency expectations with wrapper additions.
     pub(crate) fn get_wrapper_test(&self) -> Vec<String> {
         self.get_frequency_test()
             .iter()
@@ -249,6 +290,7 @@ impl<'a> LabelTestCtx<'a> {
             .cloned()
             .collect()
     }
+    /// Extend wrapper expectations with partition additions.
     pub(crate) fn get_partition_test(&self) -> Vec<String> {
         self.get_wrapper_test()
             .iter()
@@ -257,12 +299,14 @@ impl<'a> LabelTestCtx<'a> {
             .cloned()
             .collect()
     }
+    /// Resolve selected identities to a content set for order-insensitive checks.
     pub(crate) fn label_strings_set(&self) -> HashSet<String> {
         self.labels
             .iter()
             .map(|vi| self.test.vocab().get_vertex(vi).unwrap().ngram.clone())
             .collect()
     }
+    /// Assert exact cumulative frequency-stage content.
     pub(crate) fn test_freq(&self) {
         let label_strings = self.label_strings_set();
         let frequency_test = self.get_frequency_test();
@@ -272,6 +316,7 @@ impl<'a> LabelTestCtx<'a> {
             frequency_test,
         );
     }
+    /// Assert exact cumulative wrapper-stage content.
     pub(crate) fn test_wrap(&self) {
         let label_strings = self.label_strings_set();
         let wrapper_test = self.get_wrapper_test();
@@ -281,6 +326,7 @@ impl<'a> LabelTestCtx<'a> {
             wrapper_test,
         );
     }
+    /// Assert exact cumulative partition-stage content, not decomposition patterns.
     pub(crate) fn test_part(&self) {
         let label_strings = self.label_strings_set();
         let partition_test = self.get_partition_test();
@@ -292,6 +338,7 @@ impl<'a> LabelTestCtx<'a> {
     }
 }
 
+/// Check frequency selections for overlapping repeated ASCII substrings.
 #[test]
 pub(crate) fn test_graph1() {
     let corpus = ["abab", "abcabc", "babc"];
@@ -315,7 +362,7 @@ pub(crate) fn test_graph1() {
     .execute();
 }
 
-// too slow!
+/// Slow manual scenario, not registered as a test; wrapper expectations are tentative.
 #[allow(unused)]
 pub(crate) fn test_graph2() {
     let corpus = OTTOS_MOPS_CORPUS;
@@ -372,6 +419,7 @@ pub(crate) fn test_graph2() {
     .execute();
 }
 
+/// Smoke-test nonempty results and string reconstruction for both returned graphs.
 #[test]
 pub(crate) fn test_parse_corpus() {
     use crate::graph::{
@@ -433,6 +481,7 @@ pub(crate) fn test_parse_corpus() {
     }
 }
 
+/// Exercise a repeated-block input without asserting exact selected token content.
 #[test]
 pub(crate) fn test_parse_corpus_aabbaabbaa() {
     use crate::graph::{
@@ -465,8 +514,7 @@ pub(crate) fn test_parse_corpus_aabbaabbaa() {
         "Containment should have vertices"
     );
 
-    // The string "aabbaabbaa" has repeating patterns like "aa", "bb", "aabb"
-    // These should appear as frequency labels
+    // This is a nonempty-selection check, not an assertion of particular tokens.
     assert!(
         !parse_result.labels.is_empty(),
         "Should have frequency labels"
@@ -492,6 +540,7 @@ pub(crate) fn test_parse_corpus_aabbaabbaa() {
     }
 }
 
+/// Exercise a repeated single-character alphabet using the four-character text `aaaa`.
 #[test]
 pub(crate) fn test_parse_corpus_single_char() {
     use crate::graph::{
@@ -518,7 +567,7 @@ pub(crate) fn test_parse_corpus_single_char() {
         "Graph should have vertices"
     );
 
-    // "aaaa" contains "aa" 3 times, so it should be a frequency label
+    // Selection is checked for nonemptiness, not specifically for the token "aa".
     assert!(
         !parse_result.labels.is_empty(),
         "Should have labels for repeated aa"
@@ -544,6 +593,7 @@ pub(crate) fn test_parse_corpus_single_char() {
     }
 }
 
+/// Smoke-test two texts sharing `bc`, without asserting its exact decomposition.
 #[test]
 pub(crate) fn test_parse_corpus_two_texts() {
     use crate::graph::{
@@ -570,7 +620,7 @@ pub(crate) fn test_parse_corpus_two_texts() {
         "Graph should have vertices"
     );
 
-    // "bc" appears in both texts, so it should be labeled
+    // This does not independently assert that the shared token "bc" was selected.
     assert!(
         !parse_result.labels.is_empty(),
         "Should have labels for shared bc"
@@ -596,6 +646,7 @@ pub(crate) fn test_parse_corpus_two_texts() {
     }
 }
 
+/// Check successful parsing and string reconstruction when the input has no repeats.
 #[test]
 pub(crate) fn test_parse_corpus_empty_result() {
     use crate::graph::{
@@ -647,6 +698,7 @@ pub(crate) fn test_parse_corpus_empty_result() {
     }
 }
 
+/// Require an empty input collection to report `EmptyVocabulary`.
 #[test]
 pub(crate) fn test_parse_corpus_empty_texts() {
     use crate::graph::{
@@ -676,6 +728,7 @@ pub(crate) fn test_parse_corpus_empty_texts() {
     }
 }
 
+/// Require an input collection containing only empty strings to report `EmptyVocabulary`.
 #[test]
 pub(crate) fn test_parse_corpus_only_empty_strings() {
     use crate::graph::{

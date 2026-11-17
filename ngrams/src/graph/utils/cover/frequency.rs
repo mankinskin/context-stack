@@ -1,3 +1,5 @@
+//! Select labelled ancestors that contribute distinct occurrences of a candidate.
+
 use std::collections::VecDeque;
 
 use derive_more::{
@@ -45,12 +47,22 @@ use context_trace::{
     HashSet,
 };
 
+/// Labelled containing strings encountered while covering candidate occurrences.
+///
+/// This stores ancestor identities, not positional child spans. Construction
+/// tracks occurrence positions separately to avoid counting the same position
+/// twice when reached through multiple containment paths.
 #[derive(Debug, Default, Clone, Deref)]
 pub(crate) struct FrequencyCover {
+    /// Ancestors that contributed at least one previously uncovered position.
     #[deref]
     cover: HashSet<NGramId>,
 }
 impl FrequencyCover {
+    /// Search upward, retaining labelled ancestors that add new occurrences.
+    ///
+    /// An ancestor that contributes positions ends that search branch; one that
+    /// contributes none is expanded further. Offsets accumulate along each path.
     pub(crate) fn from_entry(
         ctx: &LabellingCtx,
         entry: &VertexCtx,
@@ -64,6 +76,7 @@ impl FrequencyCover {
             let pe = entry.vocab.get_vertex(&p).unwrap();
             let diff = Self::new_occurrences(ctx, off, &pe, &occ_set);
             if diff.is_empty() {
+                // Unlabelled or already-accounted-for ancestors do not stop ascent.
                 queue.extend(
                     Self::next_parent_offsets(&pe)
                         .into_iter()
@@ -76,6 +89,9 @@ impl FrequencyCover {
         }
         Ok(Self { cover })
     }
+    /// Return each parent occurrence in a pattern with this child's local offset.
+    ///
+    /// Multiple pattern positions may yield the same parent at different offsets.
     fn next_parent_offsets(entry: &VertexCtx) -> Vec<(usize, NGramId)> {
         entry
             .data
@@ -100,6 +116,10 @@ impl FrequencyCover {
             })
             .collect_vec()
     }
+    /// Project labelled-parent positions onto the candidate and subtract known ones.
+    ///
+    /// `offset` is the candidate's character offset within this ancestor.
+    /// Unlabelled ancestors contribute no positions.
     pub(crate) fn new_occurrences(
         ctx: &LabellingCtx,
         offset: usize,

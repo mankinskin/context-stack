@@ -1,3 +1,8 @@
+//! Inactive accumulation scaffold; not called by the corpus-parsing pipeline.
+//!
+//! The pattern-building body remains commented out. Running this implementation
+//! inserts root placeholders but does not construct their decompositions.
+
 use derive_more::{
     Deref,
     DerefMut,
@@ -68,16 +73,21 @@ use crate::graph::{
     vocabulary::Vocabulary,
 };
 
+/// Unused traversal context for the accumulation scaffold.
 #[derive(Debug, Deref, DerefMut)]
 pub(crate) struct AccumulateCtx<'b> {
+    /// Shared vocabulary and labels.
     #[deref]
     #[deref_mut]
     pub(crate) ctx: &'b mut LabellingCtx,
+    /// Root placeholders created by queue initialization.
     pub(crate) result: Hypergraph,
+    /// Visit storage used by the scaffold's admission condition.
     visited: <Self as VisitTracking>::Collection,
 }
 
 impl<'b> From<&'b mut LabellingCtx> for AccumulateCtx<'b> {
+    /// Borrow shared labels and initialize an empty scaffold graph and visit set.
     fn from(ctx: &'b mut LabellingCtx) -> Self {
         Self {
             ctx,
@@ -88,6 +98,7 @@ impl<'b> From<&'b mut LabellingCtx> for AccumulateCtx<'b> {
 }
 impl VisitTracking for AccumulateCtx<'_> {
     type Collection = HashSet<<Self as TraversalPass>::Node>;
+    /// Expose the visit state consulted by the scaffold's admission condition.
     fn visited_mut(&mut self) -> &mut <Self as VisitTracking>::Collection {
         &mut self.visited
     }
@@ -96,9 +107,11 @@ impl TraversalPass for AccumulateCtx<'_> {
     type Node = NGramId;
     type NextNode = NGramId;
     type Queue = LinearQueue<Self>;
+    /// Expose cancellation and vocabulary through the shared context.
     fn ctx(&self) -> &LabellingCtx {
         self.ctx
     }
+    /// Create output placeholders for the corpus roots.
     fn start_queue(&mut self) -> RunResult<Self::Queue> {
         let queue =
             Self::Queue::from_iter(TopDown::starting_nodes(self.vocab()));
@@ -111,6 +124,10 @@ impl TraversalPass for AccumulateCtx<'_> {
         }
         Ok(queue)
     }
+    /// Admit unvisited labels or leaves; only the leaf branch updates visits.
+    ///
+    /// The leaf branch checks whether insertion was attempted, not its boolean
+    /// return value, so previously visited leaves still pass that branch.
     fn node_condition(
         &mut self,
         node: Self::Node,
@@ -123,6 +140,7 @@ impl TraversalPass for AccumulateCtx<'_> {
                 .then(|| self.visited_mut().insert(node))
                 .is_some()
     }
+    /// Return no further work; decomposition construction is currently inactive.
     fn on_node(
         &mut self,
         node: &NGramId,
@@ -194,10 +212,12 @@ impl TraversalPass for AccumulateCtx<'_> {
         let next = vec![];
         Ok(Some(next))
     }
+    /// Print the scaffold's stage name to stdout.
     fn begin_run(&mut self) {
         println!("Accumulate Pass");
     }
 
+    /// Attempt root string resolution, mark partitions status, and print the graph.
     fn finish_run(&mut self) -> RunResult<()> {
         self.vocab().roots.iter().for_each(|key| {
             let _ = self.result.vertex_key_string(key);

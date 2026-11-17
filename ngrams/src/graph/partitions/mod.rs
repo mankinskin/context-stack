@@ -1,3 +1,9 @@
+//! Build the selected output graph while discovering additional gap-token labels.
+//!
+//! Selection is not frozen: processing a node may add labels that change later
+//! nodes' covers. Already-visited nodes are not rebuilt, making decompositions
+//! sensitive to traversal order.
+
 pub(crate) mod collect;
 pub(crate) mod container;
 
@@ -76,30 +82,31 @@ use super::{
     vocabulary::Vocabulary,
 };
 
-// - run top down (smaller nodes to label need to be found)
-// - for each node x:
-//  - run top down to find all largest labelled children
-//  - arrange labelled nodes in most compact list of lists of positioned children:
-//    [(p, [(x, v)])]
-//  - find all nodes describing the gaps (by querying a larger node)
-//  - label all gaps
+/// Read-only partition context scoped to the node whose patterns are being built.
 #[derive(Debug, Deref, new)]
 pub(crate) struct NodePartitionCtx<'a, 'b> {
+    /// Containing string used to resolve positioned gap substrings.
     root: NGramId,
+    /// Outer pass, exposed through dereferencing for vocabulary access.
     #[deref]
     ctx: &'a PartitionsCtx<'b>,
 }
 
+/// Top-down, FIFO output construction over roots and selected composite children.
 #[derive(Debug, Deref, DerefMut)]
 pub(crate) struct PartitionsCtx<'b> {
+    /// Shared vocabulary and labels, mutated by nested gap discovery.
     #[deref]
     #[deref_mut]
     pub(crate) ctx: &'b mut LabellingCtx,
+    /// Nodes already decomposed; later label discoveries do not invalidate them.
     visited: <Self as VisitTracking>::Collection,
+    /// Derived graph sharing vocabulary keys but using its own vertex indices.
     pub(crate) graph: Hypergraph,
 }
 
 impl<'b> From<&'b mut LabellingCtx> for PartitionsCtx<'b> {
+    /// Start a fresh graph and visit set while retaining the current label selection.
     fn from(ctx: &'b mut LabellingCtx) -> Self {
         Self {
             ctx,
@@ -110,6 +117,7 @@ impl<'b> From<&'b mut LabellingCtx> for PartitionsCtx<'b> {
 }
 impl VisitTracking for PartitionsCtx<'_> {
     type Collection = HashSet<<Self as TraversalPass>::Node>;
+    /// Expose the set preventing repeated decomposition of a node.
     fn visited_mut(&mut self) -> &mut <Self as VisitTracking>::Collection {
         &mut self.visited
     }
@@ -118,9 +126,11 @@ impl TraversalPass for PartitionsCtx<'_> {
     type Node = NGramId;
     type NextNode = NGramId;
     type Queue = LinearQueue<Self>;
+    /// Expose the shared context for traversal cancellation checks.
     fn ctx(&self) -> &LabellingCtx {
         self.ctx
     }
+    /// Insert root placeholders and queue roots in their hash-set iteration order.
     fn start_queue(&mut self) -> RunResult<Self::Queue> {
         let queue =
             Self::Queue::from_iter(TopDown::starting_nodes(self.vocab()));
@@ -138,6 +148,7 @@ impl TraversalPass for PartitionsCtx<'_> {
         );
         Ok(queue)
     }
+    /// Admit labelled or leaf nodes once, marking them before decomposition.
     fn node_condition(
         &mut self,
         node: Self::Node,
@@ -153,6 +164,11 @@ impl TraversalPass for PartitionsCtx<'_> {
         }
         false
     }
+    /// Build patterns, discover gap labels, and schedule composite child nodes.
+    ///
+    /// Patterns are chosen before deduplication expands the label set. They are
+    /// not recomputed here after that expansion. Atom children are inserted but
+    /// normally not queued for this method.
     fn on_node(
         &mut self,
         node: &NGramId,
@@ -191,6 +207,7 @@ impl TraversalPass for PartitionsCtx<'_> {
             .filter(|k| !self.labels().contains(k))
             .collect_vec();
 
+        // This nested pass mutates global labels; its result is currently ignored.
         ChildDedupPass::new(self.ctx, unlabelled).run();
 
         // create child nodes in self.graph
@@ -231,6 +248,8 @@ impl TraversalPass for PartitionsCtx<'_> {
                 })
                 .unwrap();
         }
+        // Resolve through containment: child_locations still holds its indices,
+        // even though the stored output patterns have now been translated.
         let next = child_locations
             .clone()
             .into_iter()
@@ -246,10 +265,12 @@ impl TraversalPass for PartitionsCtx<'_> {
         //let next = vec![];
         Ok(Some(next))
     }
+    /// Announce partition construction on stderr.
     fn begin_run(&mut self) {
         eprintln!("Partition Pass");
     }
 
+    /// Resolve root strings and mark construction finished, without a fixed-point rerun.
     fn finish_run(&mut self) -> RunResult<()> {
         self.vocab().roots.iter().for_each(|key| {
             let _ = self.graph.vertex_key_string(key);

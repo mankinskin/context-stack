@@ -3,6 +3,9 @@
 //! This module provides a unified interface for storing and retrieving data
 //! that works both on native platforms (using the filesystem) and in WebAssembly
 //! (using browser localStorage).
+//!
+//! Both backends serialize with CBOR. Native keys are paths relative to a base
+//! directory; browser keys use a prefix and store base64-encoded CBOR strings.
 
 use ciborium::{
     de::Error as DeError,
@@ -20,8 +23,10 @@ mod native;
 mod wasm;
 
 #[cfg(not(target_arch = "wasm32"))]
+/// Filesystem backend selected for native builds.
 pub(crate) use native::NativeStorage as PlatformStorage;
 #[cfg(target_arch = "wasm32")]
+/// Browser localStorage backend selected for wasm builds.
 pub(crate) use wasm::WasmStorage as PlatformStorage;
 
 /// Error type for storage operations
@@ -40,6 +45,7 @@ pub(crate) enum StorageError {
 }
 
 impl std::fmt::Display for StorageError {
+    /// Prefix the underlying diagnostic with its storage-error category.
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
@@ -60,24 +66,30 @@ impl std::fmt::Display for StorageError {
 impl std::error::Error for StorageError {}
 
 impl From<io::Error> for StorageError {
+    /// Preserve filesystem and browser-operation I/O diagnostics.
     fn from(e: io::Error) -> Self {
         StorageError::Io(e)
     }
 }
 
 impl<T: std::fmt::Debug> From<SerError<T>> for StorageError {
+    /// Retain the CBOR serializer diagnostic as text.
     fn from(e: SerError<T>) -> Self {
         StorageError::Serialize(format!("{:?}", e))
     }
 }
 
 impl<T: std::fmt::Debug> From<DeError<T>> for StorageError {
+    /// Retain the CBOR deserializer diagnostic as text.
     fn from(e: DeError<T>) -> Self {
         StorageError::Deserialize(format!("{:?}", e))
     }
 }
 
-/// Trait for storage operations
+/// Typed persistence operations implemented by each platform backend.
+///
+/// These operations do not consult `CacheConfig`; callers decide whether an
+/// optional cache read or write should happen.
 pub(crate) trait Storage {
     /// Store serializable data at the given key
     fn store<T: Serialize>(
@@ -92,13 +104,13 @@ pub(crate) trait Storage {
         key: &str,
     ) -> Result<T, StorageError>;
 
-    /// Check if a key exists
+    /// Check if a key exists; the browser backend maps access failures to `false`.
     fn exists(
         &self,
         key: &str,
     ) -> bool;
 
-    /// Remove data at the given key
+    /// Remove data at the given key, succeeding when it is already absent.
     fn remove(
         &self,
         key: &str,

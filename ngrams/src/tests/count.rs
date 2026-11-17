@@ -1,9 +1,15 @@
+//! Diagnostic substring counting, separate from the oracle's label-selection passes.
+
 use itertools::Itertools;
 use ngram::NGram;
 use tap::Tap;
 
 use context_trace::HashMap;
 
+/// Count overlapping character windows for lengths one through nine.
+///
+/// The returned vector's index is the window length minus one. Prints the number
+/// of distinct strings at each length; does not build containment or select labels.
 pub(crate) fn ngram_set(s: String) -> Vec<HashMap<String, usize>> {
     let slen: usize = s.len();
     let N_MAX: usize = 10;
@@ -26,6 +32,7 @@ pub(crate) fn ngram_set(s: String) -> Vec<HashMap<String, usize>> {
         .collect()
 }
 
+/// Print corpus-wide repeated substrings and a count histogram; contains no assertions.
 #[test]
 pub(crate) fn test_ngrams() {
     //let file_path = "./corpus/eng_news_2020_100K/eng_news_2020_100K-sentences.txt";

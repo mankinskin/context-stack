@@ -1,3 +1,9 @@
+//! Promote partition gap tokens and their shared descendants into global labels.
+//!
+//! A new pass is run for the unlabelled children of one partitioned node, not
+//! once for the whole corpus. Its roots are gap-token identities, not necessarily
+//! corpus roots. Label mutations are visible to later partition construction.
+
 use context_trace::{
     graph::{
         vertex::{
@@ -85,25 +91,25 @@ use crate::graph::{
 
 use super::cover::ChildCover;
 
-// - roots are not labelled in the beginning
-// - all nodes with multiple occurences are labelled
-// - there are at least two roots
-// Todo:
-// - visit each root child only once (use visited set)
-// - do not expand labelled or covered nodes (use child cover)
-// - detect nodes that have been visited in other roots
+/// Per-gap search state used to recognize descendants shared with other gaps.
 #[derive(Debug, Default)]
 pub(crate) struct DedupRoot {
+    /// Selected spans that stop further expansion within this gap.
     pub(crate) cover: ChildCover,
+    /// Descendant identities seen under this gap, independent of their offsets.
     pub(crate) visited: HashSet<VertexKey>,
 }
+/// Interleaved downward traversal over a batch of newly required gap tokens.
 #[derive(Debug)]
 pub(crate) struct ChildDedupPass<'a> {
+    /// Global label set and containment vocabulary.
     pub(crate) ctx: &'a mut LabellingCtx,
+    /// Search state keyed by distinct supplied gap-token identity.
     pub(crate) roots: HashMap<VertexKey, DedupRoot>,
 }
 
 impl<'a> ChildDedupPass<'a> {
+    /// Create empty search state, collapsing duplicate supplied root identities.
     pub(crate) fn new(
         ctx: &'a mut LabellingCtx,
         roots: impl IntoIterator<Item = VertexKey>,
@@ -122,9 +128,11 @@ impl TraversalPass for ChildDedupPass<'_> {
     type Node = (VertexKey, usize, NGramId);
     type NextNode = (VertexKey, usize, NGramId);
     type Queue = LinearQueue<Self>;
+    /// Expose shared vocabulary and cooperative cancellation to the driver.
     fn ctx(&self) -> &LabellingCtx {
         self.ctx
     }
+    /// Label every supplied gap and queue its proper children in hash-map order.
     fn start_queue(&mut self) -> RunResult<Self::Queue> {
         Ok(Self::Queue::from_iter(
             //self.roots.iter()
@@ -137,6 +145,7 @@ impl TraversalPass for ChildDedupPass<'_> {
             }),
         ))
     }
+    /// Visit each descendant identity once per gap, regardless of its offset.
     fn node_condition(
         &mut self,
         (root, _, node): Self::Node,
@@ -147,6 +156,7 @@ impl TraversalPass for ChildDedupPass<'_> {
             .visited
             .insert(node.vertex_key())
     }
+    /// Stop at labels or covered spans and label descendants seen under another gap.
     fn on_node(
         &mut self,
         node: &Self::Node,
@@ -159,7 +169,7 @@ impl TraversalPass for ChildDedupPass<'_> {
         let tree = this_tree.into_iter().next().unwrap().1;
         let other_trees = other_trees.into_iter().map(|(k, v)| v).collect_vec();
 
-        // check if covered
+        // Cross-gap detection uses visits so far, not a precomputed intersection.
         let next = if node.vertex_key() == root {
             {
                 tree.cover.insert(off, node);

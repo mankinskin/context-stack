@@ -1,3 +1,5 @@
+//! Convert a positioned labelled-child cover into complete decomposition lines.
+
 mod builder;
 
 use builder::PartitionBuilder;
@@ -72,12 +74,18 @@ use crate::graph::{
     },
 };
 
+/// Cell representation distinguishing an existing token from an unresolved gap.
+///
+/// The current line builder materializes gaps directly as tokens instead.
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum PartitionCell {
+    /// Child handle indexed in the containment graph.
     ChildIndex(Token),
+    /// Width of a nonempty span awaiting a token.
     GapSize(NonZeroUsize),
 }
 impl PartitionCell {
+    /// Number of characters represented by this cell.
     pub(crate) fn width(&self) -> usize {
         match self {
             Self::ChildIndex(c) => c.width().0,
@@ -85,11 +93,17 @@ impl PartitionCell {
         }
     }
 }
+/// Alternative gap-filled patterns, still indexed in the containment graph.
 #[derive(Debug, IntoIterator, Deref)]
 pub(crate) struct PartitionContainer {
+    /// Each line is an ordered, non-overlapping sequence of child tokens.
     wall: Vec<Vec<Token>>,
 }
 impl PartitionContainer {
+    /// Find a node's current labelled-child cover and pack it into patterns.
+    ///
+    /// Intended for composites: atoms have empty covers, which the subsequent
+    /// `from_child_list` call rejects. Missing composite coverage also panics.
     pub(crate) fn from_ngram(
         ctx: &PartitionsCtx<'_>,
         ngram: NGramId,
@@ -107,6 +121,9 @@ impl PartitionContainer {
         let ctx = NodePartitionCtx::new(ngram, ctx);
         Self::from_child_list(&ctx, tree)
     }
+    /// Sort positioned children, assert unique starts, and fill gaps between them.
+    ///
+    /// Panics if the list is empty, repeats an offset, or does not begin at zero.
     pub(crate) fn from_child_list(
         ctx: &NodePartitionCtx,
         list: impl IntoIterator<Item = (usize, NGramId)>,
@@ -142,6 +159,7 @@ impl PartitionContainer {
     }
 }
 impl Display for PartitionContainer {
+    /// Print cell widths by line for diagnostics, without token content or IDs.
     fn fmt(
         &self,
         f: &mut Formatter<'_>,

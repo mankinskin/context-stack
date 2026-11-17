@@ -1,4 +1,4 @@
-//! WebAssembly localStorage-based storage implementation
+//! WebAssembly persistence using base64-encoded CBOR in browser localStorage.
 
 use super::{
     Storage,
@@ -12,9 +12,12 @@ use serde::{
 /// Storage key prefix for ngrams data in localStorage
 const STORAGE_PREFIX: &str = "ngrams_storage_";
 
-/// WebAssembly localStorage-based storage
+/// Browser storage namespace.
+///
+/// `new` uses the crate prefix; the derived `Default` instead has an empty prefix.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct WasmStorage {
+    /// Namespace prepended verbatim to every logical key.
     prefix: String,
 }
 
@@ -63,6 +66,7 @@ impl WasmStorage {
 }
 
 impl Storage for WasmStorage {
+    /// Serialize CBOR bytes, encode them as base64, and replace the browser item.
     fn store<T: Serialize>(
         &self,
         key: &str,
@@ -92,6 +96,7 @@ impl Storage for WasmStorage {
         Ok(())
     }
 
+    /// Decode a browser item's base64 and deserialize its CBOR payload.
     fn load<T: DeserializeOwned>(
         &self,
         key: &str,
@@ -123,6 +128,7 @@ impl Storage for WasmStorage {
         Ok(data)
     }
 
+    /// Check item presence, returning `false` for browser-access errors as well.
     fn exists(
         &self,
         key: &str,
@@ -137,6 +143,7 @@ impl Storage for WasmStorage {
             .unwrap_or(false)
     }
 
+    /// Remove an item, propagating browser access and removal errors.
     fn remove(
         &self,
         key: &str,
@@ -155,7 +162,7 @@ impl Storage for WasmStorage {
     }
 }
 
-/// Simple base64 encoding (no external dependency needed)
+/// Encode bytes with the standard base64 alphabet and `=` padding.
 fn base64_encode(bytes: &[u8]) -> String {
     const ALPHABET: &[u8] =
         b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -164,6 +171,7 @@ fn base64_encode(bytes: &[u8]) -> String {
     let mut i = 0;
 
     while i < bytes.len() {
+        // Pack three bytes into four six-bit symbols; missing bytes become padding.
         let b0 = bytes[i] as usize;
         let b1 = bytes.get(i + 1).copied().unwrap_or(0) as usize;
         let b2 = bytes.get(i + 2).copied().unwrap_or(0) as usize;
@@ -189,8 +197,12 @@ fn base64_encode(bytes: &[u8]) -> String {
     result
 }
 
-/// Simple base64 decoding
+/// Decode four-symbol groups, omitting bytes indicated by `=` padding.
+///
+/// Rejects invalid characters and lengths, but does not validate canonical
+/// padding placement or unused padding bits.
 fn base64_decode(s: &str) -> Result<Vec<u8>, &'static str> {
+    /// Map an alphabet symbol to six bits, treating padding as zero.
     fn decode_char(c: char) -> Result<u8, &'static str> {
         match c {
             'A'..='Z' => Ok(c as u8 - b'A'),

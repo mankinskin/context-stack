@@ -1,3 +1,7 @@
+//! End-to-end CLI shape, validation, and representative decomposition checks.
+//!
+//! These tests do not compare repeated executions or prove oracle completeness.
+
 use ngrams::output::GraphSnapshot;
 use serde_json::{json, Value};
 use std::{
@@ -7,9 +11,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+/// Owned temporary-directory path, removed recursively when the guard is dropped.
 struct Directory(PathBuf);
 
 impl Directory {
+    /// Create an isolated directory using the process ID and current timestamp.
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
             "ngrams-cli-{}-{}",
@@ -23,17 +29,20 @@ impl Directory {
         Self(path)
     }
 
+    /// Borrow the guard's directory for scenario and output paths.
     fn path(&self) -> &Path {
         &self.0
     }
 }
 
 impl Drop for Directory {
+    /// Remove only this guard's uniquely created test directory.
     fn drop(&mut self) {
         fs::remove_dir_all(&self.0).expect("remove CLI test directory");
     }
 }
 
+/// Run the built CLI and capture stdout, stderr, and exit status.
 fn run(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_ngrams"))
         .args(args)
@@ -41,6 +50,7 @@ fn run(args: &[&str]) -> Output {
         .unwrap()
 }
 
+/// Require success while including stderr in failure diagnostics.
 fn assert_success(output: &Output) {
     assert!(
         output.status.success(),
@@ -49,6 +59,9 @@ fn assert_success(output: &Output) {
     );
 }
 
+/// Check JSON-only output, exact top-level fields, validation, and corpus identity.
+///
+/// Also verifies that deserialization rejects unknown fields.
 fn snapshot(bytes: &[u8], corpus: &[&str]) -> GraphSnapshot {
     let value: Value = serde_json::from_slice(bytes).expect("output must be JSON only");
     let object = value.as_object().unwrap();
@@ -65,6 +78,7 @@ fn snapshot(bytes: &[u8], corpus: &[&str]) -> GraphSnapshot {
     snapshot
 }
 
+/// Inline arguments form one corpus and emit both roots with atom decompositions.
 #[test]
 fn inline_inputs_emit_one_complete_graph_to_stdout() {
     let output = run(&["abc", "xyz"]);
@@ -75,6 +89,7 @@ fn inline_inputs_emit_one_complete_graph_to_stdout() {
     assert!(snapshot.graph.vertices["xyz"].contains(&vec!["x".into(), "y".into(), "z".into()]));
 }
 
+/// The serialized graph retains both alternatives rather than flattening patterns.
 #[test]
 fn output_preserves_alternative_decompositions() {
     let output = run(&["ab", "bc", "abc"]);
@@ -86,6 +101,7 @@ fn output_preserves_alternative_decompositions() {
     );
 }
 
+/// Both accepted file shapes create one validated graph per named scenario.
 #[test]
 fn file_accepts_single_and_multiple_scenarios_and_creates_output_directory() {
     let directory = Directory::new();
@@ -131,6 +147,7 @@ fn file_accepts_single_and_multiple_scenarios_and_creates_output_directory() {
     }
 }
 
+/// Invalid argument combinations fail without graph output; help remains available.
 #[test]
 fn invalid_cli_combinations_fail_before_generation() {
     for args in [
@@ -151,6 +168,7 @@ fn invalid_cli_combinations_fail_before_generation() {
     assert!(String::from_utf8_lossy(&help.stdout).contains("--file"));
 }
 
+/// Reject malformed batches before creating output and report unusable output paths.
 #[test]
 fn invalid_scenario_files_fail_without_writing_graphs() {
     let directory = Directory::new();

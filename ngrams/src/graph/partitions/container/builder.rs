@@ -1,3 +1,8 @@
+//! Greedily pack positioned children into alternative, gap-filled token lines.
+//!
+//! Tokens here still use containment-graph indices. Partition construction
+//! translates them into output-graph indices after the lines are complete.
+
 use crate::graph::{
     partitions::{
         container::PartitionCell,
@@ -32,15 +37,20 @@ use std::{
     num::NonZeroUsize,
 };
 
+/// One non-overlapping decomposition under construction.
 #[derive(Debug, Deref, DerefMut)]
 pub(crate) struct PartitionLineBuilder<'a, 'b> {
+    /// Start offset of the last cell, or zero when empty; not the line's end.
     pos: usize,
+    /// Root and vocabulary used to resolve gap substrings.
     ctx: &'a NodePartitionCtx<'a, 'b>,
+    /// Ordered cells, including gaps materialized as ordinary tokens.
     #[deref]
     #[deref_mut]
     line: Vec<Token>,
 }
 impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
+    /// Create an empty line starting at the root's beginning.
     pub(crate) fn new(ctx: &'a NodePartitionCtx<'a, 'b>) -> Self {
         Self {
             ctx,
@@ -48,6 +58,7 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
             line: Default::default(),
         }
     }
+    /// Append a cell and advance the cached last-cell start by the previous width.
     fn push_cell(
         &mut self,
         cell: Token,
@@ -57,18 +68,22 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
         }
         self.line.push(cell);
     }
+    /// Append a token contiguously at the current end.
     pub(crate) fn append(
         &mut self,
         index: Token,
     ) {
         self.push_cell(index);
     }
+    /// Fill a nonempty gap with the root substring covering that interval.
+    ///
+    /// The interval must lie within the root and resolve in the containment graph.
     pub(crate) fn skip(
         &mut self,
         offset: NonZeroUsize,
     ) {
         let end_pos = self.end_pos();
-        // Get the root data to use its token for get_vertex_subrange
+        // Gap tokens need not already be labelled; the outer pass discovers them.
         let root_data = self
             .ctx
             .vocab()
@@ -82,6 +97,7 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
             .get_vertex_subrange(root_token, end_pos..(end_pos + offset.get()));
         self.push_cell(index);
     }
+    /// Insert an optional gap before appending the supplied child.
     pub(crate) fn append_after_offset(
         &mut self,
         offset: Option<NonZeroUsize>,
@@ -92,12 +108,16 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
         }
         self.append(index);
     }
+    /// Return the positive distance to a position at or beyond this line's end.
+    ///
+    /// Callers must not pass a position before the current end.
     pub(crate) fn offset_to(
         &self,
         pos: usize,
     ) -> Option<NonZeroUsize> {
         NonZeroUsize::new(pos - self.end_pos())
     }
+    /// Extend the line to a target end with a gap token if necessary.
     pub(crate) fn skip_to(
         &mut self,
         end_pos: usize,
@@ -106,6 +126,7 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
             self.skip(o);
         }
     }
+    /// Exclusive end offset of all appended cells.
     pub(crate) fn end_pos(&self) -> usize {
         self.pos
             + self
@@ -114,6 +135,7 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
                 .map(|cell| cell.width().0)
                 .unwrap_or_default()
     }
+    /// Pad to the supplied end and return the completed token sequence.
     pub(crate) fn close(
         mut self,
         end_pos: usize,
@@ -123,11 +145,14 @@ impl<'a, 'b> PartitionLineBuilder<'a, 'b> {
     }
 }
 
+/// Index of the most recently created or extended decomposition line.
 #[derive(Debug, Clone, Copy, Hash)]
 struct PartitionCursor {
+    /// Index into the enclosing builder's wall.
     pub(crate) line: usize,
 }
 impl PartitionCursor {
+    /// Borrow the selected line, panicking if the cursor is invalid.
     pub(crate) fn get_current_line<'a, 'b>(
         &self,
         builder: &'a mut PartitionBuilder<'a, 'b>,
@@ -136,14 +161,19 @@ impl PartitionCursor {
     }
 }
 
+/// Alternative lines assembled from children supplied in increasing start order.
 #[derive(Debug)]
 pub(crate) struct PartitionBuilder<'a, 'b> {
+    /// Root against which every line and gap is positioned.
     ctx: &'a NodePartitionCtx<'a, 'b>,
+    /// Last modified line, also used to choose the final padding extent.
     cursor: PartitionCursor,
+    /// Non-overlapping lines; overlaps across different lines are allowed.
     wall: Vec<PartitionLineBuilder<'a, 'b>>,
 }
 
 impl<'a, 'b> PartitionBuilder<'a, 'b> {
+    /// Initialize the wall by placing its first child.
     pub(crate) fn new(
         ctx: &'a NodePartitionCtx<'a, 'b>,
         offset: usize,
@@ -161,6 +191,7 @@ impl<'a, 'b> PartitionBuilder<'a, 'b> {
         builder.append_child(offset, Token::new(index, first.width()));
         builder
     }
+    /// Add a new line with any leading gap and select it as current.
     pub(crate) fn create_line(
         &mut self,
         pos: usize,
@@ -171,6 +202,9 @@ impl<'a, 'b> PartitionBuilder<'a, 'b> {
         self.cursor.line = self.wall.len();
         self.wall.push(line);
     }
+    /// Add and select a line containing a child at the requested position.
+    ///
+    /// Currently performs the same operations as `create_line`.
     pub(crate) fn create_and_append_line(
         &mut self,
         pos: usize,
@@ -181,17 +215,22 @@ impl<'a, 'b> PartitionBuilder<'a, 'b> {
         self.cursor.line = self.wall.len();
         self.wall.push(line);
     }
+    /// Borrow a line by index, panicking on an invalid cursor.
     pub(crate) fn get_line_mut(
         &mut self,
         index: usize,
     ) -> &mut PartitionLineBuilder<'a, 'b> {
         self.wall.get_mut(index).expect("Invalid PartitionCursor")
     }
+    /// Borrow the most recently modified line.
     pub(crate) fn get_current_line(
         &mut self
     ) -> &mut PartitionLineBuilder<'a, 'b> {
         self.get_line_mut(self.cursor.line)
     }
+    /// Fill any gap before a child, append it to a line, and update the cursor.
+    ///
+    /// `pos` must be at or beyond the selected line's end.
     pub(crate) fn append_at_line(
         &mut self,
         line_index: usize,
@@ -202,7 +241,10 @@ impl<'a, 'b> PartitionBuilder<'a, 'b> {
         line.append_after_offset(line.offset_to(pos), index);
         self.cursor.line = line_index;
     }
-    // pick current line, append index or create new line, advance cursor accordingly
+    /// Greedily append to a compatible line, creating a new one for overlaps.
+    ///
+    /// Existing lines are tried by descending last-cell start, not by end offset.
+    /// This packing does not enumerate every possible segmentation.
     pub(crate) fn append_child(
         &mut self,
         pos: usize,
@@ -241,6 +283,10 @@ impl<'a, 'b> PartitionBuilder<'a, 'b> {
                 self.create_and_append_line(pos, index)
             })
     }
+    /// Pad all lines to the current line's end and consume the wall.
+    ///
+    /// Assumes that end is no earlier than every other line's end. It is not
+    /// independently replaced with the root width or the maximum line end.
     pub(crate) fn close(mut self) -> Vec<Vec<Token>> {
         let end_pos = self.get_current_line().end_pos();
         self.wall

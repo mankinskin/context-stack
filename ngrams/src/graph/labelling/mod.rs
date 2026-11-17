@@ -1,3 +1,8 @@
+//! Shared label state, optional persistence, and entry points for the three passes.
+//!
+//! All passes use one growing label set. Frequency and wrapper entry points are
+//! guarded by progress status; partition construction always starts a new graph.
+
 use derive_more::derive::{
     Deref,
     DerefMut,
@@ -61,6 +66,7 @@ use wrapper::WrapperCtx;
 use super::StatusHandle;
 
 impl From<Vocabulary> for LabellingImage {
+    /// Start with the supplied vocabulary and no selected vertices.
     fn from(vocab: Vocabulary) -> Self {
         Self {
             vocab,
@@ -68,9 +74,12 @@ impl From<Vocabulary> for LabellingImage {
         }
     }
 }
+/// Persistable vocabulary and current selection, without output graph or status.
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct LabellingImage {
+    /// Exhaustive substring graph and occurrence metadata.
     pub(crate) vocab: Vocabulary,
+    /// Selected vertex identities; selection reasons are not stored separately.
     pub(crate) labels: HashSet<VertexKey>,
 }
 impl LabellingImage {
@@ -94,6 +103,10 @@ impl LabellingImage {
         storage::exists(key)
     }
 
+    /// Load by corpus name on native platforms when caching is enabled, or rebuild.
+    ///
+    /// Cache read errors fall through to fresh construction. Loaded images are
+    /// not checked against the supplied texts and do not restore progress status.
     pub(crate) fn from_corpus(
         corpus: &Corpus,
         status: &mut StatusHandle,
@@ -121,15 +134,20 @@ impl LabellingImage {
         }
     }
 }
+/// Mutable execution context shared by labelling, cover searches, and partitions.
 #[derive(Debug, Deref, DerefMut, new)]
 pub(crate) struct LabellingCtx {
+    /// Image and source corpus, held in the same wrapper used by test helpers.
     #[deref]
     #[deref_mut]
     pub(crate) corpus: TestCorpus,
+    /// Shared pass marker and progress counters.
     pub(crate) status: StatusHandle,
+    /// Cooperatively checked cancellation source.
     pub(crate) cancellation: Cancellation,
 }
 impl LabellingCtx {
+    /// Initialize corpus state and a fresh progress handle without running labels.
     pub(crate) fn from_corpus(
         corpus: Corpus,
         cancellation: impl Into<Cancellation>,
@@ -144,6 +162,7 @@ impl LabellingCtx {
             cancellation: cancellation.into(),
         })
     }
+    /// Return a cancellation error when the supplied handle has been signalled.
     pub(crate) fn check_cancelled(&self) -> RunResult<()> {
         if self.cancellation.is_cancelled() {
             Err(CancelReason::Cancelled)
@@ -151,15 +170,21 @@ impl LabellingCtx {
             Ok(())
         }
     }
+    /// Borrow the exhaustive vocabulary rather than the derived output graph.
     pub(crate) fn vocab(&self) -> &'_ Vocabulary {
         &self.corpus.image.vocab
     }
+    /// Borrow the current selection shared by every pass.
     pub(crate) fn labels(&self) -> &'_ HashSet<VertexKey> {
         &self.corpus.image.labels
     }
+    /// Mutate global selection; no automatic graph invalidation is performed.
     pub(crate) fn labels_mut(&mut self) -> &'_ mut HashSet<VertexKey> {
         &mut self.corpus.image.labels
     }
+    /// Run frequency selection unless status has already reached that stage.
+    ///
+    /// Optional cache write errors are currently discarded.
     pub(crate) fn label_freq(&mut self) -> RunResult<()> {
         if *self.status.pass() < ProcessStatus::Frequency {
             FrequencyCtx::new(&mut *self).run()?;
@@ -169,6 +194,9 @@ impl LabellingCtx {
         }
         Ok(())
     }
+    /// Run bottom-up wrapper selection unless status has reached that stage.
+    ///
+    /// Optional cache write errors are currently discarded.
     pub(crate) fn label_wrap(&mut self) -> RunResult<()> {
         if *self.status.pass() < ProcessStatus::Wrappers {
             WrapperCtx::new(&mut *self).run()?;
@@ -178,6 +206,7 @@ impl LabellingCtx {
         }
         Ok(())
     }
+    /// Construct a fresh output graph, potentially adding further global labels.
     pub(crate) fn label_part(&mut self) -> RunResult<Hypergraph> {
         let mut ctx = PartitionsCtx::from(&mut *self);
         ctx.run()?;
