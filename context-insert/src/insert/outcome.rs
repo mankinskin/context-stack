@@ -89,3 +89,131 @@ impl InsertOutcome {
         matches!(self, InsertOutcome::NoExpansion { .. })
     }
 }
+
+/// An [`InsertOutcome`] together with the edits its publication applied.
+///
+/// Use [`Publication::translate`](crate::insert::publication::Publication::translate)
+/// to carry graph locations known before materialization across it.
+#[derive(Debug, Clone)]
+pub struct Materialization {
+    pub outcome: InsertOutcome,
+    pub publication: crate::insert::publication::Publication,
+}
+
+impl Materialization {
+    /// The first token of the materialized query.
+    pub fn query_start(&self) -> Token {
+        self.outcome.response().query_cursor().path().pattern_root_pattern()
+            [0]
+    }
+
+    /// Frames connecting the materialized token to [`Self::query_start`]
+    /// through first children, projected from the accepted search.
+    ///
+    /// - A reused whole-root result starts with the occurrence recorded by
+    ///   the search ([`Response::entire_root_start_path`]). The search
+    ///   simplified away the trailing frames, which all lie at offset 0, so
+    ///   they are completed by [`prefix_frames`](crate::overlap::prefix_frames).
+    /// - A created result is entered through first children of vertices
+    ///   created by its publication until an existing vertex is reached; the
+    ///   first-child edges the search recorded below it are translated
+    ///   through the publication, and the unrecorded border frames below
+    ///   those (all at offset 0) are completed as above.
+    ///
+    /// Returns `None` if the evidence does not connect the result to the
+    /// query start.
+    pub fn prefix_path(
+        &self,
+        graph: &Hypergraph,
+    ) -> Option<Vec<ChildLocation>> {
+        let target = self.query_start();
+        let token = self.outcome.token();
+        if token == target {
+            // Also covers the search's fallback for an unextended start
+            // token, whose root location is a placeholder.
+            return Some(Vec::new());
+        }
+        let response = self.outcome.response();
+        if let Some(mut path) = response.entire_root_start_path() {
+            assert_eq!(
+                response.root_token(),
+                token,
+                "reused result must be the matched root"
+            );
+            let leaf = boundary_target(graph, token, &path, true);
+            path.extend(crate::overlap::prefix_frames(graph, leaf, target)?);
+            return Some(path);
+        }
+        self.enter_prefix(graph, &response.cache, token, target)
+    }
+
+    fn enter_prefix(
+        &self,
+        graph: &Hypergraph,
+        cache: &TraceCache,
+        token: Token,
+        target: Token,
+    ) -> Option<Vec<ChildLocation>> {
+        if token == target {
+            return Some(Vec::new());
+        }
+        if !self.publication.created(token) {
+            let (traced, leaf) = traced_prefix(cache, token, target);
+            let mut path = self.publication.translate(graph, &traced, leaf, true);
+            path.extend(crate::overlap::prefix_frames(graph, leaf, target)?);
+            return Some(path);
+        }
+        graph
+            .expect_child_patterns(token)
+            .iter()
+            .filter(|(_, pattern)| pattern[0].width() >= target.width())
+            .find_map(|(&id, pattern)| {
+                let mut rest =
+                    self.enter_prefix(graph, cache, pattern[0], target)?;
+                rest.insert(0, ChildLocation::new(token, id, 0));
+                Some(rest)
+            })
+    }
+}
+
+/// Follow first-child edges recorded by a search from `root` towards
+/// `target`, returning the recorded frames and the vertex they reach.
+///
+/// The search records only edges it needs for splitting; children matched
+/// entirely at the start border are not recorded, so the walk stops at the
+/// deepest recorded vertex. Prefers the widest traced child at each level;
+/// every first-child path identifies the same occurrence at offset 0.
+fn traced_prefix(
+    cache: &TraceCache,
+    root: Token,
+    target: Token,
+) -> (Vec<ChildLocation>, Token) {
+    let mut token = root;
+    let mut path = Vec::new();
+    while token != target {
+        let Some(entry) = cache.entries.get(&token.vertex_index()) else {
+            break;
+        };
+        let Some((location, child)) = entry
+            .bottom_up
+            .values()
+            .chain(entry.top_down.values())
+            .flat_map(|position| position.bottom())
+            .filter(|(key, sub)| {
+                sub.sub_index() == 0 && key.index.width() >= target.width()
+            })
+            .map(|(key, sub)| {
+                (
+                    ChildLocation::new(token, sub.pattern_id(), 0),
+                    key.index,
+                )
+            })
+            .max_by_key(|(_, child)| child.width())
+        else {
+            break;
+        };
+        path.push(location);
+        token = child;
+    }
+    (path, token)
+}

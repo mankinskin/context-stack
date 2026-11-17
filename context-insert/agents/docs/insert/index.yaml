@@ -14,7 +14,18 @@ files:
   - name: result.rs
     description: InsertResult type
 
+  - name: outcome.rs
+    description: InsertOutcome and Materialization (outcome + publication; prefix_path projects the result -> query-start frames from the accepted search)
+
+  - name: publication.rs
+    description: Publication - composed range replacements, added patterns and created vertices per publish stage; translate/translate_chain carry boundary paths recorded before insertion
+
+  - name: scoped.rs
+    description: Scope-restricted complement insertion; path entry points resolve from sibling ranges and return their Publication
+
 key_types:
   - InsertCtx: Context for insertion operations
   - InsertResult: Result of insertion
-  - ToInsertCtx: Trait for converting to InsertCtx
+  - ToInsertCtx: Trait for converting to InsertCtx (insert, insert_next_match, materialize)
+  - Materialization: Materialized accepted response with its Publication
+  - Publication: Edits for translating locations across publication

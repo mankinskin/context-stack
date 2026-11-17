@@ -1,22 +1,25 @@
 use context::*;
 use result::InsertResult;
 
-use crate::{
-    interval::init::InitInterval,
-    overlap::{
-        OverlapBundleInput,
-        bundle_overlap,
-    },
-};
+use crate::interval::init::InitInterval;
 use context_search::*;
 use context_trace::*;
 pub mod context;
 pub(crate) mod direction;
 pub mod outcome;
+pub mod publication;
 pub mod result;
 pub mod scoped;
 
-pub use outcome::InsertOutcome;
+pub use outcome::{
+    InsertOutcome,
+    Materialization,
+};
+pub use publication::{
+    Publication,
+    PublicationStage,
+    RangeReplacement,
+};
 
 /// Trait for types that can create an InsertCtx for graph insertions.
 ///
@@ -39,13 +42,6 @@ pub trait ToInsertCtx<R: InsertResult = Token>:
         init: InitInterval,
     ) -> Result<R, ErrorState> {
         self.insert_context().insert_init(ext, init)
-    }
-    fn bundle_overlap(
-        &self,
-        input: OverlapBundleInput,
-    ) -> Result<Token, ErrorState> {
-        bundle_overlap(&HypergraphRef::from(self.graph().clone()), input)
-            .map_err(ErrorState::from)
     }
     /// Canonical token for `scope`'s content before the postfix reached by
     /// `postfix_path`, represented inside `scope` (see [`scoped`]).
@@ -93,17 +89,20 @@ pub trait ToInsertCtx<R: InsertResult = Token>:
     > {
         self.insert_context().insert_next_match(searchable)
     }
+    /// Materialize an accepted search response without searching again.
+    fn materialize(
+        &self,
+        response: Response,
+    ) -> Result<Materialization, ErrorReason> {
+        self.insert_context()
+            .materialize(response)
+            .map_err(|err| err.reason)
+    }
 }
 
 impl<R: InsertResult> ToInsertCtx<R> for HypergraphRef {
     fn insert_context(&self) -> InsertCtx<R> {
         InsertCtx::<R>::from(self.clone())
-    }
-    fn bundle_overlap(
-        &self,
-        input: OverlapBundleInput,
-    ) -> Result<Token, ErrorState> {
-        bundle_overlap(self, input).map_err(ErrorState::from)
     }
 }
 

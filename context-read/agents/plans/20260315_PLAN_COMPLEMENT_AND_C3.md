@@ -11,6 +11,13 @@ blocking: 10 failing context-read unit tests (all overlap-collapse paths)
 
 # Plan: Complement Fix and C3 Follow-up
 
+> **Superseded (2026-11-16):** the overlap-bundling sections (the
+> `bundle_overlap` API and sibling-collection partitions) are superseded by
+> [20261116_PLAN_OVERLAP_PROVIDER_MIGRATION](20261116_PLAN_OVERLAP_PROVIDER_MIGRATION.md).
+> `bundle_overlap`, `OverlapBundleInput` and `PartitionOutcome` were removed;
+> overlaps are closed by `context_insert::Overlap::close`. The content below is
+> kept for history.
+
 **Date:** 2026-03-15  
 **Scope:** structural overlap complement construction, overlap bundling, and subsequent Pass C3 wiring  
 **Primary crates:** `context-insert`, `context-read`  

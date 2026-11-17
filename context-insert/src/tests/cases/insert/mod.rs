@@ -8,6 +8,8 @@
 //! - `prefix` - Prefix matching
 //! - `postfix` - Postfix matching
 //! - `scoped` - Scope-restricted complement insertion
+//! - `materialize` - Accepted-response materialization, location translation
+//!   and overlap closure
 //!
 //! ### Validation & Error Handling
 //! - `validation` - Input validation (empty patterns, invalid InitInterval)
@@ -19,6 +21,7 @@
 
 // Core insertion tests
 pub(crate) mod infix;
+pub(crate) mod materialize;
 pub(crate) mod pattern;
 pub(crate) mod postfix;
 pub(crate) mod prefix;
@@ -30,4 +33,3 @@ pub(crate) mod validation;
 // Scenario tests
 pub(crate) mod context_read_scenarios;
 pub(crate) mod expanded_overlap;
-pub(crate) mod overlap_bundle;

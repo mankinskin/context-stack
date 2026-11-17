@@ -1,343 +1,311 @@
-//! Overlap bundling for path-driven structural collapse.
+//! Structural closure of an accepted overlap.
 //!
-//! This module provides the first working implementation of structural overlap
-//! bundling for `context-read`.
+//! ```text
+//! anchor A:       L P
+//! expansion E:      P T
+//! closure C:      L P T = [A, T] = [L, E]
+//! ```
 //!
-//! ## Design
+//! [`Overlap`] carries the structural evidence of one accepted overlap: the
+//! closure bound `X` (the selected anchor scope), its retained postfix
+//! frames down to the shared token `P`, the accepted expansion `E`, and the
+//! prefix frames of `E` reaching the same `P`. [`Overlap::close`] integrates
+//! `E` with `X` and returns their union token; root ownership and
+//! installation stay with the caller.
 //!
-//! Given:
-//! - an old-anchor postfix path to the shared overlap token `P`
-//! - an overlap-side prefix path to the same token `P` inside `t2`
-//! - the participating tokens `t1` and `t2`
+//! For frames `P = S0 < S1 < ... < Sk = X`, closure unwinds from `P`
+//! outward:
 //!
-//! we construct:
-//! - the structural left partition of the anchor around `P`
-//! - the structural right partition of `t2` around `P`
+//! ```text
+//! C0 = E
+//! Si = Li + S(i-1)
+//! Ci = [Si, T] = [Li, C(i-1)]
+//! ```
 //!
-//! by collecting hierarchical siblings along the supplied paths.
+//! - `T` is resolved once from the expansion frames' right siblings and
+//!   reused by every step.
+//! - The closure steps `Si` are the parents of the supplied anchor frames.
+//!   `Li` is resolved from the left siblings along the frames from `Si` to
+//!   `S(i-1)`; a wrapper introduced by an earlier complement resolution
+//!   lengthens those frames but is not a closure step.
+//! - Complements come from the scoped split/join core
+//!   ([`scope_complement`]); a single sibling is used directly. Every
+//!   resolution returns its [`Publication`], through which the frames still
+//!   to be closed are translated, so no frame is rediscovered by search or
+//!   depth-first reconnection.
+//! - An existing union is reused: first through a known decomposition of
+//!   `Si` or `C(i-1)`, then by one structured content lookup of `[Si, T]`.
+//!   Its decompositions are extended with the missing closure patterns.
+//!   The two closure decompositions are added directly: join cannot plan a
+//!   new union vertex, and reconciling `Si`'s other decompositions with it
+//!   is deferred to affected-host completion.
 //!
-//! This is intentionally implemented as a direct hierarchical sibling
-//! collection first. It establishes the semantics needed by the overlap
-//! collapse path while keeping the API in `context-insert`, where the
-//! longer-term path→trace-cache→split/join implementation belongs.
-//!
-//! ## Important note
-//!
-//! The design documents describe a future implementation based on converting
-//! paths into `TraceCache` and routing through recursive split/join. This file
-//! implements the same *structural semantics* but does so directly by walking
-//! the path hierarchy and inserting the collected sibling patterns.
-//!
-//! That gives `context-read` a durable overlap-bundling entry point now, while
-//! leaving room to swap the internals to trace-cache-based split/join later
-//! without changing the call site.
+//! [`ClosurePolicy::SingleStep`] closes `X` with `E` in one step using the
+//! whole frame path, as required when the expansion is the scope itself.
+//! If `X == P`, the result is `E` and no complement is resolved.
 
-use context_trace::{
-    path::accessors::has_path::HasRolePath,
-    *,
+use context_search::{
+    ErrorState,
+    Find,
+};
+use context_trace::*;
+
+use crate::insert::{
+    publication::Publication,
+    scoped::{
+        Boundary,
+        scope_complement,
+    },
 };
 
-/// Result of extracting one structural partition around a shared overlap token.
-///
-/// In the `context-read` overlap pipeline, the expected case is `Token(_)`,
-/// because only true overlap paths with a non-empty complement should be used.
-/// `Empty` exists as a graceful recovery outcome for more general callers and
-/// for defensive handling.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PartitionOutcome {
-    /// A non-empty structural partition was successfully constructed.
-    Token(Token),
-    /// The requested side of the path contains no siblings.
-    Empty,
-}
-
-impl PartitionOutcome {
-    /// Return the contained token when present.
-    pub fn token(self) -> Option<Token> {
-        match self {
-            Self::Token(token) => Some(token),
-            Self::Empty => None,
-        }
-    }
-
-    /// Borrow the contained token when present.
-    pub fn as_token(&self) -> Option<Token> {
-        match self {
-            Self::Token(token) => Some(*token),
-            Self::Empty => None,
-        }
-    }
-
-    /// `true` when the partition is empty.
-    pub fn is_empty(&self) -> bool {
-        matches!(self, Self::Empty)
-    }
-}
-
-/// Input bundle describing one overlap collapse operation.
-///
-/// The shared overlap token is represented structurally by two path witnesses:
-///
-/// - `anchor_postfix_path`: path from the old anchor root to the shared overlap
-///   token `P`
-/// - `overlap_prefix_path`: path inside the overlap token `t2` to the same
-///   shared token `P`
-///
-/// `t1` and `t2` are the two decomposition tokens currently used by
-/// `context-read`'s overlap collapse path:
-///
-/// - `t1`: the sequential token matched from the current cursor position
-/// - `t2`: the expanded overlap token that contains the shared token `P`
-#[derive(Clone, Debug)]
-pub struct OverlapBundleInput {
-    /// Path from the old anchor root to the selected shared overlap token.
-    pub anchor_postfix_path: IndexEndPath,
-    /// Path inside the overlap expansion to the selected shared overlap token.
-    pub overlap_prefix_path: IndexStartPath,
-    /// Sequential expansion token from the current cursor position.
-    pub t1: Token,
-    /// Overlap expansion token containing the shared overlap token.
-    pub t2: Token,
-    /// True when the overlap token IS the anchor (repetition pattern).
-    /// In this case the standard partition formula double-counts and a
-    /// specialized decomposition is used instead.
-    pub self_overlap: bool,
-}
-
-impl OverlapBundleInput {
-    /// Create a new overlap bundle input.
-    pub fn new(
-        anchor_postfix_path: IndexEndPath,
-        overlap_prefix_path: IndexStartPath,
-        t1: Token,
-        t2: Token,
-    ) -> Self {
-        Self {
-            anchor_postfix_path,
-            overlap_prefix_path,
-            t1,
-            t2,
-            self_overlap: false,
-        }
-    }
-}
-
+/// Which retained anchor frames become closure steps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PartitionSide {
-    Left,
-    Right,
+pub enum ClosurePolicy {
+    /// Close every frame from the shared token outward.
+    Nested,
+    /// Close only the scope with the expansion, in one step.
+    SingleStep,
 }
 
-/// Bundle an overlap into a single token.
-///
-/// This is the durable API entry point intended for `context-read`.
-///
-/// Semantics:
-/// - find the structural left partition of the old anchor around the shared
-///   overlap token
-/// - find the structural right partition of `t2` around the same token
-/// - build the two bundled decompositions
-/// - insert and return the resulting bundled token
-///
-/// The current implementation is based on hierarchical sibling collection from
-/// the supplied paths.
-pub fn bundle_overlap(
-    graph: &HypergraphRef,
-    input: OverlapBundleInput,
-) -> Result<Token, ErrorReason> {
-    let anchor = input.anchor_postfix_path.root_parent();
+/// One accepted overlap with the connections to its shared occurrence.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Overlap {
+    /// Closure bound `X`: the anchor scope integrated with the expansion.
+    pub scope: Token,
+    /// Frames from `scope` to the shared token through last children.
+    /// Empty when the scope is the shared token.
+    pub anchor_path: Vec<ChildLocation>,
+    /// Accepted expansion `E`, beginning with the shared token.
+    pub expansion: Token,
+    /// Frames from `expansion` to the shared token through first children.
+    pub expansion_path: Vec<ChildLocation>,
+}
 
-    // Self-overlap: the overlap token IS the anchor (repetition pattern).
-    // The standard formula double-counts because left/right partitions
-    // are extracted from what is effectively the same token.
-    //
-    // Instead, build:
-    //   primary     = [anchor, t1]
-    //   alternative = [left_partition, join(shared, t1)]
-    //
-    // Example: anchor=[abc,abc]=abcabc, postfix=abc, t1=abc
-    //   left = abc, join(abc, abc) = abcabc
-    //   primary = [abcabc, abc], alternative = [abc, abcabc]
-    if input.self_overlap {
-        // In the self-overlap case, the shared token is the postfix
-        // of the anchor — the token at the root of the anchor postfix path.
-        let shared: Token = GraphRootChild::<End>::graph_root_child(
-            &input.anchor_postfix_path,
-            graph,
+impl Overlap {
+    /// The shared token `P` reached by the anchor frames.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the anchor frames are disconnected.
+    pub fn shared(
+        &self,
+        graph: &Hypergraph,
+    ) -> Token {
+        boundary_target(graph, self.scope, &self.anchor_path, false)
+    }
+
+    /// Close the overlap and return the union of `scope` and `expansion`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the expansion does not extend the shared token, if the
+    /// frames are disconnected or do not reach the same token, if a
+    /// translated frame cannot be resolved, or if an existing union would
+    /// receive a duplicate boundary. Mutations are not rolled back.
+    pub fn close(
+        self,
+        graph: &HypergraphRef,
+        policy: ClosurePolicy,
+    ) -> Result<Token, ErrorState> {
+        let shared = self.shared(graph);
+        assert!(
+            self.expansion.width() > shared.width(),
+            "overlap must consume input"
         );
-        let left = left_partition_from_postfix_path(
+        if self.anchor_path.is_empty() {
+            return Ok(self.expansion);
+        }
+        assert_eq!(
+            boundary_target(graph, self.expansion, &self.expansion_path, true),
+            shared,
+            "expansion frames do not reach the shared token"
+        );
+        let (right, publication) = scope_complement(
             graph,
-            &input.anchor_postfix_path,
+            self.expansion,
+            &self.expansion_path,
+            Boundary::Postfix,
         )?;
-
-        // Find or create the right extension token [shared, t1].
-        // In the common repetition case (t1 == postfix), this is the
-        // anchor itself, which already exists in the graph.
-        use crate::insert::{
-            ToInsertCtx,
-            outcome::InsertOutcome,
+        // Closure steps are the supplied frame parents, innermost last.
+        // Wrappers introduced later by complement resolution only lengthen
+        // the frames between two steps; they are not closure steps.
+        let mut steps: Vec<Token> = match policy {
+            ClosurePolicy::Nested =>
+                self.anchor_path.iter().map(|l| l.parent).collect(),
+            ClosurePolicy::SingleStep => vec![self.scope],
         };
-        let right_ext: Token = match <HypergraphRef as ToInsertCtx<
-            IndexWithPath,
-        >>::insert_next_match(
-            graph, vec![shared, input.t1]
-        ) {
-            Ok(o) => {
-                let outcome: InsertOutcome = o;
-                outcome.token()
-            },
-            Err(_) => graph.insert_pattern(vec![shared, input.t1]),
-        };
-
-        let primary_pat = vec![anchor, input.t1];
-        let overlap_pat = match left.token() {
-            Some(l) => vec![l, right_ext],
-            None => vec![right_ext],
-        };
-
-        return Ok(graph.insert_patterns(vec![primary_pat, overlap_pat]));
+        let mut frames =
+            publication.translate(graph, &self.anchor_path, shared, false);
+        let mut closed = self.expansion;
+        while let Some(outer) = steps.pop() {
+            let start = frames
+                .iter()
+                .rposition(|location| location.parent == outer)
+                .expect("closure step must remain on its translated frames");
+            let (left, publication) = scope_complement(
+                graph,
+                outer,
+                &frames[start..],
+                Boundary::Prefix,
+            )?;
+            frames = translate_outer(graph, &publication, &frames[..start], outer);
+            closed = close_step(graph, outer, left, closed, right);
+        }
+        Ok(closed)
     }
-
-    let shared = shared_overlap_token(graph, &input.overlap_prefix_path);
-
-    let left =
-        left_partition_from_postfix_path(graph, &input.anchor_postfix_path)?;
-    let right =
-        right_partition_from_prefix_path(graph, &input.overlap_prefix_path)?;
-
-    let primary = join_non_empty(
-        graph,
-        [
-            left.as_token(),
-            Some(shared),
-            right.as_token(),
-            Some(input.t1),
-        ],
-    )
-    .ok_or(ErrorReason::NotFound)?;
-
-    let overlap = join_non_empty(
-        graph,
-        [left.as_token(), Some(input.t2), right.as_token()],
-    )
-    .ok_or(ErrorReason::NotFound)?;
-
-    Ok(graph.insert_patterns(vec![vec![primary], vec![overlap]]))
 }
 
-/// Build the structural left partition of the shared overlap token inside the
-/// old anchor.
+/// Frames from `root` to its prefix `target` along the widest first child.
 ///
-/// This is the token represented by all siblings to the **left** of the leaf
-/// reached by `path`, preserving the hierarchy described by the path.
-pub fn left_partition_from_postfix_path(
-    graph: &HypergraphRef,
-    path: &IndexEndPath,
-) -> Result<PartitionOutcome, ErrorReason> {
-    partition_from_path(graph, path, PartitionSide::Left)
+/// A prefix occurs once, at offset 0, so every first-child path identifies
+/// the same occurrence; only the decomposition chosen per level differs.
+/// Used to complete evidence whose trailing border frames were simplified
+/// away, and by callers without search evidence. Mirrors the widest-postfix
+/// traversal that selects overlap anchors. Returns `None` if `target` is not
+/// reached along the widest first children.
+pub fn prefix_frames(
+    graph: &Hypergraph,
+    root: Token,
+    target: Token,
+) -> Option<Vec<ChildLocation>> {
+    let mut token = root;
+    let mut path = Vec::new();
+    while token != target {
+        let (location, child) = graph
+            .expect_child_patterns(token)
+            .iter()
+            .map(|(&id, pattern)| (ChildLocation::new(token, id, 0), pattern[0]))
+            .max_by_key(|(_, child)| child.width())?;
+        if child.width() < target.width() {
+            return None;
+        }
+        path.push(location);
+        token = child;
+    }
+    Some(path)
 }
 
-/// Build the structural right partition of the shared overlap token inside the
-/// overlap expansion token.
+/// Translate the frames still to be closed, which end at `outer`.
+fn translate_outer(
+    graph: &Hypergraph,
+    publication: &Publication,
+    frames: &[ChildLocation],
+    outer: Token,
+) -> Vec<ChildLocation> {
+    if publication.is_unchanged() {
+        frames.to_vec()
+    } else {
+        publication.translate(graph, frames, outer, false)
+    }
+}
+
+/// Close one frame: `C = [outer, right] = [left, closed]`.
+fn close_step(
+    graph: &HypergraphRef,
+    outer: Token,
+    left: Token,
+    closed: Token,
+    right: Token,
+) -> Token {
+    let patterns = [
+        Pattern::from(vec![outer, right]),
+        Pattern::from(vec![left, closed]),
+    ];
+    let Some(token) = existing_union(graph, &patterns) else {
+        return graph.insert_patterns(patterns);
+    };
+    let planned = [
+        std::collections::BTreeSet::from([outer.width().0]),
+        std::collections::BTreeSet::from([left.width().0]),
+    ];
+    for current in graph.expect_child_patterns(token).values() {
+        let current = boundaries(current);
+        for proposed in &planned {
+            assert!(
+                &current == proposed || current.is_disjoint(proposed),
+                "closure would duplicate an existing boundary"
+            );
+        }
+    }
+    for pattern in patterns {
+        if !graph
+            .expect_child_patterns(token)
+            .values()
+            .any(|p| p == &pattern)
+        {
+            graph.add_pattern_with_update(token, pattern);
+        }
+    }
+    token
+}
+
+/// Find an existing token for the union of a closure step.
 ///
-/// This is the token represented by all siblings to the **right** of the leaf
-/// reached by `path`, preserving the hierarchy described by the path.
-pub fn right_partition_from_prefix_path(
+/// Known decompositions are checked through the parents of their first
+/// child; otherwise the structured pattern `[outer, right]` is looked up
+/// once.
+fn existing_union(
     graph: &HypergraphRef,
-    path: &IndexStartPath,
-) -> Result<PartitionOutcome, ErrorReason> {
-    partition_from_path(graph, path, PartitionSide::Right)
+    patterns: &[Pattern; 2],
+) -> Option<Token> {
+    patterns
+        .iter()
+        .find_map(|pattern| parent_with_pattern(graph, pattern))
+        .or_else(|| find_complete(graph, &patterns[0]))
 }
 
-fn partition_from_path<R: PathRole>(
-    graph: &HypergraphRef,
-    path: &RootedRolePath<R, IndexRoot>,
-    side: PartitionSide,
-) -> Result<PartitionOutcome, ErrorReason> {
-    let steps = flatten_path_steps(path);
-    if steps.is_empty() {
-        return Ok(PartitionOutcome::Empty);
-    }
-
-    let mut acc: Option<Token> = None;
-
-    for step in steps.iter().rev() {
-        let pattern = graph.expect_pattern_at(step.pattern_location);
-        let sibling_slice: &[Token] = match side {
-            PartitionSide::Left => &pattern[..step.sub_index],
-            PartitionSide::Right => &pattern[step.sub_index + 1..],
-        };
-
-        let siblings = sibling_slice.iter().copied();
-
-        let parts: Vec<Token> = match side {
-            PartitionSide::Left => siblings.chain(acc.into_iter()).collect(),
-            PartitionSide::Right => acc.into_iter().chain(siblings).collect(),
-        };
-
-        acc = join_non_empty_vec(graph, parts);
-    }
-
-    Ok(match acc {
-        Some(token) => PartitionOutcome::Token(token),
-        None => PartitionOutcome::Empty,
+fn parent_with_pattern(
+    graph: &Hypergraph,
+    pattern: &Pattern,
+) -> Option<Token> {
+    let vertex = graph.expect_vertex_data(pattern[0]);
+    vertex.parents().iter().find_map(|(&index, parent)| {
+        let token = Token::new(index, parent.width());
+        graph
+            .expect_child_patterns(token)
+            .values()
+            .any(|p| p == pattern)
+            .then_some(token)
     })
 }
 
-#[derive(Clone, Copy, Debug)]
-struct PathStep {
-    pattern_location: PatternLocation,
-    sub_index: usize,
-}
-
-fn flatten_path_steps<R: PathRole>(
-    path: &RootedRolePath<R, IndexRoot>
-) -> Vec<PathStep> {
-    use context_trace::HasChildPath;
-
-    let child_path = path.child_path();
-    let mut steps = Vec::with_capacity(child_path.len() + 1);
-
-    steps.push(PathStep {
-        pattern_location: path.root_pattern_location(),
-        sub_index: path.role_path().root_child_index(),
-    });
-
-    for loc in child_path.iter().copied() {
-        steps.push(PathStep {
-            pattern_location: loc.into_pattern_location(),
-            sub_index: loc.sub_index,
-        });
-    }
-
-    steps
-}
-
-fn shared_overlap_token(
+/// Look up an entire token matching a nonempty pattern without
+/// materialization.
+///
+/// Returns `None` for absent or partial matches; unexpected search errors
+/// panic.
+pub fn find_complete(
     graph: &HypergraphRef,
-    path: &IndexStartPath,
-) -> Token {
-    path.role_leaf_token::<Start, _>(graph)
-        .or_else(|| path.leaf_token(graph))
-        .or_else(|| Some(path.graph_root_child(graph)))
-        .expect("overlap path should always identify a shared overlap token")
-}
-
-fn join_non_empty<const N: usize>(
-    graph: &HypergraphRef,
-    parts: [Option<Token>; N],
+    pattern: &Pattern,
 ) -> Option<Token> {
-    let collected: Vec<Token> = parts.into_iter().flatten().collect();
-    join_non_empty_vec(graph, collected)
+    if pattern.len() == 1 {
+        return Some(pattern[0]);
+    }
+    let width: usize = pattern.iter().map(|t| t.width().0).sum();
+    match graph.find_ancestor(pattern.to_vec()) {
+        Ok(response)
+            if response.query_exhausted()
+                && response.is_entire_root()
+                && response.root_token().width().0 == width =>
+            Some(response.root_token()),
+        Ok(_)
+        | Err(
+            ErrorReason::SingleIndex(_)
+            | ErrorReason::NoParents
+            | ErrorReason::NotFound,
+        ) => None,
+        Err(error) => panic!("closure content lookup failed: {:?}", error),
+    }
 }
 
-fn join_non_empty_vec(
-    graph: &HypergraphRef,
-    parts: Vec<Token>,
-) -> Option<Token> {
-    match parts.len() {
-        0 => None,
-        1 => Some(parts[0]),
-        _ => Some(graph.insert_pattern(parts)),
-    }
+fn boundaries(pattern: &Pattern) -> std::collections::BTreeSet<usize> {
+    let mut width = 0;
+    pattern
+        .iter()
+        .take(pattern.len() - 1)
+        .map(|token| {
+            width += token.width().0;
+            width
+        })
+        .collect()
 }

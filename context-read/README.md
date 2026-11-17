@@ -18,7 +18,8 @@ data with structural overlap closure and ownership-safe accumulation.
   - `root.rs`: Ownership-safe accumulation sink
 - **`expansion/`**: Graph expansion operations
   - `mod.rs`: Root-first postfix search and forward steps
-  - `closure.rs`: Path-based factored overlap closure
+  - `closure.rs`: Closure bound/policy selection and sink integration
+    (the closure executor is `context_insert::Overlap`)
   - `block.rs`: Immediate commit orchestration
 - **`input.rs`**: Input conversion
 - **`segment.rs`**: Known/unknown atom block iteration
@@ -44,7 +45,9 @@ graph changes, and algorithm responsibilities.
 
 `ExpansionCtx` searches eligible postfix tokens of the latest committed root,
 largest-first, for an expansion into the remaining known block. Candidate
-searches are read-only; only the accepted match is materialized. Without an
+searches are read-only; the accepted probe response is materialized directly,
+without searching its query again, and the traversal's frames to the shared
+token are translated through the materialization's publication. Without an
 extending postfix, expansion consumes the largest forward match.
 
 `BlockExpansionCtx` immediately commits each span through `RootManager::commit`
@@ -65,12 +68,14 @@ separate local anchor or pending overlap chain.
 
 After materialization, closure recomputes editability. For an editable root it
 closes around the entire last child; otherwise around the root. With
-`X=L+P` and `E=P+T`, every postfix token `Si` of `X`'s widest-postfix chain
-with `|P| < |Si| <= |X|` is closed bottom-up with the expansion:
+`X=L+P` and `E=P+T`, every retained anchor frame `Si` (the widest-postfix
+chain at traversal) with `|P| < |Si| <= |X|` is closed bottom-up with the
+expansion by `context_insert::Overlap::close`:
 `Ci = [Si,T] = [Li,C(i-1)]`, `C0 = E`; the final binary `Ck` is committed.
-Complements `Li` and `T` are canonical tokens represented inside their scopes
-(`Li` at offset 0 of `Si`, `T` at offset `|P|` of `E`); missing ones are created
-by scope-restricted insertion, which rewrites the scope's decompositions.
+Complements `Li` and `T` are read from the frames' siblings (a single sibling
+is used directly) or resolved by scope-restricted insertion, which rewrites
+the scope's decompositions; remaining frames are translated through each
+resolution's publication.
 Whole-child overlaps can replace the tail directly. Self-overlap freezes the
 root and uses whole-root closure, preventing cycles.
 

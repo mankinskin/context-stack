@@ -17,6 +17,7 @@ use crate::{
 };
 use context_search::{
     AncestorPolicy,
+    Response,
     BftQueue,
     ErrorState,
     SearchKind,
@@ -25,7 +26,11 @@ use context_search::{
 use context_trace::*;
 
 use crate::insert::{
-    outcome::InsertOutcome,
+    outcome::{
+        InsertOutcome,
+        Materialization,
+    },
+    publication::Publication,
     result::InsertResult,
 };
 
@@ -90,6 +95,16 @@ impl<R: InsertResult> InsertCtx<R> {
         ext: R::Extract,
         init: InitInterval,
     ) -> Result<R, ErrorState> {
+        let (joined, _) = self.insert_init_published(init)?;
+        Ok(R::build_with_extract(joined, ext))
+    }
+
+    /// Split, join and publish an interval, returning the target token and
+    /// the edits needed to translate locations recorded before publication.
+    pub(crate) fn insert_init_published(
+        &self,
+        init: InitInterval,
+    ) -> Result<(Token, Publication), ErrorState> {
         use crate::visualization::emit_insert_node_with_delta;
         use context_trace::graph::visualization::{
             DeltaOp,
@@ -100,7 +115,8 @@ impl<R: InsertResult> InsertCtx<R> {
         let plan = self.plan_init(init)?;
 
         // Single publication boundary: the graph is only mutated here.
-        let joined = publish(&self.graph, select(&self.graph, plan));
+        let (joined, publication) =
+            publish(&self.graph, select(&self.graph, plan));
 
         // Emit: Join complete — include delta for the result node
         emit_insert_node_with_delta(
@@ -115,7 +131,7 @@ impl<R: InsertResult> InsertCtx<R> {
             }),
         );
 
-        Ok(R::build_with_extract(joined, ext))
+        Ok((joined, publication))
     }
 
     /// Split and plan an insertion without mutating the graph.
@@ -255,69 +271,59 @@ impl<R: InsertResult> InsertCtx<R> {
         }
     }
 
-    /// Core implementation for `insert_next_match`.
-    ///
-    /// Unlike `insert_impl`, this method:
-    /// - Always returns `IndexWithPath` (no generics)
-    /// - Distinguishes `Complete` vs `NoExpansion` (no `TryInitWith` encoding)
-    /// - Carries the search `Response` in every variant
+    /// Core implementation for `insert_next_match`: search, then
+    /// materialize the response.
     fn insert_next_match_impl(
         &mut self,
         searchable: impl Searchable<InsertTraversal>,
     ) -> Result<InsertOutcome, ErrorState> {
-        match searchable.search(self.graph.clone()) {
-            Ok(result) => {
-                if result.is_entire_root() && result.query_exhausted() {
-                    // ── Complete ──
-                    // Query fully matched an existing token. No insertion needed.
-                    let query_path = result.query_cursor().path().clone();
-                    let root_token = result.root_token();
-                    let response = result; // MOVE — no clone
+        let response = searchable.search(self.graph.clone())?;
+        self.materialize(response).map(|m| m.outcome)
+    }
 
-                    Ok(InsertOutcome::Complete {
-                        result: IndexWithPath {
-                            index: root_token,
-                            path: query_path,
-                        },
-                        response,
-                    })
-                } else if result.is_entire_root() && !result.query_exhausted() {
-                    // ── NoExpansion ──
-                    // Found a complete token at start, but query extends beyond.
-                    let root_token = result.root_token();
-                    let query_path = result.query_cursor().path().clone();
-                    let response = result; // MOVE — no clone
-
-                    Ok(InsertOutcome::NoExpansion {
-                        result: IndexWithPath {
-                            index: root_token,
-                            path: query_path,
-                        },
-                        response,
-                    })
-                } else {
-                    // ── Created ──
-                    // Partial match — need to insert via split+join.
-                    let response = result.clone(); // CLONE — needed because InitInterval consumes result
-                    let query_path = result.query_cursor().path().clone();
-                    let extract =
-                        <R::Extract as ResultExtraction>::extract_from(&result);
-                    let init = InitInterval::from(result); // MOVE — consumes result
-
-                    let new_token: R = self.insert_init(extract, init)?;
-                    let token: Token = new_token.into();
-
-                    Ok(InsertOutcome::Created {
-                        result: IndexWithPath {
-                            index: token,
-                            path: query_path,
-                        },
-                        response,
-                    })
-                }
-            },
-            Err(err) => Err(err),
+    /// Materialize an already accepted search response without searching
+    /// its query again.
+    ///
+    /// - `Complete`: the query exactly matches an existing token.
+    /// - `NoExpansion`: an existing token matches a proper prefix of the
+    ///   query.
+    /// - `Created`: the matched range is split and joined into a new token.
+    ///
+    /// The returned [`Publication`] is empty unless a token was created.
+    /// `IndexWithPath::path` is the *query* cursor path, not a graph path.
+    pub fn materialize(
+        &self,
+        response: Response,
+    ) -> Result<Materialization, ErrorState> {
+        let query_path = response.query_cursor().path().clone();
+        if response.is_entire_root() {
+            let result = IndexWithPath {
+                index: response.root_token(),
+                path: query_path,
+            };
+            let outcome = if response.query_exhausted() {
+                InsertOutcome::Complete { result, response }
+            } else {
+                InsertOutcome::NoExpansion { result, response }
+            };
+            return Ok(Materialization {
+                outcome,
+                publication: Publication::default(),
+            });
         }
+        // InitInterval consumes the response; keep it for the outcome.
+        let (token, publication) =
+            self.insert_init_published(InitInterval::from(response.clone()))?;
+        Ok(Materialization {
+            outcome: InsertOutcome::Created {
+                result: IndexWithPath {
+                    index: token,
+                    path: query_path,
+                },
+                response,
+            },
+            publication,
+        })
     }
 }
 

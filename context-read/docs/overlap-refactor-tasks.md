@@ -241,3 +241,18 @@ Separate tasks, outside this refactor:
   completed.
 - [ ] **Existing read/search expectations:** investigate the three remaining
   legacy read failures without weakening canonical occurrence/boundary checks.
+
+### Overlap provider migration (2026-11-16)
+
+See [the migration plan](../agents/plans/20261116_PLAN_OVERLAP_PROVIDER_MIGRATION.md).
+
+- [x] Materialize the accepted probe response without searching again.
+- [x] Return `Publication` evidence from `publish`; translate retained anchor
+  frames instead of reconnecting them by DFS.
+- [x] Resolve complements from frame siblings through
+  `insert::scoped::scope_complement`.
+- [x] Close overlaps with the single executor `context_insert::Overlap`; read
+  keeps only bound/policy selection and sink integration.
+- [x] Retire `bundle_overlap`, `OverlapBundleInput` and `PartitionOutcome`.
+- [ ] Affected-host completion (plan phase 4).
+- [ ] Historical-pattern retention (plan phase 5).

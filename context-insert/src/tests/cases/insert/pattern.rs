@@ -262,7 +262,7 @@ fn publish_composes_replacements_in_one_pattern() {
     }
     plan.target = Some(y);
 
-    let y = publish(&graph, plan);
+    let (y, _) = publish(&graph, plan);
     let g = graph.graph();
 
     let root_patterns = g.expect_child_patterns(root);

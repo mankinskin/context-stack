@@ -12,6 +12,9 @@ pub(crate) mod tests;
 pub use crate::{
     insert::{
         InsertOutcome,
+        Materialization,
+        Publication,
+        RangeReplacement,
         ToInsertCtx,
         context::InsertCtx,
         result::InsertResult,
@@ -21,9 +24,8 @@ pub use crate::{
         init::InitInterval,
     },
     overlap::{
-        OverlapBundleInput,
-        PartitionOutcome,
-        bundle_overlap,
+        ClosurePolicy,
+        Overlap,
     },
     split::{
         TraceBack,

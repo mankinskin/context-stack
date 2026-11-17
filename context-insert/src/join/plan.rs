@@ -29,9 +29,16 @@ use std::{
 
 use context_trace::*;
 
-use crate::split::{
-    cache::position::PosKey,
-    provenance::SplitProvenance,
+use crate::{
+    insert::publication::{
+        Publication,
+        PublicationStage,
+        RangeReplacement,
+    },
+    split::{
+        cache::position::PosKey,
+        provenance::SplitProvenance,
+    },
 };
 
 /// Identifier of a planned (not yet materialized) vertex.
@@ -460,11 +467,13 @@ impl NodeOverlay {
 /// Candidates are inserted children-first; edits to existing vertices are
 /// applied afterwards. Range replacements in the same original pattern are
 /// composed from their original index ranges (outermost wins) and applied
-/// right-to-left so earlier indices stay valid.
+/// right-to-left so earlier indices stay valid. The returned [`Publication`]
+/// records the composed replacements and created vertices, so locations
+/// known before publication can be translated.
 pub(crate) fn publish(
     graph: &Hypergraph,
     plan: JoinPlan,
-) -> Token {
+) -> (Token, Publication) {
     let mut tokens: Vec<Option<Token>> = vec![None; plan.candidates.len()];
     for index in 0..plan.candidates.len() {
         materialize(graph, &plan, index, &mut tokens);
@@ -497,25 +506,36 @@ pub(crate) fn publish(
             }
         }
     }
+    let mut stage = PublicationStage {
+        created: tokens.iter().flatten().copied().collect(),
+        ..Default::default()
+    };
     for ((target, pid), group) in replacement_groups {
         let mut outermost = compose_replacements(group);
         outermost.sort_by(|a, b| b.0.start.cmp(&a.0.start));
         for (range, r) in outermost {
-            graph.replace_in_pattern(
-                target.to_pattern_location(pid),
+            let location = target.to_pattern_location(pid);
+            let token = resolve(r);
+            graph.replace_in_pattern(location, range.clone(), vec![token]);
+            stage.replacements.push(RangeReplacement {
+                location,
                 range,
-                vec![resolve(r)],
-            );
+                token,
+            });
         }
     }
     for edit in &plan.edits {
         if let PlanEdit::AddPattern { target, pattern } = edit {
             let pattern: Pattern =
                 pattern.refs.iter().map(|r| resolve(*r)).collect();
-            graph.add_pattern_with_update(*target, pattern);
+            let id = graph.add_pattern_with_update(*target, pattern);
+            stage.added.push(target.to_pattern_location(id));
         }
     }
-    resolve(plan.target.expect("plan has no target"))
+    (
+        resolve(plan.target.expect("plan has no target")),
+        Publication::from(stage),
+    )
 }
 
 /// Keep only the outermost replacements; later proposals win ties.

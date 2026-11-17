@@ -1,14 +1,22 @@
 name: overlap
-description: Structural overlap bundling and partition extraction helpers
+description: Graph-only structural closure of an accepted overlap from retained anchor and expansion frames
 
 files:
   - name: mod.rs
-    description: OverlapBundleInput, PartitionOutcome, and bundle_overlap entry points
+    description: Overlap, ClosurePolicy, Overlap::close, prefix_frames and find_complete
 
 key_types:
-  - OverlapBundleInput: Input bundle describing the anchor path, overlap path, and participating tokens
-  - PartitionOutcome: Outcome of extracting one side of the structural overlap partition
-  - bundle_overlap: Entry point for collapsing an overlap into a bundled token
+  - Overlap: Closure bound X, its postfix frames to the shared token P, the expansion E and its prefix frames to P
+  - ClosurePolicy: Nested closes every retained frame from P outward; SingleStep closes X with E in one step (self-expansion)
+  - Overlap::close: Resolves T once, unwinds frames inner to outer (Ci = [Si,T] = [Li,C(i-1)]), translating remaining frames through each Publication
+  - prefix_frames: Widest-first-child frames from a token to its prefix
+  - find_complete: Read-only structured lookup of an entire token for a pattern
+
+notes:
+  - Complements are resolved by insert::scoped::scope_complement; a single sibling is used directly
+  - Frames are never rediscovered by search or DFS; stale locations are translated through Publication
+  - Root ownership and installation remain with the caller (context-read's RootManager)
+  - Affected-host completion and historical-pattern retention (plan phases 4-5) are not implemented
 
 source_files:
   - src/overlap/mod.rs

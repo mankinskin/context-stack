@@ -66,16 +66,8 @@ impl ExpansionCtx {
         }
         if let Some(root) = self.root {
             assert_eq!(sink.root, Some(root), "expansion root is stale");
-            if let Some((postfix, path, expansion)) = self.expand_root(root) {
-                let consumed = expansion.width().0 - postfix.width().0;
-                let plan = closure::prepare(
-                    &self.graph,
-                    sink,
-                    root,
-                    postfix,
-                    &path,
-                    expansion,
-                );
+            if let Some((consumed, accepted)) = self.expand_root(root) {
+                let plan = closure::prepare(&self.graph, sink, accepted);
                 let span = plan.apply(&self.graph);
                 assert_eq!(
                     sink.root,
@@ -95,7 +87,7 @@ impl ExpansionCtx {
         let token = self.match_forward();
         self.cursor += token.width().0;
         if let Some(previous) = sink.root {
-            if let Some(root) = closure::find_complete(
+            if let Some(root) = context_insert::overlap::find_complete(
                 &self.graph,
                 &Pattern::from(vec![previous, token]),
             ) {
@@ -135,12 +127,17 @@ impl ExpansionCtx {
 
     /// Find the first extending postfix, largest-first, within the block seam.
     ///
-    /// Return the shared token, its reconnected root path, and the materialized
-    /// expansion. Rejected probes do not mutate the graph.
+    /// The traversal selects the shared token and its occurrence; the probe
+    /// response of the first match consuming new input is materialized
+    /// without searching its query again. Anchor frames are translated
+    /// through that materialization's publication, joined by wider postfixes
+    /// it created; expansion frames are projected from the search trace. Returns the consumed
+    /// width and the accepted evidence. Rejected probes do not mutate the
+    /// graph.
     fn expand_root(
         &self,
         root: Token,
-    ) -> Option<(Token, Vec<ChildLocation>, Token)> {
+    ) -> Option<(usize, closure::Accepted)> {
         if self.cursor == 0 {
             return None;
         }
@@ -152,8 +149,8 @@ impl ExpansionCtx {
             }
             let mut query = vec![postfix];
             query.extend_from_slice(&self.atoms[self.cursor..]);
-            let matched = match self.graph.find_ancestor(query.clone()) {
-                Ok(response) => usize::from(response.checkpoint_position()),
+            let response = match self.graph.find_ancestor(query) {
+                Ok(response) => response,
                 Err(
                     ErrorReason::SingleIndex(_)
                     | ErrorReason::NoParents
@@ -161,6 +158,7 @@ impl ExpansionCtx {
                 ) => continue,
                 Err(error) => panic!("root postfix search failed: {:?}", error),
             };
+            let matched = usize::from(response.checkpoint_position());
             if matched <= postfix.width().0 {
                 continue;
             }
@@ -168,30 +166,40 @@ impl ExpansionCtx {
                 matched <= postfix.width().0 + self.atoms.len() - self.cursor,
                 "root expansion extends beyond the block"
             );
-            closure::validate_path(&self.graph, root, postfix, &path, false);
-            let expansion =
-                match ToInsertCtx::<IndexWithPath>::insert_next_match(
-                    &self.graph,
-                    query,
-                ) {
-                    Ok(outcome) => outcome.token(),
-                    Err(error) => panic!(
-                        "root expansion materialization failed: {:?}",
-                        error
-                    ),
-                };
+            let materialized =
+                ToInsertCtx::<IndexWithPath>::materialize(&self.graph, response)
+                    .unwrap_or_else(|error| {
+                        panic!(
+                            "root expansion materialization failed: {:?}",
+                            error
+                        )
+                    });
+            let expansion = materialized.outcome.token();
             assert_eq!(
                 expansion.width().0,
                 matched,
                 "materialization changed the accepted match"
             );
-            // Splitting the accepted match can rewrite the anchor's decomposition.
-            let path =
-                closure::boundary_path(&self.graph, root, postfix, false)
-                    .expect(
-                    "materialized root must still represent the shared postfix",
+            // Wider postfixes created by materialization join the chain.
+            let anchor_path = materialized.publication.translate_chain(
+                &self.graph,
+                &path,
+                postfix,
+                false,
+            );
+            let expansion_path =
+                materialized.prefix_path(&self.graph).expect(
+                    "search evidence must connect the expansion to the shared token",
                 );
-            return Some((postfix, path, expansion));
+            return Some((
+                matched - postfix.width().0,
+                closure::Accepted {
+                    root,
+                    anchor_path,
+                    expansion,
+                    expansion_path,
+                },
+            ));
         }
         None
     }

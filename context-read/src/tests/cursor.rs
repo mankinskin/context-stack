@@ -648,9 +648,13 @@ fn closure_uses_connected_shared_token_paths() {
     let cdab = graph.insert_pattern(vec![cd, ab]);
     let mut sink = RootManager::new(graph.clone());
     sink.append_completed(abcd);
-    let path = closure::boundary_path(&graph, abcd, cd, false).unwrap();
     let span =
-        closure::prepare(&graph, &sink, abcd, cd, &path, cdab).apply(&graph);
+        closure::prepare(
+        &graph,
+        &sink,
+        closure::accept(&graph, abcd, cd, cdab),
+    )
+    .apply(&graph);
     let result = sink.commit(span).root;
 
     assert_patterns!(
@@ -677,10 +681,10 @@ fn closure_closes_nested_suffix_before_outer_scope() {
 
     let mut sink = RootManager::new(graph.clone());
     sink.append_completed(abc);
-    let path = closure::boundary_path(&graph, abc, c, false).unwrap();
-    assert_eq!(path.len(), 2);
+    let accepted = closure::accept(&graph, abc, c, cd);
+    assert_eq!(accepted.anchor_path.len(), 2);
 
-    let span = closure::prepare(&graph, &sink, abc, c, &path, cd).apply(&graph);
+    let span = closure::prepare(&graph, &sink, accepted).apply(&graph);
     let abcd = sink.commit(span).root;
     assert_eq!(graph.index_string(abcd), "abcd");
     crate::tests::assert_graph_invariants(&graph);
@@ -951,9 +955,13 @@ fn closure_preserves_entire_last_child_and_canonical_complement() {
     sink.append_completed(x);
     sink.append_completed(wabc);
     let root = sink.root.unwrap();
-    let path = closure::boundary_path(&graph, root, bc, false).unwrap();
     let span =
-        closure::prepare(&graph, &sink, root, bc, &path, bcd).apply(&graph);
+        closure::prepare(
+        &graph,
+        &sink,
+        closure::accept(&graph, root, bc, bcd),
+    )
+    .apply(&graph);
     sink.commit(span);
     let root = sink.root.unwrap();
     let wabcd = *root
@@ -994,10 +1002,9 @@ fn closure_replaces_whole_tail_without_allocating_a_token() {
     sink.append_completed(x);
     sink.append_completed(ab);
     let root = sink.root.unwrap();
-    let path = closure::boundary_path(&graph, root, ab, false).unwrap();
+    let accepted = closure::accept(&graph, root, ab, abcd);
     let count = graph.vertex_count();
-    let span =
-        closure::prepare(&graph, &sink, root, ab, &path, abcd).apply(&graph);
+    let span = closure::prepare(&graph, &sink, accepted).apply(&graph);
     assert_eq!(
         span,
         Span::ReplaceTail {
@@ -1026,9 +1033,9 @@ fn closure_reuses_existing_canonical_result() {
     let abc = graph.insert_patterns(vec![vec![ab, c], vec![a, bc]]);
     let mut sink = RootManager::new(graph.clone());
     sink.append_completed(ab);
-    let path = closure::boundary_path(&graph, ab, b, false).unwrap();
+    let accepted = closure::accept(&graph, ab, b, bc);
     let count = graph.vertex_count();
-    let span = closure::prepare(&graph, &sink, ab, b, &path, bc).apply(&graph);
+    let span = closure::prepare(&graph, &sink, accepted).apply(&graph);
     assert_eq!(
         span,
         Span::ReplaceRoot {
@@ -1060,9 +1067,13 @@ fn closure_represents_nested_complements_inside_their_scopes() {
     sink.append_completed(x);
     sink.append_completed(wabc);
     let root = sink.root.unwrap();
-    let path = closure::boundary_path(&graph, root, bc, false).unwrap();
     let span =
-        closure::prepare(&graph, &sink, root, bc, &path, bcdef).apply(&graph);
+        closure::prepare(
+        &graph,
+        &sink,
+        closure::accept(&graph, root, bc, bcdef),
+    )
+    .apply(&graph);
     sink.commit(span);
     let root = sink.root.unwrap();
     let wabcdef = *root
@@ -1111,9 +1122,13 @@ fn closure_materializes_left_complement_inside_flat_tail() {
     sink.append_completed(x);
     sink.append_completed(vis);
     let root = sink.root.unwrap();
-    let path = closure::boundary_path(&graph, root, s, false).unwrap();
     let span =
-        closure::prepare(&graph, &sink, root, s, &path, su).apply(&graph);
+        closure::prepare(
+        &graph,
+        &sink,
+        closure::accept(&graph, root, s, su),
+    )
+    .apply(&graph);
     assert!(
         matches!(span, Span::ReplaceTail { previous, old, .. } if previous == root && old == vis)
     );

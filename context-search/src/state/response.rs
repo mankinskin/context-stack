@@ -116,6 +116,29 @@ impl Response {
         self.end.cursor.checkpoint().atom_position
     }
 
+    /// Locations from a whole-root match to the start of the query.
+    ///
+    /// Starts with the matched root decomposition and its start entry,
+    /// followed by the recorded start path. Trailing frames at the start
+    /// border (first children) were simplified away by the search, so the
+    /// remaining occurrence lies at offset 0 of the last returned child.
+    /// Returns `None` unless the match covers its entire root.
+    pub fn entire_root_start_path(&self) -> Option<Vec<ChildLocation>> {
+        match &self.end.path {
+            PathCoverage::EntireRoot(path) => {
+                let root = path.root_pattern_location();
+                let mut locations = vec![ChildLocation::new(
+                    root.parent,
+                    root.pattern_id,
+                    path.role_root_child_index::<Start>(),
+                )];
+                locations.extend(path.start_path().path().iter().copied());
+                Some(locations)
+            },
+            _ => None,
+        }
+    }
+
     /// Get the collected transitions (event kinds) in emission order.
     ///
     /// Useful for test assertions:
