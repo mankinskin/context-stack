@@ -24,11 +24,7 @@ use crate::{
         Corpus,
         StatusHandle,
     },
-};
-use context_trace::Hypergraph;
-use std::collections::{
-    BTreeMap,
-    BTreeSet,
+    output::GraphData,
 };
 
 struct RootOrder<'a> {
@@ -78,28 +74,6 @@ impl TraversalPass for RootOrder<'_> {
     }
 }
 
-fn canonical(graph: &Hypergraph) -> BTreeMap<String, BTreeSet<Vec<String>>> {
-    let mut result = BTreeMap::new();
-    for key in graph.vertex_keys() {
-        let text = graph.vertex_key_string(&key);
-        let patterns = graph
-            .expect_child_patterns(key)
-            .values()
-            .map(|pattern| {
-                pattern
-                    .iter()
-                    .map(|child| graph.index_string(*child))
-                    .collect()
-            })
-            .collect();
-        assert!(
-            result.insert(text.clone(), patterns).is_none(),
-            "duplicate token content: {text:?}"
-        );
-    }
-    result
-}
-
 #[test]
 fn partitions_are_independent_of_root_hash_iteration_order() {
     let texts = ["subdivision", "visualization"];
@@ -132,7 +106,8 @@ fn partitions_are_independent_of_root_hash_iteration_order() {
             reverse,
         };
         pass.run().unwrap();
-        canonical(&pass.inner.graph)
+        GraphData::from_graph(&pass.inner.graph)
+            .expect("partition graph must be structurally valid")
     };
 
     pretty_assertions::assert_eq!(
