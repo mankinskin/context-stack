@@ -61,6 +61,7 @@ use crate::graph::{
         NodePartitionCtx,
         PartitionsCtx,
     },
+    trace,
     traversal::{
         direction::{
             TopDown,
@@ -138,8 +139,12 @@ impl TraversalPass for ChildDedupPass<'_> {
             //self.roots.iter()
             //    .map(|&root| (0, NGramId::new(root, self.ctx.vocab.expect_vertex(&root).width())))
             self.roots.iter().flat_map(|(root, tree)| {
-                self.ctx.labels_mut().insert(*root);
-                TopDown::next_nodes(&self.ctx.vocab().expect_vertex(root))
+                let inserted = self.ctx.labels_mut().insert(*root);
+                let entry = self.ctx.vocab().expect_vertex(root);
+                if inserted {
+                    trace::labelled_gap(&entry.ngram);
+                }
+                TopDown::next_nodes(&entry)
                     .into_iter()
                     .map(|(p, n)| (*root, p, n))
             }),
@@ -183,7 +188,14 @@ impl TraversalPass for ChildDedupPass<'_> {
                         (!other_trees.iter().any(|r| r.visited.contains(&node)))
                             .then_some(())
                             .or_else(|| {
-                                self.ctx.labels_mut().insert(node.vertex_key());
+                                if self.ctx.labels_mut().insert(node.vertex_key()) {
+                                    trace::labelled_shared_descendant(
+                                        self.ctx.vocab(),
+                                        node,
+                                        root,
+                                        off,
+                                    );
+                                }
                                 tree.cover.insert(off, node);
                                 None
                             })

@@ -61,6 +61,7 @@ use crate::{
 pub(crate) mod containment;
 pub(crate) mod labelling;
 pub(crate) mod partitions;
+pub(crate) mod trace;
 pub mod traversal;
 pub(crate) mod utils;
 pub mod vocabulary;

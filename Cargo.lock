@@ -5496,6 +5496,7 @@ dependencies = [
  "tap",
  "tokio",
  "tokio-util",
+ "tracing",
  "web-sys",
 ]
 

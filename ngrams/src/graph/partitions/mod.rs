@@ -20,6 +20,7 @@ use tokio_util::sync::CancellationToken;
 use crate::graph::{
     labelling::LabellingCtx,
     partitions::container::PartitionContainer,
+    trace,
     traversal::{
         direction::{
             TopDown,
@@ -174,8 +175,10 @@ impl TraversalPass for PartitionsCtx<'_> {
         node: &NGramId,
     ) -> RunResult<Option<Vec<Self::NextNode>>> {
         *self.status.steps_mut() += 1;
-        let container = PartitionContainer::from_ngram(self, *node);
         let entry = self.vocab().get_vertex(node).unwrap();
+        let _span = trace::partition_span(&entry.ngram).entered();
+        let container = PartitionContainer::from_ngram(self, *node);
+        trace::partition_patterns(self.vocab(), &entry.ngram, &container);
 
         let pids: Vec<_> = std::iter::repeat_n((), container.len())
             .map(|_| PatternId::default())

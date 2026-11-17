@@ -77,3 +77,22 @@ cargo test --release -p ngrams --test cli
 # Currently fails on the known order-dependence regression:
 cargo test --release -p ngrams --lib
 ```
+
+### Trace the root-order regression
+
+```bash
+NGRAMS_TRACE_DIR="$PWD/target/ngrams-traces" \
+  cargo test --release -p ngrams --lib \
+  partitions_are_independent_of_root_hash_iteration_order -- --nocapture
+```
+
+This writes `subdivision-first.jsonl` and `visualization-first.jsonl` in the
+reader's trace format, even though the equality assertion still fails. Files
+with those names are overwritten on each run. Set an absolute directory path
+to avoid resolving it relative to the crate's test working directory.
+
+Each file records the root queue and the partition events, including positioned
+child-cover choices, constructed patterns, and new labels. Compare the
+`built partition patterns` events for `vis` and `visu`: in the
+`visualization`-first run, `visu` labels the gap `vi` before `vis` chooses its
+children. Event definitions live in [the graph tracing module](src/graph/trace.rs).

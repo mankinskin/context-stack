@@ -55,6 +55,7 @@ use crate::graph::{
         NodePartitionCtx,
         PartitionsCtx,
     },
+    trace,
     traversal::{
         direction::{
             TopDown,
@@ -131,10 +132,12 @@ impl TraversalPass for ChildCoverPass<'_> {
         Ok(if self.cover.any_covers(off, node) {
             None
         } else if self.ctx.labels().contains(&node) {
+            trace::selected_child(self.ctx.vocab(), node, off);
             self.cover.insert(off, node);
             None
         } else {
             let ne = self.ctx.vocab().get_vertex(&node).unwrap();
+            trace::descend_through_child(&ne.ngram, off);
             // Child offsets are local to node; translate them back to the root.
             Some(
                 TopDown::next_nodes(&ne)

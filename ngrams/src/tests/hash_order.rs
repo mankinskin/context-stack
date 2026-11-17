@@ -3,6 +3,10 @@
 //! Both runs start from one cloned semantic state. With two roots, sorting and
 //! reversing exercises every root permutation without relying on randomized hashes.
 
+use std::path::PathBuf;
+
+use context_trace::logging::build_capture_dispatch;
+
 use super::TestCorpus;
 use crate::{
     cancellation::Cancellation,
@@ -12,6 +16,7 @@ use crate::{
             LabellingImage,
         },
         partitions::PartitionsCtx,
+        trace,
         traversal::{
             pass::{
                 RunResult,
@@ -62,6 +67,7 @@ impl TraversalPass for RootOrder<'_> {
         if self.reverse {
             roots.reverse();
         }
+        trace::scheduled_roots(self.ctx().vocab(), &roots);
         Ok(roots.into_iter().collect())
     }
 
@@ -85,6 +91,25 @@ impl TraversalPass for RootOrder<'_> {
     fn finish_run(&mut self) -> RunResult<()> {
         self.inner.finish_run()
     }
+}
+
+fn with_partition_trace<T>(reverse: bool, run: impl FnOnce() -> T) -> T {
+    let Some(dir) = std::env::var_os("NGRAMS_TRACE_DIR") else {
+        return run();
+    };
+    let file = if reverse {
+        "visualization-first.jsonl"
+    } else {
+        "subdivision-first.jsonl"
+    };
+    let path = PathBuf::from(dir).join(file);
+    let capture = build_capture_dispatch(&path, "ngrams=trace")
+        .unwrap_or_else(|err| {
+            panic!("could not open trace {}: {err}", path.display())
+        });
+    let result = tracing::dispatcher::with_default(&capture.dispatch, run);
+    eprintln!("Partition trace: {}", path.display());
+    result
 }
 
 /// Require structurally valid, content-keyed graphs to match for both root orders.
@@ -123,7 +148,7 @@ fn partitions_are_independent_of_root_hash_iteration_order() {
             inner: PartitionsCtx::from(&mut ctx),
             reverse,
         };
-        pass.run().unwrap();
+        with_partition_trace(reverse, || pass.run()).unwrap();
         GraphData::from_graph(&pass.inner.graph)
             .expect("partition graph must be structurally valid")
     };
