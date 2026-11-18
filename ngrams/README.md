@@ -71,6 +71,8 @@ Sorting JSON does not fix that defect, and these structural checks do not prove
 semantic completeness. The active regression
 `partitions_are_independent_of_root_hash_iteration_order` exposes it.
 Do not treat generated graphs as uniquely correct until it is resolved.
+The planned fix is described in
+[the positioned composition plan](agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md).
 
 ```bash
 cargo test --release -p ngrams --test cli
