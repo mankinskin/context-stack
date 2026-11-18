@@ -43,7 +43,7 @@ use ngrams::{
     graph::{
         Corpus,
         StatusHandle,
-        parse_corpus,
+        parse_corpus_legacy,
         traversal::pass::CancelReason,
     },
 };
@@ -159,10 +159,15 @@ impl WorkspaceManager {
         Ok(info)
     }
 
-    /// Create a workspace by parsing a text with the slow but canonical ngrams algorithm.
+    /// Create a workspace by parsing a text with the slow legacy row-based ngrams algorithm.
     ///
     /// This is primarily intended for validation workflows against `context-read`.
     /// A timeout is mandatory at call sites and should default to 60s in adapters.
+    ///
+    /// Provisional: this stores a row `HypergraphRef`, so it uses the legacy
+    /// row-based oracle (`ngrams::graph::parse_corpus_legacy`, order-dependent)
+    /// rather than the positioned v3 `parse_corpus`. It moves to positioned
+    /// data together with the workspace persistence format.
     pub fn create_workspace_from_ngrams_text(
         &mut self,
         name: &str,
@@ -193,7 +198,8 @@ impl WorkspaceManager {
             }
         });
 
-        let parse_result = parse_corpus(corpus, status, Arc::clone(&cancelled));
+        let parse_result =
+            parse_corpus_legacy(corpus, status, Arc::clone(&cancelled));
 
         done.store(true, Ordering::SeqCst);
         let _ = watchdog.join();

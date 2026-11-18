@@ -1,0 +1,19 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "aa"
+  ],
+  "vertices": {
+    "a": [],
+    "aa": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "a"
+      ]
+    ]
+  }
+}

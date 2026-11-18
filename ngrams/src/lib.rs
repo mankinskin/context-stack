@@ -1,11 +1,13 @@
 //! Exhaustive n-gram vocabulary construction and selected decomposition graphs.
 //!
-//! The oracle counts substring occurrences, labels frequency tokens and overlap
-//! wrappers, then builds a smaller graph while discovering gap tokens. The
-//! original containment graph and final labels remain available in parse results.
+//! The oracle counts substring occurrences, selects frequency tokens into a
+//! frozen retained set, and publishes every retained vertex's maximal
+//! positioned child occurrences (format v3, see [`output`]). The result does
+//! not depend on traversal or corpus input order.
 //!
-//! Decompositions are currently traversal-order dependent; serialization sorting
-//! does not make the oracle's token-selection process order-independent.
+//! The legacy row-based pipeline ([`graph::parse_corpus_legacy`]) additionally
+//! labels overlap wrappers and gap tokens; its decompositions are
+//! traversal-order dependent.
 
 #![allow(non_snake_case, unused)]
 #![feature(mapped_lock_guards)]

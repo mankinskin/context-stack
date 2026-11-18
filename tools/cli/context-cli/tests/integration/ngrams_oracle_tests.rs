@@ -1,7 +1,7 @@
 //! Ngrams oracle validation tests — Phase 3.1
 //!
 //! For each test string we:
-//!   1. Run `ngrams::graph::parse_corpus` to build the oracle graph.
+//!   1. Run `ngrams::graph::parse_corpus_legacy` to build the oracle graph.
 //!   2. Run `Command::InsertSequence` to build the context-read candidate graph.
 //!   3. Extract a `GraphSnapshot` from each.
 //!   4. Build [`LabelMap`]s from both snapshots.
@@ -20,6 +20,13 @@
 //!
 //! See `20260315_PLAN_NGRAMS_ORACLE_VALIDATION.md` §Execution Steps for the
 //! full plan.
+//!
+//! # Provisional legacy comparison
+//!
+//! These are provisional row comparisons against the *legacy* oracle
+//! (`parse_corpus_legacy`, row `Hypergraph`, order-dependent). The default
+//! `parse_corpus` now returns positioned v3 covers; these comparisons move to
+//! content-keyed v3 equality once the reader produces positioned covers.
 
 use ngrams::{
     Cancellation,
@@ -27,7 +34,7 @@ use ngrams::{
         Corpus,
         Status,
         StatusHandle,
-        parse_corpus,
+        parse_corpus_legacy,
     },
 };
 
@@ -49,7 +56,7 @@ use crate::common::{
 ///
 /// # Steps
 ///
-/// 1. Build oracle via `parse_corpus` (ngrams crate).
+/// 1. Build oracle via `parse_corpus_legacy` (ngrams crate).
 /// 2. Build candidate via `InsertSequence` on a fresh `TestWorkspace`.
 /// 3. Call `to_graph_snapshot()` on the ngrams `Hypergraph`; call
 ///    `get_snapshot()` on the workspace.
@@ -62,9 +69,9 @@ fn oracle_assert(input: &str) {
     let corpus = Corpus::new(format!("oracle-{input}"), texts.clone());
     let status = StatusHandle::from(Status::new(texts));
 
-    let parse_result = parse_corpus(corpus, status, Cancellation::None)
+    let parse_result = parse_corpus_legacy(corpus, status, Cancellation::None)
         .unwrap_or_else(|e| {
-            panic!("ngrams parse_corpus failed for {input:?}: {e:?}")
+            panic!("ngrams parse_corpus_legacy failed for {input:?}: {e:?}")
         });
 
     let oracle_snap = parse_result.graph.to_graph_snapshot();
@@ -282,7 +289,7 @@ fn oracle_slow_abababab() {
 // ---------------------------------------------------------------------------
 // Self-check tests — exercise comparison machinery; NOT RC-1 gated
 //
-// These tests run `parse_corpus` and compare the oracle against *itself*.
+// These tests run `parse_corpus_legacy` and compare the oracle against *itself*.
 // They validate that:
 //   • `label_map_from_snapshot` correctly round-trips a ngrams graph.
 //   • `compare_against_oracle` passes when both sides are identical.
@@ -297,7 +304,7 @@ fn oracle_machinery_self_check_ab() {
     let texts = vec!["ab".to_string()];
     let corpus = Corpus::new("self-check-ab".to_string(), texts.clone());
     let status = StatusHandle::from(Status::new(texts));
-    let result = parse_corpus(corpus, status, Cancellation::None)
+    let result = parse_corpus_legacy(corpus, status, Cancellation::None)
         .expect("ngrams should succeed for 'ab'");
     let snap = result.graph.to_graph_snapshot();
     let map = label_map_from_snapshot(&snap);
@@ -318,7 +325,7 @@ fn oracle_machinery_self_check_abab() {
     let texts = vec!["abab".to_string()];
     let corpus = Corpus::new("self-check-abab".to_string(), texts.clone());
     let status = StatusHandle::from(Status::new(texts));
-    let result = parse_corpus(corpus, status, Cancellation::None)
+    let result = parse_corpus_legacy(corpus, status, Cancellation::None)
         .expect("ngrams should succeed for 'abab'");
     let snap = result.graph.to_graph_snapshot();
     let map = label_map_from_snapshot(&snap);
@@ -343,7 +350,7 @@ fn oracle_machinery_self_check_abcabc() {
     let texts = vec!["abcabc".to_string()];
     let corpus = Corpus::new("self-check-abcabc".to_string(), texts.clone());
     let status = StatusHandle::from(Status::new(texts));
-    let result = parse_corpus(corpus, status, Cancellation::None)
+    let result = parse_corpus_legacy(corpus, status, Cancellation::None)
         .expect("ngrams should succeed for 'abcabc'");
     let snap = result.graph.to_graph_snapshot();
     let map = label_map_from_snapshot(&snap);
@@ -373,7 +380,7 @@ fn oracle_machinery_label_map_roundtrip() {
     let texts = vec!["abab".to_string()];
     let corpus = Corpus::new("roundtrip-abab".to_string(), texts.clone());
     let status = StatusHandle::from(Status::new(texts));
-    let result = parse_corpus(corpus, status, Cancellation::None)
+    let result = parse_corpus_legacy(corpus, status, Cancellation::None)
         .expect("ngrams should succeed for 'abab'");
 
     let snap1 = result.graph.to_graph_snapshot();

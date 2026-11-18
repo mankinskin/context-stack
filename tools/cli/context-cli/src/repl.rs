@@ -1274,7 +1274,7 @@ fn print_help() {
         "  create <name>        Create a new workspace and set it as active"
     );
     println!(
-        "  create-ngrams <name> [--timeout <sec>] <text>  Create workspace from ngrams text (default timeout: 60s)"
+        "  create-ngrams <name> [--timeout <sec>] <text>  Create workspace from text via legacy row-based ngrams oracle (default timeout: 60s)"
     );
     println!(
         "  open <name>          Open a workspace from disk and set it as active"

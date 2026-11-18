@@ -1,7 +1,9 @@
 //! Corpus-to-graph pipeline and shared progress reporting.
 //!
-//! Construction enumerates substrings, selects frequency tokens and overlap
-//! wrappers, then materializes selected decompositions with additional gap labels.
+//! [`parse_corpus`] (v3) enumerates substrings, selects frequency tokens into a
+//! frozen retained set, and composes maximal positioned child covers.
+//! [`parse_corpus_legacy`] keeps the row-based pipeline, which additionally
+//! selects overlap wrappers and materializes decompositions with gap labels.
 
 use std::sync::{
     Arc,
@@ -48,16 +50,21 @@ use crate::{
             LabellingCtx,
             LabellingImage,
         },
-        traversal::pass::RunResult,
+        traversal::pass::{
+            CancelReason,
+            RunResult,
+        },
         vocabulary::{
             entry::HasVertexEntries,
             ProcessStatus,
             Vocabulary,
         },
     },
+    output::PositionedGraphData,
     tests::TestCorpus,
 };
 
+pub(crate) mod composition;
 pub(crate) mod containment;
 pub(crate) mod labelling;
 pub(crate) mod partitions;
@@ -201,6 +208,20 @@ impl Corpus {
         }
     }
 
+    /// Reject an empty corpus or any empty text before enumeration.
+    ///
+    /// Returns `EmptyVocabulary` when no text has an atom, otherwise
+    /// `EmptyText` with the index of the first empty text.
+    pub(crate) fn validate(&self) -> RunResult<()> {
+        if self.texts.iter().all(String::is_empty) {
+            return Err(CancelReason::EmptyVocabulary);
+        }
+        match self.texts.iter().position(String::is_empty) {
+            Some(i) => Err(CancelReason::EmptyText(i)),
+            None => Ok(()),
+        }
+    }
+
     /// Get the storage key for this corpus
     pub(crate) fn storage_key(&self) -> &str {
         &self.name
@@ -210,9 +231,46 @@ impl Corpus {
 pub(crate) type AbortSender = std::sync::mpsc::Sender<()>;
 /// Receiving end of the legacy abort channel.
 pub(crate) type AbortReceiver = std::sync::mpsc::Receiver<()>;
-/// Selected output plus the exhaustive graph and final label identities.
-#[derive(Debug)]
+/// Validated positioned (v3) oracle result.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseResult {
+    /// Maximal positioned covers of every retained vertex.
+    ///
+    /// Its keys are exactly the frozen retained set: corpus roots, atoms, and
+    /// frequency-selected tokens. No wrapper or gap vertices are added.
+    pub graph: PositionedGraphData,
+}
+/// Build a fresh containment vocabulary, select frequency tokens, and compose
+/// positioned covers for that frozen retained set.
+///
+/// Rejects an empty corpus or empty text before enumeration. Never reads or
+/// writes the labelling-image cache and never runs wrapper or partition passes.
+/// The result is structurally validated before return; a failure is reported
+/// as [`CancelReason::InvalidOutput`]. Status reaches
+/// [`ProcessStatus::Finished`] only on success, and no partial graph is
+/// returned on cancellation.
+pub fn parse_corpus(
+    corpus: Corpus,
+    status: StatusHandle,
+    cancellation: impl Into<Cancellation>,
+) -> RunResult<ParseResult> {
+    corpus.validate()?;
+    let texts = corpus.texts.clone();
+    let ctx = LabellingCtx::select_frequency_fresh(corpus, status, cancellation)?;
+    let covers = ctx.compose()?;
+    let graph = PositionedGraphData {
+        vertices: covers.by_content(ctx.vocab()),
+    };
+    graph
+        .validate_for_corpus(&texts)
+        .map_err(CancelReason::InvalidOutput)?;
+    ctx.check_cancelled()?;
+    ctx.status.next_pass(ProcessStatus::Finished, 1, 1);
+    Ok(ParseResult { graph })
+}
+/// Legacy row-based result: selected output plus the exhaustive graph and labels.
+#[derive(Debug)]
+pub struct LegacyParseResult {
     /// Reachable selected tokens and their constructed alternative patterns.
     pub graph: Hypergraph,
     /// All discovered substrings and elementary decompositions.
@@ -220,16 +278,18 @@ pub struct ParseResult {
     /// Selection after all passes, including gap-token discovery.
     pub labels: HashSet<VertexKey>,
 }
-/// Build containment, select frequency tokens and wrappers, then construct patterns.
+/// Legacy pipeline: build containment (or load it from the corpus-name cache),
+/// select frequency tokens and wrappers, then construct row patterns.
 ///
-/// Cancellation is cooperative in traversal passes, not in initial substring
-/// enumeration. Output is currently order-dependent because partitioning can
-/// add labels after earlier nodes have already been decomposed.
-pub fn parse_corpus(
+/// Kept for row-based consumers (v2 fixtures, workspace creation) until they
+/// migrate to positioned covers. Cancellation is cooperative in traversal
+/// passes, not in initial substring enumeration. Output is order-dependent
+/// because partitioning can add labels after earlier nodes were decomposed.
+pub fn parse_corpus_legacy(
     corpus: Corpus,
     mut status: StatusHandle,
     cancellation: impl Into<Cancellation>,
-) -> RunResult<ParseResult> {
+) -> RunResult<LegacyParseResult> {
     let image = LabellingImage::from_corpus(&corpus, &mut status)?;
     let test_corpus = TestCorpus::new(image, corpus);
     let mut ctx = LabellingCtx::new(test_corpus, status, cancellation.into());
@@ -241,7 +301,7 @@ pub fn parse_corpus(
     let graph = ctx.label_part()?;
 
     let LabellingImage { vocab, labels } = ctx.corpus.image;
-    Ok(ParseResult {
+    Ok(LegacyParseResult {
         graph,
         labels,
         containment: vocab.containment,

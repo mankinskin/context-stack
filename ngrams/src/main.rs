@@ -1,4 +1,4 @@
-//! CLI for generating validated complete graphs from inline texts or scenario files.
+//! CLI for generating validated positioned (v3) graphs from inline texts or scenario files.
 //!
 //! Graph JSON goes to stdout in inline mode and to named files in batch mode.
 //! Diagnostics go to stderr; a failed batch may leave earlier successful outputs.
@@ -6,7 +6,7 @@
 use clap::Parser;
 use ngrams::{
     graph::{parse_corpus, Corpus, Status, StatusHandle},
-    output::{GraphData, GraphSnapshot, Scenario, FORMAT_VERSION},
+    output::{PositionedGraphSnapshot, Scenario},
     Cancellation,
 };
 use serde::Deserialize;
@@ -19,7 +19,7 @@ use std::{
     process::ExitCode,
 };
 
-/// Generate a complete n-gram graph for each input corpus.
+/// Generate a positioned n-gram graph (format v3) for each input corpus.
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
@@ -50,8 +50,8 @@ enum Scenarios {
     Many(Vec<Scenario>),
 }
 
-/// Run the oracle for one nonempty corpus and validate its content-keyed output.
-fn generate(name: &str, inputs: Vec<String>) -> Result<GraphSnapshot, Box<dyn Error>> {
+/// Run the oracle for one nonempty corpus and validate its positioned output.
+fn generate(name: &str, inputs: Vec<String>) -> Result<PositionedGraphSnapshot, Box<dyn Error>> {
     if inputs.is_empty() || inputs.iter().any(String::is_empty) {
         return Err(format!("{name}: a corpus must contain nonempty inputs").into());
     }
@@ -61,12 +61,10 @@ fn generate(name: &str, inputs: Vec<String>) -> Result<GraphSnapshot, Box<dyn Er
         Cancellation::None,
     )
     .map_err(|error| format!("oracle failed for {name}: {error:?}"))?;
-    let snapshot = GraphSnapshot {
-        format_version: FORMAT_VERSION,
-        corpus: inputs,
-        graph: GraphData::from_graph(&parsed.graph)?,
-    };
-    snapshot.validate()?;
+    let snapshot = PositionedGraphSnapshot::new(inputs, parsed.graph);
+    snapshot
+        .validate()
+        .map_err(|error| format!("{name}: invalid snapshot: {error}"))?;
     Ok(snapshot)
 }
 

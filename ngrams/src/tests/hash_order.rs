@@ -1,9 +1,14 @@
-//! Regression isolating partition scheduling from earlier label selection.
+//! Order-independence regression for `["subdivision", "visualization"]`.
 //!
-//! Both runs start from one cloned semantic state. With two roots, sorting and
-//! reversing exercises every root permutation without relying on randomized hashes.
+//! The v3 checks hold selection fixed while reversing composition tie order,
+//! then reverse the corpus inputs through the full pipeline. The legacy
+//! partition reproducer is kept, ignored, for diagnostics only: the legacy
+//! pipeline is known to be order-dependent.
 
-use std::path::PathBuf;
+use std::{
+    collections::BTreeSet,
+    path::PathBuf,
+};
 
 use context_trace::logging::build_capture_dispatch;
 
@@ -31,11 +36,75 @@ use crate::{
             NGramId,
             Vocabulary,
         },
+        composition::{
+            compose_with_order,
+            TieOrder,
+        },
+        parse_corpus,
         Corpus,
         StatusHandle,
     },
-    output::GraphData,
+    output::legacy::GraphData,
 };
+
+const TEXTS: [&str; 2] = ["subdivision", "visualization"];
+
+/// Fixed selection: reversing same-width processing leaves covers unchanged.
+#[test]
+fn composition_is_independent_of_tie_order() {
+    let ctx = LabellingCtx::select_frequency_fresh(
+        Corpus::new("root_hash_order", TEXTS),
+        StatusHandle::default(),
+        Cancellation::None,
+    )
+    .unwrap();
+    let run = |order| {
+        compose_with_order(
+            ctx.vocab(),
+            ctx.labels(),
+            &ctx.status,
+            &ctx.cancellation,
+            order,
+        )
+        .unwrap()
+        .by_content(ctx.vocab())
+    };
+    let forward = run(TieOrder::Forward);
+    let reversed = run(TieOrder::Reversed);
+    assert_eq!(
+        forward.keys().collect::<Vec<_>>(),
+        reversed.keys().collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(forward, reversed);
+}
+
+/// Full pipeline: reversed corpus inputs give the same retained set and covers.
+#[test]
+fn parse_corpus_is_independent_of_input_order() {
+    let parse = |texts: [&str; 2]| {
+        parse_corpus(
+            Corpus::new("root_hash_order", texts),
+            StatusHandle::default(),
+            Cancellation::None,
+        )
+        .unwrap()
+        .graph
+    };
+    let forward = parse(TEXTS);
+    let mut reversed_texts = TEXTS;
+    reversed_texts.reverse();
+    let reversed = parse(reversed_texts);
+    let retained = |g: &crate::output::PositionedGraphData| {
+        g.vertices.keys().cloned().collect::<BTreeSet<_>>()
+    };
+    pretty_assertions::assert_eq!(retained(&forward), retained(&reversed));
+    pretty_assertions::assert_eq!(forward, reversed);
+    assert_eq!(
+        forward.vertices["vis"],
+        [(0, "v"), (1, "i"), (2, "s")].map(|(o, c)| (o, c.to_string()))
+    );
+    assert!(!forward.vertices.contains_key("vi"));
+}
 
 /// Partition-pass adapter that changes only the initial root processing order.
 struct RootOrder<'a> {
@@ -112,12 +181,14 @@ fn with_partition_trace<T>(reverse: bool, run: impl FnOnce() -> T) -> T {
     result
 }
 
-/// Require structurally valid, content-keyed graphs to match for both root orders.
+/// Legacy reproducer: require row graphs to match for both root orders.
 ///
-/// Currently exposes the known late-label discovery defect. Equality ignores
-/// graph IDs and pattern ordering but preserves child order within each pattern.
+/// Exposes the known late-label discovery defect of the legacy partition pass.
+/// Equality ignores graph IDs and pattern ordering but preserves child order
+/// within each pattern.
 #[test]
-fn partitions_are_independent_of_root_hash_iteration_order() {
+#[ignore = "legacy, known order-dependent"]
+fn legacy_partitions_are_independent_of_root_hash_iteration_order() {
     let texts = ["subdivision", "visualization"];
     let corpus = Corpus::new("root_hash_order", texts);
     let mut status = StatusHandle::default();

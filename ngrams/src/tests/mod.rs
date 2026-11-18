@@ -6,7 +6,13 @@
 
 pub(crate) mod count;
 #[cfg(test)]
+mod composition;
+#[cfg(test)]
 mod hash_order;
+#[cfg(test)]
+mod output;
+#[cfg(test)]
+mod selection;
 
 use std::path::Path;
 
@@ -419,283 +425,182 @@ pub(crate) fn test_graph2() {
     .execute();
 }
 
-/// Smoke-test nonempty results and string reconstruction for both returned graphs.
+/// Run the v3 pipeline and return its table with retained-set invariants checked.
+#[cfg(test)]
+fn parse_table(
+    texts: &[&str]
+) -> std::collections::BTreeMap<String, Vec<(usize, String)>> {
+    use crate::graph::{
+        parse_corpus,
+        Status,
+    };
+    let status = StatusHandle::from(Status::new(texts));
+    let result = parse_corpus(
+        Corpus::new("test_parse_corpus", texts),
+        status.clone(),
+        Cancellation::None,
+    )
+    .unwrap_or_else(|e| panic!("parse_corpus failed for {texts:?}: {e:?}"));
+    assert_eq!(*status.pass(), ProcessStatus::Finished);
+    let corpus = texts.iter().map(ToString::to_string).collect_vec();
+    result.graph.validate_for_corpus(&corpus).unwrap();
+    result.graph.vertices
+}
+
+/// Build an expected v3 table from `(owner, [(offset, child)])` rows.
+#[cfg(test)]
+fn table(
+    rows: &[(&str, &[(usize, &str)])]
+) -> std::collections::BTreeMap<String, Vec<(usize, String)>> {
+    rows.iter()
+        .map(|(owner, cover)| {
+            (
+                owner.to_string(),
+                cover.iter().map(|&(o, c)| (o, c.to_string())).collect(),
+            )
+        })
+        .collect()
+}
+
+/// Separate texts keep their roots; the shared root is covered by both.
 #[test]
 pub(crate) fn test_parse_corpus() {
-    use crate::graph::{
-        parse_corpus,
-        Status,
-    };
-
-    let corpus = ["hello", "world", "hello world"];
-    let texts = corpus.into_iter().map(ToString::to_string).collect_vec();
-    let corpus_name = "test_parse_corpus".to_owned();
-
-    let status = StatusHandle::from(Status::new(texts.clone()));
-
-    let result = parse_corpus(
-        Corpus::new(corpus_name, texts),
-        status,
-        Cancellation::None,
-    );
-
-    assert!(result.is_ok(), "parse_corpus should succeed");
-
-    let parse_result = result.unwrap();
-
-    // Verify that the result contains expected data
-    assert!(
-        !parse_result.labels.is_empty(),
-        "Should have some labels after parsing"
-    );
-
-    // Verify the graph has vertices
-    assert!(
-        parse_result.graph.vertex_count() > 0,
-        "Graph should have vertices"
-    );
-
-    // Verify the containment graph has vertices
-    assert!(
-        parse_result.containment.vertex_count() > 0,
-        "Containment graph should have vertices"
-    );
-
-    // Validate ALL vertices in the partition graph can produce string representations
-    let graph_keys: Vec<_> = parse_result.graph.vertex_keys().collect();
-    for key in &graph_keys {
-        let s = parse_result.graph.vertex_key_string(key);
-        assert!(
-            !s.is_empty(),
-            "Vertex {:?} should have non-empty string representation",
-            key
-        );
-    }
-
-    // Validate ALL vertices in the containment graph can produce string representations
-    let containment_keys: Vec<_> =
-        parse_result.containment.vertex_keys().collect();
-    for key in &containment_keys {
-        let s = parse_result.containment.vertex_key_string(key);
-        assert!(!s.is_empty(), "Containment vertex {:?} should have non-empty string representation", key);
-    }
+    let atoms = [" ", "d", "e", "h", "l", "o", "r", "w"].map(|a| (a, &[][..]));
+    let mut expected = table(&atoms);
+    expected.extend(table(&[
+        (
+            "hello",
+            &[(0, "h"), (1, "e"), (2, "l"), (3, "l"), (4, "o")],
+        ),
+        (
+            "world",
+            &[(0, "w"), (1, "o"), (2, "r"), (3, "l"), (4, "d")],
+        ),
+        ("hello world", &[(0, "hello"), (5, " "), (6, "world")]),
+    ]));
+    assert_eq!(parse_table(&["hello", "world", "hello world"]), expected);
 }
 
-/// Exercise a repeated-block input without asserting exact selected token content.
+/// Repeated blocks overlap at offset 4 instead of being re-chunked.
 #[test]
 pub(crate) fn test_parse_corpus_aabbaabbaa() {
-    use crate::graph::{
-        parse_corpus,
-        Status,
-    };
-
-    let texts = vec!["aabbaabbaa".to_string()];
-    let corpus_name = "test_aabbaabbaa".to_owned();
-
-    let status = StatusHandle::from(Status::new(texts.clone()));
-
-    let result = parse_corpus(
-        Corpus::new(corpus_name, texts),
-        status,
-        Cancellation::None,
+    assert_eq!(
+        parse_table(&["aabbaabbaa"]),
+        table(&[
+            ("a", &[]),
+            ("b", &[]),
+            ("aa", &[(0, "a"), (1, "a")]),
+            ("aabbaa", &[(0, "aa"), (2, "b"), (3, "b"), (4, "aa")]),
+            ("aabbaabbaa", &[(0, "aabbaa"), (4, "aabbaa")]),
+        ])
     );
-
-    assert!(result.is_ok(), "parse_corpus should succeed for aabbaabbaa");
-
-    let parse_result = result.unwrap();
-
-    // Verify basic structure
-    assert!(
-        parse_result.graph.vertex_count() > 0,
-        "Graph should have vertices"
-    );
-    assert!(
-        parse_result.containment.vertex_count() > 0,
-        "Containment should have vertices"
-    );
-
-    // This is a nonempty-selection check, not an assertion of particular tokens.
-    assert!(
-        !parse_result.labels.is_empty(),
-        "Should have frequency labels"
-    );
-
-    // Validate ALL vertices in the partition graph
-    let graph_keys: Vec<_> = parse_result.graph.vertex_keys().collect();
-    for key in &graph_keys {
-        let s = parse_result.graph.vertex_key_string(key);
-        assert!(
-            !s.is_empty(),
-            "Vertex {:?} should have non-empty string representation",
-            key
-        );
-    }
-
-    // Validate ALL vertices in the containment graph
-    let containment_keys: Vec<_> =
-        parse_result.containment.vertex_keys().collect();
-    for key in &containment_keys {
-        let s = parse_result.containment.vertex_key_string(key);
-        assert!(!s.is_empty(), "Containment vertex {:?} should have non-empty string representation", key);
-    }
 }
 
-/// Exercise a repeated single-character alphabet using the four-character text `aaaa`.
+/// Each width of a unary text is covered by two overlapping narrower children.
 #[test]
 pub(crate) fn test_parse_corpus_single_char() {
-    use crate::graph::{
-        parse_corpus,
-        Status,
-    };
-
-    let texts = vec!["aaaa".to_string()];
-    let corpus_name = "test_single_char".to_owned();
-
-    let status = StatusHandle::from(Status::new(texts.clone()));
-
-    let result = parse_corpus(
-        Corpus::new(corpus_name, texts),
-        status,
-        Cancellation::None,
+    assert_eq!(
+        parse_table(&["aaaa"]),
+        table(&[
+            ("a", &[]),
+            ("aa", &[(0, "a"), (1, "a")]),
+            ("aaa", &[(0, "aa"), (1, "aa")]),
+            ("aaaa", &[(0, "aaa"), (1, "aaa")]),
+        ])
     );
-
-    assert!(result.is_ok(), "parse_corpus should succeed for aaaa");
-
-    let parse_result = result.unwrap();
-    assert!(
-        parse_result.graph.vertex_count() > 0,
-        "Graph should have vertices"
-    );
-
-    // Selection is checked for nonemptiness, not specifically for the token "aa".
-    assert!(
-        !parse_result.labels.is_empty(),
-        "Should have labels for repeated aa"
-    );
-
-    // Validate ALL vertices in the partition graph
-    let graph_keys: Vec<_> = parse_result.graph.vertex_keys().collect();
-    for key in &graph_keys {
-        let s = parse_result.graph.vertex_key_string(key);
-        assert!(
-            !s.is_empty(),
-            "Vertex {:?} should have non-empty string representation",
-            key
-        );
-    }
-
-    // Validate ALL vertices in the containment graph
-    let containment_keys: Vec<_> =
-        parse_result.containment.vertex_keys().collect();
-    for key in &containment_keys {
-        let s = parse_result.containment.vertex_key_string(key);
-        assert!(!s.is_empty(), "Containment vertex {:?} should have non-empty string representation", key);
-    }
 }
 
-/// Smoke-test two texts sharing `bc`, without asserting its exact decomposition.
+/// The shared `bc` is selected and used by both roots at their own offsets.
 #[test]
 pub(crate) fn test_parse_corpus_two_texts() {
-    use crate::graph::{
-        parse_corpus,
-        Status,
-    };
-
-    let texts = vec!["abc".to_string(), "bcd".to_string()];
-    let corpus_name = "test_two_texts".to_owned();
-
-    let status = StatusHandle::from(Status::new(texts.clone()));
-
-    let result = parse_corpus(
-        Corpus::new(corpus_name, texts),
-        status,
-        Cancellation::None,
+    assert_eq!(
+        parse_table(&["abc", "bcd"]),
+        table(&[
+            ("a", &[]),
+            ("b", &[]),
+            ("c", &[]),
+            ("d", &[]),
+            ("bc", &[(0, "b"), (1, "c")]),
+            ("abc", &[(0, "a"), (1, "bc")]),
+            ("bcd", &[(0, "bc"), (2, "d")]),
+        ])
     );
-
-    assert!(result.is_ok(), "parse_corpus should succeed for two texts");
-
-    let parse_result = result.unwrap();
-    assert!(
-        parse_result.graph.vertex_count() > 0,
-        "Graph should have vertices"
-    );
-
-    // This does not independently assert that the shared token "bc" was selected.
-    assert!(
-        !parse_result.labels.is_empty(),
-        "Should have labels for shared bc"
-    );
-
-    // Validate ALL vertices in the partition graph
-    let graph_keys: Vec<_> = parse_result.graph.vertex_keys().collect();
-    for key in &graph_keys {
-        let s = parse_result.graph.vertex_key_string(key);
-        assert!(
-            !s.is_empty(),
-            "Vertex {:?} should have non-empty string representation",
-            key
-        );
-    }
-
-    // Validate ALL vertices in the containment graph
-    let containment_keys: Vec<_> =
-        parse_result.containment.vertex_keys().collect();
-    for key in &containment_keys {
-        let s = parse_result.containment.vertex_key_string(key);
-        assert!(!s.is_empty(), "Containment vertex {:?} should have non-empty string representation", key);
-    }
 }
 
-/// Check successful parsing and string reconstruction when the input has no repeats.
+/// Without repeats only the root and its atoms are retained.
 #[test]
 pub(crate) fn test_parse_corpus_empty_result() {
+    assert_eq!(
+        parse_table(&["xyz"]),
+        table(&[
+            ("x", &[]),
+            ("y", &[]),
+            ("z", &[]),
+            ("xyz", &[(0, "x"), (1, "y"), (2, "z")]),
+        ])
+    );
+}
+
+/// Corpus order and multiplicity affect neither retention nor covers.
+#[test]
+pub(crate) fn test_parse_corpus_order_and_multiplicity() {
+    assert_eq!(parse_table(&["a", "b", "a"]), table(&[("a", &[]), ("b", &[])]));
+    for texts in [["abc", "xabc"], ["xabc", "abc"]] {
+        let t = parse_table(&texts);
+        assert_eq!(t, table(&[
+            ("a", &[]),
+            ("b", &[]),
+            ("c", &[]),
+            ("x", &[]),
+            ("abc", &[(0, "a"), (1, "b"), (2, "c")]),
+            ("xabc", &[(0, "x"), (1, "abc")]),
+        ]));
+    }
+    assert_eq!(parse_table(&["ab", "ab"]), parse_table(&["ab"]));
+    assert_eq!(
+        parse_table(&["é🙂é"]),
+        table(&[
+            ("é", &[]),
+            ("🙂", &[]),
+            ("é🙂é", &[(0, "é"), (1, "🙂"), (2, "é")]),
+        ])
+    );
+}
+
+/// A signalled cancellation fails without reaching `Finished`.
+#[test]
+pub(crate) fn test_parse_corpus_cancelled() {
     use crate::graph::{
         parse_corpus,
-        Status,
+        traversal::pass::CancelReason,
     };
-
-    // A corpus with no repeated n-grams
-    let texts = vec!["xyz".to_string()];
-    let corpus_name = "test_no_repeats".to_owned();
-
-    let status = StatusHandle::from(Status::new(texts.clone()));
-
+    use std::sync::{
+        atomic::AtomicBool,
+        Arc,
+    };
+    let status = StatusHandle::default();
     let result = parse_corpus(
-        Corpus::new(corpus_name, texts),
-        status,
+        Corpus::new("cancelled", ["abcabca"]),
+        status.clone(),
+        Cancellation::from(Arc::new(AtomicBool::new(true))),
+    );
+    assert!(matches!(result, Err(CancelReason::Cancelled)), "{result:?}");
+    assert_ne!(*status.pass(), ProcessStatus::Finished);
+}
+
+/// Mixed empty and nonempty texts are rejected before enumeration.
+#[test]
+pub(crate) fn test_parse_corpus_mixed_empty_text() {
+    use crate::graph::{
+        parse_corpus,
+        traversal::pass::CancelReason,
+    };
+    let result = parse_corpus(
+        Corpus::new("mixed", ["ab", ""]),
+        StatusHandle::default(),
         Cancellation::None,
     );
-
-    assert!(
-        result.is_ok(),
-        "parse_corpus should succeed even with no repeats"
-    );
-
-    let parse_result = result.unwrap();
-    // Should still have the basic structure
-    assert!(
-        parse_result.containment.vertex_count() > 0,
-        "Containment should have vertices"
-    );
-
-    // Validate ALL vertices in the partition graph (may be empty or minimal)
-    let graph_keys: Vec<_> = parse_result.graph.vertex_keys().collect();
-    for key in &graph_keys {
-        let s = parse_result.graph.vertex_key_string(key);
-        assert!(
-            !s.is_empty(),
-            "Vertex {:?} should have non-empty string representation",
-            key
-        );
-    }
-
-    // Validate ALL vertices in the containment graph
-    let containment_keys: Vec<_> =
-        parse_result.containment.vertex_keys().collect();
-    for key in &containment_keys {
-        let s = parse_result.containment.vertex_key_string(key);
-        assert!(!s.is_empty(), "Containment vertex {:?} should have non-empty string representation", key);
-    }
+    assert!(matches!(result, Err(CancelReason::EmptyText(1))), "{result:?}");
 }
 
 /// Require an empty input collection to report `EmptyVocabulary`.

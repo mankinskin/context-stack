@@ -55,7 +55,8 @@ enum CliCommand {
         name: String,
     },
 
-    /// Create a workspace by parsing text with the slow canonical ngrams algorithm.
+    /// Create a workspace by parsing text with the slow legacy row-based ngrams
+    /// oracle (provisional; not the positioned v3 oracle).
     #[command(name = "create-ngrams")]
     CreateNgrams {
         /// Name of the workspace to create.

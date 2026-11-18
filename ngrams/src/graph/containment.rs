@@ -4,9 +4,9 @@
 //! exist when a new composite is linked to them. Repeated content reuses a
 //! vertex and adds an occurrence rather than creating another vertex.
 //!
-//! Windows and occurrence offsets count characters, but child slicing and root
-//! detection below use byte lengths. These units coincide for ASCII input;
-//! the implementation does not consistently handle multibyte characters.
+//! Widths, windows, occurrence offsets, and child slices all count atoms
+//! (Rust `char`s), never UTF-8 bytes. Roots are resolved by the caller after
+//! enumeration, independent of where the content was first interned.
 
 use std::sync::{
     Arc,
@@ -110,7 +110,6 @@ impl TextLevelCtx<'_> {
         &self,
         vocab: &mut Vocabulary,
     ) {
-        let N: usize = self.text.len();
         self.text
             .chars()
             .ngrams(self.n)
@@ -156,8 +155,7 @@ impl NGramFrequencyCtx<'_> {
     /// Insert unseen content, its first occurrence, and reciprocal containment links.
     ///
     /// Single characters become atoms and leaves; composites receive elementary
-    /// child patterns. Root membership is checked only on this insertion path,
-    /// using the current text's byte length.
+    /// child patterns. Root membership is resolved after enumeration.
     ///
     /// # Panics
     ///
@@ -191,10 +189,6 @@ impl NGramFrequencyCtx<'_> {
         } else {
             vocab.containment.insert_vertex_data(data);
         }
-        if self.n == self.level_ctx.text.len() {
-            // Repeated content handled by on_ngram does not reach this check.
-            vocab.roots.insert(id);
-        }
         for (pid, pat) in children {
             // Despite the local name, this token is the new parent of pat's nodes.
             let child = Token::new(
@@ -209,48 +203,34 @@ impl NGramFrequencyCtx<'_> {
     }
     /// Build elementary prefix/suffix decompositions from existing vocabulary nodes.
     ///
-    /// For ASCII composites longer than two characters, returns
-    /// `[prefix(n - 1), last]` and `[first, suffix(n - 1)]`. A bigram has just
-    /// one `[first, last]` pattern; a single ASCII character has none.
+    /// For composites wider than two atoms, returns `[prefix(n - 1), last]`
+    /// and `[first, suffix(n - 1)]`. A bigram has just one `[first, last]`
+    /// pattern; an atom has none. All slicing happens at `char` boundaries.
     ///
     /// # Panics
     ///
-    /// Panics for empty content or when a required child is absent. Length and
-    /// slice calculations use bytes even though windows iterate over characters.
+    /// Panics when a required child is absent.
     pub(crate) fn find_children(
         &self,
         vocab: &mut Vocabulary,
     ) -> ChildPatterns {
-        let ngram = self.ngram.clone();
-        let n = ngram.len() - 1;
-        ngram
-            .chars()
-            .ngrams(n)
-            .enumerate()
-            // Both bigram windows would yield the same two-character pattern.
-            .take_while(|(i, _)| n != 1 || *i < 1)
-            .map(|(i, ni)| {
-                // Surround the window with any nonempty leading/trailing fragment.
-                let f = ngram.get(0..i).filter(|s| !s.is_empty());
-                let x = String::from_iter(ni);
-                let b =
-                    ngram.get((i + n)..ngram.len()).filter(|s| !s.is_empty());
-                let pid = PatternId::default();
-                (
-                    pid,
-                    [f, Some(&x), b]
-                        .into_iter()
-                        .flatten()
-                        .map(|s| {
-                            let id = vocab.ids.get(s).unwrap();
-                            Token::new(
-                                vocab.containment.expect_index_for_key(id),
-                                id.width(),
-                            )
-                        })
-                        .collect(),
-                )
-            })
+        let chars: Vec<char> = self.ngram.chars().collect();
+        let w = chars.len();
+        let token = |vocab: &Vocabulary, s: &[char]| {
+            let id = vocab.ids.get(&String::from_iter(s)).unwrap();
+            Token::new(vocab.containment.expect_index_for_key(id), id.width())
+        };
+        let patterns: Vec<Vec<Token>> = match w {
+            0 | 1 => vec![],
+            2 => vec![vec![token(vocab, &chars[..1]), token(vocab, &chars[1..])]],
+            _ => vec![
+                vec![token(vocab, &chars[..w - 1]), token(vocab, &chars[w - 1..])],
+                vec![token(vocab, &chars[..1]), token(vocab, &chars[1..])],
+            ],
+        };
+        patterns
+            .into_iter()
+            .map(|p| (PatternId::default(), p.into_iter().collect()))
             .collect()
     }
 }

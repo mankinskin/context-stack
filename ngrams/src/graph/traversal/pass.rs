@@ -43,8 +43,14 @@ pub enum CancelReason {
     Cancelled,
     /// A pass reported a generic processing error.
     Error,
-    /// No usable vocabulary could be constructed.
+    /// No usable vocabulary could be constructed: the corpus is empty or all
+    /// of its texts are empty.
     EmptyVocabulary,
+    /// The text at this corpus index is empty while others are not.
+    EmptyText(usize),
+    /// The produced positioned graph failed structural validation; the
+    /// message names the owner and offending entry or position.
+    InvalidOutput(String),
 }
 /// Fallible result propagated by traversal and corpus construction.
 #[must_use]

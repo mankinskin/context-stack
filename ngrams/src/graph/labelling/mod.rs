@@ -26,6 +26,7 @@ use crate::{
     },
     config::CacheConfig,
     graph::{
+        composition,
         partitions::PartitionsCtx,
         traversal::pass::{
             CancelReason,
@@ -161,6 +162,41 @@ impl LabellingCtx {
             status,
             cancellation: cancellation.into(),
         })
+    }
+    /// Validate input, build a fresh vocabulary, and run frequency selection.
+    ///
+    /// Entry point for the positioned (v3) pipeline: it never reads or writes
+    /// the labelling-image cache, so cached legacy artifacts (which may contain
+    /// wrapper labels or belong to different inputs) cannot affect it. The
+    /// resulting labels are exactly roots, atoms, and frequency-selected tokens.
+    pub(crate) fn select_frequency_fresh(
+        corpus: Corpus,
+        mut status: StatusHandle,
+        cancellation: impl Into<Cancellation>,
+    ) -> RunResult<Self> {
+        let cancellation = cancellation.into();
+        if cancellation.is_cancelled() {
+            return Err(CancelReason::Cancelled);
+        }
+        let vocab = Vocabulary::from_corpus(&corpus, &mut status)?;
+        let mut ctx = Self::new(
+            TestCorpus::new(LabellingImage::from(vocab), corpus),
+            status,
+            cancellation,
+        );
+        FrequencyCtx::new(&mut ctx).run()?;
+        Ok(ctx)
+    }
+    /// Build positioned covers for the current (frozen) label set.
+    ///
+    /// Reads the vocabulary and labels only; see [`composition::compose`].
+    pub(crate) fn compose(&self) -> RunResult<composition::PositionedCovers> {
+        composition::compose(
+            self.vocab(),
+            self.labels(),
+            &self.status,
+            &self.cancellation,
+        )
     }
     /// Return a cancellation error when the supplied handle has been signalled.
     pub(crate) fn check_cancelled(&self) -> RunResult<()> {

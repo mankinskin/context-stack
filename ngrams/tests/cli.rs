@@ -1,8 +1,6 @@
-//! End-to-end CLI shape, validation, and representative decomposition checks.
-//!
-//! These tests do not compare repeated executions or prove oracle completeness.
+//! End-to-end CLI shape, validation, and exact positioned (v3) output checks.
 
-use ngrams::output::GraphSnapshot;
+use ngrams::output::{PositionedGraphSnapshot, POSITIONED_FORMAT_VERSION};
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -62,43 +60,90 @@ fn assert_success(output: &Output) {
 /// Check JSON-only output, exact top-level fields, validation, and corpus identity.
 ///
 /// Also verifies that deserialization rejects unknown fields.
-fn snapshot(bytes: &[u8], corpus: &[&str]) -> GraphSnapshot {
+fn snapshot(bytes: &[u8], corpus: &[&str]) -> PositionedGraphSnapshot {
     let value: Value = serde_json::from_slice(bytes).expect("output must be JSON only");
     let object = value.as_object().unwrap();
     assert_eq!(
         object.keys().map(String::as_str).collect::<Vec<_>>(),
         ["corpus", "format_version", "vertices"]
     );
-    let snapshot: GraphSnapshot = serde_json::from_value(value.clone()).unwrap();
+    let snapshot: PositionedGraphSnapshot = serde_json::from_value(value.clone()).unwrap();
     snapshot.validate().unwrap();
+    assert_eq!(snapshot.format_version, POSITIONED_FORMAT_VERSION);
     assert_eq!(snapshot.corpus, corpus);
     let mut unknown = value;
     unknown["unexpected"] = json!(true);
-    assert!(serde_json::from_value::<GraphSnapshot>(unknown).is_err());
+    assert!(serde_json::from_value::<PositionedGraphSnapshot>(unknown).is_err());
     snapshot
 }
 
-/// Inline arguments form one corpus and emit both roots with atom decompositions.
+/// Expected cover from `(offset, child)` pairs.
+fn cover(entries: &[(usize, &str)]) -> Vec<(usize, String)> {
+    entries.iter().map(|&(o, c)| (o, c.to_string())).collect()
+}
+
+/// Inline arguments form one corpus and emit both roots with atom covers.
 #[test]
 fn inline_inputs_emit_one_complete_graph_to_stdout() {
     let output = run(&["abc", "xyz"]);
     assert_success(&output);
     let snapshot = snapshot(&output.stdout, &["abc", "xyz"]);
     assert_eq!(snapshot.graph.vertices.len(), 8);
-    assert!(snapshot.graph.vertices["abc"].contains(&vec!["a".into(), "b".into(), "c".into()]));
-    assert!(snapshot.graph.vertices["xyz"].contains(&vec!["x".into(), "y".into(), "z".into()]));
+    assert_eq!(snapshot.graph.vertices["abc"], cover(&[(0, "a"), (1, "b"), (2, "c")]));
+    assert_eq!(snapshot.graph.vertices["xyz"], cover(&[(0, "x"), (1, "y"), (2, "z")]));
+    assert_eq!(snapshot.graph.vertices["a"], cover(&[]));
 }
 
-/// The serialized graph retains both alternatives rather than flattening patterns.
+/// Both maximal occurrences of `abca` are kept at overlapping offsets.
 #[test]
-fn output_preserves_alternative_decompositions() {
-    let output = run(&["ab", "bc", "abc"]);
+fn output_keeps_overlapping_occurrences() {
+    let output = run(&["abcabca"]);
     assert_success(&output);
-    let snapshot = snapshot(&output.stdout, &["ab", "bc", "abc"]);
+    let snapshot = snapshot(&output.stdout, &["abcabca"]);
     assert_eq!(
-        snapshot.graph.vertices["abc"],
-        [vec!["a".into(), "bc".into()], vec!["ab".into(), "c".into()]].into()
+        snapshot.graph.vertices.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["a", "abca", "abcabca", "b", "c"]
     );
+    assert_eq!(snapshot.graph.vertices["abcabca"], cover(&[(0, "abca"), (3, "abca")]));
+    assert_eq!(
+        snapshot.graph.vertices["abca"],
+        cover(&[(0, "a"), (1, "b"), (2, "c"), (3, "a")])
+    );
+}
+
+/// The corpus keeps input order and repeats, while vertices are shared.
+#[test]
+fn output_preserves_corpus_order_and_multiplicity() {
+    let output = run(&["ab", "ab"]);
+    assert_success(&output);
+    let repeated = snapshot(&output.stdout, &["ab", "ab"]);
+    assert_eq!(repeated.graph.vertices.len(), 3);
+    assert_eq!(repeated.graph.vertices["ab"], cover(&[(0, "a"), (1, "b")]));
+    let output = run(&["b", "a", "b"]);
+    assert_success(&output);
+    snapshot(&output.stdout, &["b", "a", "b"]);
+}
+
+/// A corpus of atoms succeeds with empty covers only.
+#[test]
+fn atom_only_corpus_succeeds() {
+    let output = run(&["a"]);
+    assert_success(&output);
+    let snapshot = snapshot(&output.stdout, &["a"]);
+    assert_eq!(snapshot.graph.vertices.len(), 1);
+    assert!(snapshot.graph.vertices["a"].is_empty());
+}
+
+/// Independent invocations with identical ordered input emit identical bytes.
+#[test]
+fn identical_inputs_emit_identical_bytes() {
+    let args = ["subdivision", "visualization", "abcabca"];
+    let first = run(&args);
+    let second = run(&args);
+    assert_success(&first);
+    assert_success(&second);
+    snapshot(&first.stdout, &args);
+    assert_eq!(first.stdout, second.stdout);
 }
 
 /// Both accepted file shapes create one validated graph per named scenario.
@@ -109,7 +154,8 @@ fn file_accepts_single_and_multiple_scenarios_and_creates_output_directory() {
         json!({"name": "single", "inputs": ["abc"]}),
         json!([
             {"name": "first", "inputs": ["ab"]},
-            {"name": "second", "inputs": ["xy", "xyz"]}
+            {"name": "second", "inputs": ["xy", "xyz"]},
+            {"name": "third", "inputs": ["abcabca", "a", "abcabca"]}
         ]),
     ]
     .into_iter()

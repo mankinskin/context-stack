@@ -5,7 +5,6 @@ use std::collections::VecDeque;
 use itertools::Itertools;
 
 use crate::graph::{
-    utils::cover::frequency::FrequencyCover,
     vocabulary::{
         entry::VertexCtx,
         NGramId,
@@ -18,10 +17,7 @@ use context_trace::graph::vertex::{
     VertexIndex,
 };
 
-use crate::graph::{
-    labelling::frequency::FrequencyCtx,
-    traversal::pass::TraversalPass,
-};
+use crate::graph::traversal::pass::TraversalPass;
 use derive_more::{
     Deref,
     DerefMut,
@@ -114,51 +110,6 @@ impl<P: TraversalPass> Queue<P> for LinearQueue<P> {
         self.queue.pop_front()
     }
     /// Whether any FIFO work remains.
-    fn is_empty(&self) -> bool {
-        self.queue.is_empty()
-    }
-}
-
-/// Frequency-pass queue re-sorted by decreasing width after each extension.
-#[derive(Debug, Deref, Default)]
-pub(crate) struct SortedQueue {
-    /// Pending handles; adjacent identical handles are deduplicated after sorting.
-    pub(crate) queue: VecDeque<NGramId>,
-}
-impl FromIterator<NGramId> for SortedQueue {
-    /// Seed through the same width-sorting path used for later discoveries.
-    fn from_iter<T: IntoIterator<Item = NGramId>>(iter: T) -> Self {
-        let mut v = Self {
-            queue: VecDeque::default(),
-        };
-        v.extend_layer(iter);
-        v
-    }
-}
-
-impl Queue<FrequencyCtx<'_>> for SortedQueue {
-    /// Re-sort all pending work by decreasing width and remove adjacent duplicates.
-    fn extend_layer(
-        &mut self,
-        iter: impl IntoIterator<Item = NGramId>,
-    ) {
-        self.queue.extend(iter);
-        // Equal-width ties retain their existing relative order; this is not a
-        // canonical content ordering, and dedup only removes adjacent equals.
-        self.queue = self
-            .queue
-            .drain(..)
-            .sorted_by_key(|i| std::cmp::Reverse(i.width()))
-            .dedup()
-            .collect();
-    }
-    /// Width sorting replaces explicit layer promotion.
-    fn finish_layer(&mut self) {}
-    /// Pop the next widest queued handle.
-    fn pop_front(&mut self) -> Option<NGramId> {
-        self.queue.pop_front()
-    }
-    /// Whether the sorted work list has drained.
     fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }

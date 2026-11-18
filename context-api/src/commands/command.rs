@@ -30,6 +30,8 @@ ts_export! {
         CreateWorkspace {
             name: String,
         },
+        /// Create a workspace from text using the legacy row-based ngrams
+        /// oracle (provisional; not the positioned v3 oracle output).
         CreateWorkspaceFromNgrams {
             name: String,
             text: String,

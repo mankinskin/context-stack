@@ -125,6 +125,13 @@ pub enum ProcessStatus {
     Containment,
     /// Selecting tokens by occurrence frequency.
     Frequency,
+    /// Building positioned child covers for the frozen retained set (v3).
+    ///
+    /// Ordered directly after `Frequency` so the v3 pipeline is monotonic
+    /// (`Containment < Frequency < Compositions < Finished`). The legacy
+    /// pipeline never enters this stage, so its `< Frequency` and
+    /// `< Wrappers` guards are unaffected; the v3 path never calls them.
+    Compositions,
     /// Selecting tokens that enclose overlapping labelled children.
     Wrappers,
     /// Constructing decompositions in the output graph.
@@ -165,7 +172,7 @@ pub(crate) struct Vocabulary {
     pub(crate) ids: HashMap<String, NGramId>,
     /// Single-character vertices.
     pub(crate) leaves: HashSet<NGramId>,
-    /// Vertices marked as full texts when first inserted.
+    /// Vertices whose content equals at least one full input text.
     ///
     /// Iteration is unsorted; consumers must not assume corpus input order.
     pub(crate) roots: HashSet<NGramId>,
@@ -185,29 +192,25 @@ impl Vocabulary {
         Ok(vocab)
     }
 
-    /// Enumerate lengths globally from short to long, then each text at that length.
+    /// Enumerate widths globally from short to long, then each text at that width.
     ///
-    /// Rejects an empty corpus or a zero maximum byte length. The maximum uses
-    /// bytes while individual windows use characters; see the containment module.
+    /// Rejects invalid input (see [`Corpus::validate`]) before enumeration.
+    /// Widths count atoms (`char`s). Progress counts enumerated windows. After
+    /// enumeration every full input is resolved to its vertex in `roots`.
     pub(crate) fn containment_pass(
         &mut self,
         ctx: &CorpusCtx<'_>,
     ) -> Result<(), super::traversal::pass::CancelReason> {
-        let N: usize = ctx
-            .corpus
-            .iter()
-            .map(|t| t.len())
-            .max()
-            .ok_or(super::traversal::pass::CancelReason::EmptyVocabulary)?;
-        if N == 0 {
-            return Err(super::traversal::pass::CancelReason::EmptyVocabulary);
-        }
+        ctx.corpus.validate()?;
+        let widths = ctx.corpus.iter().map(|t| t.chars().count()).collect_vec();
+        let N: usize = widths.iter().copied().max().unwrap_or_default();
+        let windows: usize = widths.iter().map(|n| n * (n + 1) / 2).sum();
         ctx.status.next_pass(
             super::vocabulary::ProcessStatus::Containment,
             0,
-            N * (N - 1),
+            windows,
         );
-        // Length is the outer loop so all proper child strings exist first.
+        // Width is the outer loop so all proper child strings exist first.
         Itertools::cartesian_product((1..=N), ctx.corpus.iter().enumerate())
             .for_each(|(n, (i, text))| {
                 TextLevelCtx {
@@ -218,6 +221,13 @@ impl Vocabulary {
                 }
                 .on_nlevel(self)
             });
+        for text in ctx.corpus.iter() {
+            let id = *self
+                .ids
+                .get(text)
+                .expect("every validated input is enumerated as a window");
+            self.roots.insert(id);
+        }
         Ok(())
     }
     //pub(crate) fn clean(&mut self) -> HashSet<NGramId> {

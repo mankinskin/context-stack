@@ -140,7 +140,16 @@ impl TraversalPass for PartitionsCtx<'_> {
                 self.vocab().containment.expect_vertex_data(vk.vertex_key());
             let builder =
                 VertexDataBuilder::default().width(data.width()).key(**vk);
-            self.graph.insert_vertex_builder(builder);
+            // An input may be a single atom; keep its atom data like atom children.
+            match self.vocab().containment.get_atom_by_key(&vk.vertex_key()) {
+                Some(atom) if vk.width == 1 => {
+                    let data = self.graph.finish_vertex_builder(builder);
+                    self.graph.insert_atom_data(atom, data);
+                },
+                _ => {
+                    self.graph.insert_vertex_builder(builder);
+                },
+            }
         }
         self.status.next_pass(
             ProcessStatus::Partitions,
@@ -175,6 +184,10 @@ impl TraversalPass for PartitionsCtx<'_> {
         node: &NGramId,
     ) -> RunResult<Option<Vec<Self::NextNode>>> {
         *self.status.steps_mut() += 1;
+        if node.width == 1 {
+            // Atoms (reachable here only as roots) have no decomposition.
+            return Ok(None);
+        }
         let entry = self.vocab().get_vertex(node).unwrap();
         let _span = trace::partition_span(&entry.ngram).entered();
         let container = PartitionContainer::from_ngram(self, *node);

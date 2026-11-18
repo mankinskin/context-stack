@@ -59,33 +59,52 @@ pub(crate) struct FrequencyCover {
     cover: HashSet<NGramId>,
 }
 impl FrequencyCover {
-    /// Search upward, retaining labelled ancestors that add new occurrences.
+    /// Search upward breadth-first, retaining labelled ancestors that add new
+    /// occurrences.
     ///
-    /// An ancestor that contributes positions ends that search branch; one that
-    /// contributes none is expanded further. Offsets accumulate along each path.
+    /// Each depth (width difference to the candidate) is processed as one
+    /// layer, ordered by `(ancestor content, candidate offset in ancestor)`;
+    /// the first ancestor in this order claims shared positions. An ancestor
+    /// that contributes positions ends its branch; one that contributes none
+    /// (unlabelled or already covered) is expanded. Each state is visited once.
     pub(crate) fn from_entry(
         ctx: &LabellingCtx,
         entry: &VertexCtx,
     ) -> RunResult<Self> {
+        let vocab = entry.vocab;
         let mut cover: HashSet<_> = Default::default();
-        let mut occ_set: HashSet<_> = Default::default(); //entry.occurrences.clone();
-        let mut queue: VecDeque<_> =
-            FromIterator::from_iter(Self::next_parent_offsets(entry));
-        while let Some((off, p)) = queue.pop_front() {
-            ctx.check_cancelled()?;
-            let pe = entry.vocab.get_vertex(&p).unwrap();
-            let diff = Self::new_occurrences(ctx, off, &pe, &occ_set);
-            if diff.is_empty() {
-                // Unlabelled or already-accounted-for ancestors do not stop ascent.
-                queue.extend(
-                    Self::next_parent_offsets(&pe)
-                        .into_iter()
-                        .map(|(o, p)| (o + off, p)),
-                );
-            } else {
-                cover.insert(p);
-                occ_set.extend(&diff);
+        let mut occ_set: HashSet<_> = Default::default();
+        let mut visited: HashSet<(usize, NGramId)> = Default::default();
+        let mut layer = Self::next_parent_offsets(entry);
+        while !layer.is_empty() {
+            let states = layer
+                .drain(..)
+                .filter(|state| visited.insert(*state))
+                .map(|(off, p)| {
+                    let pe = vocab.get_vertex(&p).unwrap();
+                    (pe.ngram.clone(), off, pe)
+                })
+                .sorted_by(|(a, ao, _), (b, bo, _)| (a, ao).cmp(&(b, bo)))
+                .collect_vec();
+            let mut next = Vec::new();
+            for (_, off, pe) in states {
+                ctx.check_cancelled()?;
+                let diff = Self::new_occurrences(ctx, off, &pe, &occ_set);
+                if diff.is_empty() {
+                    next.extend(
+                        Self::next_parent_offsets(&pe)
+                            .into_iter()
+                            .map(|(o, p)| (o + off, p)),
+                    );
+                } else {
+                    cover.insert(NGramId::new(
+                        pe.vertex_key(),
+                        pe.data.width().0,
+                    ));
+                    occ_set.extend(&diff);
+                }
             }
+            layer = next;
         }
         Ok(Self { cover })
     }

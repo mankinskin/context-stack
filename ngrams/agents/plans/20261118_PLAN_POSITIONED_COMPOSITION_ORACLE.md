@@ -17,6 +17,8 @@ tests, `context-api` compare commands.
 **Scope:** oracle semantics, output model, validation and pipeline. Reader
 algorithm migration is out of scope and needs a separate plan.
 
+For implementation, follow the [file-by-file change and test plan](20261118_PLAN_POSITIONED_COMPOSITION_ORACLE_IMPLEMENTATION.md). It supersedes the phase and test checklists in §§5–6 below.
+
 ---
 
 ## 1. Problem
