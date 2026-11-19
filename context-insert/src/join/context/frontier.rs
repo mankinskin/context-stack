@@ -24,7 +24,7 @@ use crate::{
     },
     visualization::emit_insert_node_with_delta,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::visualization::{
         DeltaOp,
         GraphMutation,

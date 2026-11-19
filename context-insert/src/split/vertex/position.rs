@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use crate::*;
-use context_trace::*;
+use context_trace::legacy::*;
 use derive_new::new;
 pub(crate) type Offset = NonZeroUsize;
 

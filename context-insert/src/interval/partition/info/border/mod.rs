@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use perfect::*;
 
 use crate::*;
-use context_trace::*;
+use context_trace::legacy::*;
 pub(crate) mod perfect;
 
 pub(crate) mod trace;

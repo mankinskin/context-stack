@@ -34,7 +34,7 @@ use crate::{
         },
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use derivative::Derivative;
 use derive_more::{
     Deref,

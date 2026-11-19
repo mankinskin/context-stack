@@ -3,7 +3,7 @@
 //! Graph with patterns: yz, xxabyzw
 //! Tests infix/range matching behavior
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         Hypergraph,
         HypergraphRef,
@@ -53,7 +53,7 @@ impl TestEnv for EnvInsertInfix1 {
         let xxabyzw = graph.insert_pattern(vec![x, x, a, b, yz, w]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

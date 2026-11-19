@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use context_trace::graph::snapshot::GraphSnapshot;
+use context_trace::legacy::graph::snapshot::GraphSnapshot;
 
 use crate::{
     error::{

@@ -12,7 +12,7 @@ use crate::cursor::{
     Matched,
     Mismatched,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::location::SubRangeLocation,
     path::accessors::role::{
         End,

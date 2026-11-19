@@ -6,7 +6,7 @@ pub(crate) mod start;
 
 use std::cmp::Ordering;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 use inner_kind::InnerKind;
 

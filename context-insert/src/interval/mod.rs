@@ -18,7 +18,7 @@ use crate::{
     },
 };
 use derivative::Derivative;
-use context_trace::*;
+use context_trace::legacy::*;
 
 pub mod init;
 pub(crate) mod partition;

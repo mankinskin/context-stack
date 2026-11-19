@@ -12,7 +12,7 @@ use std::{
     num::NonZeroUsize,
 };
 
-use context_trace::*;
+use context_trace::legacy::*;
 use derive_new::new;
 use vertex::VertexSplits;
 

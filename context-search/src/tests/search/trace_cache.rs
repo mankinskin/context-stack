@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use context_trace::{
+use context_trace::legacy::{
     tests::{
         env::Env2,
         test_case::TestEnv,

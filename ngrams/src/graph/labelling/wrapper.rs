@@ -42,7 +42,7 @@ use crate::graph::{
     },
     HasVertexEntries,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::{
         has_vertex_index::HasVertexIndex,
         has_vertex_key::HasVertexKey,

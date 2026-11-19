@@ -8,7 +8,7 @@
 //! - Partial match scenarios where query doesn't continue
 //! - Integration tests simulating context-read failures
 
-use context_trace::{
+use context_trace::legacy::{
     PatternId,
     graph::{
         Hypergraph,
@@ -63,7 +63,7 @@ impl TestEnv for EnvHypergra {
             graph.insert_pattern_with_id(vec![h, y, p, e, r, g, r, a]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

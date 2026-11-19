@@ -1,6 +1,6 @@
 //! Insert test case trait and supporting types
 
-use context_trace::{
+use context_trace::legacy::{
     Token,
     tests::test_case::{
         TestCase,

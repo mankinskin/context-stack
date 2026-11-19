@@ -40,10 +40,8 @@ impl fmt::Display for VertexIndex {
     ) -> fmt::Result {
         #[cfg(any(test, feature = "test-api"))]
         {
-            use crate::graph::test_graph;
-            if let Some(s) =
-                test_graph::get_token_string_from_test_graph(self.0)
-            {
+            use crate::graph::vertex::name_resolver;
+            if let Some(s) = name_resolver::resolve_token_name(self.0) {
                 return write!(f, "\"{}\"({})", s, self.0);
             }
         }

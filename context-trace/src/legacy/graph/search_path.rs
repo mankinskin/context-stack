@@ -1,0 +1,1394 @@
+//! Search path visualization types for incremental path construction.
+//!
+//! Models the traversal of an `IndexRangePath` during search operations.
+//! Each step modifies `(start_path, root, end_path)` and is emitted as a
+//! structured tracing event scoped by a unique `path_id`.
+//!
+//! Both Rust and TypeScript can reconstruct the full path graph from a
+//! sequence of [`PathTransition`] steps read from a log file.
+
+use crate::legacy::Token;
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use ts_rs::TS;
+
+// ---------------------------------------------------------------------------
+// Edge reference — identifies an edge in the GraphSnapshot
+// ---------------------------------------------------------------------------
+
+// ts-rs export_to path: see context_api::TS_EXPORT_DIR for the convention.
+/// Reference to a directed edge in the hypergraph snapshot.
+///
+/// Matches the fields of [`SnapshotEdge`](super::snapshot::SnapshotEdge):
+/// `(from, to, pattern_idx, sub_index)`.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS,
+)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
+pub struct EdgeRef {
+    /// Source vertex index (traversal origin).
+    /// For start_path edges: the child (pointing upward toward parent).
+    /// For end_path edges: the parent (pointing downward toward child).
+    pub from: usize,
+    /// Target vertex index (traversal destination).
+    /// For start_path edges: the parent (pointing upward).
+    /// For end_path edges: the child (pointing downward).
+    pub to: usize,
+    /// Pattern index (0-based enumeration order in snapshot).
+    pub pattern_idx: usize,
+    /// Position of child within that pattern.
+    pub sub_index: usize,
+}
+
+// ---------------------------------------------------------------------------
+// Path segment — a node in the reconstructed path graph
+// ---------------------------------------------------------------------------
+
+/// A node in the search path, referencing a vertex in the snapshot.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS,
+)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
+pub struct PathNode {
+    /// Vertex index in the snapshot.
+    pub index: usize,
+    /// Token width (atom count).
+    pub width: usize,
+}
+
+impl From<Token> for PathNode {
+    fn from(token: Token) -> Self {
+        PathNode {
+            index: token.index.0,
+            width: token.width.0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Path transitions — the incremental operations on (start_path, root, end_path)
+// ---------------------------------------------------------------------------
+
+/// Transition describing how the search path changed at this step.
+///
+/// The search path models an `IndexRangePath = (start_path, root, end_path)`:
+///
+/// - **start_path** grows upward (parent exploration): each `PushParent`
+///   appends a `ChildLocation` linking current root → parent.
+/// - **root** is set when the first child match converts a parent candidate
+///   into a `CompareState`.
+/// - **end_path** grows downward (child comparison / prefix decomposition):
+///   each `PushChild` appends a `ChildLocation` for child-ward descent.
+///
+/// Reconstruction: apply transitions in order to build the path graph.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
+pub enum PathTransition {
+    /// Search starts at a leaf token.
+    /// Path state: `start_node = node` (no start_path, no root, no end_path).
+    SetStartNode { node: PathNode },
+
+    /// Parent candidate accepted — extend start_path upward.
+    /// Edge goes from child → parent (bottom-up).
+    PushParent {
+        /// The parent vertex we moved up to.
+        parent: PathNode,
+        /// Edge from previous top-of-start-path to this parent.
+        edge: EdgeRef,
+    },
+
+    /// Root established — first child match found.
+    /// Converts parent candidate into a `CompareState` with a root.
+    SetRoot {
+        /// The root vertex.
+        root: PathNode,
+        /// Edge from the last start_path node into the root
+        /// (the root is a parent of the start-path top, containing
+        /// the first matched child pattern).
+        edge: EdgeRef,
+    },
+
+    /// Child candidate — extend end_path downward (prefix decomposition).
+    /// Edge goes from parent → child (top-down).
+    PushChild {
+        /// The child vertex we descended into.
+        child: PathNode,
+        /// Edge from current end_path bottom to this child.
+        edge: EdgeRef,
+    },
+
+    /// Backtrack end_path — pop last child (mismatch at this level).
+    PopChild,
+
+    /// Replace the last element of end_path
+    /// (different child of the same parent tried).
+    ReplaceChild {
+        /// The new child vertex.
+        child: PathNode,
+        /// Edge from parent to new child.
+        edge: EdgeRef,
+    },
+
+    /// Child comparison succeeded at this cursor position.
+    ChildMatch {
+        /// Atom position in the query after match.
+        cursor_pos: usize,
+    },
+
+    /// Child comparison failed.
+    ChildMismatch {
+        /// Atom position where mismatch was detected.
+        cursor_pos: usize,
+    },
+
+    /// This search path is complete.
+    Done {
+        /// Whether the search found a match.
+        success: bool,
+    },
+}
+
+// ---------------------------------------------------------------------------
+// VizPathGraph — the reconstructed path graph for highlighting
+// ---------------------------------------------------------------------------
+
+/// A reconstructed search path graph for visualization.
+///
+/// Contains the ordered list of nodes and edges that form the current
+/// `IndexRangePath`. The frontend highlights these in the hypergraph view.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../packages/context-types/src/generated/")]
+pub struct VizPathGraph {
+    /// The start node (leaf token where search began).
+    pub start_node: Option<PathNode>,
+
+    /// Nodes in the start_path (bottom-up, from start_node toward root).
+    /// Does NOT include start_node itself or the root.
+    pub start_path: Vec<PathNode>,
+
+    /// Edges in the start_path (bottom-up: from=child, to=parent).
+    pub start_edges: Vec<EdgeRef>,
+
+    /// The root node (set when first child match occurs).
+    pub root: Option<PathNode>,
+
+    /// Edge connecting the top of start_path to the root (bottom-up: from=child, to=root).
+    /// This is the "root entry" edge — the last upward step before root.
+    pub root_entry_edge: Option<EdgeRef>,
+
+    /// Edge connecting the root to the first end_path child (top-down: from=root, to=child).
+    /// This is the "root exit" edge — the first downward step from root.
+    pub root_exit_edge: Option<EdgeRef>,
+
+    /// Nodes in the end_path (top-down, from root toward leaf).
+    /// Does NOT include the root itself.
+    pub end_path: Vec<PathNode>,
+
+    /// Edges in the end_path (top-down: from=parent, to=child).
+    pub end_edges: Vec<EdgeRef>,
+
+    /// Current cursor position in the query.
+    pub cursor_pos: usize,
+
+    /// Whether this path is complete.
+    pub done: bool,
+
+    /// Whether this path resulted in a match (only meaningful when `done`).
+    pub success: bool,
+
+    /// Whether the current root is tentative (set by VisitParent, awaiting confirmation).
+    ///
+    /// - `true`: Root was set by `VisitParent` but not yet confirmed by `CandidateMatch`.
+    /// - `false`: Root is confirmed (after `CandidateMatch`) or no root is set.
+    ///
+    /// The frontend can use this for tentative styling (dimmed gold / pulsing).
+    #[serde(default)]
+    pub root_tentative: bool,
+}
+
+impl VizPathGraph {
+    /// Create an empty path graph.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn require_start_node(
+        &self,
+        message: &str,
+    ) -> Result<(), String> {
+        if self.start_node.is_none() {
+            Err(message.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn ensure_start_node_unset(
+        &self,
+        message: &str,
+    ) -> Result<(), String> {
+        if self.start_node.is_some() {
+            Err(message.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn ensure_root_unset(
+        &self,
+        message: &str,
+    ) -> Result<(), String> {
+        if self.root.is_some() {
+            Err(message.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn clear_end_path(&mut self) {
+        self.end_path.clear();
+        self.end_edges.clear();
+        self.root_exit_edge = None;
+    }
+
+    fn demote_root_to_start_path(&mut self) {
+        if let Some(old_root) = self.root.take() {
+            let old_edge = self.root_entry_edge.take().unwrap();
+            self.start_path.push(old_root);
+            self.start_edges.push(old_edge);
+            self.clear_end_path();
+        }
+    }
+
+    fn set_root_candidate(
+        &mut self,
+        root: PathNode,
+        edge: EdgeRef,
+        tentative: bool,
+    ) {
+        self.root = Some(root);
+        self.root_entry_edge = Some(edge);
+        self.root_tentative = tentative;
+    }
+
+    fn promote_root_from_start_path_or_edge(
+        &mut self,
+        root: PathNode,
+        edge: EdgeRef,
+    ) {
+        if self.start_path.last().map(|node| node.index) == Some(root.index) {
+            self.start_path.pop();
+            self.root = Some(root);
+            self.root_entry_edge = self.start_edges.pop().or(Some(edge));
+        } else {
+            self.root = Some(root);
+            self.root_entry_edge = Some(edge);
+        }
+    }
+
+    fn push_child(
+        &mut self,
+        child: PathNode,
+        edge: EdgeRef,
+    ) {
+        self.end_path.push(child);
+        self.end_edges.push(edge);
+        if self.end_path.len() == 1 {
+            self.root_exit_edge = Some(edge);
+        }
+    }
+
+    fn replace_child(
+        &mut self,
+        child: PathNode,
+        edge: EdgeRef,
+    ) -> Result<(), String> {
+        if self.end_path.is_empty() {
+            return Err("ReplaceChild on empty end_path".into());
+        }
+        *self.end_path.last_mut().unwrap() = child;
+        *self.end_edges.last_mut().unwrap() = edge;
+        if self.end_path.len() == 1 {
+            self.root_exit_edge = Some(edge);
+        }
+        Ok(())
+    }
+
+    fn pop_child(&mut self) -> Result<(), String> {
+        if self.end_path.is_empty() {
+            return Err("PopChild on empty end_path".into());
+        }
+        self.end_path.pop();
+        self.end_edges.pop();
+        if self.end_path.is_empty() {
+            self.root_exit_edge = None;
+        }
+        Ok(())
+    }
+
+    fn set_cursor_pos(
+        &mut self,
+        cursor_pos: usize,
+    ) {
+        self.cursor_pos = cursor_pos;
+    }
+
+    fn mark_done(
+        &mut self,
+        success: bool,
+    ) {
+        self.done = true;
+        self.success = success;
+    }
+
+    fn clear_rejected_root(&mut self) {
+        self.root = None;
+        self.root_entry_edge = None;
+        self.root_exit_edge = None;
+        self.end_path.clear();
+        self.end_edges.clear();
+        self.root_tentative = false;
+    }
+
+    fn pop_rejected_parent(
+        &mut self,
+        node_index: usize,
+    ) {
+        if self.start_path.last().map(|node| node.index) == Some(node_index) {
+            self.start_path.pop();
+            self.start_edges.pop();
+        }
+    }
+
+    fn apply_transition_root_phase(
+        &mut self,
+        transition: &super::visualization::Transition,
+    ) -> Result<(), String> {
+        use super::visualization::Transition;
+
+        match transition {
+            Transition::StartNode { node } => {
+                self.ensure_start_node_unset("StartNode applied twice")?;
+                self.start_node = Some(*node);
+            },
+            Transition::VisitParent { to, edge, .. } => {
+                self.require_start_node("VisitParent before StartNode")?;
+                self.demote_root_to_start_path();
+                self.set_root_candidate(*to, *edge, true);
+            },
+            Transition::CandidateMatch { root, edge } => {
+                if self.root.is_none() {
+                    self.require_start_node("CandidateMatch before StartNode")?;
+                    self.promote_root_from_start_path_or_edge(*root, *edge);
+                }
+                self.root_tentative = false;
+            },
+            _ => unreachable!(
+                "non-root transition passed to apply_transition_root_phase"
+            ),
+        }
+
+        Ok(())
+    }
+
+    fn apply_transition_cursor_update(
+        &mut self,
+        transition: &super::visualization::Transition,
+    ) {
+        use super::visualization::Transition;
+
+        match transition {
+            Transition::ChildMatch { cursor_pos, .. }
+            | Transition::ChildMismatch { cursor_pos, .. } => {
+                self.set_cursor_pos(*cursor_pos);
+            },
+            _ => unreachable!(
+                "non-cursor transition passed to apply_transition_cursor_update"
+            ),
+        }
+    }
+
+    /// Apply a [`Transition`] to update this path graph in place.
+    ///
+    /// **Root-setting semantics:**
+    /// - `VisitParent` sets the root (so child arrows appear during comparison).
+    /// - `CandidateMatch` only sets root as fallback when no `VisitParent` preceded it
+    ///   (e.g. non-parent / start-node matches). Otherwise it is informational.
+    /// - `CandidateMismatch` clears root + end_path when the candidate is rejected.
+    ///
+    /// Informational transitions (e.g., `ParentExplore`) are silently ignored.
+    pub fn apply_transition(
+        &mut self,
+        transition: &super::visualization::Transition,
+    ) -> Result<(), String> {
+        use super::visualization::Transition;
+        match transition {
+            Transition::StartNode { .. }
+            | Transition::VisitParent { .. }
+            | Transition::CandidateMatch { .. } => {
+                self.apply_transition_root_phase(transition)?;
+            },
+            Transition::VisitChild {
+                to, edge, replace, ..
+            } =>
+                if *replace {
+                    self.replace_child(*to, *edge).map_err(|_| {
+                        "VisitChild replace on empty end_path".to_string()
+                    })?;
+                } else {
+                    self.push_child(*to, *edge);
+                },
+            Transition::ChildMatch { .. }
+            | Transition::ChildMismatch { .. } => {
+                self.apply_transition_cursor_update(transition);
+            },
+            Transition::Done { success, .. } => {
+                self.mark_done(*success);
+            },
+            Transition::CandidateMismatch { node, .. } => {
+                if self.root.map(|n| n.index) == Some(node.index) {
+                    self.clear_rejected_root();
+                } else {
+                    self.pop_rejected_parent(node.index);
+                }
+            },
+            _ => {},
+        }
+        Ok(())
+    }
+
+    /// Apply a single [`PathTransition`], mutating this path graph in place.
+    ///
+    /// Returns `Err` if the transition is invalid for the current state
+    /// (e.g., `PushChild` before `SetRoot`).
+    pub fn apply(
+        &mut self,
+        transition: &PathTransition,
+    ) -> Result<(), String> {
+        match transition {
+            PathTransition::SetStartNode { node } => {
+                self.ensure_start_node_unset("SetStartNode called twice")?;
+                self.start_node = Some(*node);
+            },
+            PathTransition::PushParent { parent, edge } => {
+                self.require_start_node("PushParent before SetStartNode")?;
+                self.demote_root_to_start_path();
+                self.start_path.push(*parent);
+                self.start_edges.push(*edge);
+            },
+            PathTransition::SetRoot { root, edge } => {
+                self.require_start_node("SetRoot before SetStartNode")?;
+                self.ensure_root_unset("SetRoot called twice")?;
+                self.promote_root_from_start_path_or_edge(*root, *edge);
+            },
+            PathTransition::PushChild { child, edge } => {
+                if self.root.is_none() {
+                    return Err("PushChild before SetRoot".into());
+                }
+                self.push_child(*child, *edge);
+            },
+            PathTransition::PopChild => {
+                self.pop_child()?;
+            },
+            PathTransition::ReplaceChild { child, edge } => {
+                self.replace_child(*child, *edge)?;
+            },
+            PathTransition::ChildMatch { cursor_pos } => {
+                self.set_cursor_pos(*cursor_pos);
+            },
+            PathTransition::ChildMismatch { cursor_pos } => {
+                self.set_cursor_pos(*cursor_pos);
+            },
+            PathTransition::Done { success } => {
+                self.mark_done(*success);
+            },
+        }
+        Ok(())
+    }
+
+    /// Reconstruct a path graph from a sequence of transitions.
+    pub fn from_transitions(
+        transitions: &[PathTransition]
+    ) -> Result<Self, String> {
+        let mut graph = Self::new();
+        for (i, t) in transitions.iter().enumerate() {
+            graph.apply(t).map_err(|e| format!("step {i}: {e}"))?;
+        }
+        Ok(graph)
+    }
+
+    /// All node indices referenced by this path (for highlighting).
+    pub fn all_node_indices(&self) -> Vec<usize> {
+        let mut indices = Vec::new();
+        if let Some(start) = &self.start_node {
+            indices.push(start.index);
+        }
+        for n in &self.start_path {
+            indices.push(n.index);
+        }
+        if let Some(root) = &self.root {
+            indices.push(root.index);
+        }
+        for n in &self.end_path {
+            indices.push(n.index);
+        }
+        indices
+    }
+
+    /// All edge refs referenced by this path (for highlighting).
+    pub fn all_edges(&self) -> Vec<EdgeRef> {
+        let mut edges = Vec::new();
+        edges.extend_from_slice(&self.start_edges);
+        if let Some(re) = &self.root_entry_edge {
+            edges.push(*re);
+        }
+        if let Some(re) = &self.root_exit_edge {
+            edges.push(*re);
+        }
+        edges.extend_from_slice(&self.end_edges);
+        edges
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(
+        index: usize,
+        width: usize,
+    ) -> PathNode {
+        PathNode { index, width }
+    }
+
+    fn edge(
+        from: usize,
+        to: usize,
+        pattern_idx: usize,
+        sub_index: usize,
+    ) -> EdgeRef {
+        EdgeRef {
+            from,
+            to,
+            pattern_idx,
+            sub_index,
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // VizPathGraph::apply — valid transition sequences
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_set_start_node() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(5, 1) })
+            .unwrap();
+        assert_eq!(g.start_node, Some(node(5, 1)));
+        assert!(g.start_path.is_empty());
+        assert!(g.root.is_none());
+    }
+
+    #[test]
+    fn test_push_parent_builds_start_path() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::PushParent {
+            parent: node(10, 2),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        g.apply(&PathTransition::PushParent {
+            parent: node(20, 4),
+            edge: edge(10, 20, 0, 1),
+        })
+        .unwrap();
+
+        assert_eq!(g.start_path.len(), 2);
+        assert_eq!(g.start_path[0], node(10, 2));
+        assert_eq!(g.start_path[1], node(20, 4));
+        assert_eq!(g.start_edges.len(), 2);
+        assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
+        assert_eq!(g.start_edges[1], edge(10, 20, 0, 1));
+    }
+
+    #[test]
+    fn test_set_root_after_parents() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::PushParent {
+            parent: node(10, 2),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        g.apply(&PathTransition::SetRoot {
+            root: node(20, 4),
+            edge: edge(10, 20, 0, 0),
+        })
+        .unwrap();
+
+        assert_eq!(g.root, Some(node(20, 4)));
+        assert_eq!(g.root_entry_edge, Some(edge(10, 20, 0, 0)));
+    }
+
+    #[test]
+    fn test_push_child_builds_end_path() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        g.apply(&PathTransition::PushChild {
+            child: node(3, 1),
+            edge: edge(10, 3, 0, 1),
+        })
+        .unwrap();
+        g.apply(&PathTransition::PushChild {
+            child: node(2, 1),
+            edge: edge(3, 2, 0, 0),
+        })
+        .unwrap();
+
+        assert_eq!(g.end_path.len(), 2);
+        assert_eq!(g.end_path[0], node(3, 1));
+        assert_eq!(g.end_path[1], node(2, 1));
+        assert_eq!(g.end_edges[0], edge(10, 3, 0, 1));
+        assert_eq!(g.end_edges[1], edge(3, 2, 0, 0));
+    }
+
+    #[test]
+    fn test_pop_child_backtracks() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        g.apply(&PathTransition::PushChild {
+            child: node(3, 1),
+            edge: edge(10, 3, 0, 1),
+        })
+        .unwrap();
+        g.apply(&PathTransition::PopChild).unwrap();
+
+        assert!(g.end_path.is_empty());
+        assert!(g.end_edges.is_empty());
+    }
+
+    #[test]
+    fn test_replace_child() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        g.apply(&PathTransition::PushChild {
+            child: node(3, 1),
+            edge: edge(10, 3, 0, 1),
+        })
+        .unwrap();
+        g.apply(&PathTransition::ReplaceChild {
+            child: node(4, 1),
+            edge: edge(10, 4, 0, 2),
+        })
+        .unwrap();
+
+        assert_eq!(g.end_path.len(), 1);
+        assert_eq!(g.end_path[0], node(4, 1));
+        assert_eq!(g.end_edges[0], edge(10, 4, 0, 2));
+    }
+
+    #[test]
+    fn test_child_match_updates_cursor() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::ChildMatch { cursor_pos: 3 })
+            .unwrap();
+        assert_eq!(g.cursor_pos, 3);
+    }
+
+    #[test]
+    fn test_done_sets_flags() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::Done { success: true }).unwrap();
+        assert!(g.done);
+        assert!(g.success);
+    }
+
+    // ---------------------------------------------------------------
+    // VizPathGraph::apply — invalid transition sequences
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_double_start_node_fails() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        let err = g.apply(&PathTransition::SetStartNode { node: node(2, 1) });
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_push_parent_before_start_fails() {
+        let mut g = VizPathGraph::new();
+        let err = g.apply(&PathTransition::PushParent {
+            parent: node(10, 2),
+            edge: edge(10, 1, 0, 0),
+        });
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_push_parent_after_root_extends_start_path() {
+        // PushParent after SetRoot demotes the old root into start_path
+        // and clears root/root_entry_edge so a new SetRoot can follow.
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        assert!(g.root.is_some());
+
+        g.apply(&PathTransition::PushParent {
+            parent: node(20, 4),
+            edge: edge(10, 20, 0, 0),
+        })
+        .unwrap();
+
+        // Old root (10) demoted into start_path; root cleared.
+        assert_eq!(g.start_path.len(), 2);
+        assert_eq!(g.start_path[0], node(10, 3));
+        assert_eq!(g.start_path[1], node(20, 4));
+        assert_eq!(g.start_edges.len(), 2);
+        assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
+        assert_eq!(g.start_edges[1], edge(10, 20, 0, 0));
+        assert!(g.root.is_none());
+        assert!(g.root_entry_edge.is_none());
+
+        // A second SetRoot with a DIFFERENT node (extends path further)
+        g.apply(&PathTransition::SetRoot {
+            root: node(30, 6),
+            edge: edge(20, 30, 0, 0),
+        })
+        .unwrap();
+        assert_eq!(g.root, Some(node(30, 6)));
+    }
+
+    #[test]
+    fn test_push_parent_then_set_root_same_node() {
+        // Tests the real-world pattern: PushParent(X) then SetRoot(X).
+        // SetRoot should pop X from start_path (graduate to root)
+        // and use the popped edge as root_entry_edge.
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+
+        // First root
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+
+        // Root boundary exhausted — explore parent
+        g.apply(&PathTransition::PushParent {
+            parent: node(20, 4),
+            edge: edge(10, 20, 0, 0),
+        })
+        .unwrap();
+
+        // After PushParent-after-SetRoot: start_path = [10, 20]
+        assert_eq!(g.start_path.len(), 2);
+        assert!(g.root.is_none());
+
+        // SetRoot with the SAME node as PushParent — node graduates from
+        // start_path candidate to confirmed root.
+        g.apply(&PathTransition::SetRoot {
+            root: node(20, 4),
+            edge: edge(1, 20, 0, 0), // emission has wrong 'from', but apply fixes it
+        })
+        .unwrap();
+
+        // Node 20 popped from start_path, now root. root_entry_edge is the
+        // popped edge (10→20), NOT the provided edge (1→20).
+        assert_eq!(g.start_path.len(), 1);
+        assert_eq!(g.start_path[0], node(10, 3));
+        assert_eq!(g.start_edges.len(), 1);
+        assert_eq!(g.start_edges[0], edge(1, 10, 0, 0));
+        assert_eq!(g.root, Some(node(20, 4)));
+        assert_eq!(g.root_entry_edge, Some(edge(10, 20, 0, 0))); // correct popped edge
+
+        // Chain: PushParent(30) then SetRoot(30) again
+        g.apply(&PathTransition::PushParent {
+            parent: node(30, 6),
+            edge: edge(20, 30, 0, 0),
+        })
+        .unwrap();
+        // start_path = [10, 20, 30] (20 re-enters from demoted root)
+        assert_eq!(g.start_path.len(), 3);
+
+        g.apply(&PathTransition::SetRoot {
+            root: node(30, 6),
+            edge: edge(1, 30, 0, 0), // wrong from, but apply fixes it
+        })
+        .unwrap();
+        // 30 popped, root_entry_edge is the popped edge (20→30)
+        assert_eq!(g.start_path.len(), 2);
+        assert_eq!(g.start_path[0], node(10, 3));
+        assert_eq!(g.start_path[1], node(20, 4));
+        assert_eq!(g.root, Some(node(30, 6)));
+        assert_eq!(g.root_entry_edge, Some(edge(20, 30, 0, 0)));
+    }
+
+    #[test]
+    fn test_push_child_before_root_fails() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        let err = g.apply(&PathTransition::PushChild {
+            child: node(3, 1),
+            edge: edge(10, 3, 0, 1),
+        });
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_pop_child_empty_fails() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        let err = g.apply(&PathTransition::PopChild);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_replace_child_empty_fails() {
+        let mut g = VizPathGraph::new();
+        g.apply(&PathTransition::SetStartNode { node: node(1, 1) })
+            .unwrap();
+        g.apply(&PathTransition::SetRoot {
+            root: node(10, 3),
+            edge: edge(1, 10, 0, 0),
+        })
+        .unwrap();
+        let err = g.apply(&PathTransition::ReplaceChild {
+            child: node(4, 1),
+            edge: edge(10, 4, 0, 2),
+        });
+        assert!(err.is_err());
+    }
+
+    // ---------------------------------------------------------------
+    // from_transitions — reconstruct from a list
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_full_search_path_reconstruction() {
+        // Simulate: start(1) → parent(10) → root(20) → child(5) → match → done
+        let transitions = vec![
+            PathTransition::SetStartNode { node: node(1, 1) },
+            PathTransition::PushParent {
+                parent: node(10, 2),
+                edge: edge(1, 10, 0, 0),
+            },
+            PathTransition::SetRoot {
+                root: node(20, 4),
+                edge: edge(10, 20, 0, 0),
+            },
+            PathTransition::PushChild {
+                child: node(5, 1),
+                edge: edge(20, 5, 0, 1),
+            },
+            PathTransition::ChildMatch { cursor_pos: 2 },
+            PathTransition::Done { success: true },
+        ];
+
+        let g = VizPathGraph::from_transitions(&transitions).unwrap();
+
+        assert_eq!(g.start_node, Some(node(1, 1)));
+        assert_eq!(g.start_path, vec![node(10, 2)]);
+        assert_eq!(g.root, Some(node(20, 4)));
+        assert_eq!(g.end_path, vec![node(5, 1)]);
+        assert_eq!(g.cursor_pos, 2);
+        assert!(g.done);
+        assert!(g.success);
+        assert_eq!(g.all_node_indices(), vec![1, 10, 20, 5]);
+        assert_eq!(g.all_edges().len(), 4); // start_edge + root_entry_edge + root_exit_edge + end_edge
+    }
+
+    #[test]
+    fn test_mismatch_path() {
+        let transitions = vec![
+            PathTransition::SetStartNode { node: node(1, 1) },
+            PathTransition::SetRoot {
+                root: node(10, 2),
+                edge: edge(1, 10, 0, 0),
+            },
+            PathTransition::PushChild {
+                child: node(3, 1),
+                edge: edge(10, 3, 0, 1),
+            },
+            PathTransition::ChildMismatch { cursor_pos: 1 },
+            PathTransition::Done { success: false },
+        ];
+
+        let g = VizPathGraph::from_transitions(&transitions).unwrap();
+
+        assert_eq!(g.start_node, Some(node(1, 1)));
+        assert!(g.start_path.is_empty());
+        assert_eq!(g.root, Some(node(10, 2)));
+        assert_eq!(g.end_path, vec![node(3, 1)]);
+        assert_eq!(g.cursor_pos, 1);
+        assert!(g.done);
+        assert!(!g.success);
+    }
+
+    #[test]
+    fn test_backtrack_and_retry_path() {
+        let transitions = vec![
+            PathTransition::SetStartNode { node: node(1, 1) },
+            PathTransition::SetRoot {
+                root: node(10, 3),
+                edge: edge(1, 10, 0, 0),
+            },
+            PathTransition::PushChild {
+                child: node(3, 1),
+                edge: edge(10, 3, 0, 1),
+            },
+            PathTransition::ChildMismatch { cursor_pos: 1 },
+            PathTransition::PopChild,
+            PathTransition::PushChild {
+                child: node(4, 1),
+                edge: edge(10, 4, 0, 2),
+            },
+            PathTransition::ChildMatch { cursor_pos: 2 },
+            PathTransition::Done { success: true },
+        ];
+
+        let g = VizPathGraph::from_transitions(&transitions).unwrap();
+
+        assert_eq!(g.end_path, vec![node(4, 1)]);
+        assert_eq!(g.cursor_pos, 2);
+        assert!(g.success);
+    }
+
+    // ---------------------------------------------------------------
+    // JSON serialization round-trip
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_path_transition_json_roundtrip() {
+        let transitions = vec![
+            PathTransition::SetStartNode { node: node(1, 1) },
+            PathTransition::PushParent {
+                parent: node(10, 2),
+                edge: edge(1, 10, 0, 0),
+            },
+            PathTransition::SetRoot {
+                root: node(20, 4),
+                edge: edge(10, 20, 0, 0),
+            },
+            PathTransition::PushChild {
+                child: node(5, 1),
+                edge: edge(20, 5, 0, 1),
+            },
+            PathTransition::PopChild,
+            PathTransition::ReplaceChild {
+                child: node(6, 1),
+                edge: edge(20, 6, 0, 2),
+            },
+            PathTransition::ChildMatch { cursor_pos: 2 },
+            PathTransition::ChildMismatch { cursor_pos: 3 },
+            PathTransition::Done { success: true },
+        ];
+
+        for t in &transitions {
+            let json = serde_json::to_string(t).unwrap();
+            let deserialized: PathTransition =
+                serde_json::from_str(&json).unwrap();
+            assert_eq!(*t, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_viz_path_graph_json_roundtrip() {
+        let transitions = vec![
+            PathTransition::SetStartNode { node: node(1, 1) },
+            PathTransition::PushParent {
+                parent: node(10, 2),
+                edge: edge(1, 10, 0, 0),
+            },
+            PathTransition::SetRoot {
+                root: node(20, 4),
+                edge: edge(10, 20, 0, 0),
+            },
+            PathTransition::PushChild {
+                child: node(5, 1),
+                edge: edge(20, 5, 0, 1),
+            },
+            PathTransition::Done { success: true },
+        ];
+
+        let g = VizPathGraph::from_transitions(&transitions).unwrap();
+        let json = serde_json::to_string(&g).unwrap();
+        let deserialized: VizPathGraph = serde_json::from_str(&json).unwrap();
+        assert_eq!(g, deserialized);
+    }
+
+    // ---------------------------------------------------------------
+    // Cross-language test fixture generation
+    // ---------------------------------------------------------------
+
+    /// A test fixture case: name, transitions, and expected output.
+    #[derive(Serialize, Deserialize)]
+    struct TestFixture {
+        name: String,
+        transitions: Vec<PathTransition>,
+        expected: VizPathGraph,
+    }
+
+    /// Generate all cross-language test fixtures.
+    fn build_fixtures() -> Vec<TestFixture> {
+        vec![
+            TestFixture {
+                name: "simple_start_only".into(),
+                transitions: vec![PathTransition::SetStartNode {
+                    node: node(1, 1),
+                }],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                ])
+                .unwrap(),
+            },
+            TestFixture {
+                name: "start_with_parents".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::PushParent {
+                        parent: node(10, 2),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushParent {
+                        parent: node(20, 4),
+                        edge: edge(10, 20, 0, 1),
+                    },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::PushParent {
+                        parent: node(10, 2),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushParent {
+                        parent: node(20, 4),
+                        edge: edge(10, 20, 0, 1),
+                    },
+                ])
+                .unwrap(),
+            },
+            TestFixture {
+                name: "full_search_path".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::PushParent {
+                        parent: node(10, 2),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::SetRoot {
+                        root: node(20, 4),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(5, 1),
+                        edge: edge(20, 5, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 2 },
+                    PathTransition::Done { success: true },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::PushParent {
+                        parent: node(10, 2),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::SetRoot {
+                        root: node(20, 4),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(5, 1),
+                        edge: edge(20, 5, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 2 },
+                    PathTransition::Done { success: true },
+                ])
+                .unwrap(),
+            },
+            TestFixture {
+                name: "mismatch_path".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 2),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(10, 3, 0, 1),
+                    },
+                    PathTransition::ChildMismatch { cursor_pos: 1 },
+                    PathTransition::Done { success: false },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 2),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(10, 3, 0, 1),
+                    },
+                    PathTransition::ChildMismatch { cursor_pos: 1 },
+                    PathTransition::Done { success: false },
+                ])
+                .unwrap(),
+            },
+            TestFixture {
+                name: "backtrack_and_retry".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(10, 3, 0, 1),
+                    },
+                    PathTransition::ChildMismatch { cursor_pos: 1 },
+                    PathTransition::PopChild,
+                    PathTransition::PushChild {
+                        child: node(4, 1),
+                        edge: edge(10, 4, 0, 2),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 2 },
+                    PathTransition::Done { success: true },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(10, 3, 0, 1),
+                    },
+                    PathTransition::ChildMismatch { cursor_pos: 1 },
+                    PathTransition::PopChild,
+                    PathTransition::PushChild {
+                        child: node(4, 1),
+                        edge: edge(10, 4, 0, 2),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 2 },
+                    PathTransition::Done { success: true },
+                ])
+                .unwrap(),
+            },
+            TestFixture {
+                name: "replace_child".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(10, 3, 0, 1),
+                    },
+                    PathTransition::ReplaceChild {
+                        child: node(4, 1),
+                        edge: edge(10, 4, 0, 2),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 2 },
+                    PathTransition::Done { success: true },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(10, 3, 0, 1),
+                    },
+                    PathTransition::ReplaceChild {
+                        child: node(4, 1),
+                        edge: edge(10, 4, 0, 2),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 2 },
+                    PathTransition::Done { success: true },
+                ])
+                .unwrap(),
+            },
+            TestFixture {
+                name: "deep_nested_path".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(0, 1) },
+                    PathTransition::PushParent {
+                        parent: node(5, 2),
+                        edge: edge(0, 5, 0, 0),
+                    },
+                    PathTransition::PushParent {
+                        parent: node(10, 3),
+                        edge: edge(5, 10, 0, 1),
+                    },
+                    PathTransition::SetRoot {
+                        root: node(20, 6),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(15, 3),
+                        edge: edge(20, 15, 0, 1),
+                    },
+                    PathTransition::PushChild {
+                        child: node(8, 2),
+                        edge: edge(15, 8, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(8, 3, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 5 },
+                    PathTransition::Done { success: true },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(0, 1) },
+                    PathTransition::PushParent {
+                        parent: node(5, 2),
+                        edge: edge(0, 5, 0, 0),
+                    },
+                    PathTransition::PushParent {
+                        parent: node(10, 3),
+                        edge: edge(5, 10, 0, 1),
+                    },
+                    PathTransition::SetRoot {
+                        root: node(20, 6),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(15, 3),
+                        edge: edge(20, 15, 0, 1),
+                    },
+                    PathTransition::PushChild {
+                        child: node(8, 2),
+                        edge: edge(15, 8, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(3, 1),
+                        edge: edge(8, 3, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 5 },
+                    PathTransition::Done { success: true },
+                ])
+                .unwrap(),
+            },
+            // Simulates the runtime search pattern: SetRoot is called first (root found),
+            // then PushParent extends the start path when the root boundary is exhausted.
+            // Matches real behavior where PushParent and the following SetRoot target
+            // the SAME node (SetRoot "graduates" the candidate from start_path to root).
+            TestFixture {
+                name: "push_parent_after_root".into(),
+                transitions: vec![
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    // First root found immediately
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    // Root boundary exhausted — explore parent (PushParent after SetRoot)
+                    PathTransition::PushParent {
+                        parent: node(20, 6),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    // SetRoot for the SAME node 20 — graduates from start_path to root.
+                    // The emission uses from:1 (start_node) which is wrong, but apply()
+                    // pops node 20 and uses the popped edge (10→20) as root_entry_edge.
+                    PathTransition::SetRoot {
+                        root: node(20, 6),
+                        edge: edge(1, 20, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(5, 1),
+                        edge: edge(20, 5, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 3 },
+                    PathTransition::Done { success: true },
+                ],
+                expected: VizPathGraph::from_transitions(&[
+                    PathTransition::SetStartNode { node: node(1, 1) },
+                    PathTransition::SetRoot {
+                        root: node(10, 3),
+                        edge: edge(1, 10, 0, 0),
+                    },
+                    PathTransition::PushParent {
+                        parent: node(20, 6),
+                        edge: edge(10, 20, 0, 0),
+                    },
+                    PathTransition::SetRoot {
+                        root: node(20, 6),
+                        edge: edge(1, 20, 0, 0),
+                    },
+                    PathTransition::PushChild {
+                        child: node(5, 1),
+                        edge: edge(20, 5, 0, 1),
+                    },
+                    PathTransition::ChildMatch { cursor_pos: 3 },
+                    PathTransition::Done { success: true },
+                ])
+                .unwrap(),
+            },
+        ]
+    }
+
+    #[test]
+    fn generate_cross_language_fixtures() {
+        let fixtures = build_fixtures();
+        let json = serde_json::to_string_pretty(&fixtures).unwrap();
+        let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..") // up to context-engine root
+            .join(
+                "tools/log-viewer/frontend/src/search-path/test-fixtures.json",
+            );
+        std::fs::create_dir_all(fixture_path.parent().unwrap()).unwrap();
+        std::fs::write(&fixture_path, &json).unwrap();
+        eprintln!("Wrote test fixtures to {}", fixture_path.display());
+    }
+}

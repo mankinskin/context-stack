@@ -8,7 +8,7 @@ use derive_more::{
     IntoIterator,
 };
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[derive(Debug, Default, IntoIterator, DerefMut)]
 pub(crate) struct PatternSubDeltas {

@@ -13,7 +13,7 @@ use crate::split::{
         position::Offset,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SplitTraceState {

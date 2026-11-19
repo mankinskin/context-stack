@@ -12,7 +12,7 @@
 //! - `TokenRef::Label(s)` where `s.len() > 1` → search for a token whose
 //!   atom sequence matches `s` using `Find::find_ancestor`.
 
-use context_trace::{
+use context_trace::legacy::{
     VertexSet,
     graph::{
         HypergraphRef,
@@ -114,7 +114,7 @@ pub fn resolve_token_refs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::graph::{
+    use context_trace::legacy::graph::{
         Hypergraph,
         HypergraphRef,
         kind::BaseGraphKind,

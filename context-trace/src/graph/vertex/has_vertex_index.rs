@@ -1,6 +1,5 @@
 use crate::graph::vertex::{
     VertexIndex,
-    data::VertexData,
     token::Token,
     wide::Wide,
 };
@@ -28,7 +27,8 @@ impl HasVertexIndex for VertexIndex {
     }
 }
 
-impl HasVertexIndex for VertexData {
+#[cfg(feature = "legacy")]
+impl HasVertexIndex for crate::legacy::VertexData {
     fn vertex_index(&self) -> VertexIndex {
         self.token.vertex_index()
     }

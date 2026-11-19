@@ -1,6 +1,6 @@
 use derivative::Derivative;
 
-use context_trace::*;
+use context_trace::legacy::*;
 use derive_new::new;
 
 use crate::split::vertex::node::NodeTraceCtx;

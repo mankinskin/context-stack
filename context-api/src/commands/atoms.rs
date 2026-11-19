@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use context_trace::graph::vertex::atom::Atom;
+use context_trace::legacy::graph::vertex::atom::Atom;
 
 use crate::{
     error::{

@@ -21,7 +21,7 @@ use std::{
     },
 };
 
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     Hypergraph,
     kind::BaseGraphKind,
 };
@@ -254,7 +254,7 @@ fn dir_name(dir: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::graph::vertex::atom::Atom;
+    use context_trace::legacy::graph::vertex::atom::Atom;
 
     /// Helper: create a temporary base directory that is automatically cleaned
     /// up when the returned `TempDir` is dropped.

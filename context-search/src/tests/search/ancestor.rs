@@ -19,7 +19,7 @@ use {
         },
         tests::search::event_helpers::*,
     },
-    context_trace::*,
+    context_trace::legacy::*,
     itertools::*,
     pretty_assertions::{
         assert_eq,
@@ -586,7 +586,7 @@ fn find_ancestor1_long_pattern() {
 
 #[test]
 fn find_ancestor2() {
-    use context_trace::*;
+    use context_trace::legacy::*;
 
     let graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, x, y, z});

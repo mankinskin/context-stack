@@ -24,14 +24,14 @@ use {
         Response,
         Searchable,
     },
-    context_trace::trace::cache::key::directed::{
+    context_trace::legacy::trace::cache::key::directed::{
         down::{
             DownKey,
             DownPosition,
         },
         DirectedKey,
     },
-    context_trace::*,
+    context_trace::legacy::*,
     pretty_assertions::assert_eq,
 };
 
@@ -1100,7 +1100,7 @@ fn search_complete_token_a_bc() {
 #[test]
 fn test_index_prefix1_hell() {
     use crate::tests::env::EnvInsertPrefix1;
-    use context_trace::tests::test_case::TestEnv;
+    use context_trace::legacy::tests::test_case::TestEnv;
 
     let EnvInsertPrefix1 {
         graph,
@@ -1176,7 +1176,7 @@ fn test_index_prefix1_hell() {
 #[test]
 fn test_index_postfix1_bcdd() {
     use crate::tests::env::EnvInsertPostfix1;
-    use context_trace::tests::test_case::TestEnv;
+    use context_trace::legacy::tests::test_case::TestEnv;
 
     let EnvInsertPostfix1 {
         graph,

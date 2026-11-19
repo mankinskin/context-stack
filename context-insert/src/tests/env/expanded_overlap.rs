@@ -3,7 +3,7 @@
 //! Tests cases where insert query starts at a postfix of an existing token.
 //! For example, graph has "abc" and insert starts with "bcd" (bc is postfix of abc).
 
-use context_trace::{
+use context_trace::legacy::{
     PatternId,
     graph::{
         Hypergraph,
@@ -62,7 +62,7 @@ impl TestEnv for EnvExpandedOverlap {
         let (abc, abc_id) = graph.insert_pattern_with_id(vec![ab, c]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 
@@ -150,7 +150,7 @@ impl TestEnv for EnvMultiOverlap {
         let (abcd, abcd_id) = graph.insert_pattern_with_id(vec![ab, cd]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

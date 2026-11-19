@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use context_trace::{
+use context_trace::legacy::{
     VertexSet,
     graph::{
         Hypergraph,
@@ -91,7 +91,7 @@ pub fn validate_simple_pattern(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::graph::vertex::atom::Atom;
+    use context_trace::legacy::graph::vertex::atom::Atom;
 
     /// Helper: create a default graph and insert the given atoms.
     fn graph_with_atoms(chars: &[char]) -> Hypergraph<BaseGraphKind> {

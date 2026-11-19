@@ -11,7 +11,7 @@
 #[cfg(test)]
 use {
     crate::search::Find,
-    context_trace::{
+    context_trace::legacy::{
         graph::vertex::token::Token,
         *,
     },
@@ -20,7 +20,7 @@ use {
 
 fn dump(
     label: &str,
-    events: &[context_trace::graph::visualization::GraphOpEvent],
+    events: &[context_trace::legacy::graph::visualization::GraphOpEvent],
 ) {
     eprintln!("\n=== {label} ({} events) ===", events.len());
     for e in events {
@@ -61,7 +61,7 @@ fn dump_long_pattern() {
 #[test]
 #[ignore = "diagnostic: run with --ignored --nocapture"]
 fn dump_ancestor2() {
-    use context_trace::*;
+    use context_trace::legacy::*;
     let graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, x, y, z});
     insert_patterns!(graph,

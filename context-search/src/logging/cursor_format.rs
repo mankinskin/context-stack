@@ -4,7 +4,7 @@ use crate::cursor::{
     CursorState,
     PathCursor,
 };
-use context_trace::logging::compact_format::{
+use context_trace::legacy::logging::compact_format::{
     write_indent,
     CompactFormat,
 };

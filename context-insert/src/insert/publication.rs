@@ -13,7 +13,7 @@
 
 use std::ops::Range;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 /// An original child index range of `location` replaced by `token`.
 #[derive(Debug, Clone, PartialEq, Eq)]

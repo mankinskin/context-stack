@@ -3,7 +3,7 @@
 //! Graph with patterns: yy, xx, xy, abcdx, yabcdx, abcdxx, xxy, xxyyabcdxxyy
 //! Tests complex infix matching with repetitions
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         Hypergraph,
         HypergraphRef,
@@ -68,7 +68,7 @@ impl TestEnv for EnvInsertInfix2 {
         ]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

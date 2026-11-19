@@ -24,7 +24,7 @@ use crate::{
         vertex::pattern::GetPatternCtx,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use derive_more::{
     Deref,
     DerefMut,

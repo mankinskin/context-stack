@@ -3,7 +3,7 @@
 //! Provides a thread-local step counter and helper functions for emitting
 //! `GraphOpEvent` messages during split and join operations.
 
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     search_path::VizPathGraph,
     visualization::{
         GraphMutation,

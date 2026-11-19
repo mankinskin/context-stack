@@ -16,7 +16,7 @@ use super::{
     Mismatched,
     PathCursor,
 };
-use context_trace::{
+use context_trace::legacy::{
     logging::CompactFormat,
     trace::state::StateAdvance,
     Advance,
@@ -447,8 +447,8 @@ impl<EndNode: PathNode> StateAdvance
     for Checkpointed<ChildCursor<Matched, EndNode>, AtCheckpoint>
 where
     EndNode: Clone,
-    context_trace::ChildState<EndNode>:
-        StateAdvance<Next = context_trace::ChildState<EndNode>>,
+    context_trace::legacy::ChildState<EndNode>:
+        StateAdvance<Next = context_trace::legacy::ChildState<EndNode>>,
 {
     type Next = Checkpointed<ChildCursor<Matched, EndNode>, HasCandidate>;
 

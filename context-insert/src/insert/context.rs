@@ -23,7 +23,7 @@ use context_search::{
     SearchKind,
     Searchable,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 use crate::insert::{
     outcome::{
@@ -106,7 +106,7 @@ impl<R: InsertResult> InsertCtx<R> {
         init: InitInterval,
     ) -> Result<(Token, Publication), ErrorState> {
         use crate::visualization::emit_insert_node_with_delta;
-        use context_trace::graph::visualization::{
+        use context_trace::legacy::graph::visualization::{
             DeltaOp,
             GraphMutation,
             Transition,
@@ -144,7 +144,7 @@ impl<R: InsertResult> InsertCtx<R> {
             emit_insert_node_with_delta,
             reset_step_counter,
         };
-        use context_trace::graph::visualization::{
+        use context_trace::legacy::graph::visualization::{
             DeltaOp,
             GraphMutation,
             PathNode,

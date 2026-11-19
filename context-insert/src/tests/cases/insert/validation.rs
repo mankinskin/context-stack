@@ -19,7 +19,7 @@ use context_search::{
     ErrorState,
     *,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::getters::ErrorReason,
     tests::test_case::TestEnv,
     *,

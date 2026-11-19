@@ -24,7 +24,7 @@ use crate::{
     },
     Response,
 };
-use context_trace::{
+use context_trace::legacy::{
     build_trace_cache,
     graph::vertex::token::Token,
     tests::test_case::{

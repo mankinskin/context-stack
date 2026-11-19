@@ -1,6 +1,7 @@
 //! Graph environment trait for reusable test fixtures
 
-use crate::HypergraphRef;
+#[cfg(feature = "legacy")]
+use crate::legacy::HypergraphRef;
 use std::sync::{
     RwLockReadGuard,
     RwLockWriteGuard,
@@ -74,5 +75,6 @@ pub trait TestEnv: Sized {
     fn get_mut<'a>() -> RwLockWriteGuard<'a, Self>;
 
     /// Get a reference to the graph.
+    #[cfg(feature = "legacy")]
     fn graph(&self) -> &HypergraphRef;
 }

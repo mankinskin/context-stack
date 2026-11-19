@@ -6,7 +6,7 @@ pub mod pipeline;
 pub(crate) mod request;
 pub(crate) mod segment;
 
-use context_trace::{
+use context_trace::legacy::{
     HypergraphRef,
     Token,
 };

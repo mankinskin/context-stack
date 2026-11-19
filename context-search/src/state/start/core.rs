@@ -13,7 +13,7 @@ use crate::{
     ErrorState,
     SearchKind,
 };
-use context_trace::{
+use context_trace::legacy::{
     logging::format_utils::pretty,
     path::{
         accessors::child::HasRootedLeafToken,

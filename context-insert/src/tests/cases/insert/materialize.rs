@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use context_search::Find;
-use context_trace::*;
+use context_trace::legacy::*;
 
 fn atoms<const N: usize>(
     graph: &HypergraphRef,

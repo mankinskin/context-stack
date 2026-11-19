@@ -22,7 +22,7 @@ use crate::{
         plan::JoinRef,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 /// Joined decompositions of a partition, one per original node pattern.
 #[derive(Debug)]

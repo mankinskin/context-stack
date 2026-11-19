@@ -1,6 +1,6 @@
 #![allow(unused)]
 use crate::state::matched::CheckpointedCursor;
-use context_trace::trace::cache::{
+use context_trace::legacy::trace::cache::{
     position::PositionCache,
     vertex::VertexCache,
 };
@@ -9,7 +9,7 @@ use std::{
     marker::PhantomData,
 };
 
-use context_trace::*;
+use context_trace::legacy::*;
 use pretty_assertions::{
     assert_eq,
     assert_matches,
@@ -28,7 +28,7 @@ use crate::{
     },
     Response,
 };
-use context_trace::{
+use context_trace::legacy::{
     trace::has_graph::HasGraph,
     HashMap,
 };
@@ -38,7 +38,7 @@ use tracing::{
 };
 #[allow(unused)]
 use {
-    context_trace::graph::vertex::token::Token,
+    context_trace::legacy::graph::vertex::token::Token,
     std::{
         borrow::Borrow,
         num::NonZeroUsize,

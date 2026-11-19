@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum InnerKind {

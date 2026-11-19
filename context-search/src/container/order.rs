@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 pub(crate) trait TraversalOrder: Wide + HasSubIndex {
     fn cmp(

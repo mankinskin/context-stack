@@ -3,7 +3,7 @@
 //! Graph with patterns: yz, xab, xyz, xabz, xabyz
 //! Tests pattern matching with different compositions
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         Hypergraph,
         HypergraphRef,
@@ -58,7 +58,7 @@ impl TestEnv for EnvInsertPattern2 {
         let xabyz = graph.insert_pattern(vec![xab, yz]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

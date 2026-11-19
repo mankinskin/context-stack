@@ -3,7 +3,7 @@ use result::InsertResult;
 
 use crate::interval::init::InitInterval;
 use context_search::*;
-use context_trace::*;
+use context_trace::legacy::*;
 pub mod context;
 pub(crate) mod direction;
 pub mod outcome;
@@ -85,7 +85,7 @@ pub trait ToInsertCtx<R: InsertResult = Token>:
         searchable: impl Searchable<InsertTraversal>,
     ) -> Result<
         outcome::InsertOutcome,
-        context_trace::graph::getters::ErrorReason,
+        context_trace::legacy::graph::getters::ErrorReason,
     > {
         self.insert_context().insert_next_match(searchable)
     }

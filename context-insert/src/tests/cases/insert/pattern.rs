@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use context_search::*;
-use context_trace::{
+use context_trace::legacy::{
     GraphRoot,
     HasGraph,
     HashSet,
@@ -227,7 +227,7 @@ fn publish_composes_replacements_in_one_pattern() {
         ProposedPattern,
         publish,
     };
-    use context_trace::{
+    use context_trace::legacy::{
         HypergraphRef,
         assert_parents,
         graph::vertex::parent::PatternIndex,

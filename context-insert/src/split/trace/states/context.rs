@@ -16,7 +16,7 @@ use crate::{
     },
     *,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[derive(Debug, Deref, DerefMut)]
 pub(crate) struct SplitTraceStatesCtx<G: HasGraph> {

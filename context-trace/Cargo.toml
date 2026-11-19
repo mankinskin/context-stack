@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = []
+default = ["legacy"]
+# Row-model implementation in `context_trace::legacy`.
+legacy = []
 test-api = []
 
 [dependencies]

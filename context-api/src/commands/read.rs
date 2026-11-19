@@ -10,7 +10,7 @@
 //! primitives. For each vertex, the first child pattern is followed (vertices
 //! may have multiple decompositions; we pick the first for determinism).
 
-use context_trace::{
+use context_trace::legacy::{
     VertexSet,
     graph::{
         Hypergraph,
@@ -148,10 +148,10 @@ impl WorkspaceManager {
             let graph = ws.graph();
 
             // Ensure atom exists
-            let atom = context_trace::graph::vertex::atom::Atom::Element(ch);
+            let atom = context_trace::legacy::graph::vertex::atom::Atom::Element(ch);
             let token = match graph.get_atom_index(atom) {
                 Ok(idx) =>
-                    context_trace::graph::vertex::token::Token::new(idx, 1),
+                    context_trace::legacy::graph::vertex::token::Token::new(idx, 1),
                 Err(_) => graph.insert_atom(atom),
             };
 

@@ -1,4 +1,4 @@
-use context_trace::{
+use context_trace::legacy::{
     graph::visualization::{
         GraphOpEvent,
         Transition,
@@ -143,7 +143,7 @@ impl Response {
     ///
     /// Useful for test assertions:
     /// ```ignore
-    /// use context_trace::graph::visualization::Transition;
+    /// use context_trace::legacy::graph::visualization::Transition;
     /// let transitions = response.transitions();
     /// assert!(matches!(transitions[0], Transition::StartNode { .. }));
     /// ```

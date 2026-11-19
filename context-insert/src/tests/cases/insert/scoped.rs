@@ -9,7 +9,7 @@ use crate::insert::{
         insert_scope_prefix_width,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     trace::has_graph::HasGraph,
     *,
 };

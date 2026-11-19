@@ -2,7 +2,7 @@ use crate::{
     expansion::ExpansionCtx,
     pipeline::root::RootManager,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use tracing::debug;
 
 /// Context for block-based expansion of a known-atom pattern.

@@ -24,7 +24,7 @@ use std::{
     fmt,
 };
 
-use context_trace::graph::snapshot::GraphSnapshot;
+use context_trace::legacy::graph::snapshot::GraphSnapshot;
 
 // ---------------------------------------------------------------------------
 // Core data structures
@@ -388,7 +388,7 @@ fn format_pattern(pattern: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::graph::snapshot::{
+    use context_trace::legacy::graph::snapshot::{
         SnapshotEdge,
         SnapshotNode,
     };

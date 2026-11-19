@@ -7,7 +7,7 @@ use crate::{
         vertex::pattern::PatternElems,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 pub(crate) mod borders;
 

@@ -21,7 +21,7 @@ mod tests;
 use std::collections::HashSet;
 
 use context_search::Find;
-use context_trace::graph::vertex::{
+use context_trace::legacy::graph::vertex::{
     atom::Atom,
     pattern::Pattern,
 };
@@ -167,7 +167,7 @@ impl WorkspaceManager {
             .map(|ch| {
                 graph_ref
                     .get_atom_index(Atom::Element(ch))
-                    .map(|index| context_trace::Token::new(index, 1))
+                    .map(|index| context_trace::legacy::Token::new(index, 1))
                     .unwrap_or_else(|_| {
                         graph_ref.insert_atom(Atom::Element(ch))
                     })

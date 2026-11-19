@@ -22,7 +22,7 @@ use context_search::{
     tests::search::trace_cache::CdefghiTraceCase,
     *,
 };
-use context_trace::tests::{
+use context_trace::legacy::tests::{
     env::{
         Env1,
         Env2,
@@ -443,7 +443,7 @@ fn test_perfect_split_no_wrapper_offset() {
             cache::position::SplitPositionCache,
         },
     };
-    use context_trace::graph::vertex::pattern::id::PatternId;
+    use context_trace::legacy::graph::vertex::pattern::id::PatternId;
 
     // Create a pattern ID for testing
     let pattern_id = PatternId::default();
@@ -455,7 +455,7 @@ fn test_perfect_split_no_wrapper_offset() {
             nz!(3),
             SplitPositionCache {
                 top: Default::default(),
-                pattern_splits: context_trace::HashMap::from_iter([(
+                pattern_splits: context_trace::legacy::HashMap::from_iter([(
                     pattern_id,
                     TokenTracePos {
                         inner_offset: None, // Perfect split - no inner offset
@@ -479,7 +479,7 @@ fn test_perfect_split_no_wrapper_offset() {
             nz!(5),
             SplitPositionCache {
                 top: Default::default(),
-                pattern_splits: context_trace::HashMap::from_iter([(
+                pattern_splits: context_trace::legacy::HashMap::from_iter([(
                     pattern_id,
                     TokenTracePos {
                         inner_offset: Some(nz!(2)), // Unperfect - 2 chars into child
@@ -503,7 +503,7 @@ fn test_perfect_split_no_wrapper_offset() {
                 nz!(3),
                 SplitPositionCache {
                     top: Default::default(),
-                    pattern_splits: context_trace::HashMap::from_iter([(
+                    pattern_splits: context_trace::legacy::HashMap::from_iter([(
                         pattern_id,
                         TokenTracePos {
                             inner_offset: None, // Perfect
@@ -516,7 +516,7 @@ fn test_perfect_split_no_wrapper_offset() {
                 nz!(5),
                 SplitPositionCache {
                     top: Default::default(),
-                    pattern_splits: context_trace::HashMap::from_iter([(
+                    pattern_splits: context_trace::legacy::HashMap::from_iter([(
                         pattern_id,
                         TokenTracePos {
                             inner_offset: Some(nz!(2)), // Unperfect
@@ -554,7 +554,7 @@ fn test_required_partitions_perfect_vs_unperfect() {
             cache::position::SplitPositionCache,
         },
     };
-    use context_trace::graph::vertex::pattern::id::PatternId;
+    use context_trace::legacy::graph::vertex::pattern::id::PatternId;
 
     let pattern_id = PatternId::default();
 
@@ -564,7 +564,7 @@ fn test_required_partitions_perfect_vs_unperfect() {
             nz!(3),
             SplitPositionCache {
                 top: Default::default(),
-                pattern_splits: context_trace::HashMap::from_iter([(
+                pattern_splits: context_trace::legacy::HashMap::from_iter([(
                     pattern_id,
                     TokenTracePos {
                         inner_offset: None, // Perfect split
@@ -592,7 +592,7 @@ fn test_required_partitions_perfect_vs_unperfect() {
             nz!(3),
             SplitPositionCache {
                 top: Default::default(),
-                pattern_splits: context_trace::HashMap::from_iter([(
+                pattern_splits: context_trace::legacy::HashMap::from_iter([(
                     pattern_id,
                     TokenTracePos {
                         inner_offset: Some(nz!(1)), // Unperfect split

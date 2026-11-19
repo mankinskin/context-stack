@@ -14,7 +14,7 @@ use crate::{
         PathCursor,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::token::{
         HasSubLocation,
         SubToken,

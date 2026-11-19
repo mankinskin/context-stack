@@ -4,7 +4,7 @@
 //! Unlike the trait-based `HasReadCtx` interface, this provides a more explicit,
 //! data-oriented way to specify read operations.
 
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::atom::{
         NewAtomIndex,
         NewAtomIndices,
@@ -141,7 +141,7 @@ impl ToNewAtomIndices for Pattern {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::init_test_tracing;
+    use context_trace::legacy::init_test_tracing;
 
     #[test]
     fn read_request_from_text() {

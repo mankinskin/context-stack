@@ -8,7 +8,7 @@ use crate::{
     pipeline::root::{RootManager, Span},
 };
 use context_insert::ToInsertCtx;
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[test]
 fn cursor_returns_existing_prefix_and_preserves_query_path() {

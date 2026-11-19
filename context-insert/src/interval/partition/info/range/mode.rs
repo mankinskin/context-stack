@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
 };
 
-use context_trace::{
+use context_trace::legacy::{
     HasToken,
     Token,
 };

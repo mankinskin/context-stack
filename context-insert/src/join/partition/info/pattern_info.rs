@@ -31,7 +31,7 @@ use crate::{
         plan::JoinRef,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[derive(Debug, Clone)]
 pub(crate) struct JoinPatternInfo<R: RangeRole<Mode = Join>> {

@@ -12,8 +12,8 @@ use {
             PatternCursor,
         },
     },
-    context_trace::trace::cache::key::directed::up::UpPosition,
-    context_trace::*,
+    context_trace::legacy::trace::cache::key::directed::up::UpPosition,
+    context_trace::legacy::*,
     std::marker::PhantomData,
 };
 

@@ -1,5 +1,4 @@
 use crate::graph::vertex::{
-    data::VertexData,
     key::VertexKey,
 };
 
@@ -25,7 +24,8 @@ impl HasVertexKey for VertexKey {
     }
 }
 
-impl HasVertexKey for VertexData {
+#[cfg(feature = "legacy")]
+impl HasVertexKey for crate::legacy::VertexData {
     fn vertex_key(&self) -> VertexKey {
         self.key
     }

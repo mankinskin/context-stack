@@ -3,7 +3,7 @@
 //! Graph with patterns: ab, by, yz, xa, xab, xaby, xabyz
 //! Tests complex pattern matching with overlapping structures
 
-use context_trace::{
+use context_trace::legacy::{
     HasGraph,
     graph::{
         Hypergraph,
@@ -66,7 +66,7 @@ impl TestEnv for EnvInsertPattern1 {
         let xabyz = graph.insert_patterns([vec![xaby, z], vec![xab, yz]]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

@@ -48,7 +48,7 @@ use ngrams::{
     },
 };
 
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     Hypergraph,
     HypergraphRef,
     kind::BaseGraphKind,
@@ -692,7 +692,7 @@ mod tests {
 
         // Insert some atoms.
         {
-            use context_trace::graph::vertex::atom::Atom;
+            use context_trace::legacy::graph::vertex::atom::Atom;
             let ws = mgr.get_workspace_mut("persist").unwrap();
             let graph = ws.graph_mut();
             graph.insert_atom(Atom::Element('a'));

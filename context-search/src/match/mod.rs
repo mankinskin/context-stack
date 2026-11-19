@@ -19,7 +19,7 @@ use crate::{
         SearchKind,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::search_path::PathNode,
     path::accessors::has_path::HasRootedPath,
     *,

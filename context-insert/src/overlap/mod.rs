@@ -48,7 +48,7 @@ use context_search::{
     ErrorState,
     Find,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 use crate::insert::{
     publication::Publication,

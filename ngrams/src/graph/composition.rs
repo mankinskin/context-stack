@@ -16,7 +16,7 @@
 
 use std::collections::BTreeMap;
 
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::key::VertexKey,
     HashMap,
     HashSet,

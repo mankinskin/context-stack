@@ -3,7 +3,7 @@ use std::collections::{
     HashMap,
 };
 
-use context_trace::graph::snapshot::GraphSnapshot;
+use context_trace::legacy::graph::snapshot::GraphSnapshot;
 
 /// Per-label entry derived from a `GraphSnapshot`.
 #[derive(Debug, Clone)]

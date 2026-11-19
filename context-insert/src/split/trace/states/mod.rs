@@ -14,7 +14,7 @@ use crate::split::{
         SubSplitLocation,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 pub(crate) mod context;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SplitStates {

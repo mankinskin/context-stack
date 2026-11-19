@@ -1,4 +1,4 @@
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::atom::{
         Atom,
         NewAtomIndex,

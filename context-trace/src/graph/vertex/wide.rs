@@ -1,14 +1,15 @@
+use crate::TokenWidth;
+#[cfg(feature = "legacy")]
 use crate::{
     Token,
-    TokenWidth,
-    graph::vertex::{
+    legacy::graph::vertex::{
         data::VertexData,
         pattern::{
             Pattern,
             pattern_width,
         },
     },
-    trace::cache::key::directed::{
+    legacy::trace::cache::key::directed::{
         down::DownKey,
         up::UpKey,
     },
@@ -18,12 +19,14 @@ pub trait Wide {
     fn width(&self) -> TokenWidth;
 }
 
+#[cfg(feature = "legacy")]
 impl Wide for Pattern {
     fn width(&self) -> TokenWidth {
         pattern_width(self)
     }
 }
 
+#[cfg(feature = "legacy")]
 impl Wide for [Token] {
     fn width(&self) -> TokenWidth {
         pattern_width(self)
@@ -58,23 +61,27 @@ impl<T: Wide> Wide for &'_ mut T {
 //        self.width
 //    }
 //}
+#[cfg(feature = "legacy")]
 impl Wide for VertexData {
     fn width(&self) -> TokenWidth {
         self.token.width()
     }
 }
+#[cfg(feature = "legacy")]
 impl WideMut for VertexData {
     fn width_mut(&mut self) -> &mut TokenWidth {
         self.token.width_mut()
     }
 }
 
+#[cfg(feature = "legacy")]
 impl Wide for UpKey {
     fn width(&self) -> TokenWidth {
         self.index.width()
     }
 }
 
+#[cfg(feature = "legacy")]
 impl Wide for DownKey {
     fn width(&self) -> TokenWidth {
         self.index.width()

@@ -1,4 +1,4 @@
-use context_trace::Wide;
+use context_trace::legacy::Wide;
 use linked_hash_map::LinkedHashMap;
 use tracing::info;
 

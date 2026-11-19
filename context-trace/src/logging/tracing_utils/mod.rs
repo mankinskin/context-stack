@@ -60,7 +60,7 @@ pub use writers::{
 ///
 /// With a test graph (automatically registers and clears on drop):
 /// ```no_run
-/// use context_trace::{init_test_tracing, Hypergraph};
+/// use context_trace::{init_test_tracing, legacy::Hypergraph};
 ///
 /// #[test]
 /// fn my_test() {

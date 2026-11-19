@@ -47,7 +47,7 @@ use crate::{
     },
     tests::TestCorpus,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             key::VertexKey,

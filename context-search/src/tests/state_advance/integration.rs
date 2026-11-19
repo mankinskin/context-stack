@@ -15,7 +15,7 @@ use {
             PatternCursor,
         },
     },
-    context_trace::*,
+    context_trace::legacy::*,
     std::marker::PhantomData,
 };
 
@@ -81,7 +81,7 @@ fn test_advancement_chain_through_multiple_states() {
         // Verify the child state is properly set up
         assert!(
             advanced.candidate.child.current().child_state.path.role_root_child_index::<
-                context_trace::path::accessors::role::End,
+                context_trace::legacy::path::accessors::role::End,
             >() > start_index,
             "Child state should point to index after parent"
         );
@@ -361,7 +361,7 @@ fn test_advancement_with_nested_patterns() {
         .current()
         .child_state
         .path
-        .role_root_child_index::<context_trace::path::accessors::role::End>(
+        .role_root_child_index::<context_trace::legacy::path::accessors::role::End>(
     );
     assert_eq!(
         child_root_index, 1,

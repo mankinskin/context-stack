@@ -9,7 +9,7 @@
 //! - Triple repeat pattern handling
 //! - Intermediate token discovery
 
-use context_trace::{
+use context_trace::legacy::{
     PatternId,
     graph::{
         Hypergraph,
@@ -55,7 +55,7 @@ impl TestEnv for EnvTripleRepeat {
             graph.insert_pattern_with_id(vec![ab, ab, ab]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

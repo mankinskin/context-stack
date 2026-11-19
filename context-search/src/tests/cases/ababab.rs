@@ -26,7 +26,7 @@ use crate::{
     },
     Response,
 };
-use context_trace::{
+use context_trace::legacy::{
     build_trace_cache,
     graph::vertex::token::Token,
     tests::test_case::{
@@ -165,7 +165,7 @@ mod tests {
         },
         Searchable,
     };
-    use context_trace::init_test_tracing;
+    use context_trace::legacy::init_test_tracing;
     use pretty_assertions::assert_eq;
 
     /// Critical test: Searching for [ab, ab, ab] should find ababab

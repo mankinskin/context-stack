@@ -6,7 +6,7 @@ use serde::{
     Serialize,
 };
 
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::{
         data::VertexData,
         has_vertex_index::HasVertexIndex,

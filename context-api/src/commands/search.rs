@@ -11,7 +11,7 @@
 //! Both return a [`SearchResult`] indicating complete, partial, or not-found.
 
 use context_search::Find;
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     HypergraphRef,
     kind::BaseGraphKind,
 };

@@ -4,7 +4,7 @@
 //! and merging partitions within a `MergeCtx`. It encapsulates the state
 //! needed during partition iteration, including the range map and target tracking.
 
-use context_trace::{
+use context_trace::legacy::{
     Wide,
     graph::visualization::{
         DeltaOp,

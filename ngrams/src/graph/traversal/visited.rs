@@ -12,7 +12,7 @@ use crate::graph::{
         Vocabulary,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::{
         token::Token,
         wide::Wide,

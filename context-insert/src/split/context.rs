@@ -20,7 +20,7 @@ use crate::split::{
         position::SubSplitLocation,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::getters::ErrorReason,
     *,
 };

@@ -3,7 +3,7 @@
 //! Graph: ababcd with patterns ab and ababcd
 //! Tests postfix matching behavior
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             atom::Atom,
@@ -53,7 +53,7 @@ impl TestEnv for EnvInsertPostfix1 {
             graph.insert_pattern_with_id(vec![ab, ab, c, d]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

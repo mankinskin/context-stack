@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::key::VertexKey,
     HashSet,
 };

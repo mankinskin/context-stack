@@ -36,7 +36,7 @@ use crate::graph::{
     },
     Corpus,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::{
         data::VertexDataBuilder,
         has_vertex_index::{

@@ -4,7 +4,7 @@
 //! pipeline accepts as input.  Implement it for a type to make it passable
 //! to [`crate::read`] and [`crate::pipeline::ReadCtx::new`].
 
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::atom::NewAtomIndices,
     trace::has_graph::HasGraph,
     BaseGraphKind,

@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::*;
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[derive(Clone, Debug, Copy, Hash, Eq, PartialEq)]
 pub struct PosKey<T = Token> {

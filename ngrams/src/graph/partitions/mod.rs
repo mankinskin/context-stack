@@ -42,7 +42,7 @@ use crate::graph::{
         ProcessStatus,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             data::{

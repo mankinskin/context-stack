@@ -12,7 +12,7 @@ pub mod persistence;
 
 use std::path::PathBuf;
 
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     Hypergraph,
     HypergraphRef,
     kind::BaseGraphKind,
@@ -139,7 +139,7 @@ impl Workspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::graph::vertex::atom::Atom;
+    use context_trace::legacy::graph::vertex::atom::Atom;
 
     /// Helper: build a `Workspace` in memory (no disk, no lock).
     fn test_workspace(name: &str) -> Workspace {

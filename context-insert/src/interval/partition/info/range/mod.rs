@@ -11,7 +11,7 @@ use role::{
     RangeRole,
 };
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 use crate::{
     interval::partition::info::border::{

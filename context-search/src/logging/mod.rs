@@ -20,7 +20,7 @@ use crate::{
         SearchQueue,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use std::fmt;
 
 impl CompactFormat for ParentCompareState {

@@ -82,7 +82,7 @@ impl TestTracing {
     ///
     /// # Example
     /// ```no_run
-    /// use context_trace::{Hypergraph, logging::tracing_utils::TestTracing};
+    /// use context_trace::{legacy::Hypergraph, logging::tracing_utils::TestTracing};
     ///
     /// #[test]
     /// fn my_test() {
@@ -387,7 +387,7 @@ impl Drop for TestTracing {
         // Clear test graph if requested
         #[cfg(any(test, feature = "test-api"))]
         if self.clear_test_graph_on_drop {
-            crate::graph::test_graph::clear_test_graph();
+            crate::graph::vertex::name_resolver::clear_token_name_resolver();
         }
     }
 }

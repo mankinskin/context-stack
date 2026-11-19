@@ -5,7 +5,7 @@ use crate::container::{
     order::TraversalOrder,
     StateContainer,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::{
         parent::{
             HasPatternId,

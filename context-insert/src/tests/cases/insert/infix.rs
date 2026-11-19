@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use context_search::*;
-use context_trace::{
+use context_trace::legacy::{
     tests::{
         macros::string_repr::{
             assert_all_vertices_unique,

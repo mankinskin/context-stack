@@ -23,7 +23,7 @@ use crate::{
     },
     Response,
 };
-use context_trace::{
+use context_trace::legacy::{
     build_trace_cache,
     graph::vertex::token::Token,
     tests::test_case::{
@@ -161,7 +161,7 @@ mod tests {
     /// returns SingleIndex error (searching for single token is not supported)
     #[test]
     fn test_search_y_alone() {
-        use context_trace::ErrorReason;
+        use context_trace::legacy::ErrorReason;
 
         let env = EnvXyyxy::get();
         let graph = env.graph();

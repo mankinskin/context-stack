@@ -17,7 +17,7 @@ use crate::{
         trace::SplitTraceState,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::getters::ErrorReason,
     *,
 };

@@ -1,4 +1,4 @@
-use context_trace::*;
+use context_trace::legacy::*;
 use std::marker::PhantomData;
 
 pub(crate) mod checkpointed;
@@ -292,14 +292,14 @@ impl<EndNode: PathNode + Clone> CursorStateMachine
 // Uses CompactFormat if available, otherwise falls back to Debug
 impl<P, State> std::fmt::Display for PathCursor<P, State>
 where
-    P: context_trace::logging::compact_format::CompactFormat,
+    P: context_trace::legacy::logging::compact_format::CompactFormat,
     State: CursorState,
 {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        use context_trace::logging::compact_format::CompactFormat;
+        use context_trace::legacy::logging::compact_format::CompactFormat;
         self.fmt_indented(f, 0)
     }
 }

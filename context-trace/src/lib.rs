@@ -1,14 +1,17 @@
 #![deny(clippy::disallowed_methods)]
-#![feature(type_changing_struct_update)]
+#![cfg_attr(feature = "legacy", feature(type_changing_struct_update))]
 
 pub mod direction;
-pub mod path;
 
 pub mod graph;
-pub mod trace;
+pub mod position;
 
 // Logging utilities (tracing and formatting)
 pub mod logging;
+
+/// Row-model implementation, fenced off from the model-agnostic root.
+#[cfg(feature = "legacy")]
+pub mod legacy;
 
 // Hidden re-export for use in macros only (not part of public API)
 #[doc(hidden)]
@@ -45,35 +48,8 @@ pub type HashMap<K, V> =
     std::collections::HashMap<K, V, BuildHasherDefault<DefaultHasher>>;
 
 #[cfg(any(test, feature = "test-api"))]
-pub use tests::{
-    assert_parents,
-    env::Env1,
-    test_case::TestEnv,
-};
+pub use tests::test_case::TestEnv;
 
-// Essential public re-exports for context-search
-pub(crate) use crate::{
-    direction::pattern::PatternDirection,
-    graph::vertex::{
-        IndexPosition,
-        location::SubRangeLocation,
-        pattern::pattern_range::get_child_pattern_range,
-        token::SubToken,
-    },
-    path::{
-        accessors::{
-            border::PathBorder,
-            child::root::PatternRootChild,
-            has_path::HasRolePath,
-        },
-        mutators::{
-            move_path::key::AdvanceKey,
-            raise::PathRaise,
-        },
-        structs::rooted::root::PathRoot,
-    },
-    trace::has_graph::TravDir,
-};
 pub use crate::{
     direction::{
         Direction,
@@ -81,63 +57,25 @@ pub use crate::{
         Right,
     },
     graph::{
-        Hypergraph,
-        HypergraphRef,
-        getters::{
-            ErrorReason,
-            IndexWithPath,
-            vertex::VertexSet,
-        },
         kind::{
             AtomOf,
             BaseGraphKind,
             GraphKind,
         },
         vertex::{
-            ChildPatterns,
             VertexIndex,
             atom::{
                 AsAtom,
                 Atom,
                 atomizing_iter,
             },
-            data::VertexData,
-            has_vertex_data::HasVertexData,
             has_vertex_index::{
                 HasVertexIndex,
                 ToToken,
             },
             has_vertex_key::HasVertexKey,
             key::VertexKey,
-            location::{
-                SubLocation,
-                child::{
-                    ChildLocation,
-                    HasSubIndex,
-                    HasSubIndexMut,
-                },
-                pattern::{
-                    HasPatternLocation,
-                    IntoPatternLocation,
-                    PatternLocation,
-                },
-            },
-            parent::{
-                HasPatternId,
-                Parent,
-            },
-            pattern::{
-                IntoPattern,
-                Pattern,
-                id::PatternId,
-                pattern_range::{
-                    PatternRangeIndex,
-                    RangeIndex,
-                },
-                pattern_width,
-            },
             token::{
-                HasToken,
                 Token,
                 TokenWidth,
             },
@@ -149,184 +87,5 @@ pub use crate::{
         format_utils::pretty,
         write_indent,
     },
-    path::{
-        RolePathUtils,
-        accessors::{
-            calc::{
-                CalcOffset,
-                CalcWidth,
-            },
-            child::{
-                HasLeafToken,
-                HasRootedLeafToken,
-                HasRootedLeafTokenLocation,
-                root::GraphRootChild,
-            },
-            has_path::{
-                HasChildPath,
-                IntoRolePath,
-                IntoRootedPath,
-                IntoRootedRolePath,
-            },
-            role::{
-                End,
-                PathRole,
-                Start,
-            },
-            root::{
-                GraphRoot,
-                GraphRootPattern,
-                PatternRoot,
-                RootPattern,
-            },
-        },
-        mutators::{
-            append::PathAppend,
-            lower::PathLower,
-            move_path::{
-                advance::{
-                    Advance,
-                    CanAdvance,
-                },
-                key::{
-                    AtomPosition,
-                    MoveKey,
-                },
-                path::MovePath,
-                root::MoveRootIndex,
-            },
-            pop::PathPop,
-            simplify::PathSimplify,
-        },
-        structs::{
-            role_path::RolePath,
-            rooted::{
-                IntoChildLocation,
-                PathNode,
-                RootedRangePath,
-                index_range::IndexRangePath,
-                pattern_range::{
-                    PatternPostfixPath,
-                    PatternPrefixPath,
-                    PatternRangePath,
-                },
-                role_path::{
-                    HasRootChildIndex,
-                    HasRootChildIndexMut,
-                    HasRootChildToken,
-                    IndexEndPath,
-                    IndexStartPath,
-                    PatternEndPath,
-                    PatternStartPath,
-                    RootedRolePath,
-                    range::{
-                        EndPath,
-                        HasEndPath,
-                        HasStartPath,
-                        StartPath,
-                    },
-                },
-                root::{
-                    IndexRoot,
-                    RootedPath,
-                },
-            },
-            sub_path::{
-                PositionAnnotated,
-                SubPath,
-            },
-        },
-    },
-    trace::{
-        TraceCtx,
-        cache::{
-            TraceCache,
-            key::{
-                directed::{
-                    DirectedKey,
-                    DirectedPosition,
-                    HasAtomPosition,
-                    down::{
-                        DownKey,
-                        DownPosition,
-                    },
-                    up::{
-                        UpKey,
-                        UpPosition,
-                    },
-                },
-                props::{
-                    CursorPosition,
-                    LeafKey,
-                    RootKey,
-                    TargetKey,
-                },
-            },
-            position::PositionCache,
-            vertex::{
-                VertexCache,
-                positions::DirectedPositions,
-            },
-        },
-        child::{
-            iterator::{
-                ChildIterator,
-                ChildQueue,
-                TraceKind,
-            },
-            state::{
-                ChildState,
-                RootChildState,
-            },
-        },
-        has_graph::{
-            HasGraph,
-            HasGraphMut,
-            TravKind,
-        },
-        state::{
-            BaseState,
-            IntoParentState,
-            StateAdvance,
-            parent::{
-                ParentBatch,
-                ParentState,
-            },
-        },
-        traceable::{
-            PostfixCommand,
-            PrefixCommand,
-            RangeCommand,
-            Traceable,
-        },
-    },
-};
-
-pub use graph::vertex::traversal::{
-    BandExpandingIterator,
-    BandExpandingPolicy,
-    BandIterator,
-    HasTokenRoleIters,
-    PostfixExpandingPolicy,
-    PostfixIterator,
-    PrefixExpandingPolicy,
-    PrefixIterator,
-    boundary_target,
-};
-
-// Re-export new consolidated accessor traits
-pub use path::accessors::{
-    path_accessor::{
-        PathAccessor,
-        RootedPathAccessor,
-        StatePosition,
-    },
-    range_accessor::{
-        EndPathAccessor,
-        RangePathAccessor,
-        RootedEndPathAccessor,
-        RootedRolePathAccessor,
-        RootedStartPathAccessor,
-        StartPathAccessor,
-    },
+    position::AtomPosition,
 };

@@ -43,7 +43,7 @@ use context_search::{
     ErrorState,
     *,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::vertex::{
         data::VertexData,
         key::VertexKey,
@@ -162,12 +162,12 @@ fn nested_repeat_interval_within_one_child() {
         ababab => [[ab, abab], [abab, ab], [ababa, b]],
         root => [[abc, ababab], [abcaba, b, ab]]
     };
-    context_trace::tests::macros::string_repr::assert_token_string_repr(
+    context_trace::legacy::tests::macros::string_repr::assert_token_string_repr(
         graph.graph(),
         abcaba,
         "abcaba",
     );
-    context_trace::tests::macros::string_repr::assert_token_string_repr(
+    context_trace::legacy::tests::macros::string_repr::assert_token_string_repr(
         graph.graph(),
         root,
         "abcababab",

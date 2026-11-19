@@ -38,7 +38,7 @@ use crate::{
         },
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     HasVertexIndex,
     SubLocation,
     Token,

@@ -4,7 +4,7 @@ use crate::{
     tests::env::EnvInsertPostfix1,
 };
 use context_search::*;
-use context_trace::{
+use context_trace::legacy::{
     tests::test_case::TestEnv,
     trace::has_graph::HasGraph,
     *,

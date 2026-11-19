@@ -3,7 +3,7 @@ use {
     crate::search::Find,
     crate::state::end::PathCoverage,
     crate::tests::search::event_helpers::*,
-    context_trace::{
+    context_trace::legacy::{
         graph::{
             getters::{
                 ErrorReason,

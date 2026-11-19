@@ -1,6 +1,6 @@
 //! Find largest labelled descendants without expanding already-covered spans.
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             data::{

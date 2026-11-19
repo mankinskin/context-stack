@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ngram::NGram;
 use tap::Tap;
 
-use context_trace::HashMap;
+use context_trace::legacy::HashMap;
 
 /// Count overlapping character windows for lengths one through nine.
 ///

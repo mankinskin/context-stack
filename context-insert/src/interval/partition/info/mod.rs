@@ -32,7 +32,7 @@ use crate::{
         },
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 pub(crate) mod border;
 pub(crate) mod borders;

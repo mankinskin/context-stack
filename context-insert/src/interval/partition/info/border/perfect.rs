@@ -9,7 +9,7 @@ use derive_more::{
     Into,
 };
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 pub(crate) trait BoolPerfect: Default + Debug + Clone {
     type Result: BorderPerfect<Boolean = Self>;

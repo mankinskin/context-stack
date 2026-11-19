@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 use crate::split::vertex::position::{
     Offset,

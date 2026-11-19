@@ -25,7 +25,7 @@ use crate::{
         },
     },
 };
-use context_trace::Wide;
+use context_trace::legacy::Wide;
 
 pub(crate) trait JoinBorders<R: RangeRole<Mode = Join>>:
     TraceBorders<R>

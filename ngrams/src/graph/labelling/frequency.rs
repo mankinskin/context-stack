@@ -21,7 +21,7 @@ use crate::graph::{
         ProcessStatus,
     },
 };
-use context_trace::graph::vertex::has_vertex_key::HasVertexKey;
+use context_trace::legacy::graph::vertex::has_vertex_key::HasVertexKey;
 
 /// Deterministic frequency selection over the whole containment vocabulary.
 #[derive(Debug, Deref, new, DerefMut)]

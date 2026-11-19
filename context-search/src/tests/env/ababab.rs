@@ -12,7 +12,7 @@
 //!
 //! Key property: When searching for [ab, ab, ab], should find ababab as EntireRoot.
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             atom::Atom,
@@ -58,7 +58,7 @@ impl TestEnv for EnvAbabab {
         let (ababab, ababab_id) = graph.insert_pattern_with_id(vec![abab, ab]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

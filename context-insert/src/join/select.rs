@@ -29,7 +29,7 @@
 //! parent occurrence count of the inlined children. Proposals cannot produce
 //! circular support because they never count as parents.
 
-use context_trace::*;
+use context_trace::legacy::*;
 use itertools::Itertools;
 use std::ops::Range;
 

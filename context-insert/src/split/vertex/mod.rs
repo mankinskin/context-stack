@@ -27,7 +27,7 @@ use crate::split::{
         },
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use derive_more::derive::Deref;
 use derive_new::new;
 use itertools::Itertools;

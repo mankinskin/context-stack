@@ -7,7 +7,7 @@ use crate::{
     cursor::Candidate,
     SearchKind,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 use std::fmt::Debug;
 

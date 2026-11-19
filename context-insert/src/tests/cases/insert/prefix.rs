@@ -6,7 +6,7 @@ use context_search::{
     tests::env::EnvInsertPrefix1,
     *,
 };
-use context_trace::{
+use context_trace::legacy::{
     tests::test_case::TestEnv,
     trace::has_graph::HasGraph,
     *,

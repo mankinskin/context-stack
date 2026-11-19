@@ -27,7 +27,7 @@
 //! depend on the selected side.
 //!
 //! Path-based entry points consume their boundary path structurally: the path
-//! is validated with [`context_trace::boundary_target`] (no search), the
+//! is validated with [`context_trace::legacy::boundary_target`] (no search), the
 //! complement is read from the siblings at each frame, and a single sibling
 //! is returned directly. Otherwise the siblings' width is the internal
 //! coordinate used to reconcile alternative decompositions, and the split is
@@ -43,7 +43,7 @@ use crate::{
     interval::init::InitInterval,
 };
 use context_search::ErrorState;
-use context_trace::{
+use context_trace::legacy::{
     trace::{
         BottomUp,
         TopDown,

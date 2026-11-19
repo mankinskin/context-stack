@@ -4,7 +4,7 @@ use std::{
 };
 
 use context_search::*;
-use context_trace::*;
+use context_trace::legacy::*;
 
 pub trait ResultExtraction {
     fn extract_from(state: &Response) -> Self;

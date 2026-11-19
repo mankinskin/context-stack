@@ -20,9 +20,9 @@ use {
         },
         state::matched::MatchResult,
     },
-    context_trace::tests::env::Env1,
+    context_trace::legacy::tests::env::Env1,
 
-    context_trace::*,
+    context_trace::legacy::*,
     pretty_assertions::assert_eq,
 
     std::iter::FromIterator,

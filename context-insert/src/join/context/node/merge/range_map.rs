@@ -9,7 +9,7 @@ use std::{
     num::NonZeroUsize,
 };
 
-use context_trace::Wide;
+use context_trace::legacy::Wide;
 use derive_more::{
     Deref,
     DerefMut,

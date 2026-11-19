@@ -7,7 +7,7 @@
 //! The `get_vertex` and `list_vertices` commands provide read access to the
 //! full vertex data (atoms and patterns alike).
 
-use context_trace::graph::vertex::{
+use context_trace::legacy::graph::vertex::{
     VertexIndex,
     atom::Atom,
 };

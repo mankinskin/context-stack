@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::*;
-use context_trace::*;
+use context_trace::legacy::*;
 
 use pretty_assertions::assert_eq;
 
@@ -74,7 +74,7 @@ fn atom_pos_split() {
 //
 //        $(
 //            let $name1: Token = $graph.insert_pattern([$($pat1),*]);
-//            let $name1: Token = $graph.insert_patterns(vec![$(vec![$($pat2),*]),*] as Vec<context_trace::graph::vertex::pattern::Pattern>);
+//            let $name1: Token = $graph.insert_patterns(vec![$(vec![$($pat2),*]),*] as Vec<context_trace::legacy::graph::vertex::pattern::Pattern>);
 //            $(
 //                let ($name2, $idname): (Token, _) = $graph.graph_mut().insert_pattern_with_id([$($pat3),*]);
 //                let $idname = $idname.unwrap();
@@ -109,7 +109,7 @@ macro_rules! build_split_cache {
     ) => {
         $crate::SplitCache {
             root_mode: $root_mode,
-            entries: context_trace::HashMap::from_iter([
+            entries: context_trace::legacy::HashMap::from_iter([
                 $(
                     (
                         $entry_root.index,
@@ -119,7 +119,7 @@ macro_rules! build_split_cache {
                                     (
                                         nz!($pos),
                                         $crate::SplitPositionCache {
-                                            top: context_trace::HashSet::from_iter([
+                                            top: context_trace::legacy::HashSet::from_iter([
                                                 $(
                                                     $crate::PosKey {
                                                         index: $top.to_owned(),
@@ -127,7 +127,7 @@ macro_rules! build_split_cache {
                                                     }
                                                 ),*
                                             ]),
-                                            pattern_splits: context_trace::HashMap::from_iter([
+                                            pattern_splits: context_trace::legacy::HashMap::from_iter([
                                                 $(
                                                     (
                                                         $pid.to_owned(),

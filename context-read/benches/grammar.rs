@@ -13,7 +13,7 @@ use criterion::{
 use derive_more::Deref;
 use derive_new::new;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 type BuildKey = RangeInclusive<usize>;
 

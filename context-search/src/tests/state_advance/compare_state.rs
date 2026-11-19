@@ -11,7 +11,7 @@ use {
             PatternCursor,
         },
     },
-    context_trace::*,
+    context_trace::legacy::*,
     std::marker::PhantomData,
 };
 
@@ -31,7 +31,7 @@ fn test_compare_state_candidate_advance() {
     let root = IndexRoot::from(
         ChildLocation::new(ab, ab_id, 0).into_pattern_location(),
     );
-    let child_state = context_trace::ChildState {
+    let child_state = context_trace::legacy::ChildState {
         entry_pos: UpPosition::from(0),
         exit_pos: DownPosition::from(0),
         start_pos: AtomPosition::from(0),
@@ -73,9 +73,9 @@ fn test_compare_state_candidate_advance() {
             _state: PhantomData,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
-        target: context_trace::trace::cache::key::directed::down::DownKey::new(
+        target: context_trace::legacy::trace::cache::key::directed::down::DownKey::new(
             ab,
-            context_trace::trace::cache::key::directed::down::DownPosition(
+            context_trace::legacy::trace::cache::key::directed::down::DownPosition(
                 AtomPosition::from(0),
             ),
         ),
@@ -121,7 +121,7 @@ fn test_compare_state_matched_advance() {
     let root = IndexRoot::from(
         ChildLocation::new(abc, abc_id, 0).into_pattern_location(),
     );
-    let child_state = context_trace::ChildState {
+    let child_state = context_trace::legacy::ChildState {
         entry_pos: UpPosition::from(0),
         exit_pos: DownPosition::from(0),
         start_pos: AtomPosition::from(0),
@@ -163,9 +163,9 @@ fn test_compare_state_matched_advance() {
             _state: PhantomData,
         },
         mode: crate::compare::state::PathPairMode::GraphMajor,
-        target: context_trace::trace::cache::key::directed::down::DownKey::new(
+        target: context_trace::legacy::trace::cache::key::directed::down::DownKey::new(
             ab,
-            context_trace::trace::cache::key::directed::down::DownPosition(
+            context_trace::legacy::trace::cache::key::directed::down::DownPosition(
                 AtomPosition::from(0),
             ),
         ),

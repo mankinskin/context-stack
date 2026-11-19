@@ -10,7 +10,7 @@
 //! sides) because their values depend on internal `VizPathGraph` state that
 //! isn't part of the algorithm's observable behaviour.
 
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     search_path::{
         EdgeRef,
         PathNode,
@@ -78,7 +78,7 @@ pub fn assert_events(
     events: &[GraphOpEvent],
     expected: &[Transition],
 ) {
-    use context_trace::graph::visualization::OperationType;
+    use context_trace::legacy::graph::visualization::OperationType;
 
     // Filter out Query events - they're emitted alongside Search events
     // but tests focus on the Search event stream.

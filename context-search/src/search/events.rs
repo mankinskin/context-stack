@@ -9,7 +9,7 @@ use crate::r#match::{
     CompareOutcome,
     PrefixChildInfo,
 };
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     search_path::{
         EdgeRef,
         PathNode,
@@ -338,7 +338,7 @@ fn prefix_child_transition(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::graph::search_path::PathNode;
+    use context_trace::legacy::graph::search_path::PathNode;
 
     #[test]
     fn compare_info_match_produces_two_events() {

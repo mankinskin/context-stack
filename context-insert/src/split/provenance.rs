@@ -7,7 +7,7 @@
 
 use std::num::NonZeroUsize;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 use crate::split::cache::position::PosKey;
 

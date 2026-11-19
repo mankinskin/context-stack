@@ -15,7 +15,7 @@ use crate::{
     },
     state::end::PathCoverage,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 /// Checkpointed cursor state for MatchResult
 ///
@@ -141,7 +141,7 @@ impl MatchResult {
     /// Returns true if the cursor's path has reached the end of the pattern
     /// and there are no more tokens to traverse
     pub(crate) fn query_exhausted(&self) -> bool {
-        use context_trace::{
+        use context_trace::legacy::{
             path::accessors::role::End,
             HasChildPath,
             HasRootChildIndex,

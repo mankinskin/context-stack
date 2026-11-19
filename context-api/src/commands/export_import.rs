@@ -34,7 +34,7 @@ use serde::{
     Serialize,
 };
 
-use context_trace::graph::{
+use context_trace::legacy::graph::{
     Hypergraph,
     kind::BaseGraphKind,
 };

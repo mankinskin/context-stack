@@ -4,7 +4,7 @@
 //! once for the whole corpus. Its roots are gap-token identities, not necessarily
 //! corpus roots. Label mutations are visible to later partition construction.
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             data::{

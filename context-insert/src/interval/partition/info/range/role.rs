@@ -48,7 +48,7 @@ use crate::{
     },
 };
 use crate::join::plan::JoinRef;
-use context_trace::*;
+use context_trace::legacy::*;
 
 use crate::interval::partition::info::range::splits::OffsetIndexRange;
 

@@ -19,5 +19,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [dev-dependencies]
 tempfile = "3"
 context-api = { path = "../../../context-api" }
-context-trace = { path = "../../../context-trace" }
+context-trace = { path = "../../../context-trace", features = ["legacy"] }
 ngrams = { path = "../../../ngrams" }

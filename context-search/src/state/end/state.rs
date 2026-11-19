@@ -50,7 +50,7 @@ impl EndState {
         reason: EndReason,
         parent: ParentCompareState,
     ) -> Self {
-        let root_pos = *context_trace::path::accessors::path_accessor::StatePosition::root_pos(&parent.parent_state);
+        let root_pos = *context_trace::legacy::path::accessors::path_accessor::StatePosition::root_pos(&parent.parent_state);
         Self {
             reason,
             path: PathCoverage::from_start_path(

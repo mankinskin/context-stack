@@ -29,7 +29,7 @@ use crate::{
         },
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use tracing::{
     debug,
     info,

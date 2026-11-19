@@ -5,7 +5,7 @@ use crate::{
     },
     state::start::StartFoldPath,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 impl_cursor_pos! {
     <R: StartFoldPath, S: CursorState> CursorPosition for PathCursor<R, S>, self => self.atom_position

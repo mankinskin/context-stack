@@ -2,7 +2,7 @@
 #[allow(dead_code)]
 mod support;
 
-use context_trace::{HypergraphRef, Wide};
+use context_trace::legacy::{HypergraphRef, Wide};
 use support::{load, GraphData};
 
 fn assert_scenario(name: &str) {

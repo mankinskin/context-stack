@@ -7,9 +7,6 @@ pub mod format_utils;
 /// Compact formatting for tracing logs
 pub mod compact_format;
 
-/// Compact formatting implementations for path types
-pub mod path_format;
-
 /// Typed debug wrapper that includes full type paths
 pub mod typed_debug;
 

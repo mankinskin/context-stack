@@ -1,4 +1,4 @@
-use context_trace::*;
+use context_trace::legacy::*;
 
 //impl VertexData {
 //    pub(crate) fn offset_children(

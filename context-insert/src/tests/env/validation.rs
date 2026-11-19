@@ -3,7 +3,7 @@
 //! These environments provide pre-configured graph states for testing
 //! input validation and error handling in context-insert.
 
-use context_trace::{
+use context_trace::legacy::{
     PatternId,
     graph::{
         Hypergraph,
@@ -63,7 +63,7 @@ impl TestEnv for EnvAbcd {
         let (abcd, abcd_id) = graph.insert_pattern_with_id(vec![a, b, c, d]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 
@@ -137,7 +137,7 @@ impl TestEnv for EnvAb {
         let (ab, ab_id) = graph.insert_pattern_with_id(vec![a, b]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 
@@ -212,7 +212,7 @@ impl TestEnv for EnvAbc {
         let (ab, ab_id) = graph.insert_pattern_with_id(vec![a, b]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

@@ -24,7 +24,7 @@ use crate::{
         matched::MatchResult,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     path::RolePathUtils,
     End,
     Start,

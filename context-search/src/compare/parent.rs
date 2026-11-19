@@ -8,7 +8,7 @@ use crate::{
         PatternCursor,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use derive_more::{
     Deref,
     DerefMut,
@@ -20,7 +20,7 @@ use std::{
 use tracing::trace;
 
 use crate::compare::state::PathPairMode::GraphMajor;
-use context_trace::trace::cache::key::directed::down::{
+use context_trace::legacy::trace::cache::key::directed::down::{
     DownKey,
     DownPosition,
 };

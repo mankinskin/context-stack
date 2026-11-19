@@ -1,4 +1,4 @@
-use context_trace::{
+use context_trace::legacy::{
     logging::compact_format::{
         write_indent,
         CompactFormat,

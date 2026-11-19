@@ -11,7 +11,7 @@ jq = ["jaq-core", "jaq-std", "jaq-interpret", "jaq-syn"]
 dev = []
 
 [dependencies]
-context-trace = { path = "../context-trace", features = ["test-api"] }
+context-trace = { path = "../context-trace", features = ["legacy", "test-api"] }
 context-search = { path = "../context-search", features = ["test-api"] }
 context-insert = { path = "../context-insert", features = ["test-api"] }
 context-read = { path = "../context-read", features = ["test-api"] }

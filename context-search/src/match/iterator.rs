@@ -14,7 +14,7 @@ use crate::{
         SearchQueue,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use tracing::{
     debug,
     trace,

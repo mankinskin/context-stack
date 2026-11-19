@@ -3,7 +3,7 @@ use serde::{
     Serialize,
 };
 
-use context_trace::graph::snapshot::GraphSnapshot;
+use context_trace::legacy::graph::snapshot::GraphSnapshot;
 
 use crate::{
     ts_export,

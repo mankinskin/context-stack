@@ -5,7 +5,7 @@ use crate::{
     },
     BftQueue,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 #[derive(Debug)]
 pub struct AncestorPolicy<T: HasGraph>(std::marker::PhantomData<T>);
 

@@ -10,7 +10,7 @@ use std::{
     time::Instant,
 };
 
-use context_trace::logging::build_capture_dispatch;
+use context_trace::legacy::logging::build_capture_dispatch;
 
 use crate::types::TraceSummary;
 

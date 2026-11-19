@@ -3,7 +3,7 @@
 //! Despite its name, this implementation descends into children, like the child
 //! cover search; it does not walk upward through containing parents.
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             data::{

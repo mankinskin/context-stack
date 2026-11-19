@@ -30,7 +30,7 @@ use serde::{
     Serialize,
 };
 
-use context_trace::{
+use context_trace::legacy::{
     VertexSet,
     graph::{
         Hypergraph,
@@ -44,7 +44,7 @@ use context_trace::{
 
 // Re-export snapshot types from context-trace so consumers don't need to
 // depend on context-trace directly.
-pub use context_trace::graph::snapshot::{
+pub use context_trace::legacy::graph::snapshot::{
     GraphSnapshot as Snapshot,
     SnapshotEdge,
     SnapshotNode,
@@ -771,7 +771,7 @@ impl std::fmt::Display for CompareMode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context_trace::graph::vertex::atom::Atom;
+    use context_trace::legacy::graph::vertex::atom::Atom;
 
     #[test]
     fn token_ref_display() {

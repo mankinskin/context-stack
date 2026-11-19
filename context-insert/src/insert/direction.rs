@@ -1,4 +1,4 @@
-use context_trace::*;
+use context_trace::legacy::*;
 
 #[allow(dead_code)]
 pub(crate) trait InsertDirection:

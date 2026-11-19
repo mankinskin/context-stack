@@ -40,7 +40,7 @@ use context::{
     ParentSearchTraversal,
     SearchCtx,
 };
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         search_path::{
             EdgeRef,

@@ -4,7 +4,7 @@
 //! workspace's hypergraph. They are useful for CLI output, testing, and
 //! debugging.
 
-use context_trace::{
+use context_trace::legacy::{
     VertexData,
     VertexIndex,
     VertexSet,

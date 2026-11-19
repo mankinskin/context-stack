@@ -21,7 +21,7 @@ use context_insert::{
     ClosurePolicy,
     Overlap,
 };
-use context_trace::*;
+use context_trace::legacy::*;
 
 /// Structural evidence of an accepted root expansion.
 ///

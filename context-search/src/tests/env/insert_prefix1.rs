@@ -3,7 +3,7 @@
 //! Graph: heldld with patterns ld and heldld
 //! Tests prefix matching behavior
 
-use context_trace::{
+use context_trace::legacy::{
     graph::{
         vertex::{
             atom::Atom,
@@ -53,7 +53,7 @@ impl TestEnv for EnvInsertPrefix1 {
             graph.insert_pattern_with_id(vec![a, b, cd, cd]);
 
         #[cfg(any(test, feature = "test-api"))]
-        context_trace::graph::test_graph::register_test_graph(&graph);
+        context_trace::legacy::graph::test_graph::register_test_graph(&graph);
 
         graph.emit_graph_snapshot();
 

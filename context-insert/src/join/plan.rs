@@ -27,7 +27,7 @@ use std::{
     ops::Range,
 };
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 use crate::{
     insert::publication::{

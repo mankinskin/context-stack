@@ -8,7 +8,7 @@ use crate::cursor::{
     Mismatched,
     PathCursor,
 };
-use context_trace::{
+use context_trace::legacy::{
     path::accessors::has_path::HasRootedPath,
     *,
 };

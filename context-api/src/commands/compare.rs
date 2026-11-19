@@ -27,7 +27,7 @@ mod tests;
 
 use std::collections::HashSet;
 
-use context_trace::graph::snapshot::{
+use context_trace::legacy::graph::snapshot::{
     GraphSnapshot,
     SnapshotEdge,
     SnapshotNode,

@@ -29,7 +29,7 @@ use crate::{
         EnvMultiOverlap,
     },
 };
-use context_trace::{
+use context_trace::legacy::{
     tests::test_case::TestEnv,
     *,
 };

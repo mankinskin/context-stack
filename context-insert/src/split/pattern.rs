@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use context_trace::*;
+use context_trace::legacy::*;
 
 use std::fmt::Debug;
 

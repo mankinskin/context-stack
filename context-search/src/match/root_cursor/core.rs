@@ -16,7 +16,7 @@ use crate::{
         SearchKind,
     },
 };
-use context_trace::*;
+use context_trace::legacy::*;
 use derive_more::{
     Deref,
     DerefMut,

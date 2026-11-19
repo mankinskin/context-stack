@@ -12,20 +12,20 @@ pub trait AsGraphRef<G: crate::graph::kind::GraphKind> {
         G::Atom: std::fmt::Display;
 }
 
-#[cfg(any(test, feature = "test-api"))]
-impl<G: crate::graph::kind::GraphKind> AsGraphRef<G> for &crate::Hypergraph<G> {
+#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
+impl<G: crate::graph::kind::GraphKind> AsGraphRef<G> for &crate::legacy::Hypergraph<G> {
     fn register_test_graph(self)
     where
         G: Send + Sync + 'static,
         G::Atom: std::fmt::Display,
     {
-        crate::graph::test_graph::register_test_graph(self);
+        crate::legacy::graph::test_graph::register_test_graph(self);
     }
 }
 
-#[cfg(any(test, feature = "test-api"))]
+#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
 impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
-    for &crate::HypergraphRef<G>
+    for &crate::legacy::HypergraphRef<G>
 {
     fn register_test_graph(self)
     where
@@ -33,24 +33,24 @@ impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
         G::Atom: std::fmt::Display,
     {
         // Use the new register_test_graph_ref to avoid cloning
-        crate::graph::test_graph::register_test_graph_ref(self);
+        crate::legacy::graph::test_graph::register_test_graph_ref(self);
     }
 }
 
-#[cfg(any(test, feature = "test-api"))]
-impl<G: crate::graph::kind::GraphKind> AsGraphRef<G> for crate::Hypergraph<G> {
+#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
+impl<G: crate::graph::kind::GraphKind> AsGraphRef<G> for crate::legacy::Hypergraph<G> {
     fn register_test_graph(self)
     where
         G: Send + Sync + 'static,
         G::Atom: std::fmt::Display,
     {
-        crate::graph::test_graph::register_test_graph(&self);
+        crate::legacy::graph::test_graph::register_test_graph(&self);
     }
 }
 
-#[cfg(any(test, feature = "test-api"))]
+#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
 impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
-    for crate::HypergraphRef<G>
+    for crate::legacy::HypergraphRef<G>
 {
     fn register_test_graph(self)
     where
@@ -58,6 +58,6 @@ impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
         G::Atom: std::fmt::Display,
     {
         // Use the new register_test_graph_ref to avoid cloning
-        crate::graph::test_graph::register_test_graph_ref(&self);
+        crate::legacy::graph::test_graph::register_test_graph_ref(&self);
     }
 }

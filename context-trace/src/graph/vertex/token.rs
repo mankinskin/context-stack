@@ -22,20 +22,23 @@ use serde::{
     Serialize,
 };
 
-use crate::{
+use crate::graph::vertex::{
+    VertexIndex,
+    atom::NewAtomIndex,
+    has_vertex_index::HasVertexIndex,
+    wide::{
+        Wide,
+        WideMut,
+    },
+};
+#[cfg(feature = "legacy")]
+use crate::legacy::{
     graph::vertex::{
-        PatternId,
-        VertexIndex,
-        atom::NewAtomIndex,
-        has_vertex_index::HasVertexIndex,
+        pattern::id::PatternId,
         location::{
             SubLocation,
             child::ChildLocation,
             pattern::PatternLocation,
-        },
-        wide::{
-            Wide,
-            WideMut,
         },
     },
     trace::cache::key::directed::{
@@ -181,22 +184,27 @@ impl crate::logging::compact_format::CompactFormat for TokenWidth {
     }
 }
 
+#[cfg(feature = "legacy")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SubToken {
     pub(crate) token: Token,
     pub(crate) location: SubLocation,
 }
+#[cfg(feature = "legacy")]
 pub trait HasToken {
     fn token(&self) -> Token;
 }
+#[cfg(feature = "legacy")]
 impl HasToken for SubToken {
     fn token(&self) -> Token {
         self.token
     }
 }
+#[cfg(feature = "legacy")]
 pub trait HasSubLocation {
     fn sub_location(&self) -> &SubLocation;
 }
+#[cfg(feature = "legacy")]
 impl HasSubLocation for SubToken {
     fn sub_location(&self) -> &SubLocation {
         &self.location
@@ -232,14 +240,16 @@ impl Token {
 
     #[cfg(any(test, feature = "test-api"))]
     pub fn get_string_repr(&self) -> Option<String> {
-        crate::graph::test_graph::get_token_string_from_test_graph(*self.index)
+        crate::graph::vertex::name_resolver::resolve_token_name(*self.index)
     }
+    #[cfg(feature = "legacy")]
     pub fn to_pattern_location(
         self,
         pattern_id: PatternId,
     ) -> PatternLocation {
         PatternLocation::new(self, pattern_id)
     }
+    #[cfg(feature = "legacy")]
     pub fn to_child_location(
         self,
         sub: SubLocation,
@@ -252,12 +262,14 @@ impl Token {
     pub(crate) fn get_width(&self) -> usize {
         self.width.0
     }
+    #[cfg(feature = "legacy")]
     pub(crate) fn down_key(
         self,
         pos: impl Into<DownPosition>,
     ) -> DownKey {
         DownKey::new(self, pos.into())
     }
+    #[cfg(feature = "legacy")]
     pub(crate) fn up_key(
         self,
         pos: impl Into<UpPosition>,
