@@ -1,8 +1,8 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition` `#overlap` `#frequency` `#streaming`
 summary: Migrate the context stack from contiguous child-pattern rows to positioned compositions. Retained vertices store maximal child occurrences with offsets; overlaps are explicit and gaps/wrappers are never vertices. Introduce positioned locations and navigation, replace row-based overlap closure with an occurrence merge plus seam discovery, accumulate input in owned positioned covers, and only then add streaming retention with retrospective host updates.
-status: 🚧 phases 0-2 done (via the preparation plan); phase 3 next
-revision: 3
+status: 🚧 phases 0-2 done (via the preparation plan); phase 2b (content-free model) next, then 2c (search state), then 3
+revision: 4
 date: 2026-11-19
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
 prerequisite: 20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md (Phase −1 legacy isolation, and Phases 0-2 below)
@@ -51,6 +51,51 @@ implement Phases 0-2 below. State after the preparation plan:
   lane (`context-read/tests/reader_behavior.rs`) is ignored until Phase 4.
 - Phase 5 now records the within-input provisional-retention rule and the
   across-input monotonicity evidence (prep plan §0.5, Step 2.6).
+
+## Revision 4 (2026-11-19): model requirements
+
+The Phase 1 scaffold indexes vertices by expanded content
+(`PositionedGraph::by_content: HashMap<Vec<Atom>, VertexIndex>`,
+`PositionedGraph::find(&[Atom])`) and expands content inside `insert` and
+`validate`. That contradicts three requirements, which now bind every phase:
+
+- **R1 — No content-keyed index.** The graph must scale to massive numbers of
+  vertices of arbitrary width, so no index structure stores expanded content.
+  The only value-keyed index is atom value → atom vertex (bounded by the
+  alphabet; the legacy `atom_keys` equivalent). A composite vertex is found
+  only structurally: by **search** from atoms through parent links and
+  compositions. A content lookup table also invites the wrong algorithm
+  (searching indices by content instead of by structure), so it must not
+  exist, not even as a convenience.
+- **R2 — Expanded content is debug-only.** Expanded atom sequences may be
+  *stored* only in debug builds (`#[cfg(debug_assertions)]`, e.g. a label per
+  vertex for `Display` and the `TokenNameResolver`). Release builds store
+  only structure. Computing content on demand by traversal
+  (`read_interval`) stays allowed for export, tests and diagnostics, but no
+  algorithm may depend on it.
+- **R3 — Search states are reusable.** As in the legacy stack
+  (`Response { cache: TraceCache, end }` → `InitInterval::from(Response)` →
+  insertion, and the reader continuing from the last match), a search result
+  carries the traced structure needed by (a) insertion and (b) the next,
+  adjacent search. Neither insertion nor the next search may repeat the
+  traversal that produced it.
+
+Consequences:
+
+- **Uniqueness of content** (one vertex per content) is no longer checked by
+  lookup at insertion. It follows from search completeness: insertion is
+  only reachable from a search outcome proving no retained vertex spans the
+  range (a maximal cover loses no occurrence, and parent links reach every
+  retained superstring, so a complete search cannot miss an existing vertex).
+  Debug builds additionally assert it via the debug labels.
+- **Overlap agreement** (overlapping children denote the same atoms) is
+  likewise established by the search evidence that produced the occurrences,
+  and checked by expansion only under `debug_assertions` / `test-api`.
+- **Tests** address fixture vertices through a test-only name map built by
+  `from_interchange` (fixture key → `Token`), never through the graph. Brute
+  force expectations come from fixture strings, not from graph lookups.
+
+Phases 2b and 2c below implement R1-R3 before any algorithm work (Phase 3).
 
 ---
 
@@ -156,6 +201,99 @@ vertex, every position and every interval of every v3 fixture with
 brute-force string matching over the fixture's retained set, and pass
 without the `legacy` feature.
 
+### Phase 2b — Content-free model (R1, R2)
+
+Corrects the Phase 1 scaffold; no new algorithms.
+
+- [ ] Remove `PositionedGraph::by_content` and `PositionedGraph::find`.
+  Replace with `atom_index: HashMap<Atom, VertexIndex>` and
+  `atom(&Atom) -> Option<Token>`; `insert_atom` uses it.
+- [ ] `insert(composition)` no longer expands content in release builds. It
+  checks only structure: `Composition` invariants, known children, recorded
+  widths, reciprocal links. Content agreement of overlapping children and
+  content uniqueness move into `#[cfg(debug_assertions)]` checks.
+  (Phase 2c replaces the public `insert(Vec<Occurrence>)` by insertion from a
+  search state; a raw structural insert stays `pub(crate)`/`test-api` for
+  fixture loading.)
+- [ ] Debug-only content: `#[cfg(debug_assertions)] label` on
+  `PositionedVertex` (built from the children's labels at insertion); the
+  graph registers itself as `TokenNameResolver` in debug builds. Release
+  `Display` shows index and width only.
+- [ ] `content(index)` becomes a traversal (`read_interval` over the whole
+  vertex), documented as diagnostic/export only; no algorithm uses it.
+- [ ] `validate()`: structural rules and reciprocal links always; the
+  one-vertex-per-content and overlap-agreement rules only under
+  `debug_assertions` or `test-api`, computed by traversal into a temporary
+  set that is dropped after validation.
+- [ ] `from_interchange` returns the graph plus a test/interchange name map
+  (`BTreeMap<String, Token>`, `test-api`); `to_interchange` names vertices by
+  traversal. Rewrite the Phase 1/2 tests that call `find(&atoms)` to use the
+  name map.
+- [ ] Guard: a test (or `clippy::disallowed_methods`/review rule) that the
+  positioned graph has no content-keyed field; document R1/R2 in the
+  context-trace README.
+
+**Gate:** all Phase 1/2 tests pass through the name map; no positioned type
+stores expanded content in release (`cargo test --release -p context-trace
+--no-default-features --features test-api` passes and the release
+`PositionedVertex` has no label field); `--no-default-features` check green.
+
+### Phase 2c — Positioned search with reusable state (R1, R3)
+
+The positioned replacement for `Find`/`Response`/`TraceCache`. Lives in
+`context-search` (search) with the trace types in `context-trace`.
+
+- **`PositionedTrace`** (successor of `TraceCache`): for each vertex entered,
+  the occurrences taken bottom-up (child → parent at offset) and top-down
+  (parent → child at offset), keyed by `(vertex, offset in the search root)`.
+  It is the only record of which structure the search visited; insertion and
+  continuation read it instead of re-traversing.
+- **`SearchState`** (successor of `Response`):
+  - `start`: query position; `matched`: the widest retained token matching
+    the query from `start`, with its `OccurrencePath`(s);
+  - `trace: PositionedTrace`;
+  - `frontier`: candidates climbed but not yet decided — parents in which
+    the matched token occurs and whose content continues past the matched end
+    (these are both the overlap candidates for the reader and the starting
+    points of the next search), each with its occurrence path;
+  - `end`: `Complete` (query consumed inside a retained token), `Mismatch {
+    at }` (next atom diverges from every candidate) or `QueryExhausted`
+    (input ended inside candidates; needed for streaming).
+- **Algorithm** (structural only, R1): start at the atom vertex of
+  `query[start]`, climb parent links (`parents: child → {parent → offsets}`),
+  compare the following query atoms against each candidate's content by
+  descending its composition with a positioned cursor (an `OccurrencePath`
+  to the child covering the next position — no content expansion), keep the
+  widest complete match, and stop when no candidate continues. Candidates
+  are pruned on the first diverging atom.
+- **Reuse API:**
+  - `search(graph, query) -> SearchState` (fresh);
+  - `SearchState::continue_at(self, graph, query) -> SearchState` for the
+    adjacent search starting at `matched` end: seeds from `frontier` and the
+    retained postfixes recorded in `trace`, never restarting from the atom
+    when the frontier already covers the position;
+  - `InsertRequest::from(SearchState)` (successor of
+    `InitInterval::from(Response)`): carries the occurrences for the new
+    composition and the parents whose reciprocal links change, taken from the
+    trace. `PositionedGraph::insert_from(InsertRequest)` is the only public
+    composite insertion; a search state that found a complete existing token
+    yields that token instead of an insert request (this is what makes
+    content uniqueness structural, see Revision 4).
+- **Tests:**
+  - every position of every v3 fixture's corpus texts and of random strings
+    over the fixture alphabet: `matched` equals the brute-force longest
+    retained prefix computed from the fixture *strings*;
+  - continuation: reading a whole text by `continue_at` yields the same
+    matches as fresh searches at each position, and a counting hook shows no
+    vertex entered twice across the chain beyond the frontier;
+  - insertion from a search state on a graph with a token removed from the
+    fixture reproduces the fixture's composition and parent links of that
+    token;
+  - no test uses content lookup (R1).
+
+**Gate:** all three test groups pass on every v3 fixture; the search and
+insertion code compiles in release without any content-keyed structure.
+
 ### Phase 3 — Positioned merge and seam discovery in `context-insert`
 
 Replace row closure for the positioned backend:
@@ -172,6 +310,12 @@ No complement interning, no wrapper creation, no nested closure. Preserve the
 accepted evidence (anchor occurrence, expansion path) as in the overlap
 provider plan; only its consumer changes.
 
+Inputs are `SearchState`s (Phase 2c), not tokens: the occurrences to project
+and the seam candidates come from their traces and frontiers, so the merge
+does not repeat the searches that found the two sides. Seam discovery may
+traverse only beyond what the traces already cover. No content expansion
+(R1/R2).
+
 **Gate:** merging the oracle covers of overlapping observations reproduces the
 oracle composition of the combined vertex, including the seam case.
 
@@ -186,6 +330,12 @@ oracle composition of the combined vertex, including the seam case.
   extends the width and reconciles affected occurrences; an accepted overlap
   extends the same coordinate space. The real root vertex is published or
   reused only at the end of the input.
+- The reader drives one chain of search states per input: each next token
+  is found by `SearchState::continue_at` from the previous state, and the
+  committed root keeps the state of its committed suffix (its retained
+  postfixes with paths), so overlap expansion at the commit boundary reuses
+  it. Re-searching a position already covered by a state is a bug; the
+  Phase 2c counting hook is asserted in the reader tests.
 - First milestone: read `abcabca` into one owned cover and publish
   `abcabca = abca@0, abca@3` without allocating `abc`, `bca`, `bc` or any
   wrapper vertex.
@@ -212,7 +362,9 @@ remain exactly reconstructible after those updates.
    Discovery must reach inside existing composites and across their boundaries
    within an input; matching only existing vertices is not enough. Keep
    candidate evidence separate from vertex storage until the retention
-   criterion is met.
+   criterion is met. Candidate evidence obeys R1 too: candidates are keyed
+   by structure (e.g. the pair of adjacent tokens/occurrences that spans
+   them, plus input offsets), never by expanded content.
 3. **Reconcile current and historical hosts.** On promotion, find the token's
    occurrences, including in earlier inputs and their retained hosts. For
    example, if `vi` qualifies later, revisit published `vis`. Insert each
@@ -288,6 +440,8 @@ in the Linux codespace) and all tests pass; READMEs updated.
 | Batch frequency disagrees with append-only retention | Phase 4 isolates frequency by supplying retention; Phase 5 requires resolving any divergence before cutover |
 | Retrospective updates are unbounded | Measure affected hosts; answer the Phase 5 open questions before committing to a data structure |
 | Large blast radius of the `context-trace` model change | Coexisting backends until Phase 6; no in-place rewrite of `ChildPatterns` |
+| Content-keyed shortcuts creep back (lookup tables, expanding content to compare) | R1/R2 in Revision 4; Phase 2b guard test; review rule: no algorithm calls `content`/`read_interval` |
+| Repeated traversals while reading many adjacent patterns | R3: `SearchState` continuation and `InsertRequest::from(SearchState)`; counting hook asserted in Phase 2c and Phase 4 tests |
 
 ## 6. Non-goals
 

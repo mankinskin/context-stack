@@ -264,6 +264,12 @@ docs/plan commit. Notes and deviations:
   `PositionedGraphRef<G> = Arc<RwLock<PositionedGraph<G>>>` (newtype with
   `read()`/`write()`); readers share the lock, insertion is exclusive.
   Revisit only when the reader needs concurrent insertion.
+- **Superseded in part (2026-11-19, reader plan rev 4):** the scaffold's
+  content index (`by_content`, `find(&[Atom])`) and the content expansion in
+  `insert`/`validate` violate the model requirements R1 (no content-keyed
+  index) and R2 (expanded content stored only in debug builds). They are
+  removed in reader plan Phase 2b; search-state reuse (R3) follows in
+  Phase 2c. Do not build on `find` in new code.
 
 ### 2.3 Conversion and comparison
 
