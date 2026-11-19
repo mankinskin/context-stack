@@ -9,7 +9,11 @@ use ngrams::{
     Cancellation,
 };
 use std::collections::BTreeSet;
-use support::{load, load_v3, scenarios, seed, token, v3_dir, GraphData, PositionedGraphSnapshot};
+use support::{
+    legacy::{load, seed, token, GraphData},
+    positioned::{load_v3, v3_dir, PositionedGraphSnapshot},
+    scenarios,
+};
 
 #[test]
 fn canonicalization_rejects_duplicate_content_instead_of_overwriting() {

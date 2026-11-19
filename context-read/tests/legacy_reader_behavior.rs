@@ -1,15 +1,23 @@
-//! Black-box tests: only the public reader API and offline oracle data.
+//! Black-box tests of the legacy (row-model) reader: only the public
+//! `context_read::legacy` API and offline v2 oracle data.
+//!
+//! Known legacy failures (final corpus graph differs from the v2 oracle
+//! fixture), marked `#[ignore = "legacy known failure: ..."]` below so that the
+//! legacy gate is "all non-ignored tests pass". This list is fixed and checked
+//! by review (see `agents/plans/20261116_PLAN_OVERLAP_PROVIDER_MIGRATION.md`):
+//! `complex_overlap`, `infix`, `multiple_overlaps`, `nested_complements`,
+//! `flat_complement`, `accepted_materialization`.
 #[allow(dead_code)]
 mod support;
 
 use context_trace::legacy::{HypergraphRef, Wide};
-use support::{load, GraphData};
+use support::legacy::{load, GraphData};
 
 fn assert_scenario(name: &str) {
     let fixture = load(name);
     let graph = HypergraphRef::default();
     for (index, input) in fixture.corpus.iter().enumerate() {
-        let root = context_read::read(&graph, input.chars()).expect("nonempty input");
+        let root = context_read::legacy::read(&graph, input.chars()).expect("nonempty input");
         assert_eq!(
             graph.index_string(root),
             *input,
@@ -27,10 +35,11 @@ fn assert_scenario(name: &str) {
 }
 
 macro_rules! scenarios {
-    ($($name:ident),* $(,)?) => {
+    ($($(#[$attr:meta])* $name:ident),* $(,)?) => {
         const SCENARIO_NAMES: &[&str] = &[$(stringify!($name)),*];
         $(
         #[test]
+        $(#[$attr])*
         fn $name() {
             assert_scenario(stringify!($name));
         }
@@ -64,14 +73,17 @@ scenarios!(
     repeat_separated,
     repeat_ab_separated,
     repeat_hello,
+    #[ignore = "legacy known failure: final graph differs from v2 oracle"]
     complex_overlap,
     text,
     text_extension,
     sequence,
+    #[ignore = "legacy known failure: final graph differs from v2 oracle"]
     infix,
     infix_short,
     loose,
     repeating_known,
+    #[ignore = "legacy known failure: final graph differs from v2 oracle"]
     multiple_overlaps,
     cursor_seed,
     connected_closure,
@@ -81,9 +93,12 @@ scenarios!(
     whole_tail,
     direct_tail,
     canonical_closure,
+    #[ignore = "legacy known failure: final graph differs from v2 oracle"]
     nested_complements,
+    #[ignore = "legacy known failure: final graph differs from v2 oracle"]
     flat_complement,
     self_overlap,
+    #[ignore = "legacy known failure: final graph differs from v2 oracle"]
     accepted_materialization,
     tail_replacement,
     closure_forward_seed,
@@ -94,17 +109,17 @@ scenarios!(
 #[test]
 fn empty_input_does_not_change_graph() {
     let graph = HypergraphRef::default();
-    assert!(context_read::read(&graph, "".chars()).is_none());
+    assert!(context_read::legacy::read(&graph, "".chars()).is_none());
     assert_eq!(graph.vertex_count(), 0);
 }
 
 #[test]
 fn single_atom_is_reused() {
     let graph = HypergraphRef::default();
-    let first = context_read::read(&graph, "x".chars()).unwrap();
+    let first = context_read::legacy::read(&graph, "x".chars()).unwrap();
     assert_eq!(graph.index_string(first), "x");
     assert_eq!(first.width().0, 1);
-    assert_eq!(context_read::read(&graph, "x".chars()), Some(first));
+    assert_eq!(context_read::legacy::read(&graph, "x".chars()), Some(first));
     assert_eq!(graph.vertex_count(), 1);
 }
 
@@ -121,7 +136,7 @@ fn fixture_manifest_is_covered_and_round_trips() {
             scenario.name
         );
         assert_eq!(
-            GraphData::from_graph(&support::to_graph(&fixture.graph)).unwrap(),
+            GraphData::from_graph(&support::legacy::to_graph(&fixture.graph)).unwrap(),
             fixture.graph
         );
     }

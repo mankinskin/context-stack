@@ -15,7 +15,7 @@ use std::{
     str::Chars,
 };
 
-use crate::request::RequestInput;
+use crate::legacy::request::RequestInput;
 
 // ---------------------------------------------------------------------------
 // ToNewAtomIndices trait (unchanged)

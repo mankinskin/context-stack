@@ -1,7 +1,7 @@
 pub(crate) mod block;
 pub(crate) mod closure;
 
-use crate::pipeline::root::{
+use crate::legacy::pipeline::root::{
     CommitReceipt,
     RootManager,
     Span,

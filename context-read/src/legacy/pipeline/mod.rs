@@ -5,7 +5,7 @@ use context_trace::legacy::*;
 use std::io::Read;
 use tracing::debug;
 
-use crate::{
+use crate::legacy::{
     expansion::block::BlockExpansionCtx,
     input::IntoReadInput,
     pipeline::root::RootManager,

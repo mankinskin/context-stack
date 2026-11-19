@@ -13,7 +13,7 @@ use context_trace::legacy::{
 };
 use derive_builder::Builder;
 
-use crate::{
+use crate::legacy::{
     pipeline::ReadCtx,
     segment::ToNewAtomIndices,
 };

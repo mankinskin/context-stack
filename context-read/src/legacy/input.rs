@@ -2,7 +2,7 @@
 //!
 //! `IntoReadInput` is the single conversion trait for everything the read
 //! pipeline accepts as input.  Implement it for a type to make it passable
-//! to [`crate::read`] and [`crate::pipeline::ReadCtx::new`].
+//! to [`crate::legacy::read`] and [`crate::legacy::pipeline::ReadCtx::new`].
 
 use context_trace::legacy::{
     graph::vertex::atom::NewAtomIndices,
@@ -12,7 +12,7 @@ use context_trace::legacy::{
     Token,
 };
 
-use crate::segment::ToNewAtomIndices;
+use crate::legacy::segment::ToNewAtomIndices;
 
 /// Conversion trait for types that can be used as input to the read pipeline.
 ///
@@ -39,26 +39,26 @@ impl<T: ToNewAtomIndices + std::fmt::Debug> IntoReadInput for T {
 /// Trait for types that can create or provide a ReadCtx for reading sequences.
 #[allow(dead_code)]
 pub(crate) trait HasReadCtx {
-    fn read_context(&'_ mut self) -> crate::pipeline::ReadCtx;
+    fn read_context(&'_ mut self) -> crate::legacy::pipeline::ReadCtx;
     fn read_sequence(&mut self) -> Option<Token> {
         self.read_context().read_sequence()
     }
 }
 
 impl<T: HasReadCtx> HasReadCtx for &'_ mut T {
-    fn read_context(&mut self) -> crate::pipeline::ReadCtx {
+    fn read_context(&mut self) -> crate::legacy::pipeline::ReadCtx {
         (**self).read_context()
     }
 }
 impl<S: ToNewAtomIndices + Clone> HasReadCtx for (HypergraphRef, S) {
-    fn read_context(&mut self) -> crate::pipeline::ReadCtx {
+    fn read_context(&mut self) -> crate::legacy::pipeline::ReadCtx {
         let (graph, seq) = self;
-        crate::pipeline::ReadCtx::new(graph.clone(), seq.clone())
+        crate::legacy::pipeline::ReadCtx::new(graph.clone(), seq.clone())
     }
 }
 impl<S: ToNewAtomIndices + Clone> HasReadCtx for (&mut HypergraphRef, S) {
-    fn read_context(&mut self) -> crate::pipeline::ReadCtx {
+    fn read_context(&mut self) -> crate::legacy::pipeline::ReadCtx {
         let (graph, seq) = self;
-        crate::pipeline::ReadCtx::new(graph.clone(), seq.clone())
+        crate::legacy::pipeline::ReadCtx::new(graph.clone(), seq.clone())
     }
 }

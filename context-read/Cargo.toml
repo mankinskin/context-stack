@@ -5,7 +5,13 @@ name = "context-read"
 version = "0.1.0"
 resolver = "2"
 [features]
-default = []
+default = ["legacy"]
+# Row-model implementation in `context_read::legacy`.
+legacy = [
+    "context-insert/legacy",
+    "context-search/legacy",
+    "context-trace/legacy",
+]
 test-hashing = []
 test-api = []
 async = ["dep:tokio", "dep:tokio-stream"]
@@ -39,9 +45,9 @@ nrfind = "1"
 ngram = "0.1"
 csv = "1"
 derivative = "^2.2"
-context-trace = { path = "../context-trace", features = ["test-api"] }
-context-search = { path = "../context-search", features = ["test-api"] }
-context-insert = { path = "../context-insert", features = ["test-api"] }
+context-trace = { path = "../context-trace", default-features = false, features = ["test-api"] }
+context-search = { path = "../context-search", default-features = false, features = ["test-api"] }
+context-insert = { path = "../context-insert", default-features = false, features = ["test-api"] }
 derive_builder = "^0.20"
 tracing = { version = "^0.1", features = ["attributes", "valuable"] }
 uuid = { version = "^1.10", features = ["v4", "fast-rng", "serde", "js"] }

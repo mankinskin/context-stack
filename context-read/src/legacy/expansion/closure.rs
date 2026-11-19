@@ -13,7 +13,7 @@
 //! mutate the graph but leaves accumulation updates to the sink. Neither
 //! phase provides rollback.
 
-use crate::pipeline::root::{
+use crate::legacy::pipeline::root::{
     RootManager,
     Span,
 };

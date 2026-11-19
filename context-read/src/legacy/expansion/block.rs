@@ -1,4 +1,4 @@
-use crate::{
+use crate::legacy::{
     expansion::ExpansionCtx,
     pipeline::root::RootManager,
 };

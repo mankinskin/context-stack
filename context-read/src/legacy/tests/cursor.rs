@@ -2,8 +2,8 @@
 //! Graph seeds come from checked-in oracle fixtures. Whole-graph semantics are
 //! covered separately through the public reader API.
 
-use super::oracle::{load, seed, token, GraphData};
-use crate::{
+use super::oracle::legacy::{load, seed, token, GraphData};
+use crate::legacy::{
     expansion::{closure, ExpansionCtx},
     pipeline::root::{RootManager, Span},
 };

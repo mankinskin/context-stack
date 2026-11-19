@@ -14,7 +14,7 @@ dev = []
 context-trace = { path = "../context-trace", features = ["legacy", "test-api"] }
 context-search = { path = "../context-search", features = ["legacy", "test-api"] }
 context-insert = { path = "../context-insert", features = ["legacy", "test-api"] }
-context-read = { path = "../context-read", features = ["test-api"] }
+context-read = { path = "../context-read", features = ["legacy", "test-api"] }
 ngrams = { path = "../ngrams" }
 ascii-dag = "0.9"
 
