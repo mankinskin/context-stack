@@ -7,6 +7,7 @@
 //! by review (see `agents/plans/20261116_PLAN_OVERLAP_PROVIDER_MIGRATION.md`):
 //! `complex_overlap`, `infix`, `multiple_overlaps`, `nested_complements`,
 //! `flat_complement`, `accepted_materialization`.
+#![cfg(feature = "legacy")]
 #[allow(dead_code)]
 mod support;
 

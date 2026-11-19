@@ -10,12 +10,14 @@ use ngrams::{
     Cancellation,
 };
 use std::collections::BTreeSet;
+#[cfg(feature = "legacy")]
+use support::legacy::{self, load, seed, token, v2_dir, GraphData};
 use support::{
     fixture_names,
-    legacy::{self, load, seed, token, v2_dir, GraphData},
     positioned::{self, load_v3, v3_dir, PositionedGraphSnapshot},
 };
 
+#[cfg(feature = "legacy")]
 #[test]
 fn canonicalization_rejects_duplicate_content_instead_of_overwriting() {
     let graph = seed("repeat_aaa");
@@ -25,6 +27,7 @@ fn canonicalization_rejects_duplicate_content_instead_of_overwriting() {
         .contains("duplicate token content"));
 }
 
+#[cfg(feature = "legacy")]
 #[test]
 fn fixture_validation_rejects_incorrect_content_and_missing_children() {
     let valid = load("linear_abc").graph;
@@ -41,6 +44,7 @@ fn fixture_validation_rejects_incorrect_content_and_missing_children() {
     assert!(invalid.validate().unwrap_err().contains("invalid child"));
 }
 
+#[cfg(feature = "legacy")]
 #[test]
 fn v2_fixtures_match_frozen_manifest_exactly() {
     let mut expected = BTreeSet::new();

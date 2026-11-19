@@ -102,7 +102,15 @@ root and uses whole-root closure, preventing cycles.
 
 ### Tests and oracle fixtures
 
-Reader behavior tests live in [`tests/legacy_reader_behavior.rs`](tests/legacy_reader_behavior.rs).
+Positioned reader tests live in [`tests/reader_behavior.rs`](tests/reader_behavior.rs):
+one test per v3 manifest entry, calling only `context_read::read` (a stub
+until the positioned reader exists, so all scenario tests are
+`#[ignore = "positioned reader pending"]`) and comparing the final graph with
+the v3 fixture via `context_trace::positioned::diff`. The meta-test
+`v3_manifest_is_covered` (not ignored) requires a test for every manifest
+entry, so a new v3 scenario must be registered in the `scenarios!` list.
+
+Legacy reader behavior tests live in [`tests/legacy_reader_behavior.rs`](tests/legacy_reader_behavior.rs).
 They call only the public `context_read::legacy::read` API and compare the **entire**
 graph with checked-in n-gram oracle snapshots: tokens and decompositions must
 match exactly. Extra structure is a failure, as are duplicate-content vertices,
@@ -115,7 +123,11 @@ input corpora:
 | Lane | Manifest | Fixtures | Format | Used by |
 |---|---|---|---|---|
 | Legacy v2 rows | [`tests/fixtures/v2/scenarios.json`](tests/fixtures/v2/scenarios.json) (frozen) | `tests/fixtures/v2/<name>.json` | `format_version: 2`, row decompositions (`ngrams::output::legacy`) | `legacy_reader_behavior`, cursor tests, graph seeding |
-| Positioned v3 | [`tests/fixtures/v3/scenarios.json`](tests/fixtures/v3/scenarios.json) (authoritative) | `tests/fixtures/v3/<name>.json` | `format_version: 3`, positioned covers (`context_trace::positioned::interchange::PositionedGraphSnapshot`) | `fixture_validation`, context-trace positioned model tests |
+| Positioned v3 | [`tests/fixtures/v3/scenarios.json`](tests/fixtures/v3/scenarios.json) (authoritative) | `tests/fixtures/v3/<name>.json` | `format_version: 3`, positioned covers (`context_trace::positioned::interchange::PositionedGraphSnapshot`) | `reader_behavior`, `fixture_validation`, context-trace positioned model tests, ngrams retention tests |
+
+Late-retention scenarios have one fixture per completed-input prefix
+(`<name>__1`, `<name>__2`, …), because a token may be retained only after a
+later input.
 
 #### Legacy v2 fixtures (frozen)
 
@@ -177,6 +189,7 @@ structural policies need independent justification.
 Run the suites separately:
 
 ```bash
+cargo test -p context-read --test reader_behavior
 cargo test -p context-read --test legacy_reader_behavior
 cargo test -p context-read --test fixture_validation
 cargo test -p context-read --lib

@@ -7,6 +7,7 @@
 //!   authoritative manifest `v3/scenarios.json`).
 //!
 //! This module holds what both lanes share: manifest and file loading.
+#[cfg(feature = "legacy")]
 pub mod legacy;
 pub mod positioned;
 
