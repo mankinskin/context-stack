@@ -7,6 +7,8 @@
 //! atom types ([`crate::VertexIndex`], [`crate::Token`], [`crate::GraphKind`]).
 
 pub mod composition;
+mod convert;
+pub mod diff;
 pub mod graph;
 pub mod interchange;
 pub mod location;
@@ -16,6 +18,10 @@ pub use self::{
         Composition,
         CompositionError,
         Occurrence,
+    },
+    diff::{
+        GraphDiff,
+        diff,
     },
     graph::{
         PositionedError,
