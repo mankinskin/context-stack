@@ -11,10 +11,10 @@
 //!
 //! ```rust
 //! use context_trace::legacy::{Hypergraph, graph::test_graph};
-//! # use context_trace::legacy::graph::vertex::atom::Atom;
+//! # use context_trace::{BaseGraphKind, legacy::graph::vertex::atom::Atom};
 //!
 //! # fn main() {
-//! let mut graph = Hypergraph::default();
+//! let mut graph = Hypergraph::<BaseGraphKind>::default();
 //! let a = graph.insert_atom(Atom::Element('a'));
 //! let b = graph.insert_atom(Atom::Element('b'));
 //! let c = graph.insert_atom(Atom::Element('c'));
