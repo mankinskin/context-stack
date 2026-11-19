@@ -23,6 +23,7 @@ use pretty_assertions::{
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_infix1() {
     // Create independent test environment
     let EnvInsertInfix1 {
@@ -104,6 +105,7 @@ fn insert_infix1() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_infix2() {
     // Create independent test environment
     let EnvInsertInfix2 {

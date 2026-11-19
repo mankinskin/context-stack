@@ -20,6 +20,7 @@ use {
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_advancement_chain_through_multiple_states() {
     // Test advancing through a sequence of states
     let graph = HypergraphRef::default();
@@ -89,6 +90,7 @@ fn test_advancement_chain_through_multiple_states() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_advancement_preserves_atom_positions() {
     // Verify that advancement preserves atom positions correctly
     let graph = HypergraphRef::default();
@@ -176,6 +178,7 @@ fn test_advancement_preserves_atom_positions() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_advancement_with_different_pattern_sizes() {
     // Test advancement with patterns of various sizes
     let graph = HypergraphRef::default();
@@ -240,6 +243,7 @@ fn test_advancement_with_different_pattern_sizes() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_advancement_fails_at_boundaries() {
     // Test that advancement properly fails at pattern boundaries
     let graph = HypergraphRef::default();
@@ -301,6 +305,7 @@ fn test_advancement_fails_at_boundaries() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_advancement_with_nested_patterns() {
     // Test advancement through nested pattern structures
     let graph = HypergraphRef::default();
@@ -370,6 +375,7 @@ fn test_advancement_with_nested_patterns() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_state_advance_idempotency_on_error() {
     // Test that failed advances don't modify state
     let graph = HypergraphRef::default();

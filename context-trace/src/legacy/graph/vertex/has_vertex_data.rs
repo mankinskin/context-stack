@@ -18,7 +18,9 @@ use crate::legacy::graph::{
 ///
 /// # Example
 ///
-/// ```rust
+// Legacy doctest: runs only with `--features legacy-tests`.
+#[cfg_attr(feature = "legacy-tests", doc = "```rust")]
+#[cfg_attr(not(feature = "legacy-tests"), doc = "```rust,ignore")]
 /// use context_trace::legacy::graph::vertex::has_vertex_data::HasVertexStringRepr;
 /// # use context_trace::legacy::{Hypergraph, BaseGraphKind};
 /// # use context_trace::legacy::graph::vertex::atom::Atom;

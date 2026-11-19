@@ -11,6 +11,14 @@ The module paths below refer to `src/legacy/…`.
 
 **Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
+**Legacy tests:** since the Step 2 test-suite cutover every legacy test is
+`#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]`, so a
+plain `cargo test` runs only the positioned and model-agnostic tests. Run the
+legacy suite with `cargo test -p context-search --features legacy-tests` (the feature
+propagates to the lower crates) whenever a change touches `legacy` code or
+promotes something out of it. Do not use `-- --ignored` for this: it also runs
+the pending positioned reader lane and slow sweeps.
+
 Advanced pattern search and traversal operations for hierarchical graph structures. Provides sophisticated algorithms for finding patterns, sequences, and relationships within hypergraph data structures.
 
 ## Features

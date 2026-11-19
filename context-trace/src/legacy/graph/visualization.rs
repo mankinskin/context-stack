@@ -910,6 +910,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn replay_envelope_uses_v1_schema_and_path_id_as_operation_id() {
         let event = GraphOpEvent {
             step: 7,
@@ -936,6 +937,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn replay_envelope_preserves_optional_mutation_payload() {
         let mutation =
             GraphMutation::single(DeltaOp::AddNode { index: 9, width: 3 });
@@ -958,6 +960,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn replay_envelope_extracts_ids_from_query_suffix() {
         let event = GraphOpEvent {
             step: 1,
@@ -982,6 +985,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn replay_envelope_extracts_ids_from_semicolon_suffix() {
         let event = GraphOpEvent {
             step: 1,
@@ -1006,6 +1010,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn replay_envelope_reads_correlation_from_active_span() {
         let _tracing = crate::init_test_tracing!();
         let span = tracing::info_span!(

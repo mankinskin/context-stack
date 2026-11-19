@@ -6,6 +6,7 @@ use crate::legacy::{
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_compact_formatting() {
     let _tracing = init_test_tracing!();
 
@@ -58,6 +59,7 @@ fn test_compact_formatting() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_compact_with_token_display() {
     let _tracing = init_test_tracing!();
 

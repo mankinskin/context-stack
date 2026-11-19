@@ -19,6 +19,7 @@ use support::{
 
 #[cfg(feature = "legacy")]
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn canonicalization_rejects_duplicate_content_instead_of_overwriting() {
     let graph = seed("repeat_aaa");
     graph.insert_pattern(vec![token(&graph, "aa"), token(&graph, "a")]);
@@ -29,6 +30,7 @@ fn canonicalization_rejects_duplicate_content_instead_of_overwriting() {
 
 #[cfg(feature = "legacy")]
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn fixture_validation_rejects_incorrect_content_and_missing_children() {
     let valid = load("linear_abc").graph;
     let mut invalid = valid.clone();
@@ -46,6 +48,7 @@ fn fixture_validation_rejects_incorrect_content_and_missing_children() {
 
 #[cfg(feature = "legacy")]
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn v2_fixtures_match_frozen_manifest_exactly() {
     let mut expected = BTreeSet::new();
     for scenario in legacy::scenarios() {

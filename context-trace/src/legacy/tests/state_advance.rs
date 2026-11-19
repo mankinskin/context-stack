@@ -30,6 +30,7 @@ use crate::legacy::{
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_parent_state_advance_success() {
     let _tracing = init_test_tracing!();
 
@@ -78,6 +79,7 @@ fn test_parent_state_advance_success() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_parent_state_advance_at_last_index() {
     let _tracing = init_test_tracing!();
 
@@ -118,6 +120,7 @@ fn test_parent_state_advance_at_last_index() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_parent_state_advance_single_element_pattern() {
     let _tracing = init_test_tracing!();
 
@@ -152,6 +155,7 @@ fn test_parent_state_advance_single_element_pattern() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_child_state_advance_success() {
     let _tracing = init_test_tracing!();
 
@@ -206,6 +210,7 @@ fn test_child_state_advance_success() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_child_state_advance_at_end() {
     let _tracing = init_test_tracing!();
 
@@ -247,6 +252,7 @@ fn test_child_state_advance_at_end() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_root_child_state_composition() {
     let _tracing = init_test_tracing!();
 
@@ -296,6 +302,7 @@ fn test_root_child_state_composition() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_state_advance_chain() {
     let _tracing = init_test_tracing!();
 
@@ -345,6 +352,7 @@ fn test_state_advance_chain() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_state_advance_preserves_positions() {
     let _tracing = init_test_tracing!();
 

@@ -46,6 +46,7 @@ use {
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn prefix1() {
     let Env1 {
         graph,
@@ -148,6 +149,7 @@ fn prefix1() {
     );
 }
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn postfix1() {
     let Env1 {
         graph,
@@ -247,6 +249,7 @@ fn postfix1() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn range1() {
     let Env1 {
         graph,

@@ -113,6 +113,7 @@ macro_rules! build_trace_cache {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_build_trace_cache1() {
     let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {h, e, l, d});
@@ -212,6 +213,7 @@ fn test_build_trace_cache1() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_build_trace_cache2() {
     let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c, d});

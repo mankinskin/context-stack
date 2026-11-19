@@ -23,6 +23,25 @@ There is no root `pub use legacy::*`; `legacy` mirrors the root items
 
 **Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
+**Legacy tests:** since the Step 2 test-suite cutover every legacy test is
+`#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]`, so a
+plain `cargo test` runs only the positioned and model-agnostic tests. Run the
+legacy suite with `cargo test -p context-trace --features legacy-tests` (the feature
+propagates to the lower crates) whenever a change touches `legacy` code or
+promotes something out of it. Do not use `-- --ignored` for this: it also runs
+the pending positioned reader lane and slow sweeps. The two running legacy
+doctests (`legacy::graph::test_graph`, `HasVertexStringRepr`) switch their
+fence to `rust,ignore` via `cfg_attr(not(feature = "legacy-tests"), doc = …)`.
+
+**Positioned model** (`src/positioned/`, root, no legacy dependency):
+`interchange.rs` (v3 `PositionedGraphData`/`PositionedGraphSnapshot` and the
+structural validator, re-exported by `ngrams::output`), `composition.rs`
+(`Occurrence`, `Composition`), `location.rs` (`OccurrenceLocation`,
+`OccurrencePath`, `IntervalView`), `graph.rs` (`PositionedGraph`,
+`PositionedVertex`, `PositionedGraphRef = Arc<RwLock<_>>`), `convert.rs`
+(`from_interchange`/`to_interchange`), `diff.rs` (`diff` → `GraphDiff`). Tests
+round-trip every v3 fixture of `context-read/tests/fixtures/v3`.
+
 Foundational component of the context framework providing core graph 
 structures, path operations, and tracing capabilities. Implements 
 hypergraph data structures with sophisticated path navigation and 

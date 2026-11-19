@@ -36,6 +36,7 @@ fn only_pattern_id(
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn materialize_translates_shifted_location() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, y] = atoms(&graph, "aby");
@@ -65,6 +66,7 @@ fn materialize_translates_shifted_location() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn materialize_translates_location_into_replacement() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [x, a, b] = atoms(&graph, "xab");
@@ -95,6 +97,7 @@ fn materialize_translates_location_into_replacement() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn materialize_reuses_complete_match_without_edits() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, c] = atoms(&graph, "abc");
@@ -118,6 +121,7 @@ fn materialize_reuses_complete_match_without_edits() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn single_step_closes_scope_without_nested_union() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, c, d] = atoms(&graph, "abcd");
@@ -144,6 +148,7 @@ fn single_step_closes_scope_without_nested_union() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn nested_closure_steps_ignore_wrappers_from_complements() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [x, a, b] = atoms(&graph, "xab");
@@ -227,6 +232,7 @@ fn materialize_translating_all(
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn materialize_keeps_the_accepted_response() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, y] = atoms(&graph, "aby");
@@ -241,6 +247,7 @@ fn materialize_keeps_the_accepted_response() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn translation_survives_helper_inlining() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, c] = atoms(&graph, "abc");
@@ -257,6 +264,7 @@ fn translation_survives_helper_inlining() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn translation_distinguishes_repeated_occurrences() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b] = atoms(&graph, "ab");
@@ -283,6 +291,7 @@ fn translation_distinguishes_repeated_occurrences() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn prefix_path_projects_the_trace_of_a_larger_host() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [x, a, b, c] = atoms(&graph, "xabc");
@@ -307,6 +316,7 @@ fn prefix_path_projects_the_trace_of_a_larger_host() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn translate_chain_follows_wider_boundary_created_by_publication() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [x, y, p] = atoms(&graph, "xyp");
@@ -326,6 +336,7 @@ fn translate_chain_follows_wider_boundary_created_by_publication() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn prefix_path_of_unextended_start_token_is_empty() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, x] = atoms(&graph, "abx");

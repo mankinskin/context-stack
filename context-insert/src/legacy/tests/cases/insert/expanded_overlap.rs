@@ -45,6 +45,7 @@ use pretty_assertions::assert_eq;
 /// Query: [b, c]
 /// Expected: Should find bc as postfix of abc, return bc with correct cursor
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_postfix_bc_of_abc() {
     let EnvExpandedOverlap {
         graph,
@@ -84,6 +85,7 @@ fn insert_postfix_bc_of_abc() {
 /// Query: [b, c, d]
 /// Expected: Should handle the overlap and include d
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_postfix_bcd_extends_abc() {
     let EnvExpandedOverlap {
         graph,
@@ -118,6 +120,7 @@ fn insert_postfix_bcd_extends_abc() {
 /// Query: [c, d]
 /// Expected: Should find c at end of abc, extend with d
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_single_atom_postfix() {
     let EnvExpandedOverlap {
         graph, c, d, abc, ..
@@ -146,6 +149,7 @@ fn insert_single_atom_postfix() {
 /// Query: [b, c]
 /// Expected: Should find existing bc token
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_finds_existing_overlap_pattern() {
     let EnvMultiOverlap {
         graph, b, c, bc, ..
@@ -171,6 +175,7 @@ fn insert_finds_existing_overlap_pattern() {
 /// Query: [c, d]
 /// Expected: Should find cd as postfix of abcd
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_finds_postfix_of_compound_token() {
     let EnvMultiOverlap {
         graph,
@@ -205,6 +210,7 @@ fn insert_finds_postfix_of_compound_token() {
 /// 1. How many atoms were consumed
 /// 2. What position in the query we're at
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn cursor_position_after_postfix_match() {
     let EnvExpandedOverlap {
         graph,
@@ -244,6 +250,7 @@ fn cursor_position_after_postfix_match() {
 /// The cursor (via path.end indices) should indicate which tokens
 /// in the query have been processed.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn cursor_tracks_overlap_consumption() {
     let EnvMultiOverlap {
         graph, b, c, d, bc, ..
@@ -279,6 +286,7 @@ fn cursor_tracks_overlap_consumption() {
 ///
 /// Query atoms exist in graph but don't form overlapping pattern
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_no_overlap_path() {
     let EnvExpandedOverlap { graph, d, e, .. } =
         EnvExpandedOverlap::initialize();
@@ -301,6 +309,7 @@ fn insert_no_overlap_path() {
 /// Query: [c] where abc ends with c
 /// This should handle the edge case of single-atom query
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_single_atom_is_postfix() {
     let EnvExpandedOverlap { graph, c, abc, .. } =
         EnvExpandedOverlap::initialize();

@@ -43,6 +43,7 @@ fn inner_function(value: i32) -> i32 {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_tracing_demo() {
     let _tracing = init_test_tracing!();
 

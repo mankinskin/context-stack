@@ -10,6 +10,7 @@ use crate::legacy::{
 use std::ops::ControlFlow;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn move_leaf_right_advances_through_pattern() {
     let _tracing = init_test_tracing!();
 
@@ -34,6 +35,7 @@ fn move_leaf_right_advances_through_pattern() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn move_leaf_right_breaks_at_pattern_end() {
     let _tracing = init_test_tracing!();
 
@@ -53,6 +55,7 @@ fn move_leaf_right_breaks_at_pattern_end() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn move_leaf_left_retracts_through_pattern() {
     let _tracing = init_test_tracing!();
 
@@ -77,6 +80,7 @@ fn move_leaf_left_retracts_through_pattern() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn move_leaf_left_breaks_at_pattern_start() {
     let _tracing = init_test_tracing!();
 
@@ -96,6 +100,7 @@ fn move_leaf_left_breaks_at_pattern_start() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn move_leaf_works_with_compound_children() {
     let _tracing = init_test_tracing!();
 
@@ -123,6 +128,7 @@ fn move_leaf_works_with_compound_children() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn move_leaf_sequential_movements() {
     let _tracing = init_test_tracing!();
 

@@ -143,6 +143,7 @@ mod tests {
     use std::panic::{AssertUnwindSafe, catch_unwind};
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn assertion_failure_labels_found_and_expected_patterns() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b});

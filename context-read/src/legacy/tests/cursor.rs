@@ -11,6 +11,7 @@ use context_insert::legacy::ToInsertCtx;
 use context_trace::legacy::*;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn cursor_returns_existing_prefix_and_preserves_query_path() {
     let graph = seed("cursor_seed");
     let a = token(&graph, "a");
@@ -26,6 +27,7 @@ fn cursor_returns_existing_prefix_and_preserves_query_path() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn cursor_finds_complete_repeated_token() {
     for (name, text) in [
         ("repeat_aa", "aa"),
@@ -42,6 +44,7 @@ fn cursor_finds_complete_repeated_token() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn cursor_path_tracks_advancement_and_exhaustion() {
     use std::ops::ControlFlow;
     let graph = seed("cursor_seed");
@@ -63,12 +66,14 @@ fn cursor_path_tracks_advancement_and_exhaustion() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn cursor_empty_query_is_rejected() {
     let graph = seed("cursor_seed");
     assert!(ToInsertCtx::<IndexWithPath>::insert_next_match(&graph, Vec::<Token>::new()).is_err());
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn cursor_single_atom_returns_single_index() {
     let graph = seed("cursor_seed");
     let a = token(&graph, "a");
@@ -79,6 +84,7 @@ fn cursor_single_atom_returns_single_index() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn expansion_commits_forward_match_before_overlap() {
     let fixture = load("canonical_closure");
     let graph = seed("closure_forward_seed");
@@ -103,6 +109,7 @@ fn expansion_commits_forward_match_before_overlap() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn closure_uses_retained_nested_anchor_path() {
     let fixture = load("nested_closure");
     let graph = seed("closure_nested_seed");
@@ -118,6 +125,7 @@ fn closure_uses_retained_nested_anchor_path() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn closure_reuses_existing_canonical_result() {
     let graph = seed("canonical_closure");
     let ab = token(&graph, "ab");
@@ -139,6 +147,7 @@ fn closure_reuses_existing_canonical_result() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn whole_tail_replacement_skips_unused_complement_insertion() {
     let fixture = load("tail_replacement");
     let graph = seed("closure_tail_seed");
@@ -170,6 +179,7 @@ fn whole_tail_replacement_skips_unused_complement_insertion() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn accepted_materialization_rechecks_root_editability() {
     let graph = seed("linear_abc");
     let abc = token(&graph, "abc");
@@ -194,6 +204,7 @@ fn accepted_materialization_rechecks_root_editability() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn rejected_root_probes_do_not_materialize() {
     let graph = seed("cursor_seed");
     let mut sink = RootManager::new(graph.clone());
@@ -215,6 +226,7 @@ fn rejected_root_probes_do_not_materialize() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn sink_does_not_mutate_adopted_token() {
     let graph = seed("cursor_seed");
     let ab = token(&graph, "ab");
@@ -227,6 +239,7 @@ fn sink_does_not_mutate_adopted_token() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 #[should_panic(expected = "stale last child")]
 fn sink_rejects_stale_tail_child() {
     let graph = seed("cursor_seed");
@@ -245,6 +258,7 @@ fn sink_rejects_stale_tail_child() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 #[should_panic(expected = "replacement root is stale")]
 fn sink_rejects_stale_tail_root() {
     let graph = seed("repeat_aa");
@@ -260,6 +274,7 @@ fn sink_rejects_stale_tail_root() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 #[should_panic(expected = "replacement root is not editable")]
 fn sink_rejects_adopted_tail_root() {
     let graph = seed("repeat_aaa");
@@ -276,6 +291,7 @@ fn sink_rejects_adopted_tail_root() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 #[should_panic(expected = "self-referential tail")]
 fn sink_rejects_self_referential_tail() {
     let graph = seed("cursor_seed");

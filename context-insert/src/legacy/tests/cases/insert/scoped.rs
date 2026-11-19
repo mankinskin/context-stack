@@ -25,6 +25,7 @@ fn atoms<const N: usize>(
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_prefix_splits_flat_scope_only() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [v, i, s, d] = atoms(&graph, "visd");
@@ -40,6 +41,7 @@ fn scoped_prefix_splits_flat_scope_only() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_prefix_reuses_represented_child() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [v, i, s, u] = atoms(&graph, "visu");
@@ -55,6 +57,7 @@ fn scoped_prefix_reuses_represented_child() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_prefix_splits_nested_child() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, c, d] = atoms(&graph, "abcd");
@@ -72,6 +75,7 @@ fn scoped_prefix_splits_nested_child() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_postfix_splits_flat_scope() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [s, u, b] = atoms(&graph, "sub");
@@ -85,6 +89,7 @@ fn scoped_postfix_splits_flat_scope() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_postfix_spans_alternative_decompositions() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [v, i, s, u] = atoms(&graph, "visu");
@@ -104,6 +109,7 @@ fn scoped_postfix_spans_alternative_decompositions() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_postfix_narrows_into_last_child() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, c, d] = atoms(&graph, "abcd");
@@ -123,6 +129,7 @@ fn scoped_postfix_narrows_into_last_child() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_postfix_materializes_conflicting_wrapper_first() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, c, d, e] = atoms(&graph, "abcde");
@@ -145,6 +152,7 @@ fn scoped_postfix_materializes_conflicting_wrapper_first() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_prefix_materializes_conflicting_wrapper_first() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [a, b, c, d, e] = atoms(&graph, "abcde");
@@ -167,6 +175,7 @@ fn scoped_prefix_materializes_conflicting_wrapper_first() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn scoped_complements_from_boundary_paths() {
     let graph = HypergraphRef::from(Hypergraph::default());
     let [v, i, s, u] = atoms(&graph, "visu");

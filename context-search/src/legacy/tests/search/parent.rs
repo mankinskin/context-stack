@@ -22,6 +22,7 @@ use {
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_parent1() {
     let Env1 {
         graph,

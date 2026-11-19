@@ -18,6 +18,7 @@ use {
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_parent_compare_state_advance_success() {
     // Create a graph with pattern: [a, b, c]
     let graph = HypergraphRef::default();
@@ -106,6 +107,7 @@ fn test_parent_compare_state_advance_success() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_parent_compare_state_advance_at_last_index() {
     // Create a graph with pattern: [a, b, c]
     let graph = HypergraphRef::default();
@@ -167,6 +169,7 @@ fn test_parent_compare_state_advance_at_last_index() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_parent_compare_state_advance_with_nested_pattern() {
     // Create a graph with nested patterns: [a, b] and [ab, c]
     let graph = HypergraphRef::default();
@@ -240,6 +243,7 @@ fn test_parent_compare_state_advance_with_nested_pattern() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_parent_compare_state_cursor_conversion() {
     // Test cursor type conversions during advancement
     let graph = HypergraphRef::default();
@@ -315,6 +319,7 @@ fn test_parent_compare_state_cursor_conversion() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_state_advance_error_propagation() {
     // Test that errors from underlying ParentState are properly propagated
     let graph = HypergraphRef::default();

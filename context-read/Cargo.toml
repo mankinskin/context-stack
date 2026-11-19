@@ -13,6 +13,13 @@ legacy = [
     "context-trace/legacy",
 ]
 test-hashing = []
+# Run the legacy row-model test suite (ignored by default).
+legacy-tests = [
+    "legacy",
+    "context-insert/legacy-tests",
+    "context-search/legacy-tests",
+    "context-trace/legacy-tests",
+]
 test-api = []
 async = ["dep:tokio", "dep:tokio-stream"]
 

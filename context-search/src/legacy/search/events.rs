@@ -341,6 +341,7 @@ mod tests {
     use context_trace::legacy::graph::search_path::PathNode;
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_info_match_produces_two_events() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 1 },
@@ -361,6 +362,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_info_mismatch_produces_two_events() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 1 },
@@ -387,6 +389,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_info_prefixes_produces_one_event_per_child() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 3 },
@@ -416,6 +419,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn replace_flag_depends_on_end_path_empty() {
         let info = CompareInfo {
             token: PathNode { index: 5, width: 1 },

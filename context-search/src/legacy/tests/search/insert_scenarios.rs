@@ -36,6 +36,7 @@ use {
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn prefix1() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {h, e, l, d});
@@ -103,6 +104,7 @@ fn prefix1() {
     );
 }
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_pattern1_by_z() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
@@ -206,6 +208,7 @@ fn search_pattern1_by_z() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_pattern1_ab_y() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
@@ -312,6 +315,7 @@ fn search_pattern1_ab_y() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_pattern2_a_b_y() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
@@ -465,6 +469,7 @@ fn search_pattern2_a_b_y() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_pattern2_a_b() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, x, y, z});
@@ -546,6 +551,7 @@ fn search_pattern2_a_b() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_infix1_a_b_y() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, w, x, y, z});
@@ -668,6 +674,7 @@ fn search_infix1_a_b_y() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_infix1_a_b() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, w, x, y, z});
@@ -774,6 +781,7 @@ fn search_infix1_a_b() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_infix2_a_b_c_d() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d, x, y});
@@ -879,6 +887,7 @@ fn search_infix2_a_b_c_d() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_postfix1_b_c_d_d() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c, d});
@@ -986,6 +995,7 @@ fn search_postfix1_b_c_d_d() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_complete_token_b_c() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
@@ -1041,6 +1051,7 @@ fn search_complete_token_b_c() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_complete_token_a_bc() {
     let graph = HypergraphRef::default();
     insert_atoms!(graph, {a, b, c});
@@ -1098,6 +1109,7 @@ fn search_complete_token_a_bc() {
 // New organized tests using test case structures
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_index_prefix1_hell() {
     use crate::legacy::tests::env::EnvInsertPrefix1;
     use context_trace::legacy::tests::test_case::TestEnv;
@@ -1174,6 +1186,7 @@ fn test_index_prefix1_hell() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_index_postfix1_bcdd() {
     use crate::legacy::tests::env::EnvInsertPostfix1;
     use context_trace::legacy::tests::test_case::TestEnv;

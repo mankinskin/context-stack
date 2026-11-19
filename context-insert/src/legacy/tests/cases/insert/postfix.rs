@@ -12,6 +12,7 @@ use context_trace::legacy::{
 use pretty_assertions::assert_eq;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_postfix1() {
     // Create independent test environment
     let EnvInsertPostfix1 {

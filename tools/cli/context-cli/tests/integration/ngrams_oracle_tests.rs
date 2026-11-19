@@ -14,12 +14,16 @@
 //! first `insert_next_match` call and therefore produces an incomplete graph.
 //! Un-ignoring a test after the RC-1 fix gives instant pass/fail signal.
 //!
-//! The *self-check* tests at the bottom are NOT ignored: they exercise the
+//! The *self-check* tests at the bottom carry no RC ignore: they exercise the
 //! comparison machinery itself (ngrams oracle vs. itself) independently of
 //! any context-read behaviour.
 //!
 //! See `20260315_PLAN_NGRAMS_ORACLE_VALIDATION.md` §Execution Steps for the
 //! full plan.
+//!
+//! Legacy suite: the self-checks run only with
+//! `cargo test -p context-cli --features legacy-tests`; the end-to-end
+//! oracle tests keep their own `RC-…` ignore reasons.
 //!
 //! # Provisional legacy comparison
 //!
@@ -300,6 +304,7 @@ fn oracle_slow_abababab() {
 
 /// Self-comparison of the ngrams graph for "ab" must always pass.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn oracle_machinery_self_check_ab() {
     let texts = vec!["ab".to_string()];
     let corpus = Corpus::new("self-check-ab".to_string(), texts.clone());
@@ -321,6 +326,7 @@ fn oracle_machinery_self_check_ab() {
 /// Self-comparison of the ngrams graph for "abab" must always pass.
 /// Also checks that the expected tokens (a, b, ab) are present.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn oracle_machinery_self_check_abab() {
     let texts = vec!["abab".to_string()];
     let corpus = Corpus::new("self-check-abab".to_string(), texts.clone());
@@ -346,6 +352,7 @@ fn oracle_machinery_self_check_abab() {
 /// Self-comparison of the ngrams graph for "abcabc" must always pass.
 /// Also checks that the expected tokens (a, b, c, ab, bc, abc) are present.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn oracle_machinery_self_check_abcabc() {
     let texts = vec!["abcabc".to_string()];
     let corpus = Corpus::new("self-check-abcabc".to_string(), texts.clone());
@@ -376,6 +383,7 @@ fn oracle_machinery_self_check_abcabc() {
 /// Self-comparison snapshot round-trip: build snap → LabelMap → snap again
 /// and verify the second map equals the first.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn oracle_machinery_label_map_roundtrip() {
     let texts = vec!["abab".to_string()];
     let corpus = Corpus::new("roundtrip-abab".to_string(), texts.clone());

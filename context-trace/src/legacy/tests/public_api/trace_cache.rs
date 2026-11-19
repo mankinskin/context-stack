@@ -14,6 +14,7 @@ use crate::legacy::{
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_new_contains_start_vertex_but_no_positions() {
     let _tracing = init_test_tracing!();
 
@@ -33,6 +34,7 @@ fn trace_cache_new_contains_start_vertex_but_no_positions() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_force_mut_creates_position_and_is_gettable() {
     let _tracing = init_test_tracing!();
 
@@ -57,6 +59,7 @@ fn trace_cache_force_mut_creates_position_and_is_gettable() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_add_state_creates_new_entries() {
     let _tracing = init_test_tracing!();
 
@@ -93,6 +96,7 @@ fn trace_cache_add_state_creates_new_entries() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_add_state_idempotent_for_existing_entries() {
     let _tracing = init_test_tracing!();
 
@@ -128,6 +132,7 @@ fn trace_cache_add_state_idempotent_for_existing_entries() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_add_state_with_edges_creates_bottom_edges() {
     let _tracing = init_test_tracing!();
 
@@ -169,6 +174,7 @@ fn trace_cache_add_state_with_edges_creates_bottom_edges() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_extend_merges_entries() {
     let _tracing = init_test_tracing!();
 
@@ -216,6 +222,7 @@ fn trace_cache_extend_merges_entries() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_extend_merges_positions_for_same_vertex() {
     let _tracing = init_test_tracing!();
 
@@ -251,6 +258,7 @@ fn trace_cache_extend_merges_positions_for_same_vertex() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_multiple_directed_positions() {
     let _tracing = init_test_tracing!();
 

@@ -115,6 +115,7 @@ impl InsertTestCase for Pattern1Aby {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_pattern1() {
     // Test case 1: Insert "byz"
     let case = Pattern1Byz;
@@ -166,6 +167,7 @@ fn insert_pattern1() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn insert_pattern2() {
     // Create independent test environment
     let EnvInsertPattern2 {
@@ -218,6 +220,7 @@ fn insert_pattern2() {
 /// Nested and disjoint replacements proposed for one original pattern are
 /// composed from original index ranges at publication.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn publish_composes_replacements_in_one_pattern() {
     use crate::legacy::join::plan::{
         JoinPlan,

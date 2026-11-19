@@ -15,6 +15,7 @@ use crate::legacy::{
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_pattern_cursor_at_end_cannot_advance() {
     let _tracing = init_test_tracing!();
 
@@ -84,6 +85,7 @@ fn test_pattern_cursor_at_end_cannot_advance() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_can_advance_advance_consistency() {
     let _tracing = init_test_tracing!();
 

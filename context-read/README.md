@@ -6,13 +6,24 @@ The row reader (`pipeline/`, `expansion/`, `request.rs`, `segment.rs`,
 `input.rs`, `src/tests/`) lives in `src/legacy/`, gated by the default-on
 `legacy` feature. Public API: `context_read::legacy::{read, ReadCtx,
 ReadSequenceIter, SegmentResult, IntoReadInput}`; the unqualified
-`context_read::read` is reserved for the positioned reader. Black-box tests:
+`context_read::read` is the positioned reader (an unimplemented stub until
+reader plan Phase 3+). Black-box tests:
 `tests/legacy_reader_behavior.rs` (v2 fixtures; 6 known failures are
 `#[ignore = "legacy known failure: …"]`) and `tests/fixture_validation.rs`;
 `tests/support/` is split into `legacy.rs` (v2), `positioned.rs` (v3) and a
 shared `mod.rs`. The module paths below refer to `src/legacy/…`.
 
 **Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
+
+**Legacy tests:** since the Step 2 test-suite cutover every legacy test is
+`#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]`, so a
+plain `cargo test` runs only the positioned and model-agnostic tests. Run the
+legacy suite with `cargo test -p context-read --features legacy-tests` (the feature
+propagates to the lower crates) whenever a change touches `legacy` code or
+promotes something out of it. Do not use `-- --ignored` for this: it also runs
+the pending positioned reader lane and slow sweeps. The 6 known failures in
+`legacy_reader_behavior` keep their unconditional `legacy known failure`
+ignore, so the legacy suite runs green.
 
 Graph reading and expansion operations for the context framework.
 Provides ordered, recursive hypergraph operations for sequenced tokenized

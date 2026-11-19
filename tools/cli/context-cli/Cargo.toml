@@ -8,6 +8,10 @@ description = "CLI for context-engine hypergraph workspaces"
 name = "context-cli"
 path = "src/main.rs"
 
+[features]
+# Run the legacy row-graph oracle comparison tests (ignored by default).
+legacy-tests = []
+
 [dependencies]
 context-api = { path = "../../../context-api" }
 clap = { version = "4", features = ["derive"] }

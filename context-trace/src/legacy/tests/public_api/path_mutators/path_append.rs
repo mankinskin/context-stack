@@ -3,6 +3,7 @@
 use crate::legacy::*;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn subpath_append_pushes_childlocation() {
     let _tracing = init_test_tracing!();
 

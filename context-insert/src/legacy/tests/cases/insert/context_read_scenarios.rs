@@ -67,6 +67,7 @@ use crate::legacy::split::cache::position::PosKey;
 ///
 /// Expected behavior: Returns appropriate error/result without panicking
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn integration_partial_match_no_checkpoint() {
     let EnvHypergra { graph, p, h, .. } = EnvHypergra::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -95,6 +96,7 @@ fn integration_partial_match_no_checkpoint() {
 /// Tests the boundary case where a single-token pattern exists in graph
 /// but the search query doesn't match at the first position
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn single_token_mismatch_at_start() {
     let EnvAbc { graph, b, c, .. } = EnvAbc::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -129,6 +131,7 @@ fn vertex_by_string(
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn nested_repeat_interval_within_one_child() {
     let graph = HypergraphRef::default();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -192,6 +195,7 @@ fn graph_snapshot(graph: &HypergraphRef) -> HashMap<VertexKey, VertexData> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn nested_repeat_planning_does_not_mutate_graph() {
     let graph = HypergraphRef::default();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -249,6 +253,7 @@ fn nested_repeat_planning_does_not_mutate_graph() {
 /// proposal whose children are independently retained and which adds a new
 /// border (`abab=[aba,b]`, `ababab=[ababa,b]`) is kept.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn selection_rejects_proposal_only_support() {
     let graph = HypergraphRef::default();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -333,6 +338,7 @@ fn selection_rejects_proposal_only_support() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn provenance_records_paths_per_structural_incidence() {
     let graph = HypergraphRef::default();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -403,6 +409,7 @@ fn provenance_records_paths_per_structural_incidence() {
 ///
 /// Expected behavior: Graceful error handling, no panic
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn triple_repeat_pattern_scenario() {
     let EnvTripleRepeat { graph, ab, .. } = EnvTripleRepeat::initialize();
     let _tracing = context_trace::init_test_tracing!(&graph);
@@ -431,6 +438,7 @@ fn triple_repeat_pattern_scenario() {
 /// After graph contains ab and ababab, searching for [ab, ab, ab]
 /// should find ababab, not abab.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn search_triple_repeat_finds_full_pattern() {
     let EnvTripleRepeat {
         graph, ab, ababab, ..

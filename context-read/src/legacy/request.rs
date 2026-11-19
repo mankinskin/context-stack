@@ -144,6 +144,7 @@ mod tests {
     use context_trace::legacy::init_test_tracing;
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn read_request_from_text() {
         let mut graph = HypergraphRef::<BaseGraphKind>::default();
         let _tracing = init_test_tracing!(&graph);
@@ -156,6 +157,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn read_request_empty_text() {
         let mut graph = HypergraphRef::<BaseGraphKind>::default();
         let _tracing = init_test_tracing!(&graph);
@@ -166,6 +168,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn read_request_builder() {
         let mut graph = HypergraphRef::<BaseGraphKind>::default();
         let _tracing = init_test_tracing!(&graph);

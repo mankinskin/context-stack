@@ -15,6 +15,7 @@ use crate::legacy::{
 use std::ops::ControlFlow;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_ctx_postfix_traces_path_upward() {
     let _tracing = init_test_tracing!();
 
@@ -50,6 +51,7 @@ fn trace_ctx_postfix_traces_path_upward() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_ctx_prefix_traces_path_downward() {
     let _tracing = init_test_tracing!();
 
@@ -86,6 +88,7 @@ fn trace_ctx_prefix_traces_path_downward() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_ctx_range_demonstrates_basic_usage() {
     let _tracing = init_test_tracing!();
 
@@ -117,6 +120,7 @@ fn trace_ctx_range_demonstrates_basic_usage() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn path_append_and_trace_creates_nested_path() {
     let _tracing = init_test_tracing!();
 
@@ -144,6 +148,7 @@ fn path_append_and_trace_creates_nested_path() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn move_root_and_leaf_combined() {
     let _tracing = init_test_tracing!();
 
@@ -177,6 +182,7 @@ fn move_root_and_leaf_combined() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn trace_cache_accumulates_across_multiple_commands() {
     let _tracing = init_test_tracing!();
 

@@ -11,6 +11,7 @@ mod tests {
     };
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_token_string_representation() {
         let graph: Hypergraph<BaseGraphKind> = Hypergraph::default();
         let _tracing = init_test_tracing!(&graph);
@@ -65,6 +66,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_get_string_repr_method() {
         // Clear any previously registered graph
         clear_test_graph();
@@ -88,6 +90,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_pattern_formatting_with_string_repr() {
         // Clear any previously registered graph
         clear_test_graph();

@@ -121,6 +121,7 @@ macro_rules! rooted_path {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_rooted_path_macro_range() {
     let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});
@@ -176,6 +177,7 @@ fn test_rooted_path_macro_range() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_rooted_path_macro_single_role() {
     let graph = HypergraphRef::<BaseGraphKind>::default();
     insert_atoms!(graph, {a, b, c});

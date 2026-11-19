@@ -16,6 +16,7 @@ use {
 };
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_compare_state_candidate_advance() {
     // Create a graph with pattern: [a, b, c]
     let graph = HypergraphRef::default();
@@ -106,6 +107,7 @@ fn test_compare_state_candidate_advance() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_compare_state_matched_advance() {
     // Create a graph
     let graph = HypergraphRef::default();

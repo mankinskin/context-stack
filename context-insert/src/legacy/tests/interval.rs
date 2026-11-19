@@ -80,6 +80,7 @@ fn build_split_cache1(env: &Env1) -> SplitCache {
     )
 }
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_split_cache1() {
     let env @ Env1 {
         def,
@@ -229,6 +230,7 @@ fn test_split_cache1() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn interval_graph1() {
     let env = &mut *Env1::get_mut();
     let _tracing = context_trace::init_test_tracing!(&env.graph);
@@ -271,6 +273,7 @@ fn interval_graph1() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn interval_graph2() {
     // Use test environment and trace cache test case from context-search
     let trace_test = CdefghiTraceCase::default();
@@ -435,6 +438,7 @@ fn interval_graph2() {
 /// - `is_split_perfect_at_index` correctly identifies perfect vs unperfect splits
 /// - Wrapper offsets are only generated for unperfect splits
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_perfect_split_no_wrapper_offset() {
     use crate::legacy::{
         SplitVertexCache,
@@ -546,6 +550,7 @@ fn test_perfect_split_no_wrapper_offset() {
 /// - Target range is always required
 /// - Wrapper range is only required if the boundary split is unperfect
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_required_partitions_perfect_vs_unperfect() {
     use crate::legacy::{
         SplitVertexCache,

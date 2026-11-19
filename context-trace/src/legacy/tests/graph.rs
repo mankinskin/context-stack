@@ -10,6 +10,7 @@ use crate::legacy::{
 use std::fs;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn boundary_target_validates_nested_paths_in_both_directions() {
     use crate::legacy::*;
     let graph = Hypergraph::<BaseGraphKind>::default();
@@ -32,6 +33,7 @@ fn boundary_target_validates_nested_paths_in_both_directions() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 #[should_panic(expected = "disconnected boundary path")]
 fn boundary_target_rejects_disconnected_path() {
     use crate::legacy::*;
@@ -48,6 +50,7 @@ fn boundary_target_rejects_disconnected_path() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 #[should_panic(expected = "boundary path leaves the scope boundary")]
 fn boundary_target_rejects_interior_child() {
     use crate::legacy::*;
@@ -63,6 +66,7 @@ fn boundary_target_rejects_interior_child() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn postfix_chain_keeps_alternative_descendants_connected() {
     use crate::legacy::*;
     let graph = Hypergraph::<BaseGraphKind>::default();
@@ -99,6 +103,7 @@ fn postfix_chain_keeps_alternative_descendants_connected() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn owned_tail_replacement_updates_repeated_child_metadata() {
     use crate::legacy::*;
     let graph = Hypergraph::<BaseGraphKind>::default();
@@ -127,6 +132,7 @@ fn owned_tail_replacement_updates_repeated_child_metadata() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_graph_snapshot() {
     let graph = Hypergraph::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph).keep_log();
@@ -152,6 +158,7 @@ fn test_graph_snapshot() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_to_petgraph() {
     let graph = Hypergraph::<BaseGraphKind>::default();
     let _tracing = init_test_tracing!(&graph);

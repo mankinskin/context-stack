@@ -108,6 +108,7 @@ impl CdefghiTraceCase {
 use crate::legacy::search::Find;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_cdefghi_trace_cache() {
     let test_case = CdefghiTraceCase::default();
     let _tracing = context_trace::init_test_tracing!(&test_case.env.graph);

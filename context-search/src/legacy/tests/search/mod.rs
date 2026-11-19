@@ -70,6 +70,7 @@ macro_rules! assert_indices {
     };
 }
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_sequence() {
     let Env1 {
         graph,
@@ -115,6 +116,7 @@ fn find_sequence() {
     }
 }
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_pattern1() {
     let base_graph = Hypergraph::<BaseGraphKind>::default();
     insert_atoms!(base_graph, {a, b, x, y, z});
@@ -199,6 +201,7 @@ fn find_pattern1() {
 /// should be set to the width of the root token, not 0. This is important for
 /// consecutive insertion operations that use the cursor position.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_entire_root_cursor_position_equals_token_width() {
     use crate::legacy::{
         search::context::AncestorSearchTraversal,
@@ -245,6 +248,7 @@ fn test_entire_root_cursor_position_equals_token_width() {
 /// When no matches are found, the search creates an EntireRoot response for the query's first token.
 /// The cursor position should be set to that token's width.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_no_match_entire_root_cursor_position() {
     use crate::legacy::{
         search::context::AncestorSearchTraversal,

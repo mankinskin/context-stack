@@ -14,6 +14,9 @@
 //!
 //! See `20260315_PLAN_NGRAMS_ORACLE_VALIDATION.md` §Comparison Strategy for
 //! the full rationale (Design Decisions D17–D20).
+//!
+//! Its unit tests compare row graphs (legacy suite): ignored by default, run
+//! with `cargo test -p context-cli --features legacy-tests`.
 
 use std::{
     collections::{
@@ -420,6 +423,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn label_map_atoms_only() {
         // "ab": two atoms, no compound token
         let snap = make_snap(vec![(0, "a", 1), (1, "b", 1)], vec![]);
@@ -432,6 +436,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn label_map_compound_token() {
         // "ab" as root with children "a" and "b"
         // index 2 = "ab", index 0 = "a", index 1 = "b"
@@ -453,6 +458,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn label_map_multiple_patterns() {
         // "abc" with two patterns: [ab, c] and [a, bc]
         let snap = make_snap(
@@ -489,6 +495,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_identical_maps_is_ok() {
         let snap = make_snap(
             vec![(0, "a", 1), (1, "b", 1), (2, "ab", 2)],
@@ -500,6 +507,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_root_missing_from_oracle() {
         let oracle_snap = make_snap(vec![(0, "a", 1), (1, "b", 1)], vec![]);
         let candidate_snap = make_snap(
@@ -515,6 +523,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_concatenation_violation() {
         // "ab" token with a broken pattern [b, a] (concat = "ba" ≠ "ab")
         let oracle_snap = make_snap(
@@ -537,6 +546,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_width_mismatch() {
         let oracle_snap = make_snap(
             vec![(0, "a", 1), (1, "b", 1), (2, "ab", 2)],
@@ -556,6 +566,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn compare_unverified_label_is_only_info() {
         // Candidate has "ab" and "abc"; oracle only has "ab".
         // "abc" is unverified but should not fail the report.
@@ -584,6 +595,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn report_display_smoke_test() {
         // Just ensure display doesn't panic.
         let report = ComparisonReport::default();

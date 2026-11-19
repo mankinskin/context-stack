@@ -121,6 +121,7 @@ use crate::legacy::{
     Searchable,
 };
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn test_search_1() {
     let _tracing = init_test_tracing!();
     let test = Prefix1;

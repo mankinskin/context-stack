@@ -9,7 +9,9 @@
 //!
 //! # Usage
 //!
-//! ```rust
+// Legacy doctest: runs only with `--features legacy-tests`.
+#![cfg_attr(feature = "legacy-tests", doc = "```rust")]
+#![cfg_attr(not(feature = "legacy-tests"), doc = "```rust,ignore")]
 //! use context_trace::legacy::{Hypergraph, graph::test_graph};
 //! # use context_trace::{BaseGraphKind, legacy::graph::vertex::atom::Atom};
 //!

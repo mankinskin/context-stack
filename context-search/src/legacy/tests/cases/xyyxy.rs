@@ -107,6 +107,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_search_xy_exact() {
         let _tracing = init_test_tracing!();
         let test = SearchXyExact;
@@ -127,6 +128,7 @@ mod tests {
 
     /// Test that searching for [xy, y, xy] finds xyyxy as EntireRoot
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_search_xyyxy_exact() {
         let env = EnvXyyxy::get();
         let graph = env.graph();
@@ -160,6 +162,7 @@ mod tests {
     /// Test that searching for just 'y' (which appears multiple times in xyyxy)
     /// returns SingleIndex error (searching for single token is not supported)
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_search_y_alone() {
         use context_trace::legacy::ErrorReason;
 

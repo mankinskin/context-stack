@@ -7,6 +7,7 @@ use crate::legacy::*;
 use std::collections::HashSet;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn pattern_strings_single_pattern() {
     let _tracing = init_test_tracing!();
 
@@ -28,6 +29,7 @@ fn pattern_strings_single_pattern() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn pattern_strings_multiple_patterns() {
     let _tracing = init_test_tracing!();
 
@@ -61,6 +63,7 @@ fn pattern_strings_multiple_patterns() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn pattern_strings_complex_decomposition() {
     let _tracing = init_test_tracing!();
 

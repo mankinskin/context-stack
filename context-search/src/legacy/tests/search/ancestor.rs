@@ -29,6 +29,7 @@ use {
 
 // Test: Single token bc should return error (not a pattern)
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_single_token() {
     let Env1 { graph, bc, .. } = &*Env1::get();
     let _tracing = init_test_tracing!(graph);
@@ -47,6 +48,7 @@ fn find_ancestor1_single_token() {
 
 // Test: Pattern [b, c] should match token bc (Complete)
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_b_c() {
     let Env1 {
         graph, b, c, bc, ..
@@ -81,6 +83,7 @@ fn find_ancestor1_b_c() {
 
 // Test: Pattern [a, bc] should match token abc (Complete)
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_a_bc() {
     let Env1 {
         graph,
@@ -152,6 +155,7 @@ fn find_ancestor1_a_bc() {
 
 // Test: Pattern [ab, c] should match token abc (Complete)
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_ab_c() {
     let Env1 {
         graph,
@@ -213,6 +217,7 @@ fn find_ancestor1_ab_c() {
 
 // Test: Pattern [a, bc, d] should match token abcd (Complete)
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_a_bc_d() {
     let Env1 {
         graph,
@@ -290,6 +295,7 @@ fn find_ancestor1_a_bc_d() {
 
 // Test: Pattern [a, b, c] should match token abc (Complete)
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_a_b_c() {
     let Env1 {
         graph,
@@ -357,6 +363,7 @@ fn find_ancestor1_a_b_c() {
 }
 // Test: Pattern [a, b, c, c] should partially match token abc - only first 3 tokens match
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_a_b_c_c() {
     let Env1 {
         graph,
@@ -442,6 +449,7 @@ fn find_ancestor1_a_b_c_c() {
 
 // Test: Long pattern [a,b,a,b,a,b,a,b,c,d,e,f,g,h,i] should match ababababcdefghi (Complete)
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor1_long_pattern() {
     let Env1 {
         graph,
@@ -585,6 +593,7 @@ fn find_ancestor1_long_pattern() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor2() {
     use context_trace::legacy::*;
 
@@ -709,6 +718,7 @@ fn find_ancestor2() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn find_ancestor3() {
     let graph = Hypergraph::<BaseGraphKind>::default();
     let (a, b, _w, x, y, z) = graph

@@ -287,6 +287,7 @@ mod tests {
     };
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_check_token_string_repr() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
@@ -303,6 +304,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_assert_token_string_repr() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
@@ -315,6 +317,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     #[should_panic(expected = "Token string representation mismatch")]
     #[allow(unused)]
     fn test_assert_token_string_repr_fails() {
@@ -327,6 +330,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_check_all_vertices_unique() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c, d});
@@ -346,6 +350,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_assert_all_vertices_unique() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c});
@@ -357,6 +362,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
     fn test_check_tokens_unique() {
         let graph = HypergraphRef::default();
         insert_atoms!(graph, {a, b, c, d});

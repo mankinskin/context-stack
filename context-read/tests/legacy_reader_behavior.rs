@@ -35,16 +35,28 @@ fn assert_scenario(name: &str) {
     pretty_assertions::assert_eq!(actual, fixture.graph, "{name}, final corpus graph");
 }
 
+/// Entries without attributes belong to the legacy suite (run with
+/// `--features legacy-tests`); entries with attributes (the known failures)
+/// keep exactly those, so they stay ignored unconditionally.
 macro_rules! scenarios {
     ($($(#[$attr:meta])* $name:ident),* $(,)?) => {
         const SCENARIO_NAMES: &[&str] = &[$(stringify!($name)),*];
-        $(
+        $(scenarios!(@test [$(#[$attr])*] $name);)*
+    };
+    (@test [] $name:ident) => {
         #[test]
-        $(#[$attr])*
+        #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
         fn $name() {
             assert_scenario(stringify!($name));
         }
-    )*};
+    };
+    (@test [$(#[$attr:meta])+] $name:ident) => {
+        #[test]
+        $(#[$attr])+
+        fn $name() {
+            assert_scenario(stringify!($name));
+        }
+    };
 }
 
 scenarios!(
@@ -108,6 +120,7 @@ scenarios!(
 );
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn empty_input_does_not_change_graph() {
     let graph = HypergraphRef::default();
     assert!(context_read::legacy::read(&graph, "".chars()).is_none());
@@ -115,6 +128,7 @@ fn empty_input_does_not_change_graph() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn single_atom_is_reused() {
     let graph = HypergraphRef::default();
     let first = context_read::legacy::read(&graph, "x".chars()).unwrap();
@@ -127,6 +141,7 @@ fn single_atom_is_reused() {
 /// Every frozen v2 manifest entry has a test here and round-trips through a
 /// row graph. File completeness is checked in `fixture_validation`.
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn fixture_manifest_is_covered_and_round_trips() {
     let mut names = std::collections::BTreeSet::new();
     for scenario in support::legacy::scenarios() {

@@ -7,6 +7,7 @@
 use crate::legacy::*;
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_basic_creation() {
     //let _tracing = init_test_tracing!();
 
@@ -16,6 +17,7 @@ fn atom_position_basic_creation() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_add_operations() {
     //let _tracing = init_test_tracing!();
 
@@ -32,6 +34,7 @@ fn atom_position_add_operations() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_sub_operations() {
     //let _tracing = init_test_tracing!();
 
@@ -48,6 +51,7 @@ fn atom_position_sub_operations() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_move_key_right() {
     //let _tracing = init_test_tracing!();
 
@@ -62,6 +66,7 @@ fn atom_position_move_key_right() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_move_key_left() {
     //let _tracing = init_test_tracing!();
 
@@ -76,6 +81,7 @@ fn atom_position_move_key_left() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_advance_key() {
     //let _tracing = init_test_tracing!();
 
@@ -90,6 +96,7 @@ fn atom_position_advance_key() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_retract_key() {
     //let _tracing = init_test_tracing!();
 
@@ -104,6 +111,7 @@ fn atom_position_retract_key() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_zero_moves() {
     //let _tracing = init_test_tracing!();
 
@@ -137,6 +145,7 @@ fn atom_position_zero_moves() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_position_chain_operations() {
     //let _tracing = init_test_tracing!();
 

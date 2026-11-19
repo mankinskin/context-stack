@@ -24,6 +24,7 @@ pub(crate) fn pattern_from_widths(
 }
 
 #[test]
+#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
 fn atom_pos_split() {
     // No graph available in this test - uses pattern_from_widths helper
     let _tracing = context_trace::init_test_tracing!();
