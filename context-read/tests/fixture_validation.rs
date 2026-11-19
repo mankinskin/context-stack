@@ -1,6 +1,7 @@
 //! Deliberately malformed data tests the fixture validator, not reader semantics.
-//! The v3 checks keep the positioned fixture lane complete and in sync with the
-//! current `ngrams` oracle.
+//! Each lane is checked against its own manifest: the frozen v2 lane for
+//! completeness, the v3 lane also for being in sync with the current `ngrams`
+//! oracle.
 #[allow(dead_code)]
 mod support;
 
@@ -10,9 +11,9 @@ use ngrams::{
 };
 use std::collections::BTreeSet;
 use support::{
-    legacy::{load, seed, token, GraphData},
-    positioned::{load_v3, v3_dir, PositionedGraphSnapshot},
-    scenarios,
+    fixture_names,
+    legacy::{self, load, seed, token, v2_dir, GraphData},
+    positioned::{self, load_v3, v3_dir, PositionedGraphSnapshot},
 };
 
 #[test]
@@ -41,21 +42,36 @@ fn fixture_validation_rejects_incorrect_content_and_missing_children() {
 }
 
 #[test]
+fn v2_fixtures_match_frozen_manifest_exactly() {
+    let mut expected = BTreeSet::new();
+    for scenario in legacy::scenarios() {
+        assert!(expected.insert(scenario.name.clone()), "duplicate scenario");
+        assert_eq!(
+            load(&scenario.name).corpus,
+            scenario.inputs,
+            "stale v2 fixture: {}",
+            scenario.name
+        );
+    }
+    assert_eq!(fixture_names(&v2_dir()), expected, "missing or orphaned v2 fixtures");
+}
+
+#[test]
 fn v3_fixtures_match_manifest_exactly() {
-    let expected: BTreeSet<String> = scenarios()
-        .into_iter()
-        .map(|scenario| format!("{}.json", scenario.name))
-        .collect();
-    let actual: BTreeSet<String> = std::fs::read_dir(v3_dir())
-        .expect("missing v3 fixture directory")
-        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
-        .collect();
-    assert_eq!(actual, expected, "v3 fixtures must be exactly one per scenario");
+    let mut expected = BTreeSet::new();
+    for scenario in positioned::scenarios() {
+        assert!(expected.insert(scenario.name), "duplicate scenario");
+    }
+    assert_eq!(
+        fixture_names(&v3_dir()),
+        expected,
+        "v3 fixtures must be exactly one per scenario"
+    );
 }
 
 #[test]
 fn v3_fixtures_are_valid_and_match_the_oracle() {
-    for scenario in scenarios() {
+    for scenario in positioned::scenarios() {
         let fixture = load_v3(&scenario.name);
         assert_eq!(
             fixture.corpus, scenario.inputs,

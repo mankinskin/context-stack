@@ -123,18 +123,14 @@ fn single_atom_is_reused() {
     assert_eq!(graph.vertex_count(), 1);
 }
 
+/// Every frozen v2 manifest entry has a test here and round-trips through a
+/// row graph. File completeness is checked in `fixture_validation`.
 #[test]
 fn fixture_manifest_is_covered_and_round_trips() {
-    let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let mut names = std::collections::BTreeSet::new();
-    for scenario in support::scenarios() {
+    for scenario in support::legacy::scenarios() {
         assert!(names.insert(scenario.name.clone()), "duplicate scenario");
         let fixture = load(&scenario.name);
-        assert_eq!(
-            fixture.corpus, scenario.inputs,
-            "stale fixture: {}",
-            scenario.name
-        );
         assert_eq!(
             GraphData::from_graph(&support::legacy::to_graph(&fixture.graph)).unwrap(),
             fixture.graph
@@ -150,12 +146,4 @@ fn fixture_manifest_is_covered_and_round_trips() {
             .collect::<Vec<_>>(),
         "fixture manifest and behavior tests differ",
     );
-    let files: std::collections::BTreeSet<_> = std::fs::read_dir(directory)
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
-        .map(|path| path.file_stem().unwrap().to_str().unwrap().to_owned())
-        .filter(|name| name != "scenarios")
-        .collect();
-    assert_eq!(files, names, "missing or orphaned fixtures");
 }

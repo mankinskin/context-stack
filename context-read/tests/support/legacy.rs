@@ -1,11 +1,22 @@
-//! **Legacy v2 rows** (`tests/fixtures/<name>.json`): [`Fixture`] /
+//! **Legacy v2 rows** (`tests/fixtures/v2/<name>.json`, frozen manifest
+//! `v2/scenarios.json`): [`Fixture`] /
 //! [`GraphData`] from `ngrams::output::legacy`. Row-dependent reader and
 //! cursor tests stay on this frozen lane until the reader produces
 //! positioned covers. Loaded by [`load`] and seeded by [`seed`]/[`to_graph`].
-use super::{fixtures_dir, read_json};
+use super::{fixtures_dir, manifest, read_json, Scenario};
 use context_trace::legacy::{graph::vertex::atom::Atom, *};
 pub use ngrams::output::legacy::{GraphData, GraphSnapshot as LegacyFixture};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
+
+/// Directory of the frozen legacy v2 fixtures.
+pub fn v2_dir() -> PathBuf {
+    fixtures_dir().join("v2")
+}
+
+/// Frozen v2 scenario manifest.
+pub fn scenarios() -> Vec<Scenario> {
+    manifest(&v2_dir())
+}
 
 /// Legacy v2 row fixture; alias of [`LegacyFixture`].
 pub type Fixture = LegacyFixture;
@@ -40,7 +51,7 @@ pub fn to_graph(data: &GraphData) -> HypergraphRef {
 
 /// Load and validate a frozen legacy v2 row fixture.
 pub fn load(name: &str) -> LegacyFixture {
-    let path = fixtures_dir().join(format!("{name}.json"));
+    let path = v2_dir().join(format!("{name}.json"));
     let fixture: LegacyFixture = read_json(&path);
     fixture
         .validate()
