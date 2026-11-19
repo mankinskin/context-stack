@@ -5,6 +5,8 @@ pub mod direction;
 
 pub mod graph;
 pub mod position;
+/// Positioned composition model (v3), independent of `legacy`.
+pub mod positioned;
 
 // Logging utilities (tracing and formatting)
 pub mod logging;
