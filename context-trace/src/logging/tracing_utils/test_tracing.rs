@@ -81,7 +81,9 @@ impl TestTracing {
     /// Initialize tracing and register a test graph
     ///
     /// # Example
-    /// ```no_run
+    // Example needs the row model; compiled only with `legacy`.
+    #[cfg_attr(feature = "legacy", doc = "```no_run")]
+    #[cfg_attr(not(feature = "legacy"), doc = "```ignore")]
     /// use context_trace::{legacy::Hypergraph, logging::tracing_utils::TestTracing};
     ///
     /// #[test]
