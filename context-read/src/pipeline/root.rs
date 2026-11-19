@@ -1,4 +1,4 @@
-use context_insert::*;
+use context_insert::legacy::*;
 use context_trace::legacy::*;
 use derive_more::{
     Deref,

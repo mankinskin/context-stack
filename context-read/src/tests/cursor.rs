@@ -7,7 +7,7 @@ use crate::{
     expansion::{closure, ExpansionCtx},
     pipeline::root::{RootManager, Span},
 };
-use context_insert::ToInsertCtx;
+use context_insert::legacy::ToInsertCtx;
 use context_trace::legacy::*;
 
 #[test]

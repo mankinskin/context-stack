@@ -1,7 +1,7 @@
 //! Root integration of an accepted overlap closure.
 //!
 //! Read selects the closure bound `X` and the matching sink operation; the
-//! graph-only closure itself is executed by [`context_insert::Overlap`]:
+//! graph-only closure itself is executed by [`context_insert::legacy::Overlap`]:
 //!
 //! - Editable root: `X` is its entire last child; commit replaces that tail.
 //! - Otherwise: `X` is the root; commit adopts the whole-root closure.
@@ -17,7 +17,7 @@ use crate::pipeline::root::{
     RootManager,
     Span,
 };
-use context_insert::{
+use context_insert::legacy::{
     ClosurePolicy,
     Overlap,
 };
@@ -154,7 +154,7 @@ pub(crate) fn accept(
                 root,
                 anchor_path,
                 expansion,
-                expansion_path: context_insert::overlap::prefix_frames(
+                expansion_path: context_insert::legacy::overlap::prefix_frames(
                     graph, expansion, shared,
                 )
                 .expect("expansion must begin with the shared token"),

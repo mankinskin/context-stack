@@ -1,6 +1,6 @@
 pub(crate) mod root;
 
-use context_insert::*;
+use context_insert::legacy::*;
 use context_trace::legacy::*;
 use std::io::Read;
 use tracing::debug;

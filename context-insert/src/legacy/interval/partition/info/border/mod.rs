@@ -1,0 +1,103 @@
+use std::num::NonZeroUsize;
+
+use perfect::*;
+
+use crate::legacy::*;
+use context_trace::legacy::*;
+pub(crate) mod perfect;
+
+pub(crate) mod trace;
+
+pub(crate) mod info;
+
+pub(crate) struct BorderInfo {
+    pub(crate) sub_index: usize,
+    pub(crate) pattern_len: usize,
+    pub(crate) inner_offset: Option<NonZeroUsize>,
+    /// start offset of index with border
+    pub(crate) start_offset: Option<NonZeroUsize>,
+}
+impl BorderInfo {
+    /// Create a BorderInfo by recalculating sub_index AND inner_offset from atom position.
+    /// This is more robust when the pattern may have been modified after the
+    /// original trace was recorded.
+    ///
+    /// IMPORTANT: After pattern replacement (e.g., merging tokens), the original
+    /// inner_offset from the cache no longer applies to the new token at sub_index.
+    /// We must use the inner_offset calculated from trace_child_pos to get the
+    /// correct position within the current pattern structure.
+    #[allow(dead_code)]
+    pub(crate) fn new_from_atom_pos<W: Wide>(
+        pattern: &[W],
+        atom_pos: NonZeroUsize,
+    ) -> Self {
+        // Recalculate BOTH sub_index and inner_offset from atom position using current pattern
+        let trace_pos = crate::legacy::split::trace_back_pos(pattern, atom_pos)
+            .expect("atom_pos should be valid within pattern");
+        Self::new_from_trace_pos(pattern, &trace_pos)
+    }
+
+    /// Create a BorderInfo from a pre-computed TokenTracePos.
+    /// Use this when you have delta-adjusted split positions, to avoid
+    /// re-tracing from atom positions (which may be invalid after pattern
+    /// modifications).
+    pub(crate) fn new_from_trace_pos<W: Wide>(
+        pattern: &[W],
+        trace_pos: &crate::legacy::TokenTracePos,
+    ) -> Self {
+        let sub_index = trace_pos.sub_index();
+        let offset: usize =
+            pattern[..sub_index].iter().map(|elem| *elem.width()).sum();
+        BorderInfo {
+            sub_index,
+            pattern_len: pattern.len(),
+            inner_offset: trace_pos.inner_offset(),
+            start_offset: NonZeroUsize::new(offset),
+        }
+    }
+}
+impl HasInnerOffset for BorderInfo {
+    fn inner_offset(&self) -> Option<NonZeroUsize> {
+        self.inner_offset
+    }
+}
+
+pub(crate) trait PartitionBorder<R: RangeRole>: Sized {
+    fn perfect(&self) -> BooleanPerfectOf<R>;
+    #[allow(dead_code)]
+    fn offsets(&self) -> OffsetsOf<R>;
+}
+
+impl<
+    P: BorderPerfect<Boolean = bool>,
+    R: RangeRole<Perfect = P, Offsets = NonZeroUsize>,
+> PartitionBorder<R> for BorderInfo
+{
+    fn perfect(&self) -> BooleanPerfectOf<R> {
+        self.inner_offset.is_none()
+    }
+    fn offsets(&self) -> OffsetsOf<R> {
+        self.start_offset
+            .map(|o| {
+                self.inner_offset
+                    .map(|io| o.checked_add(io.get()).unwrap())
+                    .unwrap_or(o)
+            })
+            .unwrap_or_else(|| self.inner_offset.unwrap())
+    }
+}
+
+impl<M: InVisitMode> PartitionBorder<In<M>> for (BorderInfo, BorderInfo) {
+    fn perfect(&self) -> BooleanPerfectOf<In<M>> {
+        (
+            <_ as PartitionBorder<Pre<M>>>::perfect(&self.0),
+            <_ as PartitionBorder<Post<M>>>::perfect(&self.1),
+        )
+    }
+    fn offsets(&self) -> OffsetsOf<In<M>> {
+        (
+            <_ as PartitionBorder<Pre<M>>>::offsets(&self.0),
+            <_ as PartitionBorder<Post<M>>>::offsets(&self.1),
+        )
+    }
+}

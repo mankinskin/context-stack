@@ -6,7 +6,7 @@ use crate::pipeline::root::{
     RootManager,
     Span,
 };
-use context_insert::*;
+use context_insert::legacy::*;
 use context_search::legacy::Find;
 use context_trace::legacy::*;
 
@@ -87,7 +87,7 @@ impl ExpansionCtx {
         let token = self.match_forward();
         self.cursor += token.width().0;
         if let Some(previous) = sink.root {
-            if let Some(root) = context_insert::overlap::find_complete(
+            if let Some(root) = context_insert::legacy::overlap::find_complete(
                 &self.graph,
                 &Pattern::from(vec![previous, token]),
             ) {

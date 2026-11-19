@@ -1,0 +1,95 @@
+use crate::legacy::{
+    split::{
+        cache::{
+            position::PosKey,
+            vertex::{
+                RootAugmentation,
+                SplitVertexCache,
+            },
+        },
+        provenance::RequirementOrigin,
+        trace::{
+            SplitTraceState,
+            states::context::SplitTraceStatesCtx,
+        },
+        vertex::{
+            node::NodeTraceCtx,
+            output::RootMode,
+        },
+    },
+};
+use context_trace::legacy::{
+    graph::getters::ErrorReason,
+    *,
+};
+use derive_more::derive::{
+    Deref,
+    DerefMut,
+};
+use derive_new::new;
+use std::fmt::Debug;
+use tracing::debug;
+
+pub(crate) mod vertex;
+
+pub(crate) mod leaves;
+pub mod position;
+
+#[derive(Debug, Deref, DerefMut, new, Clone, PartialEq, Eq)]
+pub struct SplitCache {
+    pub(crate) root_mode: RootMode,
+    #[deref]
+    #[deref_mut]
+    pub(crate) entries: HashMap<VertexIndex, SplitVertexCache>,
+}
+impl SplitCache {
+    pub(crate) fn augment_node(
+        &mut self,
+        trav: impl HasGraph,
+        index: Token,
+    ) -> Vec<SplitTraceState> {
+        let graph = trav.graph();
+        let ctx = NodeTraceCtx::from_index(&graph, index);
+        self.get_mut(&index.vertex_index())
+            .unwrap()
+            .node_augmentation(ctx)
+    }
+    /// complete inner range offsets for root
+    pub(crate) fn augment_root(
+        &mut self,
+        trav: impl HasGraph,
+        root: Token,
+    ) -> Result<RootAugmentation, ErrorReason> {
+        let graph = trav.graph();
+        let ctx = NodeTraceCtx::from_index(&graph, root);
+        let index = root.vertex_index();
+        let root_mode = self.root_mode;
+        self.get_mut(&index)
+            .ok_or(ErrorReason::MissingCacheEntry(index))?
+            .root_augmentation(ctx, root_mode)
+    }
+    pub(crate) fn augment_nodes<G: HasGraph, I: IntoIterator<Item = Token>>(
+        &mut self,
+        ctx: &mut SplitTraceStatesCtx<G>,
+        nodes: I,
+    ) {
+        debug!("augment_nodes");
+        for c in nodes {
+            let before = self
+                .get(&c.vertex_index())
+                .map(|v| v.positions.keys().cloned().collect::<Vec<_>>())
+                .unwrap_or_default();
+            let new = self.augment_node(&ctx.trav, c);
+            for offset in self[&c.vertex_index()].positions.keys() {
+                if !before.contains(offset) {
+                    ctx.provenance.require(
+                        PosKey::new(c, *offset),
+                        RequirementOrigin::InnerAugmentation,
+                    );
+                }
+            }
+            // todo: force order
+            ctx.states.queue.extend(new.into_iter());
+        }
+    }
+}
