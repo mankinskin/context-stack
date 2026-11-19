@@ -12,6 +12,8 @@ mod hash_order;
 #[cfg(test)]
 mod output;
 #[cfg(test)]
+mod retention;
+#[cfg(test)]
 mod selection;
 
 use std::path::Path;
