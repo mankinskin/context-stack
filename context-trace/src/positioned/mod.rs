@@ -16,6 +16,7 @@
 pub mod composition;
 mod convert;
 pub mod diff;
+mod enumerate;
 #[cfg(any(test, feature = "test-api"))]
 pub mod fixtures;
 pub mod graph;
