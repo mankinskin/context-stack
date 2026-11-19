@@ -49,5 +49,12 @@
   {"name":"tail_replacement","inputs":["ef","ab","abcd","eabcd"]},
   {"name":"closure_forward_seed","inputs":["ab","bc"]},
   {"name":"closure_nested_seed","inputs":["abc","bc","cd"]},
-  {"name":"closure_tail_seed","inputs":["ef","ab","abcd"]}
+  {"name":"closure_tail_seed","inputs":["ef","ab","abcd"]},
+  {"name":"repeat_abcabca","inputs":["abcabca"]},
+  {"name":"repeat_ababa","inputs":["ababa"]},
+  {"name":"seam_bcd","inputs":["abc","cde","xbcdy","abcde"]},
+  {"name":"late_retention__1","inputs":["vis"]},
+  {"name":"late_retention__2","inputs":["vis","vim"]},
+  {"name":"duplicate_observation","inputs":["abcabc","abcabc"]},
+  {"name":"substring_input","inputs":["abcabc","bca"]}
 ]
