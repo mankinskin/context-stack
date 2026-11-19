@@ -7,6 +7,10 @@
 
 extern crate test;
 
+/// Positioned-model boundary search (prefixes/postfixes with occurrence
+/// paths), independent of `legacy`.
+pub mod boundary;
+
 /// Row-model search, fenced off from the model-agnostic root.
 #[cfg(feature = "legacy")]
 pub mod legacy;
