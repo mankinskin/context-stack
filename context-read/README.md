@@ -1,5 +1,19 @@
 # Context-Read
 
+## Legacy / positioned split (2026-11-19)
+
+The row reader (`pipeline/`, `expansion/`, `request.rs`, `segment.rs`,
+`input.rs`, `src/tests/`) lives in `src/legacy/`, gated by the default-on
+`legacy` feature. Public API: `context_read::legacy::{read, ReadCtx,
+ReadSequenceIter, SegmentResult, IntoReadInput}`; the unqualified
+`context_read::read` is reserved for the positioned reader. Black-box tests:
+`tests/legacy_reader_behavior.rs` (v2 fixtures; 6 known failures are
+`#[ignore = "legacy known failure: …"]`) and `tests/fixture_validation.rs`;
+`tests/support/` is split into `legacy.rs` (v2), `positioned.rs` (v3) and a
+shared `mod.rs`. The module paths below refer to `src/legacy/…`.
+
+**Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
+
 Graph reading and expansion operations for the context framework.
 Provides ordered, recursive hypergraph operations for sequenced tokenized
 data with structural overlap closure and ownership-safe accumulation.
@@ -19,17 +33,17 @@ data with structural overlap closure and ownership-safe accumulation.
 - **`expansion/`**: Graph expansion operations
   - `mod.rs`: Root-first postfix search and forward steps
   - `closure.rs`: Closure bound/policy selection and sink integration
-    (the closure executor is `context_insert::Overlap`)
+    (the closure executor is `context_insert::legacy::Overlap`)
   - `block.rs`: Immediate commit orchestration
 - **`input.rs`**: Input conversion
 - **`segment.rs`**: Known/unknown atom block iteration
 
 ## Usage
 ```rust
-use context_trace::HypergraphRef;
+use context_trace::legacy::HypergraphRef;
 
 let graph = HypergraphRef::default();
-let root = context_read::read(&graph, "aabbaabb".chars()).unwrap();
+let root = context_read::legacy::read(&graph, "aabbaabb".chars()).unwrap();
 ```
 
 ## Key Concepts
@@ -70,7 +84,7 @@ After materialization, closure recomputes editability. For an editable root it
 closes around the entire last child; otherwise around the root. With
 `X=L+P` and `E=P+T`, every retained anchor frame `Si` (the widest-postfix
 chain at traversal) with `|P| < |Si| <= |X|` is closed bottom-up with the
-expansion by `context_insert::Overlap::close`:
+expansion by `context_insert::legacy::Overlap::close`:
 `Ci = [Si,T] = [Li,C(i-1)]`, `C0 = E`; the final binary `Ck` is committed.
 Complements `Li` and `T` are read from the frames' siblings (a single sibling
 is used directly) or resolved by scope-restricted insertion, which rewrites
@@ -88,8 +102,8 @@ root and uses whole-root closure, preventing cycles.
 
 ### Tests and oracle fixtures
 
-Reader behavior tests live in [`tests/reader_behavior.rs`](tests/reader_behavior.rs).
-They call only the public `context_read::read` API and compare the **entire**
+Reader behavior tests live in [`tests/legacy_reader_behavior.rs`](tests/legacy_reader_behavior.rs).
+They call only the public `context_read::legacy::read` API and compare the **entire**
 graph with checked-in n-gram oracle snapshots: tokens and decompositions must
 match exactly. Extra structure is a failure, as are duplicate-content vertices,
 invalid widths, and decompositions with inconsistent content. Vertex IDs,
@@ -100,7 +114,7 @@ input corpora. Each scenario has fixtures in two lanes:
 
 | Lane | Path | Format | Used by |
 |---|---|---|---|
-| Legacy v2 rows | `tests/fixtures/<name>.json` | `format_version: 2`, row decompositions (`ngrams::output::legacy`) | `reader_behavior`, cursor tests, graph seeding |
+| Legacy v2 rows | `tests/fixtures/<name>.json` | `format_version: 2`, row decompositions (`ngrams::output::legacy`) | `legacy_reader_behavior`, cursor tests, graph seeding |
 | Positioned v3 | `tests/fixtures/v3/<name>.json` | `format_version: 3`, positioned covers (`ngrams::output::PositionedGraphSnapshot`) | `fixture_validation` only, until the reader produces positioned covers |
 
 Each fixture records the corpus and one complete final oracle graph in a
@@ -164,13 +178,16 @@ structural policies need independent justification.
 Run the suites separately:
 
 ```bash
-cargo test -p context-read --test reader_behavior
+cargo test -p context-read --test legacy_reader_behavior
 cargo test -p context-read --test fixture_validation
 cargo test -p context-read --lib
 ```
 
-Oracle mismatches are ordinary failing tests, not ignored tests or permissive
-subset comparisons. A passing internal mechanism test does not override a
+Oracle mismatches are ordinary failing tests, not permissive subset
+comparisons. The only exception is the fixed list of 6 legacy known failures in
+`tests/legacy_reader_behavior.rs`, which are
+`#[ignore = "legacy known failure: …"]` so the frozen legacy lane gates on
+"all non-ignored tests pass". A passing internal mechanism test does not override a
 failing behavioral test.
 
 ```bash

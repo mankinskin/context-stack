@@ -1,5 +1,14 @@
 # Context-Insert
 
+## Legacy / positioned split (2026-11-19)
+
+All modules (`insert/`, `interval/`, `join/`, `overlap/`, `split/`,
+`visualization.rs`, `tests/`) live in `src/legacy/`, gated by the default-on
+`legacy` feature, and are imported as `context_insert::legacy::…`. The module
+paths below refer to `src/legacy/…`.
+
+**Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
+
 Graph insertion operations for the context framework. Handles the 
 complex process of inserting new patterns into existing graph structures 
 through sophisticated splitting, joining, and interval management operations.
@@ -35,7 +44,7 @@ through sophisticated splitting, joining, and interval management operations.
 
 ## Usage
 ```rust
-use context_insert::{ToInsertCtx, InitInterval};
+use context_insert::legacy::{ToInsertCtx, InitInterval};
 
 // Insert foldable patterns
 let result = graph.insert(foldable_pattern)?;

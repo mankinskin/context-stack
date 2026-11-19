@@ -1,5 +1,16 @@
 # context-search File Index
 
+## Legacy / positioned split (2026-11-19)
+
+All modules (`compare/`, `container/`, `cursor/`, `logging/`, `match/`,
+`policy.rs`, `search/`, `state/`, `tests/`) live in `src/legacy/`, gated by the
+default-on `legacy` feature, and are imported as `context_search::legacy::…`
+(e.g. `Find`, `Searchable`, `Response`). `container/` and `logging/` depend on
+row types and are promoted to the root only when positioned code needs them.
+The module paths below refer to `src/legacy/…`.
+
+**Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
+
 **Generated:** 2025-11-23  
 **Updated:** 2025-11-23 (Post-Phase 1 Complete)  
 **Git Commit:** f23260f  

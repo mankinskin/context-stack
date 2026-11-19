@@ -1,5 +1,28 @@
 # Context-Trace
 
+## Legacy / positioned split (2026-11-19)
+
+The row model (pattern-row `Hypergraph`) lives in `src/legacy/`, gated by the
+default-on `legacy` feature, and is imported as `context_trace::legacy::…`.
+There is no root `pub use legacy::*`; `legacy` mirrors the root items
+(`pub use crate::*`), so legacy code imports everything from one namespace.
+
+- **Root (model-agnostic):** `direction/` (`Direction`, `Left`, `Right`),
+  `logging/`, `graph/kind.rs` (`GraphKind`), `graph/vertex/{atom, key, token,
+  vertex_index, wide, has_vertex_index, has_vertex_key}`,
+  `graph/vertex/name_resolver.rs` (thread-local `TokenNameResolver` hook used by
+  `Token`/`VertexIndex` display), `position.rs` (`AtomPosition`),
+  `tests/test_case/`. Impls of root items for row types carry
+  `#[cfg(feature = "legacy")]`.
+- **`legacy/`:** `direction/pattern.rs` (`PatternDirection`), `graph/`
+  (`Hypergraph`, `HypergraphRef`, getters, insert, snapshot, validation,
+  search_path, visualization, test_graph, child_strings), `graph/vertex/{data,
+  entry, has_vertex_data, location, parent, pattern, traversal}`, `path/`,
+  `trace/`, `logging/path_format.rs`, `tests/` (env, macros, row tests).
+  The paths in the tables below refer to `src/legacy/…` for these modules.
+
+**Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
+
 Foundational component of the context framework providing core graph 
 structures, path operations, and tracing capabilities. Implements 
 hypergraph data structures with sophisticated path navigation and 
@@ -38,7 +61,7 @@ bidirectional tracing.
 
 ## Usage
 ```rust
-use context_trace::{Hypergraph, HypergraphRef, RolePath};
+use context_trace::legacy::{Hypergraph, HypergraphRef, RolePath};
 
 // Create hypergraph
 let graph = Hypergraph::new();

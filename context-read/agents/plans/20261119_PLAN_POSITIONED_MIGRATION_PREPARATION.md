@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#ngrams` `#positioned-composition` `#legacy` `#refactor` `#testing`
 summary: Prepare the crates for the positioned reader. Isolate the row-based implementation and its tests in `legacy` modules without behavior change, move the v3 interchange into context-trace, scaffold the positioned graph model with a v3 fixture round-trip loop, separate v2/v3 fixture manifests, add the missing reader scenarios, ignore legacy tests at the test-suite cutover (opt-in via `legacy-tests`), then promote reusable pieces out of legacy on demand and add read-only navigation. Algorithm work (reader plan Phase 3+) starts only after these gates.
-status: 📋 ready
+status: 🚧 step 1 done; steps 2-5 open
 revision: 1
 date: 2026-11-19
 parent: 20261118_PLAN_POSITIONED_COMPOSITION_READER.md (this plan is its preparatory "Phase −1" plus Phases 0-2)
@@ -34,7 +34,7 @@ Record these before changing anything; every step below is gated against them.
   (lib 32, fixture_validation 4, reader_behavior 48/54, 3 ignored doc/other).
 - Counted unit tests: `context-search` 60, `context-insert` 53,
   `context-read` src/tests/cursor.rs 16, request.rs 3.
-- [ ] Before Step 1, capture the full baseline into the session or a
+- [x] Before Step 1, capture the full baseline into the session or a
   commit message: `cargo test --workspace --exclude context-editor-kernel --exclude sandbox-app --no-fail-fast 2>&1 | grep -E "^test .*(ok|FAILED|ignored)$" | sort`
   and keep the list for diffing after each move.
 
@@ -112,62 +112,62 @@ and lose `pub(crate)` access).
 
 ### 1.1 Feature flag
 
-- [ ] Add a default-on `legacy` feature to `context-trace`, `context-search`,
+- [x] Add a default-on `legacy` feature to `context-trace`, `context-search`,
   `context-insert`, `context-read`, propagating downward
   (`context-read/legacy = ["context-insert/legacy", …]`).
-- [ ] `context-api`, `context-cli`, `ngrams` enable `legacy` explicitly.
-- [ ] CI-able check:
+- [x] `context-api`, `context-cli`, `ngrams` enable `legacy` explicitly.
+- [x] CI-able check:
   `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`
   must compile (proves new code does not depend on legacy). This becomes
   meaningful once Step 2 adds code; in Step 1 it may compile nearly empty crates.
 
 ### 1.2 context-trace
 
-- [ ] Create `src/legacy/mod.rs`; move B modules: `graph/vertex/{data,pattern,location,parent}`,
+- [x] Create `src/legacy/mod.rs`; move B modules: `graph/vertex/{data,pattern,location,parent}`,
   `graph/{insert,getters,snapshot,validation,search_path,test_graph}`, `path/`,
   row parts of `trace/`, `tests/{macros,env}` and row tests.
-- [ ] `Hypergraph`/`HypergraphRef` (row `VertexData`) move to
+- [x] `Hypergraph`/`HypergraphRef` (row `VertexData`) move to
   `legacy::graph`; keep the name, so legacy code stays textually similar.
-- [ ] Keep at root: `direction`, `logging`, `GraphKind`, `VertexIndex`,
+- [x] Keep at root: `direction`, `logging`, `GraphKind`, `VertexIndex`,
   `VertexKey`, `Token`/`TokenWidth`, atoms, `tests/test_case`, proc-macro
   re-exports, `HashMap/HashSet` aliases, `init_test_tracing`.
-- [ ] Move `AtomPosition` to a root module (e.g. `src/position.rs`) and
+- [x] Move `AtomPosition` to a root module (e.g. `src/position.rs`) and
   re-export it from its old legacy path.
-- [ ] Replace the `Token`/`VertexIndex` → test-graph string lookup with a
+- [x] Replace the `Token`/`VertexIndex` → test-graph string lookup with a
   model-neutral hook (e.g. thread-local `TokenNameResolver` trait object that
   the legacy test graph registers). Behavior of existing debug output must
   not change.
-- [ ] Re-export: `pub use legacy::*`-style re-exports are **not** allowed at the
+- [x] Re-export: `pub use legacy::*`-style re-exports are **not** allowed at the
   crate root (they would hide the fence). Downstream imports change to
   `context_trace::legacy::{…}`.
-- [ ] `ngrams` imports switch to `context_trace::legacy::…`.
+- [x] `ngrams` imports switch to `context_trace::legacy::…`.
 
 ### 1.3 context-search
 
-- [ ] Move `compare, match, cursor, state, search` and row tests to
+- [x] Move `compare, match, cursor, state, search` and row tests to
   `src/legacy/`. `Find`, `Searchable`, `Response` become
   `context_search::legacy::…`.
-- [ ] `container/` and `logging/` stay at root if they compile without legacy
+- [x] `container/` and `logging/` stay at root if they compile without legacy
   types; otherwise move now and promote later (Step 3).
 
 ### 1.4 context-insert
 
-- [ ] Move `insert, interval, join, split, overlap, visualization` and
+- [x] Move `insert, interval, join, split, overlap, visualization` and
   `tests/` under `src/legacy/`. Fix `context_read` deep paths to
   `context_insert::legacy::overlap::{prefix_frames, find_complete}`.
 
 ### 1.5 context-read
 
-- [ ] Move `pipeline/`, `expansion/`, `request.rs`, `src/tests/` under
+- [x] Move `pipeline/`, `expansion/`, `request.rs`, `src/tests/` under
   `src/legacy/`. Keep `segment.rs`/`input.rs` at root only if they compile
   without legacy types; otherwise move and promote in Step 3.
-- [ ] Public API becomes `context_read::legacy::{read, ReadCtx, ReadSequenceIter, SegmentResult, IntoReadInput}`.
+- [x] Public API becomes `context_read::legacy::{read, ReadCtx, ReadSequenceIter, SegmentResult, IntoReadInput}`.
   Do **not** keep an unqualified `context_read::read` alias; the name is
   reserved for the positioned reader.
-- [ ] Tests: `tests/reader_behavior.rs` → `tests/legacy_reader_behavior.rs`;
+- [x] Tests: `tests/reader_behavior.rs` → `tests/legacy_reader_behavior.rs`;
   `tests/support/mod.rs` split into `support/legacy.rs` (v2) and
   `support/positioned.rs` (v3) with a shared `mod.rs`.
-- [ ] Mark the 6 known failures `#[ignore = "legacy known failure: <ref>"]`
+- [x] Mark the 6 known failures `#[ignore = "legacy known failure: <ref>"]`
   and list them in the test file header and in the overlap provider plan,
   so the legacy gate is "all non-ignored pass" and regressions are visible.
   The list stays fixed; it is checked by review, not by a test. At the
@@ -175,9 +175,9 @@ and lose `pub(crate)` access).
 
 ### 1.6 Consumers
 
-- [ ] `context-api`: `commands/{insert,read,debug}.rs`, `types.rs`,
+- [x] `context-api`: `commands/{insert,read,debug}.rs`, `types.rs`,
   `commands/compare.rs`, `workspace/manager.rs` → legacy imports.
-- [ ] `context-cli` incl. `tests/integration/ngrams_oracle_tests.rs`,
+- [x] `context-cli` incl. `tests/integration/ngrams_oracle_tests.rs`,
   `tests/common/graph_compare.rs`; `context-http`, `context-mcp` (via
   `context-api` only; verify).
 - [ ] Context editor kernel: no direct dependency found; verify it still
@@ -185,9 +185,39 @@ and lose `pub(crate)` access).
 
 ### 1.7 Docs
 
-- [ ] Update `FILE_INDEX.md`, `README.md` of each moved crate with the
+- [x] Update `FILE_INDEX.md`, `README.md` of each moved crate with the
   legacy/positioned split and the rule "no new code in `legacy`, only fixes
   needed to keep tests green".
+
+**Step 1 done (2026-11-19).** Commits (bottom-up, each builds the workspace):
+`5f33d5e` trace, `7dfc2ff` search, `840ffa2` insert, `ca3e5c8` read, plus the
+docs/plan commit. Notes and deviations:
+
+- `legacy` modules mirror the root (`pub use crate::*`, and
+  `pub use crate::<module>::*` in split modules such as `legacy::graph`,
+  `legacy::graph::vertex`, `legacy::direction`, `legacy::logging`,
+  `legacy::tests`). Moved code only changed `crate::` → `crate::legacy::`;
+  consumers changed `context_<crate>::` → `context_<crate>::legacy::`. The
+  root never re-exports `legacy`.
+- context-trace root impls for row types (e.g. `Wide for Pattern`,
+  `HasVertexIndex for VertexData`, `SubToken`, `Token::down_key`,
+  `GraphKind::Direction: PatternDirection`, `TestEnv::graph`, `AsGraphRef`
+  impls) carry `#[cfg(feature = "legacy")]` instead of being split into new
+  files.
+- Name hook: `graph/vertex/name_resolver.rs` (thread-local
+  `TokenNameResolver`); `legacy::graph::test_graph` registers the graph as the
+  resolver; output is unchanged.
+- search `container/`, `logging/`, `policy.rs` and read `segment.rs`,
+  `input.rs` depend on row types → moved (promotion in Step 3). The roots of
+  search/insert/read are empty apart from `pub mod legacy`.
+- `context_read::legacy` additionally re-exports `ReadCtx` (listed in 1.5).
+- Gate 1: passed 831 → 831, failed 7 → 1, ignored 79 → 85. The remaining
+  failure is the baseline doctest `legacy::graph::test_graph (line 12)` (E0284,
+  only in the workspace run). The 6 known failures print
+  `ignored, legacy known failure: …`, which the baseline `awk` filter (anchored
+  on `ignored$`) does not list.
+- Editor kernel: no direct dependency on the four crates; not built here
+  (winit).
 
 **Gate 1:**
 - `cargo build --workspace --all-targets --exclude context-editor-kernel --exclude sandbox-app`

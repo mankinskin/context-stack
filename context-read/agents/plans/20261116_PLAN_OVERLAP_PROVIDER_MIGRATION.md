@@ -24,6 +24,17 @@ Verified n-gram oracle fixtures should be authoritative; hand-written graph-shap
 assertions alone do not justify a semantic requirement. Current snapshots are
 provisional pending oracle correctness, as noted below.
 
+## Legacy freeze note (2026-11-19)
+
+The row reader moved to `context_read::legacy` (and insert/search/trace to their
+`legacy` modules) per `20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`
+Step 1. `tests/reader_behavior.rs` is now `tests/legacy_reader_behavior.rs`.
+Its 6 known failures are fixed and marked
+`#[ignore = "legacy known failure: final graph differs from v2 oracle"]`:
+`complex_overlap`, `infix`, `multiple_overlaps`, `nested_complements`,
+`flat_complement`, `accepted_materialization`. The list is checked by review,
+not by a test.
+
 ## Test contract correction (2026-11-17)
 
 The test refactor supersedes references below to preserving existing synthetic
