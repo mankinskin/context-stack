@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#ngrams` `#positioned-composition` `#legacy` `#refactor` `#testing`
 summary: Prepare the crates for the positioned reader. Isolate the row-based implementation and its tests in `legacy` modules without behavior change, move the v3 interchange into context-trace, scaffold the positioned graph model with a v3 fixture round-trip loop, separate v2/v3 fixture manifests, add the missing reader scenarios, ignore legacy tests at the test-suite cutover (opt-in via `legacy-tests`), then promote reusable pieces out of legacy on demand and add read-only navigation. Algorithm work (reader plan Phase 3+) starts only after these gates.
-status: 🚧 step 1 done; steps 2-5 open
+status: 🚧 steps 1-2 done; steps 3-5 open
 revision: 1
 date: 2026-11-19
 parent: 20261118_PLAN_POSITIONED_COMPOSITION_READER.md (this plan is its preparatory "Phase −1" plus Phases 0-2)
@@ -232,51 +232,56 @@ docs/plan commit. Notes and deviations:
 
 ### 2.1 Interchange types live in context-trace
 
-- [ ] Move `PositionedGraphData`, `PositionedGraphSnapshot`,
+- [x] Move `PositionedGraphData`, `PositionedGraphSnapshot`,
   `PositionedCover`, `POSITIONED_FORMAT_VERSION`, the structural validator and
   `unique_keys` from `ngrams/src/output.rs` to
   `context-trace/src/positioned/interchange.rs`.
-- [ ] `ngrams::output` re-exports them (no API break for ngrams users); move
+- [x] `ngrams::output` re-exports them (no API break for ngrams users); move
   their tests (`ngrams/src/tests/output.rs` structural parts) along or keep
   them in ngrams calling the re-export — do not duplicate.
-- [ ] `ngrams::output::legacy` stays in ngrams.
+- [x] `ngrams::output::legacy` stays in ngrams.
 
 ### 2.2 Positioned model types (`context_trace::positioned`)
 
-- [ ] `Occurrence { offset: AtomPosition-like, child: VertexIndex }`.
-- [ ] `Composition` = sorted `Vec<Occurrence>` with constructor enforcing
+- [x] `Occurrence { offset: AtomPosition-like, child: VertexIndex }`.
+- [x] `Composition` = sorted `Vec<Occurrence>` with constructor enforcing
   order `(offset, width)`, no duplicates, no contained intervals.
-- [ ] `PositionedVertex { index, key, width, composition, parents }` with
+- [x] `PositionedVertex { index, key, width, composition, parents }` with
   reciprocal `parents: Vec<(VertexIndex /*parent*/, offset)>` (or a map
   parent → offsets).
-- [ ] `OccurrenceLocation { parent, offset, child }`; `OccurrencePath`
+- [x] `OccurrenceLocation { parent, offset, child }`; `OccurrencePath`
   (chain; absolute offset = sum).
-- [ ] `IntervalView { owner, range }` — explicitly not a token.
-- [ ] `PositionedGraph<G: GraphKind>` with its own storage, shared ID/atom
+- [x] `IntervalView { owner, range }` — explicitly not a token.
+- [x] `PositionedGraph<G: GraphKind>` with its own storage, shared ID/atom
   types; insertion API that only accepts complete compositions (no gap,
   wrapper or slice vertices by construction).
-- [ ] `validate()`: oracle structural rules 1-8 plus reciprocal-link
+- [x] `validate()`: oracle structural rules 1-8 plus reciprocal-link
   consistency and one vertex per content.
-- [ ] Decide and document: thread-safety (`DashMap` like legacy, or plain map
+- [x] Decide and document: thread-safety (`DashMap` like legacy, or plain map
   behind `Arc<RwLock>`); keep it simple until the reader needs concurrency.
+  **Decision (2026-11-19):** plain `Vec`/`HashMap` storage in
+  `PositionedGraph` (not internally synchronized), shared as
+  `PositionedGraphRef<G> = Arc<RwLock<PositionedGraph<G>>>` (newtype with
+  `read()`/`write()`); readers share the lock, insertion is exclusive.
+  Revisit only when the reader needs concurrent insertion.
 
 ### 2.3 Conversion and comparison
 
-- [ ] `PositionedGraph::from_interchange(&PositionedGraphData)` (bottom-up by
+- [x] `PositionedGraph::from_interchange(&PositionedGraphData)` (bottom-up by
   width) and `to_interchange()`.
-- [ ] `fn diff(expected, actual) -> GraphDiff` listing missing/extra vertices
+- [x] `fn diff(expected, actual) -> GraphDiff` listing missing/extra vertices
   and missing/extra occurrences per owner; readable failure output. This is
   the comparison the positioned reader tests will use.
 
 ### 2.4 Fixture manifests
 
-- [ ] Move v2 artifacts to `tests/fixtures/v2/` with a frozen
+- [x] Move v2 artifacts to `tests/fixtures/v2/` with a frozen
   `v2/scenarios.json` (copy of today's manifest). Update
   `legacy_reader_behavior` and v2 validation paths.
-- [ ] `tests/fixtures/v3/scenarios.json` becomes the authoritative manifest;
+- [x] `tests/fixtures/v3/scenarios.json` becomes the authoritative manifest;
   regenerate command in README:
   `cargo run --release -p ngrams --bin ngrams -- --file context-read/tests/fixtures/v3/scenarios.json --out context-read/tests/fixtures/v3`.
-- [ ] `fixture_validation` checks each lane against its own manifest; v3
+- [x] `fixture_validation` checks each lane against its own manifest; v3
   still recomputes from `parse_corpus`.
 
 ### 2.5 New scenarios (v3 only)
@@ -284,37 +289,37 @@ docs/plan commit. Notes and deviations:
 Each expectation hand-checked against the oracle rules, never derived from
 reader output. Add to v3 manifest and generate:
 
-- [ ] `abcabca` → `abcabca = [abca@0, abca@3]`, no `abc/bca/bc` vertices.
-- [ ] `ababa` → `ababa = [aba@0, aba@2]`.
-- [ ] Seam case: corpus where `abc` and `cde` are observed and `bcd` is
+- [x] `abcabca` → `abcabca = [abca@0, abca@3]`, no `abc/bca/bc` vertices.
+- [x] `ababa` → `ababa = [aba@0, aba@2]`.
+- [x] Seam case: corpus where `abc` and `cde` are observed and `bcd` is
   retained (choose inputs so the oracle retains `bcd`; verify), combined
   vertex must list `bcd` crossing the seam.
-- [ ] Late retention: a token retained only after a later input
+- [x] Late retention: a token retained only after a later input
   (e.g. `vis` then a corpus making `vi` frequent); expected graph per prefix
   corpus — add one fixture per completed-input prefix
   (`<name>__1`, `<name>__2`, …).
-- [ ] Duplicate observation of a composite (`["abcabc", "abcabc"]`) and an
+- [x] Duplicate observation of a composite (`["abcabc", "abcabc"]`) and an
   input that is a substring of an earlier one.
 
 ### 2.6 Tests
 
-- [ ] `context-trace` unit tests: every v3 fixture → `PositionedGraph` →
+- [x] `context-trace` unit tests: every v3 fixture → `PositionedGraph` →
   `validate()` → `to_interchange()` equals the fixture.
-- [ ] Validator rejection tests for model-only rules (broken reciprocal link,
+- [x] Validator rejection tests for model-only rules (broken reciprocal link,
   duplicate content) — structural rules are already tested in the
   interchange module; do not duplicate.
-- [ ] Content reconstruction of every vertex from its composition equals its
+- [x] Content reconstruction of every vertex from its composition equals its
   key.
-- [ ] Retention monotonicity tests in `ngrams` (from 0.5): across completed
+- [x] Retention monotonicity tests in `ngrams` (from 0.5): across completed
   inputs, retained sets are monotone for manifest scenarios plus a bounded
   generated set (normal test) and the larger sweep (ignored release test).
   Add one explicit counter-example test documenting within-input
   non-monotonicity (`abcab` → `abcabc` loses `ab`).
-- [ ] `context-read/tests/reader_behavior.rs` (new, positioned): one test per
+- [x] `context-read/tests/reader_behavior.rs` (new, positioned): one test per
   v3 scenario comparing `context_read::read` (positioned, not yet
   implemented) via `diff`; all `#[ignore = "positioned reader pending"]`.
   A meta-test asserts every v3 manifest entry has a test.
-- [ ] `context_read::read` positioned stub returning `unimplemented!()` or
+- [x] `context_read::read` positioned stub returning `unimplemented!()` or
   `Err(NotImplemented)` with the target signature
   (`&PositionedGraphRef, input) -> Option<Token>`), so test code compiles.
 
@@ -323,9 +328,9 @@ reader output. Add to v3 manifest and generate:
 Decision: when the new suite exists, **old tests are ignored**, not deleted
 and not compiled out. They are still compiled and can be run on request.
 
-- [ ] Cutover point: immediately after the 2.6 tests pass and Gate 2 holds
+- [x] Cutover point: immediately after the 2.6 tests pass and Gate 2 holds
   with the legacy lane still running. That is the last full legacy run.
-- [ ] Add a `legacy-tests` feature (off by default) to `context-trace`,
+- [x] Add a `legacy-tests` feature (off by default) to `context-trace`,
   `context-search`, `context-insert` and `context-read`, propagating like
   `legacy`. Mark every legacy test with
   `#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]`.
@@ -333,17 +338,79 @@ and not compiled out. They are still compiled and can be run on request.
   (including the `scenarios!` macro expansion), v2 fixture validation,
   `context-cli` legacy oracle comparisons and `context-api` tests that
   exercise row behavior.
-- [ ] The 6 known failures keep their unconditional
+- [x] The 6 known failures keep their unconditional
   `#[ignore = "legacy known failure: …"]`, so `--features legacy-tests`
   runs green.
-- [ ] Use the feature, not `cargo test -- --ignored`, to run legacy tests.
+- [x] Use the feature, not `cargo test -- --ignored`, to run legacy tests.
   `--ignored` also picks up the pending positioned reader lane and the slow
   ngrams sweeps.
-- [ ] Default `cargo test` from then on runs only the positioned suite, the
+- [x] Default `cargo test` from then on runs only the positioned suite, the
   oracle tests and model-agnostic tests. Document in each crate README:
   `cargo test -p <crate> --features legacy-tests` runs the legacy suite.
-- [ ] Run the legacy suite explicitly when a change touches `legacy` code or
+- [x] Run the legacy suite explicitly when a change touches `legacy` code or
   promotes something out of it (Step 3). Otherwise it is not a gate.
+
+**Step 2 done (2026-11-19).** Commits (each builds the workspace):
+`859a785` interchange move, `403a669` positioned types, `34d5885`
+conversion + diff, `41a31e0` fixture split, `e487fe8` new v3 scenarios,
+`991cfea` ngrams retention tests, `e5d450e` context-trace model tests,
+`92c8537` positioned reader lane + `context_read::read` stub, `a037e18`
+legacy doctest fix, `f5f8d68` test-suite cutover, plus this plan update.
+Notes and deviations:
+
+- Types (`context-trace/src/positioned/`): `interchange.rs`,
+  `composition.rs` (`Occurrence { offset: AtomPosition, child: Token }` —
+  `Token` instead of `VertexIndex` so the composition knows child widths;
+  `Composition::new` sorts its input and rejects too few occurrences,
+  duplicates, contained intervals and gaps), `location.rs`
+  (`OccurrenceLocation`, `OccurrencePath`, `IntervalView`), `graph.rs`
+  (`PositionedVertex` with `parents: BTreeMap<parent, BTreeSet<offset>>`,
+  atoms/composites as `VertexNode`, `PositionedGraph<G>` with dense `Vec`
+  storage + content index; `insert` additionally rejects unknown children,
+  stale widths, disagreeing overlaps and duplicate content; `validate()`
+  checks rules 1-7 — rule 8, corpus roots, stays on the snapshot — plus
+  reciprocal links and one vertex per content), `convert.rs`, `diff.rs`.
+  `ngrams::output` re-exports the interchange; structural rejection tests
+  moved to context-trace, oracle-dependent output tests stay in ngrams.
+- Fixtures: `tests/fixtures/v2/` (+ frozen `v2/scenarios.json`) and
+  `tests/fixtures/v3/` (+ authoritative `v3/scenarios.json`); regeneration of
+  the existing v3 fixtures produced no diff.
+- New v3 scenarios, all matching the hand-checked expectation (no oracle
+  discrepancy): `repeat_abcabca` (`abcabca = [abca@0, abca@3]`, vertices
+  `a b c abca abcabca`), `repeat_ababa` (`ababa = [aba@0, aba@2]`),
+  `seam_bcd` (`["abc","cde","xbcdy","abcde"]`; `bcd` retained by frequency,
+  `abcde = [abc@0, bcd@1, cde@2]`), `late_retention__1` (`["vis"]`) /
+  `late_retention__2` (`["vis","vim"]`, `vi` appears only now),
+  `duplicate_observation` (`["abcabc","abcabc"]`), `substring_input`
+  (`["abcabc","bca"]`, `abcabc = [abc@0, bca@1, abc@3]`).
+- `context_read::read(&PositionedGraphRef, impl IntoIterator<Item = char>)
+  -> Option<Token>` panics with `unimplemented!`. `tests/support::legacy`,
+  `legacy_reader_behavior` and the v2 checks of `fixture_validation` are
+  gated on context-read's `legacy` feature, so the positioned lane also runs
+  with `--no-default-features --features test-api`.
+- Retention: bounded sweep (196 two-text corpora over `{a,b}`, width ≤ 3)
+  and all v3 scenarios run by default; the ignored release sweep checks
+  54 000 transitions (three texts over `{a,b}`, width ≤ 4) plus 1 521
+  (two texts over `{a,b,c}`, width ≤ 3): no violation.
+- Gate 2: last full legacy run before the cutover 844 ok / 0 failed / 144
+  ignored (Step 1: 831 / 1 / 85 by the old filter; differences are only new
+  tests, the 3 moved interchange tests, the fixed doctest and reason-ignored
+  tests the old filter did not list). After the cutover: 544 ok / 0 failed /
+  444 ignored; exactly 300 tests changed `ok` → ignored (298 `legacy suite`
+  + 2 legacy doctests). `cargo test -p context-trace -p context-search
+  -p context-insert -p context-read -p context-cli --features legacy-tests`
+  is green. The `--no-default-features` check compiles.
+- Cutover scope: unit tests under `src/legacy` (247 compiled; 8 more in the
+  uncompiled `context-trace/src/legacy/tests/state_advance.rs`),
+  `legacy_reader_behavior` 48 (+6 known failures, unconditional),
+  `fixture_validation` v2 checks 3, context-cli `graph_compare` 9 and oracle
+  self-checks 4. Not marked: tests that already carry an ignore reason
+  (search `dump_events`, context-cli `RC-…`), the 16 ts-rs generated
+  `export_bindings_*` tests of legacy snapshot types (no attribute to
+  attach), and all context-api/http/mcp and context-cli command tests (API
+  behavior, row-backed internally). context-api therefore has no
+  `legacy-tests` feature. Legacy doctests use
+  `cfg_attr(not(feature = "legacy-tests"), doc = "```rust,ignore")`.
 
 **Gate 2:** all new tests pass (except the ignored reader lane); the legacy
 lane is unchanged at the last full run before the cutover; the
