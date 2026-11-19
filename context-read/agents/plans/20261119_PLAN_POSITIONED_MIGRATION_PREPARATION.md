@@ -508,7 +508,9 @@ enumeration, `088971a` boundary search. No reader algorithm was added;
   Without `--lib --tests` two pre-existing context-trace doctests fail to
   compile because they import `context_trace::legacy`
   (`logging::tracing_utils::init_test_tracing`,
-  `TestTracing::init_with_graph`); not caused by Step 4.
+  `TestTracing::init_with_graph`); not caused by Step 4. Fixed in `b2cf896`
+  (fences gated on `legacy`); the full doctest run now passes without
+  default features too.
 - No promotion out of `legacy` (see Step 3), so no `legacy-tests` rerun was
   required.
 
