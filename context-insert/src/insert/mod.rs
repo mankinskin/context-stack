@@ -2,7 +2,7 @@ use context::*;
 use result::InsertResult;
 
 use crate::interval::init::InitInterval;
-use context_search::*;
+use context_search::legacy::*;
 use context_trace::legacy::*;
 pub mod context;
 pub(crate) mod direction;

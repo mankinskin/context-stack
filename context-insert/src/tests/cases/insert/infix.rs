@@ -5,7 +5,7 @@ use crate::{
         EnvInsertInfix2,
     },
 };
-use context_search::*;
+use context_search::legacy::*;
 use context_trace::legacy::{
     tests::{
         macros::string_repr::{

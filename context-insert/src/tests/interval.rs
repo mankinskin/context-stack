@@ -18,7 +18,7 @@ use crate::{
     },
     *,
 };
-use context_search::{
+use context_search::legacy::{
     tests::search::trace_cache::CdefghiTraceCase,
     *,
 };

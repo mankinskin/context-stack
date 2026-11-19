@@ -20,7 +20,7 @@ mod tests;
 
 use std::collections::HashSet;
 
-use context_search::Find;
+use context_search::legacy::Find;
 use context_trace::legacy::graph::vertex::{
     atom::Atom,
     pattern::Pattern,

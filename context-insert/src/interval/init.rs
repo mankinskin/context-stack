@@ -4,7 +4,7 @@ use crate::split::{
     context::SplitCacheCtx,
     trace::states::context::SplitTraceStatesCtx,
 };
-use context_search::*;
+use context_search::legacy::*;
 use context_trace::legacy::{
     graph::getters::ErrorReason,
     *,

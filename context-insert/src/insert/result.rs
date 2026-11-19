@@ -3,7 +3,7 @@ use std::{
     fmt::Debug,
 };
 
-use context_search::*;
+use context_search::legacy::*;
 use context_trace::legacy::*;
 
 pub trait ResultExtraction {

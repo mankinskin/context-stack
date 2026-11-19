@@ -3,7 +3,7 @@ use crate::{
     interval::init::InitInterval,
     tests::env::EnvInsertPostfix1,
 };
-use context_search::*;
+use context_search::legacy::*;
 use context_trace::legacy::{
     tests::test_case::TestEnv,
     trace::has_graph::HasGraph,

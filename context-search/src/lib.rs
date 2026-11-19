@@ -3,34 +3,10 @@
 //#![feature(hash_drain_filter)]
 //#![feature(pin_macro)]
 //#![feature(return_position_impl_trait_in_trait)]
-#![feature(type_changing_struct_update)]
+#![cfg_attr(feature = "legacy", feature(type_changing_struct_update))]
 
 extern crate test;
 
-pub(crate) mod compare;
-pub mod container;
-pub(crate) mod cursor;
-pub(crate) mod r#match;
-pub mod policy;
-pub mod search;
-pub mod state;
-
-/// Compact formatting for logging
-pub(crate) mod logging;
-
-#[cfg(any(test, feature = "test-api"))]
-pub mod tests;
-
-pub use crate::{
-    container::bft::BftQueue,
-    policy::SearchKind,
-    search::{
-        context::AncestorPolicy,
-        searchable::{
-            ErrorState,
-            Searchable,
-        },
-        Find,
-    },
-    state::response::Response,
-};
+/// Row-model search, fenced off from the model-agnostic root.
+#[cfg(feature = "legacy")]
+pub mod legacy;

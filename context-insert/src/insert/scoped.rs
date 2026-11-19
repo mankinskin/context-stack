@@ -42,7 +42,7 @@ use crate::{
     },
     interval::init::InitInterval,
 };
-use context_search::ErrorState;
+use context_search::legacy::ErrorState;
 use context_trace::legacy::{
     trace::{
         BottomUp,

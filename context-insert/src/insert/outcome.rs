@@ -1,4 +1,4 @@
-use context_search::Response;
+use context_search::legacy::Response;
 use context_trace::legacy::*;
 
 /// Outcome of `insert_next_match` — always resolves to a single token + path.

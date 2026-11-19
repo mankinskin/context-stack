@@ -7,7 +7,7 @@ use crate::pipeline::root::{
     Span,
 };
 use context_insert::*;
-use context_search::Find;
+use context_search::legacy::Find;
 use context_trace::legacy::*;
 
 /// Resolves one consuming step against the latest committed graph.

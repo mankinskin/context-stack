@@ -15,7 +15,7 @@ use crate::{
         select::select,
     },
 };
-use context_search::{
+use context_search::legacy::{
     AncestorPolicy,
     Response,
     BftQueue,

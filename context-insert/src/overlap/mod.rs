@@ -44,7 +44,7 @@
 //! whole frame path, as required when the expansion is the scope itself.
 //! If `X == P`, the result is `E` and no complement is resolved.
 
-use context_search::{
+use context_search::legacy::{
     ErrorState,
     Find,
 };

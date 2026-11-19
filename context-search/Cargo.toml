@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = []  #["log_stdout", "log_gui"]
+default = ["legacy"]  #["log_stdout", "log_gui"]
+# Row-model implementation in `context_search::legacy`.
+legacy = ["context-trace/legacy"]
 test-api = []
 
 [dependencies]
@@ -32,7 +34,7 @@ linked-hash-map = "0.5"
 one-of = "0.2"
 maplit = "1.0"
 
-context-trace = { path = "../context-trace", features = ["test-api"] }
+context-trace = { path = "../context-trace", default-features = false, features = ["test-api"] }
 strum = {version="0.27.2", features=["derive"]}
 
 [dependencies.pretty_assertions]

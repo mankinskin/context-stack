@@ -10,7 +10,7 @@
 //!
 //! Both return a [`SearchResult`] indicating complete, partial, or not-found.
 
-use context_search::Find;
+use context_search::legacy::Find;
 use context_trace::legacy::graph::{
     HypergraphRef,
     kind::BaseGraphKind,
@@ -124,7 +124,7 @@ impl WorkspaceManager {
 /// with query exhausted), partial, or failed.
 fn build_search_result(
     graph: &HypergraphRef<BaseGraphKind>,
-    response: &context_search::Response,
+    response: &context_search::legacy::Response,
 ) -> SearchResult {
     if response.is_entire_root() && response.query_exhausted() {
         // Full match — the query exactly matches an existing vertex

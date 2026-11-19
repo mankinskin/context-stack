@@ -13,7 +13,7 @@ use crate::{
         prefix_frames,
     },
 };
-use context_search::Find;
+use context_search::legacy::Find;
 use context_trace::legacy::*;
 
 fn atoms<const N: usize>(

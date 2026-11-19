@@ -39,7 +39,7 @@ use crate::{
         EnvTripleRepeat,
     },
 };
-use context_search::{
+use context_search::legacy::{
     ErrorState,
     *,
 };

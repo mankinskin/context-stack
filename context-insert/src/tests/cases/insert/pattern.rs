@@ -12,7 +12,7 @@ use crate::{
         test_case::InsertTestCase,
     },
 };
-use context_search::*;
+use context_search::legacy::*;
 use context_trace::legacy::{
     GraphRoot,
     HasGraph,

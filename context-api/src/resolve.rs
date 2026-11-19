@@ -25,7 +25,7 @@ use context_trace::legacy::{
     },
 };
 
-use context_search::Find;
+use context_search::legacy::Find;
 
 use crate::{
     error::SearchError,

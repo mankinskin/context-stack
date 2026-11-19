@@ -2,7 +2,7 @@ use crate::{
     insert::ToInsertCtx,
     interval::init::InitInterval,
 };
-use context_search::{
+use context_search::legacy::{
     tests::env::EnvInsertPrefix1,
     *,
 };
