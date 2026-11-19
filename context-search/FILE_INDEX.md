@@ -9,6 +9,14 @@ default-on `legacy` feature, and are imported as `context_search::legacy::…`
 row types and are promoted to the root only when positioned code needs them.
 The module paths below refer to `src/legacy/…`.
 
+**Positioned (root, no legacy dependency):** `src/boundary/` — boundary search
+over `context_trace::positioned::PositionedGraph`:
+`boundary_occurrences(graph, owner, position, Boundary::{Start, End})`,
+`prefixes`, `postfixes` → `Vec<BoundaryOccurrence { token, path:
+OccurrencePath }>` (retained proper descendants touching the boundary, longest
+first, one evidence path each). `boundary/tests.rs` checks every v3 fixture
+vertex and position against brute-force string matching.
+
 **Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
 **Generated:** 2025-11-23  

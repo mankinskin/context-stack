@@ -1,8 +1,8 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#ngrams` `#positioned-composition` `#legacy` `#refactor` `#testing`
 summary: Prepare the crates for the positioned reader. Isolate the row-based implementation and its tests in `legacy` modules without behavior change, move the v3 interchange into context-trace, scaffold the positioned graph model with a v3 fixture round-trip loop, separate v2/v3 fixture manifests, add the missing reader scenarios, ignore legacy tests at the test-suite cutover (opt-in via `legacy-tests`), then promote reusable pieces out of legacy on demand and add read-only navigation. Algorithm work (reader plan Phase 3+) starts only after these gates.
-status: 🚧 steps 1-2 done; steps 3-5 open
-revision: 1
+status: ✅ complete (steps 1, 2, 4, 5 done; step 3 is pull-based and continuous) — open: editor-kernel build check (1.6), not runnable in the Linux codespace (winit)
+revision: 2
 date: 2026-11-19
 parent: 20261118_PLAN_POSITIONED_COMPOSITION_READER.md (this plan is its preparatory "Phase −1" plus Phases 0-2)
 related: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE_IMPLEMENTATION.md
@@ -436,6 +436,11 @@ Promotion = move to root module + legacy re-imports from root. Candidates:
 Rule: never make a legacy type generic over both models to "share" it; copy
 the concept instead. Track each promotion in this list with the commit.
 
+**Status (2026-11-19, after Step 4):** no promotion so far. The navigation
+APIs needed no legacy code: they use small explicit worklists (`Vec` stack +
+visited set) instead of the row BFT/DFT `container/`, and the v3 fixture
+loader was written fresh (`context_trace::positioned::fixtures`, `test-api`).
+
 **Gate 3:** per promotion, `cargo test --features legacy-tests` on the
 affected crates is unchanged, and the promoted item has a positioned-model
 test.
@@ -446,33 +451,89 @@ test.
 
 Three separate APIs, separate tests, all on v3 fixtures:
 
-- [ ] **Boundary search** (`context-search`): retained occurrences starting /
+- [x] **Boundary search** (`context-search`): retained occurrences starting /
   ending at a boundary of an owner, returning `OccurrencePath` evidence.
   Test: results equal oracle-retained prefixes/postfixes per vertex.
-- [ ] **Occurrence enumeration in an interval** (`context-trace`): descend
+- [x] **Occurrence enumeration in an interval** (`context-trace`): descend
   through intersecting children incl. boundary-crossing ones, report whole
   retained occurrences inside `IntervalView`, dedup by
   `(token, owner-relative offset)`. Tests: interval cutting through a child
   finds smaller occurrences inside it; same occurrence via two paths reported
   once; compare against brute-force substring enumeration over the retained
   set.
-- [ ] **Content reading**: emit each atom position once; may cut through
+- [x] **Content reading**: emit each atom position once; may cut through
   children. Test: equals owner content for all vertices and random intervals.
 
 **Gate 4:** all navigation tests pass on every v3 fixture.
+
+**Step 4 done (2026-11-19).** Commits (each builds the workspace):
+`ddee2e1` content reading (+ shared fixture loader), `839beeb` occurrence
+enumeration, `088971a` boundary search. No reader algorithm was added;
+`context_read::read` stays a stub. Notes:
+
+- APIs:
+  - `context_trace::positioned::fixtures::{v3_fixtures, v3_graphs, v3_dir}`
+    (`test-api`; replaces the private loader of the Step 2 model tests).
+  - `PositionedGraph::read_interval(&self, &IntervalView) ->
+    Option<Vec<AtomOf<G>>>` (`context-trace/src/positioned/read.rs`).
+  - `PositionedGraph::occurrences_in(&self, &IntervalView) ->
+    Option<Vec<Occurrence>>` (`context-trace/src/positioned/enumerate.rs`):
+    owner-relative offsets, sorted by `(offset, width)`, deduplicated, owner
+    excluded; descent memoized per `(child, absolute offset)`.
+  - `context_search::boundary::{boundary_occurrences(graph, owner, position,
+    Boundary::{Start, End}), prefixes(graph, owner), postfixes(graph, owner)}
+    -> Option<Vec<BoundaryOccurrence { token, path: OccurrencePath }>>`
+    (`context-search/src/boundary/mod.rs`): proper descendants only, longest
+    first, one token once with one evidence path. Generalized from
+    prefix/postfix to any position because the reader's seam discovery
+    (Phase 3) needs boundaries inside owners too.
+  - `None` for an unknown owner or a range/position beyond its width.
+- Tests (all fixtures are small — max width 14, 416 vertices — so they are
+  exhaustive instead of random): expected values come from string
+  comparison over the fixture's vertex keys, never from the graph.
+  - read: every interval of every vertex equals the key slice; views outside
+    the owner are rejected.
+  - enumerate: every interval of every vertex equals all substring matches of
+    retained keys (owner excluded); `seam_bcd` `abcde[1..3)` cuts through
+    `abc` and `bcd` and still finds `bc@1`; `bc@1` is reachable via both and
+    reported once; for every vertex the result equals the deduplicated set of
+    naive descent paths. A mutation that skips boundary-crossing children
+    fails two of the three tests.
+  - boundary: prefixes/postfixes per vertex, start/end searches at every
+    position, and each evidence path is stored, rooted at the owner, ends at
+    the token and has the right offset.
+- Gate 4: default workspace run 552 passed / 0 failed / 444 ignored (Step 2:
+  544 / 0 / 444; +8 new tests). `cargo test -p context-trace -p context-search
+  --no-default-features --features test-api --lib --tests` passes (26 + 3).
+  Without `--lib --tests` two pre-existing context-trace doctests fail to
+  compile because they import `context_trace::legacy`
+  (`logging::tracing_utils::init_test_tracing`,
+  `TestTracing::init_with_graph`); not caused by Step 4.
+- No promotion out of `legacy` (see Step 3), so no `legacy-tests` rerun was
+  required.
 
 ---
 
 ## Step 5 — Plan and docs handoff
 
-- [ ] Reader plan → revision 3: reference this plan as Phase −1/0-2
+- [x] Reader plan → revision 3: reference this plan as Phase −1/0-2
   prerequisite; add the within-input provisional-retention rule and the
   across-input monotonicity evidence to Phase 5; update `status`.
-- [ ] Overlap provider plan: mark "frozen for legacy; only fixes to keep the
+- [x] Overlap provider plan: mark "frozen for legacy; only fixes to keep the
   legacy lane green", list the 6 known failures.
-- [ ] ngrams implementation plan: note interchange types moved to
+- [x] ngrams implementation plan: note interchange types moved to
   context-trace.
-- [ ] Update this plan's checkboxes and `status` as steps land.
+- [x] Update this plan's checkboxes and `status` as steps land.
+
+**Step 5 done (2026-11-19)** in the docs commit following `088971a`:
+reader plan revision 3 (prerequisite reference, Phases 0-2 marked done, type
+deviation `Occurrence.child: Token`, Phase 5 provisional-retention rule and
+monotonicity evidence with the `ngrams/src/tests/retention.rs` test names),
+overlap provider plan frozen for legacy (extends the Step 1 freeze note),
+ngrams implementation plan note on the interchange move (`859a785`),
+`INDEX.md` statuses, context-trace/context-search README and FILE_INDEX
+entries for the navigation modules. Still open: the editor-kernel build check
+of 1.6.
 
 ---
 

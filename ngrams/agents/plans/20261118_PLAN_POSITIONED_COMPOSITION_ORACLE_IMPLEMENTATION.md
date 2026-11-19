@@ -14,6 +14,7 @@ This is the execution checklist for the [oracle design](20261118_PLAN_POSITIONED
 - [x] A–C implemented: deterministic selection, positioned composer, v3 output and validator, `parse_corpus` (v3) and `parse_corpus_legacy`.
 - [x] D cutover stage: legacy callers explicit, 51 v3 fixtures in `context-read/tests/fixtures/v3`, fixture validation recomputes them from the oracle.
 - [ ] D post-reader stage: migrate reader/workspace consumers to v3, then delete the legacy pipeline and v2 lane.
+- Note (2026-11-19): the v3 interchange types (`PositionedGraphData`, `PositionedGraphSnapshot`, `PositionedCover`, `POSITIONED_FORMAT_VERSION`, the structural validator and `unique_keys`) moved from `ngrams/src/output.rs` to `context_trace::positioned::interchange` (commit 859a785, [preparation plan](../../../context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md) Step 2.1). `ngrams::output` re-exports them, so existing paths keep working; the structural rejection tests moved along, oracle-dependent output tests stay in ngrams. `ngrams::output::legacy` (v2) stays in ngrams. Retention monotonicity tests live in `ngrams/src/tests/retention.rs`.
 
 ## 1. Contract and cutover shape
 

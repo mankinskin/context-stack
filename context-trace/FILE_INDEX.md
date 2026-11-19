@@ -14,6 +14,14 @@ There is no root `pub use legacy::*`; `legacy` mirrors the root items
   `Token`/`VertexIndex` display), `position.rs` (`AtomPosition`),
   `tests/test_case/`. Impls of root items for row types carry
   `#[cfg(feature = "legacy")]`.
+- **`positioned/` (root, no legacy dependency):** `interchange.rs` (v3
+  format + structural validator), `composition.rs` (`Occurrence`,
+  `Composition`), `location.rs` (`OccurrenceLocation`, `OccurrencePath`,
+  `IntervalView`), `graph.rs` (`PositionedGraph`, `PositionedGraphRef`),
+  `convert.rs`, `diff.rs`, navigation `read.rs`
+  (`PositionedGraph::read_interval`) and `enumerate.rs`
+  (`PositionedGraph::occurrences_in`), `fixtures.rs` (`test-api` v3 fixture
+  loader), `tests/` (round trip, model rules, `read`, `enumerate`).
 - **`legacy/`:** `direction/pattern.rs` (`PatternDirection`), `graph/`
   (`Hypergraph`, `HypergraphRef`, getters, insert, snapshot, validation,
   search_path, visualization, test_graph, child_strings), `graph/vertex/{data,

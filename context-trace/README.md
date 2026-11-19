@@ -39,8 +39,15 @@ structural validator, re-exported by `ngrams::output`), `composition.rs`
 (`Occurrence`, `Composition`), `location.rs` (`OccurrenceLocation`,
 `OccurrencePath`, `IntervalView`), `graph.rs` (`PositionedGraph`,
 `PositionedVertex`, `PositionedGraphRef = Arc<RwLock<_>>`), `convert.rs`
-(`from_interchange`/`to_interchange`), `diff.rs` (`diff` → `GraphDiff`). Tests
-round-trip every v3 fixture of `context-read/tests/fixtures/v3`.
+(`from_interchange`/`to_interchange`), `diff.rs` (`diff` → `GraphDiff`),
+read-only navigation `read.rs` (`PositionedGraph::read_interval`: content of an
+`IntervalView`, each position once) and `enumerate.rs`
+(`PositionedGraph::occurrences_in`: every retained occurrence inside an
+`IntervalView`, deduplicated by `(token, offset)`), `fixtures.rs` (`test-api`:
+`v3_fixtures`/`v3_graphs` loader, shared with context-search). Tests
+round-trip every v3 fixture of `context-read/tests/fixtures/v3` and check the
+navigation APIs on every interval of every fixture vertex against brute-force
+string matching. Boundary search lives in `context_search::boundary`.
 
 Foundational component of the context framework providing core graph 
 structures, path operations, and tracing capabilities. Implements 

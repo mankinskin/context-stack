@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#overlap` `#closure` `#structure`
 summary: Preserve the authoritative shared-token occurrence, accepted search response, boundary paths and insertion evidence through expansion materialization and nested closure. Implement one path-driven provider in context-insert, reuse scoped split/join machinery, and carry translated structural connections across publication instead of repeatedly reconstructing them from widths.
-status: 🚧 phases 1-3 and 6 implemented; phases 4-5 open
+status: 🧊 frozen for legacy (phases 1-3 and 6 implemented; phases 4-5 will not be done on the row model)
 revision: 3
 date: 2026-11-16
 supersedes: revision 2 of this plan and the overlap-bundling sections of 20260315_PLAN_COMPLEMENT_AND_C3.md
@@ -34,6 +34,18 @@ Its 6 known failures are fixed and marked
 `complex_overlap`, `infix`, `multiple_overlaps`, `nested_complements`,
 `flat_complement`, `accepted_materialization`. The list is checked by review,
 not by a test.
+
+**Frozen for legacy; only fixes to keep the legacy lane green.** No further
+phases of this plan are implemented on the row model; phases 4-5
+(affected-host completion, historical-pattern retention) are taken over by the
+positioned reader plan (`20261118_PLAN_POSITIONED_COMPOSITION_READER.md`,
+Phases 3-5: occurrence merge with seam discovery instead of row closure). The
+6 known failures above stay ignored and are not fixed here. Since the
+test-suite cutover (prep plan Step 2.7) the whole legacy lane is
+`ignore = "legacy suite"` by default; run it with
+`cargo test -p context-read --features legacy-tests` whenever legacy code is
+touched. The plan is retired (superseded) when the reader plan's Phase 6
+removes row closure.
 
 ## Test contract correction (2026-11-17)
 

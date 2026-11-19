@@ -1,10 +1,11 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition` `#overlap` `#frequency` `#streaming`
 summary: Migrate the context stack from contiguous child-pattern rows to positioned compositions. Retained vertices store maximal child occurrences with offsets; overlaps are explicit and gaps/wrappers are never vertices. Introduce positioned locations and navigation, replace row-based overlap closure with an occurrence merge plus seam discovery, accumulate input in owned positioned covers, and only then add streaming retention with retrospective host updates.
-status: 📋 ready (depends on ngrams positioned-composition oracle phases 0-3)
-revision: 2
-date: 2026-11-18
+status: 🚧 phases 0-2 done (via the preparation plan); phase 3 next
+revision: 3
+date: 2026-11-19
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
+prerequisite: 20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md (Phase −1 legacy isolation, and Phases 0-2 below)
 related: 20261116_PLAN_OVERLAP_PROVIDER_MIGRATION.md (row-based closure; superseded for the positioned backend once Phase 4 below lands)
 ---
 
@@ -18,6 +19,38 @@ consumers in `context-api`, `context-cli`, `context-http`, `context-mcp` and
 the context editor.
 **Scope:** reader-side data model and algorithms. Oracle semantics and the v3
 fixture format are owned by the ngrams plan.
+
+## Revision 3 (2026-11-19)
+
+[`20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`](20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md)
+is the prerequisite of this plan: its Step 1 ("Phase −1") fences the row model
+off in `legacy` modules (`context_<crate>::legacy`, default-on `legacy`
+feature, legacy tests opt-in via `legacy-tests`), and its Steps 2 and 4
+implement Phases 0-2 below. State after the preparation plan:
+
+- **Phase 0 ✅** (prep Step 2.4/2.5): v2/v3 fixture lanes with separate
+  manifests, `v3/scenarios.json` authoritative; new v3 scenarios
+  `repeat_abcabca`, `repeat_ababa`, `seam_bcd`, `late_retention__1/__2`,
+  `duplicate_observation`, `substring_input`; the `subdivision`/`visualization`
+  corpus is the existing `infix` scenario.
+- **Phase 1 ✅** (prep Step 2.2/2.3/2.6): `context_trace::positioned`
+  (`Composition`, `Occurrence`, `OccurrenceLocation`, `OccurrencePath`,
+  `IntervalView`, `PositionedGraph<G>`, `PositionedGraphRef =
+  Arc<RwLock<…>>`, `from_interchange`/`to_interchange`, `diff`); every v3
+  fixture round-trips. **Type deviation:** `Occurrence { offset: AtomPosition,
+  child: Token }` stores a `Token` (index + width) instead of a `VertexIndex`,
+  so a composition knows its children's widths without graph lookups.
+  `OccurrenceLocation`/`OccurrencePath` still address children by
+  `VertexIndex`.
+- **Phase 2 ✅** (prep Step 4): the three operations of §3 as separate APIs —
+  `context_search::boundary::{boundary_occurrences, prefixes, postfixes}`,
+  `PositionedGraph::occurrences_in` and `PositionedGraph::read_interval` —
+  each tested on every v3 fixture against brute-force string matching.
+- `context_read::read(&PositionedGraphRef, impl IntoIterator<Item = char>)
+  -> Option<Token>` exists as an `unimplemented!` stub; the positioned reader
+  lane (`context-read/tests/reader_behavior.rs`) is ignored until Phase 4.
+- Phase 5 now records the within-input provisional-retention rule and the
+  across-input monotonicity evidence (prep plan §0.5, Step 2.6).
 
 ---
 
@@ -84,6 +117,8 @@ deduplication.
 
 **Gate:** v3 fixtures load and validate; existing v2 tests unchanged.
 
+**Status:** ✅ done by the preparation plan, Step 2 (2026-11-19).
+
 ### Phase 1 — Positioned model in `context-trace`
 
 - Add a positioned composition vertex form beside `ChildPatterns`, with
@@ -95,6 +130,9 @@ deduplication.
 - Keep the row model untouched; the backends coexist during migration.
 
 **Gate:** v3 fixtures round-trip through the positioned graph.
+
+**Status:** ✅ done by the preparation plan, Step 2 (2026-11-19). Deviation:
+`Occurrence.child` is a `Token`, not a `VertexIndex` (see Revision 3).
 
 ### Phase 2 — Read-only navigation
 
@@ -109,6 +147,14 @@ deduplication.
   - the same occurrence reached through two paths is reported once.
 
 **Gate:** all navigation tests pass on every v3 fixture.
+
+**Status:** ✅ done by the preparation plan, Step 4 (2026-11-19):
+`context-search/src/boundary/` (boundary search with `OccurrencePath`
+evidence), `context-trace/src/positioned/enumerate.rs`
+(`occurrences_in`) and `read.rs` (`read_interval`). The tests compare every
+vertex, every position and every interval of every v3 fixture with
+brute-force string matching over the fixture's retained set, and pass
+without the `legacy` feature.
 
 ### Phase 3 — Positioned merge and seam discovery in `context-insert`
 
@@ -174,6 +220,33 @@ remain exactly reconstructible after those updates.
    cover unchanged. A change to a retained child's internal cover does not
    change the whole span it exposes to its parents, but other occurrences of
    the promoted token can still affect those parents directly.
+
+**Within-input provisional retention.** Retention is *not* monotone while an
+input is still being read. Over a growing prefix of one input the batch oracle
+gains and loses frequency-derived tokens (prep plan §0.5: 278 violations in the
+probe; `abcab` retains `ab`, `abcabc` does not; `ababa` → `ab` lost at
+`ababab`). Rule: frequency-derived tokens discovered inside an input stay
+provisional (candidate evidence, not published vertices) until the input
+completes; only completed-input boundaries are publication points. Atoms and
+the input's own root are not affected.
+
+**Across-input monotonicity evidence (empirical, not a proof).** Across
+completed inputs no retained token was lost in any probe:
+
+- prep plan §0.5 probe: 51 manifest scenarios plus 57 600 checks over
+  3-text sequences of words of width 1-4 over 2-3 letters;
+- permanent tests in `ngrams/src/tests/retention.rs`:
+  `retention_is_monotone_across_inputs_of_reader_scenarios` (every v3 reader
+  scenario, default), `retention_is_monotone_across_inputs_bounded_sweep`
+  (196 two-text corpora over `{a,b}`, width ≤ 3, default),
+  `retention_is_monotone_across_inputs_sweep` (`#[ignore]`, release:
+  55 521 transitions = 54 000 from 27 000 three-text corpora over `{a,b}`,
+  width ≤ 4, plus 1 521 two-text corpora over `{a,b,c}`, width ≤ 3), and the
+  counter-example
+  `retention_is_not_monotone_within_an_input` (`abcab` → `abcabc` loses `ab`).
+
+Phase 5 design starts from these two facts; the proof (or a larger sweep plus
+measurements of affected hosts) below is still required before cutover.
 
 **Still open:** which index or cached evidence is needed beyond lossless input
 content, and what bounds apply to retrospective discovery and affected hosts.
