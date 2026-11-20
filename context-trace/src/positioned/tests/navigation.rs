@@ -1,5 +1,5 @@
 //! `read_interval`, `occurrences_in` and the search navigation primitives
-//! (`start_at`, `prefix_child`, `parent_occurrences`, `atom_token`,
+//! (`start_at`, `end_at`, `prefix_child`, `parent_occurrences`, `atom_token`,
 //! `advance_end_path`) on every v3 fixture. Vertices are
 //! addressed through the name map; expectations come from brute-force string
 //! matching over the fixture keys.
@@ -121,6 +121,45 @@ fn start_at_is_longest_key_starting_at_position() {
             }
             for p in [width, width + 1] {
                 assert_eq!(graph.start_at(*token, p), None, "{}: {key:?} @ {p}", fixture.name);
+            }
+        }
+    }
+}
+
+#[test]
+fn end_at_is_longest_key_ending_at_position() {
+    for fixture in v3_graphs() {
+        let graph = &fixture.graph;
+        for (key, token) in &fixture.names {
+            let content = chars(key);
+            let width = content.len();
+            assert_eq!(graph.end_at(*token, 0), None);
+            assert_eq!(graph.end_at(*token, width + 1), None);
+            for e in 1..=width {
+                let context = format!("{}: {key:?} ending @ {e}", fixture.name);
+                let found = graph.end_at(*token, e);
+                let expected = fixture
+                    .names
+                    .iter()
+                    .filter(|(other, _)| *other != key && content[..e].ends_with(&chars(other)))
+                    .max_by_key(|(other, _)| other.chars().count())
+                    .map(|(_, token)| *token);
+                let Some(expected) = expected else {
+                    assert_eq!(width, 1, "{context}: composite without key at position");
+                    assert_eq!(found, None, "{context}");
+                    continue;
+                };
+                let (found, steps) = found.unwrap_or_else(|| panic!("{context}: None"));
+                assert_eq!(found, expected, "{context}");
+                let path = OccurrencePath::new(steps).expect(&context);
+                assert!(graph.contains_path(&path), "{context}");
+                assert_eq!(path.root(), token.index, "{context}");
+                assert_eq!(path.target(), expected.index, "{context}");
+                assert_eq!(
+                    path.offset() + expected.width.0,
+                    AtomPosition::from(e),
+                    "{context}"
+                );
             }
         }
     }

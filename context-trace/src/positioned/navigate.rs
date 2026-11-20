@@ -2,7 +2,9 @@
 //!
 //! Replaces the row model's "next sibling" and "prefix children": a token
 //! starting at a position is found by [`PositionedGraph::start_at`], retained
-//! prefixes by the [`PositionedGraph::prefix_child`] chain. No content is
+//! prefixes by the [`PositionedGraph::prefix_child`] chain. The largest token
+//! ending at a position ([`PositionedGraph::end_at`]) gives canonical end
+//! paths (search plan 2.4). No content is
 //! read; only compositions, parent links and the atom index are used.
 
 use super::{
@@ -79,6 +81,38 @@ impl<G: GraphKind> PositionedGraph<G> {
                 return Some((occurrence.child, steps));
             }
             p = AtomPosition(p.0 - occurrence.offset.0);
+            parent = occurrence.child.index;
+        }
+    }
+
+    /// The largest retained proper descendant of `root` ending at `e`, and
+    /// the occurrence steps from `root` down to it (mirror of
+    /// [`Self::start_at`]).
+    ///
+    /// Descends through the first occurrence ending at or after `e` until
+    /// one ends exactly at `e`. Correctness: a token ending at `e` lies in an
+    /// occurrence `O` with `O.end ≥ e`; the first such occurrence starts no
+    /// later than `O` and so contains it. `None` iff `e == 0`,
+    /// `e > width(root)`, `root` is an atom or unknown.
+    pub fn end_at(
+        &self,
+        root: impl HasVertexIndex,
+        e: impl Into<AtomPosition>,
+    ) -> Option<(Token, Vec<OccurrenceLocation>)> {
+        let mut parent = root.vertex_index();
+        let mut e = e.into();
+        let mut steps = Vec::new();
+        loop {
+            let occurrence = *self.composition_of(parent)?.ending_at(e)?;
+            steps.push(OccurrenceLocation {
+                parent,
+                offset: occurrence.offset,
+                child: occurrence.child.index,
+            });
+            if occurrence.end() == e {
+                return Some((occurrence.child, steps));
+            }
+            e = AtomPosition(e.0 - occurrence.offset.0);
             parent = occurrence.child.index;
         }
     }

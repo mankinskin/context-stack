@@ -143,6 +143,19 @@ impl Composition {
         let after = self.0.partition_point(|o| o.offset <= position);
         Some(&self.0[after - 1])
     }
+    /// The occurrence reaching `end` from furthest left: the first one with
+    /// `end() ≥ end` (binary search; ends increase strictly with offsets).
+    /// `None` iff `end == 0` or `end > width`.
+    pub fn ending_at(
+        &self,
+        end: impl Into<AtomPosition>,
+    ) -> Option<&Occurrence> {
+        let end = end.into();
+        if end.0 == 0 {
+            return None;
+        }
+        self.0.get(self.0.partition_point(|o| o.end() < end))
+    }
     /// The unique occurrence at offset 0.
     pub fn prefix(&self) -> &Occurrence {
         &self.0[0]

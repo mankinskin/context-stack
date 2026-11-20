@@ -18,6 +18,23 @@ pub mod cursor;
 pub mod error;
 pub use error::SearchError;
 
+// Positioned ancestor search (plan 2.3–2.5). Module layout and names mirror
+// `legacy`; only navigation (positions instead of rows) differs.
+pub mod compare;
+pub mod r#match;
+pub mod policy;
+pub mod search;
+pub mod state;
+
+pub use search::{
+    Find,
+    searchable::Searchable,
+};
+pub use state::response::Response;
+
+#[cfg(test)]
+mod tests;
+
 /// Row-model search, fenced off from the model-agnostic root.
 #[cfg(feature = "legacy")]
 pub mod legacy;

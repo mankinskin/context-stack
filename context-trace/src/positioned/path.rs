@@ -190,6 +190,15 @@ impl EndPath {
     ) -> Option<Self> {
         graph.start_at(root, p).map(|found| Self::new(root, found))
     }
+    /// [`PositionedGraph::end_at`] as an end path: the descent to the
+    /// largest token ending at `e`.
+    pub fn end_at<G: GraphKind>(
+        graph: &PositionedGraph<G>,
+        root: Token,
+        e: impl Into<AtomPosition>,
+    ) -> Option<Self> {
+        graph.end_at(root, e).map(|found| Self::new(root, found))
+    }
     pub fn root(&self) -> Token {
         self.root
     }
@@ -249,9 +258,10 @@ impl EndPath {
         self.leaf = prefix.child;
         true
     }
-    /// Canonical end path (2.4, positioned `simplify`): stop at the first
-    /// step whose child ends at `end` (the largest token on the path ending
-    /// at the match end). Unchanged if no step ends at `end`.
+    /// Positioned `simplify`: stop at the first step whose child ends at
+    /// `end` (the largest token on this path ending at the match end).
+    /// Unchanged if no step ends at `end`. Search results use the
+    /// path-independent [`Self::end_at`] instead (2.4).
     pub fn simplify<G: GraphKind>(
         &mut self,
         graph: &PositionedGraph<G>,
@@ -304,12 +314,25 @@ impl RangePath {
     pub fn match_end_leaf(&mut self) {
         self.span.end = self.end.leaf_end();
     }
-    /// Canonical end path for the current span end (2.4).
+    /// Trim the end path at the first token ending at the span end (2.2
+    /// positioned `simplify`; depends on the descent the path took).
     pub fn simplify<G: GraphKind>(
         &mut self,
         graph: &PositionedGraph<G>,
     ) {
         self.end.simplify(graph, self.span.end);
+    }
+    /// Canonical end path (2.4): the descent to the largest token ending at
+    /// the span end ([`EndPath::end_at`]). A function of root and span only,
+    /// so it does not depend on how the query was split into leaves (atoms
+    /// or composite tokens). Unchanged if the span is empty.
+    pub fn canonicalize_end<G: GraphKind>(
+        &mut self,
+        graph: &PositionedGraph<G>,
+    ) {
+        if let Some(end) = EndPath::end_at(graph, self.root, self.span.end) {
+            self.end = end;
+        }
     }
 }
 

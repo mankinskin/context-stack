@@ -60,7 +60,7 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
                     .map(|(offset, child)| Occurrence::new(*offset, tokens[child.as_str()]))
                     .collect();
                 graph
-                    .insert(occurrences)
+                    .insert_composition(occurrences)
                     .map_err(|error| format!("{content:?}: {error}"))?
             };
             tokens.insert(content, token);

@@ -11,7 +11,8 @@
 //! - occurrence enumeration in an interval:
 //!   [`PositionedGraph::occurrences_in`] (`enumerate.rs`);
 //! - local navigation for search: [`PositionedGraph::start_at`],
-//!   [`PositionedGraph::prefix_child`], [`PositionedGraph::parent_occurrences`],
+//!   [`PositionedGraph::end_at`], [`PositionedGraph::prefix_child`],
+//!   [`PositionedGraph::parent_occurrences`],
 //!   [`PositionedGraph::atom_token`], [`PositionedGraph::advance_end_path`]
 //!   (`navigate.rs`);
 //! - search paths ([`StartPath`], [`EndPath`], [`RangePath`], [`QueryPath`],

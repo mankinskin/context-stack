@@ -3,12 +3,15 @@
 //!
 //! Promoted from `legacy::cursor` (plan 2.0, Decision 7.3). Only
 //! row-independent parts live here; row-specific impls (paths, `ChildCursor`,
-//! `StateAdvance`) stay in `legacy::cursor`.
+//! `StateAdvance`) stay in `legacy::cursor`. The positioned cursors
+//! ([`QueryCursor`], [`ChildCursor`]) live in `query.rs` and `child.rs`.
 
 use context_trace::AtomPosition;
 use std::marker::PhantomData;
 
 pub mod checkpointed;
+pub mod child;
+pub mod query;
 pub mod state_machine;
 
 pub use checkpointed::{
@@ -18,6 +21,8 @@ pub use checkpointed::{
     HasCandidate,
     HasCheckpoint,
 };
+pub use child::ChildCursor;
+pub use query::QueryCursor;
 pub use state_machine::CursorStateMachine;
 
 mod sealed {

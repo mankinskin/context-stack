@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-search` `#context-trace` `#positioned-composition` `#search`
 summary: Complete work package for positioned search (roadmap step 2; all planning for this step lives here). Explains the legacy row-based search, the local navigation changes required by child lists (`start_at`, `prefix_child`, offset locations), and the ordered implementation steps in context-trace and context-search, validated on v3 oracle fixtures.
-status: 📋 ready (decisions 1–7 recorded 2026-11-20)
+status: 🚧 in progress (2.0–2.5 done 2026-11-20; 2.6 open)
 date: 2026-11-20
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (step 2)
 ---
@@ -454,30 +454,30 @@ traceable/{mod, role, root}}`. *Deviations and precisions:*
 
 Mirror legacy files one to one; drop visualization events.
 
-- [ ] `policy.rs`, `search/context.rs`: `SearchKind`,
+- [x] `policy.rs`, `search/context.rs`: `SearchKind`,
   `DirectedTraversalPolicy::{gen_parent_batch, next_batch}` over
   `parent_occurrences`; `AncestorPolicy` and `AncestorSearchTraversal`
   only. **Decision 7.2:** no `find_parent`, `ParentPolicy` or
   `ParentSearchTraversal` (legacy uses them only in tests).
-- [ ] `state/start.rs`, `search/searchable.rs`: `StartCtx`; `Searchable`
+- [x] `state/start.rs`, `search/searchable.rs`: `StartCtx`; `Searchable`
   for `Chars` (atoms through `atom_token`, unknown atom → `UnknownAtom`),
   `&[Token]`, `Vec<Token>` (composite tokens allowed, Decision 6 b), and the
   positioned query cursor (continuation).
-- [ ] `match/mod.rs`, `match/iterator.rs`: `SearchQueue` (**Decision 5 a:**
+- [x] `match/mod.rs`, `match/iterator.rs`: `SearchQueue` (**Decision 5 a:**
   min-heap on width only, as legacy; seeds in a defined order from
   `parent_occurrences`), `SearchNode`, `NodeConsumer`,
   `SearchIterator::pop_and_process_one` (first match clears the queue).
   A `test-api` hook selects an explicit ascending or descending
   `(index, offset)` tie order for the tie-order test (2.6).
-- [ ] `compare/parent.rs`, `compare/state/*`, `compare/iterator.rs`:
+- [x] `compare/parent.rs`, `compare/state/*`, `compare/iterator.rs`:
   `ParentCompareState::advance_state`, `CompareState<Q, I>`,
   `PathPairMode::{GraphMajor, QueryMajor, BothMajor}`,
   `compare_leaf_tokens` with `prefix_child` and one state per
   decomposition (Decision 1 b), `advance_query_cursor`,
   `advance_index_cursor`, `CompareIterator`.
-- [ ] `match/root_cursor/*`: `RootCursor::advance_to_next_match` with the
+- [x] `match/root_cursor/*`: `RootCursor::advance_to_next_match` with the
   three ends; `get_parent_batch` raises the matched span.
-- [ ] `state/matched.rs`, `state/response.rs`, `search/mod.rs`:
+- [x] `state/matched.rs`, `state/response.rs`, `search/mod.rs`:
   `MatchResult { path: PathCoverage, cursor: CheckpointedCursor }`,
   `Response { cache, end }` with the accessors consumers use today
   (`root_token`, `query_exhausted`, `is_entire_root`, `query_cursor`,
@@ -485,8 +485,101 @@ Mirror legacy files one to one; drop visualization events.
   `Find::find_ancestor` for `PositionedGraphRef` (one read guard per search).
   Positioned responses carry no visualization events (no `events`,
   `transitions()`).
-- [ ] `test-api` counters: equal-width candidates that also match at the
+- [x] `test-api` counters: equal-width candidates that also match at the
   first comparison (uniqueness), positions compared per search (reuse).
+
+*Done (2026-11-20), `context-search/src/{policy.rs, search/{mod, context,
+searchable, stats}.rs, state/{mod, start, matched, response}.rs,
+match/{mod, iterator, root_cursor/{mod, core, advance}}.rs,
+compare/{mod, parent, iterator, state/{mod, core, decomposition,
+transitions}}.rs}`, positioned cursors `cursor/{query, child}.rs`; tests
+`context-search/src/tests/{search, sweep, util}.rs` (15 tests: 12 named,
+3 sweeps).* Public API: `Find::find_ancestor` (associated `Kind`) for
+`PositionedGraph<G>` and `PositionedGraphRef<G>` (one read guard),
+`Searchable<G, K = AncestorSearchTraversal>`, `SearchState`, `Response`,
+`state::matched::{MatchResult, PathCoverage, MatchedRange, EntireRootEnd,
+CheckpointedCursor}`, `cursor::{QueryCursor, ChildCursor}`,
+`r#match::{TieOrder, with_tie_order}` and `search::stats::{SearchStats,
+last_search_stats}` (`test-api`). *Deviations and precisions:*
+
+- **Layout.** As legacy, except: `state/end/*` is folded into
+  `state/matched.rs` (one `MatchedRange` carries the legacy
+  `RangeEnd`/`PrefixEnd`/`PostfixEnd` fields: `path: RangePath`,
+  `entry_pos`, `exit_pos`, `target`, `end_pos`); `search/stats.rs` holds
+  the `test-api` counters; no `container/`, `logging/`, `events`, `CompareInfo`
+  or `BfsStepResult` payloads (visualization only). `legacy/mod.rs` gained
+  two `#[allow(hidden_glob_reexports)]` (its `compare`/`match` shadow the
+  new root modules, as `cursor` already did).
+- **Generics.** `SearchKind { type Policy }`; states carry `&'g
+  PositionedGraph<G>` instead of a `Trav`. `Searchable` is generic over the
+  graph kind (the `Chars` impl needs `G::Atom = char`).
+- **Queue.** Min-heap key `(width, tie, insertion index)`; `tie` is constant
+  for the default `TieOrder::Insertion` (FIFO among equal widths, seeds in
+  `parent_occurrences` order) and `(root index, root entry offset)`
+  ascending/descending under `with_tie_order` (thread-local, `test-api`).
+  Decompositions go back to the heap as `ChildCandidate`s, as legacy.
+- **Compare.** `PathPairMode::{GraphMajor, QueryMajor, BothMajor}`; each
+  decomposition mutates the one state (`EndPath::push_prefix`,
+  `QueryCursor::prefix_child`). `CompareEndResult::Mismatch` and
+  `QueryAdvanceResult::Exhausted` carry no state (legacy used the payloads
+  only for logging). `target` = down key of the graph leaf at the
+  query leaf's position (legacy used the cursor end position).
+- **Query cursor.** `QueryCursor<S> = PathCursor<QueryPath, S>`;
+  `atom_position` = query position at the leaf end, kept in sync. The
+  `ChildCursor` checkpoint transition (`mark_match`) extends the span over
+  the matched leaf (`RangePath::match_end_leaf`).
+- **Errors.** `SingleIndex(Token)` (first query token is the last one;
+  also for a single composite token), `UnknownAtom` (Chars),
+  `EmptyPatterns` (empty query, or a continuation at the query end). No
+  match beyond `q0` → `PathCoverage::EntireRoot(EntireRootEnd { root: q0,
+  query_start, path: None })`.
+- **Result paths.** Start path: the climbed chain (2.4); end path:
+  canonical `end_at` descent (2.4 deviation below); `exit_pos` recomputed
+  for it.
+- **Response conventions (2.2 findings).** All positions are absolute query
+  positions, so chained searches share one coordinate system.
+  `Response::query_start()` / `PathCoverage::query_start()` is the query
+  position of the match start (`span.start`); `Response::anchor()` maps root
+  offsets ↔ query positions; `MatchedRange::query_start() = end_pos −
+  |span|` and is debug-asserted equal to the child state's anchor. Up keys
+  carry the query position at the token end (root key: `entry_pos`), down
+  keys the position at the token start clamped to the match start; the true
+  inner offset of any traced token is `span.start` + sum of edge labels. On
+  final responses no end-path token starts before the match (asserted on
+  every sweep query: the root is minimal, so such a token would contain the
+  match), i.e. clamping never applies to a final `Response`. Tracing per
+  coverage as legacy: `Range` both paths, `Postfix` start path only,
+  `Prefix` end path only, `EntireRoot` nothing; the cache also holds the
+  (edge-less) entry of the first query token (`TraceCache::new`).
+- **Accessors.** `root_token`, `path`, `query_exhausted`, `is_entire_root`,
+  `query_cursor` (**the checkpoint**, i.e. the continuation point; legacy
+  returned the advanced candidate, here `end.cursor()`), `cursor_position`,
+  `checkpoint_position`, `query_start`, `span`, `anchor`,
+  `entire_root_start_path` (top-down start path; empty for an unmatched
+  `q0`), `expect_complete`.
+- **Counters** (`search::stats`, thread-local, reset per search):
+  `equal_width_candidates` (queued candidates of the matched root's width,
+  drained and probed when a root matches; the queue is cleared anyway),
+  `equal_width_first_matches` (those also matching at their first
+  comparison; must be 0), `compared_positions` (query leaf position of
+  every comparison).
+- **Tests.** Named: `repeat_abcabca` (worked example incl. exact cache
+  edges), `repeat_abcabca_postfix` (`cabcab`, up-edge keys),
+  `repeat_abcabca_composite_query` (`[abca, b]`), `repeat_ababa`,
+  `seam_bcd` (`bcd`, `abcd`), `repeat_ababab`, `repeating_known`,
+  `late_retention__2`, no parent match (`ivi` → `EntireRoot(i)`), errors,
+  `PositionedGraphRef`, `continuation` (cache keys shifted by the
+  checkpoint). Every search in them is checked against the brute-force
+  expectation (root, span, end, exhaustion, coverage, `contains_path`,
+  canonical/maximal paths, no clamping, cache edges are parent links,
+  uniqueness counter 0). Sweep: every substring (≥ 2 atoms) of every corpus
+  text and each extended by every atom, 6,228 queries: all match the
+  expectation, ascending and descending tie orders give identical
+  responses, 1,465 equal-width candidates probed, 0 match. Chained searches
+  over all pairs of corpus texts (381 continuations) equal fresh searches
+  of the rest (shifted) with identical compared positions; composite
+  queries `[t1, t2]` over all token pairs (3,962 searches, 104 continuations
+  starting inside a query token) equal the atom queries.
 
 ### 2.4 Canonical paths
 
@@ -512,12 +605,44 @@ needs paths down to where a match boundary falls inside a token.
 `positioned/tests/trace.rs` checks both on every fixture. Applying them to
 search results is part of 2.3 and re-checked by 2.6.
 
+*Remaining item done (2026-11-20, with 2.3), deviation for the end path:*
+the end path of a result is the descent to the **largest token ending at
+the span end**, `PositionedGraph::end_at(root, span.end)` (new primitive,
+mirror of `start_at`: first occurrence with `end ≥ e`, recurse until one
+ends at `e`; tested against the longest fixture key ending at each
+position), via `EndPath::end_at` / `RangePath::canonicalize_end`. The
+trimmed comparison path (`simplify`) depended on the leaves the comparison
+went through: on `multiple_overlaps`, `[ab, cdeab]` stopped at `ab@5` and
+the atom query at `b@6`, while `cdeab@2` is the largest token ending at 7.
+`end_at` is a function of root and span only, so atom and composite
+queries agree. The climbed start path already equals `start_at(root,
+span.start)` on every sweep query (asserted), so it is kept as specified.
+Both last tokens lie inside the match (minimal root). `EndPath::simplify`
+stays for the 2.2 trace tests.
+
 ### 2.5 Reuse
 
-- [ ] `Response` is the only hand-off; `Searchable` for the `end` cursor
+- [x] `Response` is the only hand-off; `Searchable` for the `end` cursor
   continues at its checkpoint without re-reading earlier positions.
-- [ ] `PositionedGraph::insert` stays `pub(crate)`/`test-api`; public
+- [x] `PositionedGraph::insert` stays `pub(crate)`/`test-api`; public
   composite insertion goes through a `Response` (step 3).
+
+*Done (2026-11-20):* `Searchable` for `QueryCursor<Matched>` (and `&`,
+`&CheckpointedCursor`, `&MatchResult`, `&Response`) continues with the query
+token starting at the checkpoint (`QueryPath::advance`, inside a composite
+query token if needed) at its absolute query position; no earlier position
+is compared (`compared_positions`, tested). `PositionedGraph::insert` is
+now `test-api` only; the crate uses `insert_composition` (`pub(crate)`,
+same checks; `from_interchange` uses it).
+
+**Notes for 2.6.** (1) "Cache entries for every vertex on both paths" does
+not hold for `Prefix` (start path untraced) and `Postfix` (end path
+untraced), mirroring legacy; check per coverage. (2) Composite queries
+equal atom queries in root, span, coverage and paths, except that an
+unmatched composite `q0` gives `EntireRoot` without paths where the atom
+query matches inside `q0` (with paths), and the start-token cache entry
+differs. (3) The 2.6 canonical-path spec holds with `end_at` (the end
+token ends at `o + k`, starts at or after `o`).
 
 ### 2.6 Validation on v3 fixtures (`context-search/src/tests/`)
 

@@ -301,12 +301,25 @@ impl<G: GraphKind> PositionedGraph<G> {
         Token::new(index, 1)
     }
 
+    /// Insert a composite from its complete composition and link its children
+    /// (`test-api` only; same checks as the crate-internal
+    /// `insert_composition`).
+    #[cfg(any(test, feature = "test-api"))]
+    pub fn insert(
+        &mut self,
+        occurrences: Vec<Occurrence>,
+    ) -> Result<Token, PositionedError> {
+        self.insert_composition(occurrences)
+    }
+
     /// Insert a composite from its complete composition and link its children.
     ///
     /// Rejects incomplete or malformed compositions, unknown children and
     /// children whose recorded width disagrees with the vertex. Checks
-    /// structure only; content is never expanded.
-    pub fn insert(
+    /// structure only; content is never expanded. Crate-internal (search plan
+    /// 2.5): public composite insertion goes through a search `Response`
+    /// (roadmap step 3); tests use [`Self::insert`] (`test-api`).
+    pub(crate) fn insert_composition(
         &mut self,
         occurrences: Vec<Occurrence>,
     ) -> Result<Token, PositionedError> {
