@@ -5,7 +5,10 @@
 //! disk so model and navigation tests need no dependency on `ngrams` or
 //! `legacy`.
 
-use std::path::PathBuf;
+use std::{
+    collections::BTreeMap,
+    path::PathBuf,
+};
 
 use serde::Deserialize;
 
@@ -13,7 +16,10 @@ use super::{
     PositionedGraph,
     interchange::PositionedGraphSnapshot,
 };
-use crate::BaseGraphKind;
+use crate::{
+    BaseGraphKind,
+    Token,
+};
 
 #[derive(Deserialize)]
 struct Scenario {
@@ -49,15 +55,29 @@ pub fn v3_fixtures() -> Vec<(String, PositionedGraphSnapshot)> {
         .collect()
 }
 
-/// Every manifest fixture as `(name, graph)`, converted with
-/// [`PositionedGraph::from_interchange`].
-pub fn v3_graphs() -> Vec<(String, PositionedGraph<BaseGraphKind>)> {
+/// A v3 fixture converted to a [`PositionedGraph`].
+pub struct V3Graph {
+    pub name: String,
+    pub corpus: Vec<String>,
+    pub graph: PositionedGraph<BaseGraphKind>,
+    /// Fixture vertex key → token; the only way tests address vertices.
+    pub names: BTreeMap<String, Token>,
+}
+
+/// Every manifest fixture, converted with
+/// [`PositionedGraph::from_interchange_named`].
+pub fn v3_graphs() -> Vec<V3Graph> {
     v3_fixtures()
         .into_iter()
         .map(|(name, fixture)| {
-            let graph = PositionedGraph::from_interchange(&fixture.graph)
+            let (graph, names) = PositionedGraph::from_interchange_named(&fixture.graph)
                 .unwrap_or_else(|error| panic!("{name}: {error}"));
-            (name, graph)
+            V3Graph {
+                name,
+                corpus: fixture.corpus,
+                graph,
+                names,
+            }
         })
         .collect()
 }

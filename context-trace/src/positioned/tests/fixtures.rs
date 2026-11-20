@@ -23,3 +23,22 @@ fn v3_fixtures_round_trip_through_positioned_graph() {
         assert_eq!(actual, fixture.graph, "{name}");
     }
 }
+
+#[test]
+fn name_map_addresses_every_fixture_vertex() {
+    for fixture in super::super::fixtures::v3_graphs() {
+        let name = &fixture.name;
+        assert_eq!(fixture.names.len(), fixture.graph.vertex_count(), "{name}");
+        for (key, token) in &fixture.names {
+            assert_eq!(token.width.0, key.chars().count(), "{name}: {key}");
+            assert_eq!(
+                fixture.graph.vertex(token.index).map(|v| v.token()),
+                Some(*token),
+                "{name}: {key}"
+            );
+        }
+        for text in &fixture.corpus {
+            assert!(fixture.names.contains_key(text), "{name}: {text}");
+        }
+    }
+}

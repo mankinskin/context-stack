@@ -22,6 +22,29 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
     /// Build a graph from structurally valid interchange data, inserting
     /// vertices bottom-up by width.
     pub fn from_interchange(data: &PositionedGraphData) -> Result<Self, String> {
+        Self::build_from_interchange(data).map(|(graph, _)| graph)
+    }
+
+    /// [`Self::from_interchange`] plus the fixture key → token map.
+    ///
+    /// Tests translate string expectations into tokens only through this
+    /// map; it is returned to the caller and never stored in the graph.
+    #[cfg(any(test, feature = "test-api"))]
+    pub fn from_interchange_named(
+        data: &PositionedGraphData,
+    ) -> Result<(Self, BTreeMap<String, Token>), String> {
+        Self::build_from_interchange(data).map(|(graph, tokens)| {
+            let names = tokens
+                .into_iter()
+                .map(|(content, token)| (content.to_string(), token))
+                .collect();
+            (graph, names)
+        })
+    }
+
+    fn build_from_interchange(
+        data: &PositionedGraphData,
+    ) -> Result<(Self, BTreeMap<&str, Token>), String> {
         data.validate()?;
         let mut order: Vec<(&String, &PositionedCover)> = data.vertices.iter().collect();
         order.sort_by_key(|(content, _)| (content.chars().count(), *content));
@@ -42,7 +65,7 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
             };
             tokens.insert(content, token);
         }
-        Ok(graph)
+        Ok((graph, tokens))
     }
 
     /// ID-free content-keyed covers of every vertex.
