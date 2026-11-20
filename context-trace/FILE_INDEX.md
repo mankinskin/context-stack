@@ -17,11 +17,15 @@ There is no root `pub use legacy::*`; `legacy` mirrors the root items
 - **`positioned/` (root, no legacy dependency):** `interchange.rs` (v3
   format + structural validator), `composition.rs` (`Occurrence`,
   `Composition`), `location.rs` (`OccurrenceLocation`, `OccurrencePath`,
-  `IntervalView`), `graph.rs` (`PositionedGraph`, `PositionedGraphRef`),
-  `convert.rs`, `diff.rs`, navigation `read.rs`
-  (`PositionedGraph::read_interval`) and `enumerate.rs`
-  (`PositionedGraph::occurrences_in`), `fixtures.rs` (`test-api` v3 fixture
-  loader), `tests/` (round trip, model rules, `read`, `enumerate`).
+  `IntervalView`), `graph.rs` (`PositionedGraph`, `PositionedGraphRef`,
+  validation, debug-only labels and `PositionedLabels` name resolver),
+  `convert.rs` (`from_interchange`, `test-api` `from_interchange_named` name
+  map), `diff.rs`, navigation `read.rs` (`PositionedGraph::read_interval`)
+  and `enumerate.rs` (`PositionedGraph::occurrences_in`), `fixtures.rs`
+  (`test-api` v3 fixture loader, `V3Graph`), `tests/` (`fixtures.rs` round
+  trip, name map, labels; `model.rs` model and validation rules;
+  `navigation.rs` `read_interval`/`occurrences_in` on v3 fixtures;
+  `guard.rs` no content-keyed field; `diff.rs`, `interchange.rs`).
 - **`legacy/`:** `direction/pattern.rs` (`PatternDirection`), `graph/`
   (`Hypergraph`, `HypergraphRef`, getters, insert, snapshot, validation,
   search_path, visualization, test_graph, child_strings), `graph/vertex/{data,

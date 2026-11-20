@@ -39,20 +39,40 @@ structural validator, re-exported by `ngrams::output`), `composition.rs`
 (`Occurrence`, `Composition`), `location.rs` (`OccurrenceLocation`,
 `OccurrencePath`, `IntervalView`), `graph.rs` (`PositionedGraph`,
 `PositionedVertex`, `PositionedGraphRef = Arc<RwLock<_>>`), `convert.rs`
-(`from_interchange`/`to_interchange`), `diff.rs` (`diff` → `GraphDiff`),
+(`from_interchange`/`to_interchange`; `test-api` `from_interchange_named`
+also returns the fixture key → token name map), `diff.rs` (`diff` → `GraphDiff`),
 read-only navigation `read.rs` (`PositionedGraph::read_interval`: content of an
 `IntervalView`, each position once) and `enumerate.rs`
 (`PositionedGraph::occurrences_in`: every retained occurrence inside an
 `IntervalView`, deduplicated by `(token, offset)`), `fixtures.rs` (`test-api`:
-`v3_fixtures`/`v3_graphs` loader, shared with context-search). Tests
-round-trip every v3 fixture of `context-read/tests/fixtures/v3`; the navigation
-APIs have no tests yet (their earlier tests looked vertices up by content and
-were removed). Boundary search lives in `context_search::boundary`.
+`v3_fixtures` and `v3_graphs` → `V3Graph { name, corpus, graph, names }`,
+shared with context-search). Tests round-trip and validate every v3 fixture
+of `context-read/tests/fixtures/v3` and check `read_interval` and
+`occurrences_in` on every fixture vertex and interval (`tests/navigation.rs`).
+Boundary search lives in `context_search::boundary`.
 
-**Model rules (reader plan rev 4):** no index stores expanded content (the
-only value-keyed index is atom value → atom vertex; composites are reached
-structurally, by search); expanded content is stored only in debug builds;
-search states are reused for insertion and adjacent searches.
+**Binding rules** (`context-read/agents/plans/20261120_PLAN_POSITIONED_READER_OPEN_WORK.md`):
+
+- **No content-keyed index.** The only value-keyed index is atom value →
+  atom vertex (`PositionedGraph::atoms`); composites are reached
+  structurally, by search through parent links and compositions. Enforced by
+  `tests/guard.rs`: the fields of `PositionedGraph` and `PositionedVertex`
+  (read from `graph.rs` source) must equal a structural allowlist, and only
+  `#[cfg(debug_assertions)]` fields may hold content. A new field fails the
+  test and must be reviewed against these rules.
+- **Expanded content is debug-only.** `PositionedVertex::label` (built from
+  the children's labels at insertion; `PositionedGraph::name_resolver` /
+  `register_name_resolver` install it as `TokenNameResolver`) exists only
+  under `debug_assertions`; release `Display` shows index and width only.
+  `read_interval` is for export, tests, diagnostics and debug/test validation,
+  never for algorithms.
+- **Validation.** `validate()` always checks the structural rules and
+  reciprocal parent links. Under `debug_assertions` or `test-api` it also
+  checks one vertex per content (`DuplicateContent`) and overlap agreement
+  (`OverlapMismatch`) by traversal into a temporary set dropped afterwards.
+- **Expectations come from the oracle.** Tests address vertices only through
+  the `test-api` name map and derive expectations from v3 fixture strings,
+  never from graph content lookups or reader output.
 
 Foundational component of the context framework providing core graph 
 structures, path operations, and tracing capabilities. Implements 

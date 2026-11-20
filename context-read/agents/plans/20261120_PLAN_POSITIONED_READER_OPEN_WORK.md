@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition`
 summary: Open work for the positioned-composition reader. Binding model rules, then the ordered steps: content-free model leftovers, positioned search (legacy architecture with positional sibling navigation) validated on v3 oracle fixtures, positioned insertion with seam discovery, fixed-retention reader, streaming retention, cutover.
-status: 📋 ready; next step 2 (positioned search)
+status: 📋 step 1 done; next step 2 (positioned search)
 date: 2026-11-20
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
 ---
@@ -59,21 +59,21 @@ strings seen so far.
 
 ## Step 1 — Content-free model leftovers (`context-trace`)
 
-- [ ] **Name map for tests.** `from_interchange` also returns a
-  `test-api` name map `BTreeMap<String, Token>` (fixture key → token).
+- [x] **Name map for tests.** `from_interchange_named` (`test-api`) also
+  returns the name map `BTreeMap<String, Token>` (fixture key → token).
   Tests translate string expectations into tokens only through it.
-- [ ] **Debug labels.** `#[cfg(debug_assertions)] label` on
+- [x] **Debug labels.** `#[cfg(debug_assertions)] label` on
   `PositionedVertex`, built from the children's labels at insertion; the
   graph registers as `TokenNameResolver` in debug builds. Release `Display`
   shows index and width only.
-- [ ] **Validation.** `validate()` checks structural rules and reciprocal
+- [x] **Validation.** `validate()` checks structural rules and reciprocal
   links always. One-vertex-per-content and overlap agreement are checked
   only under `debug_assertions` or `test-api`, by traversal into a temporary
   set dropped after validation.
-- [ ] **Navigation tests.** Re-add tests for `read_interval`,
+- [x] **Navigation tests.** Re-add tests for `read_interval`,
   `occurrences_in` and boundary search, addressing vertices through the
   name map, with expectations from fixture strings.
-- [ ] **Guard.** A test or review rule that the positioned graph has no
+- [x] **Guard.** A test or review rule that the positioned graph has no
   content-keyed field; document the binding rules in the context-trace
   README.
 
