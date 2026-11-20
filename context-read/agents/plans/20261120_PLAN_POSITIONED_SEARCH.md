@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-search` `#context-trace` `#positioned-composition` `#search`
 summary: Complete work package for positioned search (roadmap step 2; all planning for this step lives here). Explains the legacy row-based search, the local navigation changes required by child lists (`start_at`, `prefix_child`, offset locations), and the ordered implementation steps in context-trace and context-search, validated on v3 oracle fixtures.
-status: 🚧 in progress (2.0–2.5 done 2026-11-20; 2.6 open)
+status: ✅ done (2.0–2.6 done 2026-11-20; gate satisfied)
 date: 2026-11-20
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (step 2)
 ---
@@ -494,7 +494,7 @@ match/{mod, iterator, root_cursor/{mod, core, advance}}.rs,
 compare/{mod, parent, iterator, state/{mod, core, decomposition,
 transitions}}.rs}`, positioned cursors `cursor/{query, child}.rs`; tests
 `context-search/src/tests/{search, sweep, util}.rs` (15 tests: 12 named,
-3 sweeps).* Public API: `Find::find_ancestor` (associated `Kind`) for
+3 sweeps; `sweep.rs` was replaced by the 2.6 suite).* Public API: `Find::find_ancestor` (associated `Kind`) for
 `PositionedGraph<G>` and `PositionedGraphRef<G>` (one read guard),
 `Searchable<G, K = AncestorSearchTraversal>`, `SearchState`, `Response`,
 `state::matched::{MatchResult, PathCoverage, MatchedRange, EntireRootEnd,
@@ -641,24 +641,25 @@ untraced), mirroring legacy; check per coverage. (2) Composite queries
 equal atom queries in root, span, coverage and paths, except that an
 unmatched composite `q0` gives `EntireRoot` without paths where the atom
 query matches inside `q0` (with paths), and the start-token cache entry
-differs. (3) The 2.6 canonical-path spec holds with `end_at` (the end
-token ends at `o + k`, starts at or after `o`).
+differs (*resolved in 2.6*: an unmatched composite `q0` now carries the
+atom query's canonical paths). (3) The 2.6 canonical-path spec holds with
+`end_at` (the end token ends at `o + k`, starts at or after `o`).
 
 ### 2.6 Validation on v3 fixtures (`context-search/src/tests/`)
 
 Graphs from `context_trace::positioned::fixtures::v3_graphs()`, vertices
 addressed only through the name map.
 
-- **Expectation for `q`:** `k` = longest prefix of `q` occurring in a corpus
+- [x] **Expectation for `q`:** `k` = longest prefix of `q` occurring in a corpus
   text; `root` = minimal-width fixture key containing `q[..k]`, at offset
   `o`. Assert `(root, o)` is unique; a failure is an oracle/model issue.
-- **Queries:** every substring of every corpus text; each substring
+- [x] **Queries:** every substring of every corpus text; each substring
   extended by every alphabet atom; 300 seeded random strings.
-- **Per query:** `end.root == names[root]`, span `[o, o + k)`; coverage as
+- [x] **Per query:** `end.root == names[root]`, span `[o, o + k)`; coverage as
   in 2.2; end reason (exhausted iff `k == |q|`); both paths pass
   `contains_path`; diagnostic `read_interval(root, o..o + k) == q[..k]`;
   cache entries for every vertex on both paths; up edges agree with parent links.
-- **Canonical paths** (Decision 3; replaces the earlier "start path ends at
+- [x] **Canonical paths** (Decision 3; replaces the earlier "start path ends at
   the atom `q[0]`" expectation, which contradicted the canonical rule):
   - the start path's last token `S` starts at `o` and ends at or before
     `o + k`; following `prefix_child` from `S` reaches the atom at `o`;
@@ -668,21 +669,79 @@ addressed only through the name map.
   - trimming is maximal: no intermediate token on the start path starts at
     `o` and ends within the match, and no intermediate token on the end path
     ends at `o + k` and starts within the match.
-- **Uniqueness counter** is 0 on every fixture.
-- **Tie-order independence** (Decision 5): every query run with ascending
+- [x] **Uniqueness counter** is 0 on every fixture.
+- [x] **Tie-order independence** (Decision 5): every query run with ascending
   and with descending `(index, offset)` tie order gives identical
   `Response`s, paths and trace caches included.
-- **Composite queries** (Decision 6): query sequences built from fixture
+- [x] **Composite queries** (Decision 6): query sequences built from fixture
   tokens via the name map (each corpus text split into covering fixture
   tokens, plus mixed atom/token sequences) give the same match root, span,
   coverage and paths as the equivalent atom query.
-- **Named cases** (mirroring `legacy/tests/search/ancestor.rs`):
+- [x] **Named cases** (mirroring `legacy/tests/search/ancestor.rs`):
   `repeat_abcabca`, `repeat_ababa`, `seam_bcd` (`bcd`, `abcd`),
   `repeat_ababab`, `repeating_known` (`xyyxy`), `late_retention__2`;
   errors `SingleIndex` and `UnknownAtom`; no parent match → `EntireRoot` of
   `q0`.
-- **Continuation:** chained searches from each `end` checkpoint over every
+- [x] **Continuation:** chained searches from each `end` checkpoint over every
   corpus text equal fresh searches at the same positions.
+
+*Done (2026-11-20), `context-search/src/tests/{validate, exhaustive,
+search, util}.rs` (replaces the 2.3 smoke sweep `sweep.rs`).*
+
+- **`validate.rs`**: one check per response, expectations only from the
+  fixture strings (brute force over the name-map keys): root, span `[o,
+  o + k)`, query start, match end, end reason, coverage from `o`, `k` and
+  the root string, `read_interval(root, o..o + k) == q[..k]`, both paths
+  `contains_path`; start token = largest fixture key narrower than the root
+  occurring at `o` (ends within the match; its `prefix_child` chain stays
+  on keys at `o` and reaches the atom at `o`), end token = largest key
+  ending at `o + k` (starts at or after `o`; its last-occurrence chain
+  reaches the atom at `o + k − 1`), maximal trimming and no clamping on
+  both paths; the trace cache holds **exactly** the expected edges with
+  brute-force keys (up: query position at the token end, root at the
+  entry end; down: at the token start, root at the exit start), entries for
+  every traced vertex and at most one edge-less extra entry (the first
+  query token); up edges are parent links, down edges occurrences. Paths
+  are absent only for an unmatched atom `q0`.
+- **Tracing per coverage, checked against legacy:** legacy
+  `Traceable for &PathCoverage` traces `Range` (`RangeCommand`: start and
+  end sub paths), `Prefix` (`PrefixCommand`: root exit and end sub path
+  only), `Postfix` (`PostfixCommand`: start sub path and root entry only),
+  `EntireRoot` nothing. The positioned trace matches this; the validator
+  asserts it per coverage.
+- **`exhaustive.rs`** (58 fixtures; debug 3.3 s, release 0.4 s):
+  `atom_queries_match_brute_force`: 1,246 substrings (length-1 substrings
+  assert `SingleIndex`), 7,283 extended by every alphabet atom, 17,400
+  random (300 per fixture, SplitMix64 with a fixed seed, no new
+  dependency); every query also under ascending and descending tie order
+  (identical `Response`s incl. caches); uniqueness counter 0 per fixture
+  (4,592 equal-width candidates probed). `composite_queries_equal_atom_
+  queries`: 480 covering splits of corpus texts (every key at every
+  position, greedy longest keys around it), 1,488 mixed atom/token
+  sequences, 8,836 of both extended by every atom, 3,936 key pairs;
+  chained to the query end (14,475 searches, 828 continuations inside a
+  query token, 2,284 unmatched composite first tokens): `PathCoverage`
+  (root, span, coverage, paths, positions), match end and cache edges equal
+  the atom query, each composite response validated. `chained_searches_
+  equal_fresh_searches`: every corpus text and every concatenation of two
+  (514 texts, 381 continuations): validated, equal paths and coverage,
+  cache edges equal after shifting by the checkpoint, compared positions
+  all after the checkpoint and equal to the fresh search's (shifted).
+- **Named** (`search.rs`, now validated by `validate`): the 2.3 cases plus
+  `unmatched_composite_first_token_has_atom_query_paths`.
+- **Finding, fixed (implementation):** a composite first query token with
+  no match beyond it returned `EntireRoot` without paths, while the atom
+  query matching the whole token has paths (Note 2 of 2.5).
+  Not inherent: both canonical paths are functions of root and span
+  (2.4), so `PathCoverage::entire_token` now builds them for a composite
+  token: start path `[(T, 0, prefix_child(T))]` (= `start_at(T, 0)`, which
+  is what the climbed chain gives the atom query) and end path
+  `end_at(T, |T|)`, with the same query positions. Still `EntireRoot` of
+  `q0`, still untraced (legacy traces nothing for `EntireRoot`); an atom
+  `q0` keeps `path: None`. The only remaining difference is the edge-less
+  start-token cache entry (`TraceCache::new(q0)`), inherent to the query.
+- **No oracle/model issues:** every expectation had a unique minimal root
+  and offset; no other implementation bug was found.
 
 ## Gate
 

@@ -110,15 +110,15 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
         for item in self.by_ref() {
             best_match = Some(item);
         }
+        let graph = self.graph();
         let end = best_match.unwrap_or_else(|| {
             // No parent match: the first query token alone.
             let cursor = self.query.clone();
             MatchResult::new(
-                PathCoverage::entire_token(cursor.path().leaf(), cursor.path().position()),
+                PathCoverage::entire_token(graph, cursor.path().leaf(), cursor.path().position()),
                 CheckpointedCursor::AtCheckpoint(Checkpointed::new(cursor)),
             )
         });
-        let graph = self.graph();
         let cache = std::mem::replace(&mut self.matches.trace_ctx.cache, TraceCache::default());
         let mut ctx = TraceCtx::new(graph, cache);
         (&end).trace(&mut ctx);

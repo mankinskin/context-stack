@@ -3,151 +3,32 @@
 //! Expectations come from the fixture strings via the name map.
 
 use context_trace::{
-    positioned::{
-        fixtures::V3Graph,
-        SpanCoverage,
-    },
-    AtomPosition,
-    DirectedKey,
-    DirectedPosition,
-    DownPosition,
-    HasAtomPosition,
-    Token,
-    UpPosition,
+    positioned::{fixtures::V3Graph, SpanCoverage},
+    AtomPosition, DirectedKey, DirectedPosition, DownPosition, HasAtomPosition, Token, UpPosition,
 };
 use pretty_assertions::assert_eq;
 
-use super::util::{
-    expected,
-    fixture,
-    pos,
-    span,
-    step,
+use super::{
+    util::{fixture, pos, span, step},
+    validate::{validate, Oracle},
 };
-use crate::{
-    search::stats::last_search_stats,
-    Find,
-    Response,
-    SearchError,
-};
+use crate::{search::stats::last_search_stats, Find, Response, SearchError};
 
-/// Search `query` and check it against the brute-force expectation: root,
-/// span, match end, exhaustion, coverage, stored paths, uniqueness counter.
-pub(super) fn check(
-    f: &V3Graph,
-    query: &str,
-) -> Response {
+/// Search `query` and check it against the brute-force expectation (plan
+/// 2.6, [`validate`]) and the uniqueness counter.
+pub(super) fn check(f: &V3Graph, query: &str) -> Response {
     let context = format!("{}: {query}", f.name);
     let response = f
         .graph
         .find_ancestor(query.chars())
         .unwrap_or_else(|error| panic!("{context}: {error}"));
     let stats = last_search_stats();
-    let e = expected(&f.corpus, &f.names, query);
-    assert_eq!(response.root_token(), f.names[&e.root], "{context}: root");
-    assert_eq!(
-        response.span(),
-        span(e.offset, e.offset + e.k),
-        "{context}: span"
-    );
-    assert_eq!(response.query_start(), pos(0), "{context}");
-    assert_eq!(response.checkpoint_position(), pos(e.k), "{context}");
-    assert_eq!(
-        response.query_exhausted(),
-        e.k == query.chars().count(),
-        "{context}: exhausted"
-    );
-    assert_eq!(
-        response.path().coverage(),
-        SpanCoverage::of(&response.span(), response.root_token().width),
-        "{context}: coverage"
-    );
-    if let Some(range) = response.path().range() {
-        let graph = &f.graph;
-        assert!(
-            graph.contains_path(&range.path.start.to_occurrence_path()),
-            "{context}"
-        );
-        assert!(
-            graph.contains_path(&range.path.end.to_occurrence_path()),
-            "{context}"
-        );
-        assert_eq!(
-            range.path.start.start_offset(),
-            range.path.span.start,
-            "{context}"
-        );
-        assert_eq!(range.path.end.leaf_end(), range.path.span.end, "{context}");
-        // Canonical paths (2.4): the largest tokens at the span borders.
-        assert_eq!(
-            graph
-                .start_at(range.path.root, range.path.span.start)
-                .map(|(t, _)| t),
-            Some(range.path.start.start()),
-            "{context}: start path ends at the largest token at the match start"
-        );
-        assert_eq!(
-            graph
-                .end_at(range.path.root, range.path.span.end)
-                .map(|(t, _)| t),
-            Some(range.path.end.leaf()),
-            "{context}"
-        );
-        assert!(
-            range.path.end.leaf_offset() >= range.path.span.start,
-            "{context}"
-        );
-        // Maximal trimming at the span borders.
-        let width = |v| graph.token(v).unwrap().width.0;
-        let mut start = 0;
-        let start_steps: Vec<_> = range.path.start.top_down().collect();
-        for (i, s) in start_steps.iter().enumerate() {
-            start += *s.offset;
-            let last = i + 1 == start_steps.len();
-            assert!(
-                last || start != *range.path.span.start,
-                "{context}: start trimming"
-            );
-            assert!(start + width(s.child) <= *range.path.span.end, "{context}");
-        }
-        let mut start = 0;
-        let end_steps = range.path.end.steps();
-        for (i, s) in end_steps.iter().enumerate() {
-            start += *s.offset;
-            let last = i + 1 == end_steps.len();
-            let end = start + width(s.child);
-            assert!(
-                last || end != *range.path.span.end,
-                "{context}: end trimming"
-            );
-            // No end-path token starts before the match: down keys of final
-            // responses are never clamped.
-            assert!(start >= *range.path.span.start, "{context}: clamped");
-        }
-    }
-    for (parent, child, offset) in response.cache.edges() {
-        let composition = f
-            .graph
-            .vertex(parent.index.index)
-            .unwrap()
-            .composition()
-            .unwrap();
-        assert!(
-            composition
-                .occurrences()
-                .iter()
-                .any(|o| o.offset == offset && o.child.index == child.index.index),
-            "{context}: cache edge {parent:?} → {child:?} @ {offset}"
-        );
-    }
+    validate(&Oracle::new(f), query, 0, &response);
     assert_eq!(stats.equal_width_first_matches, 0, "{context}: uniqueness");
     response
 }
 
-fn names<const N: usize>(
-    f: &V3Graph,
-    keys: [&str; N],
-) -> [Token; N] {
+fn names<const N: usize>(f: &V3Graph, keys: [&str; N]) -> [Token; N] {
     keys.map(|key| f.names[key])
 }
 
@@ -433,4 +314,27 @@ fn continuation() {
         f.graph.find_ancestor(&next),
         Err(SearchError::EmptyPatterns)
     );
+}
+
+/// 2.6 finding: an unmatched composite first token is `EntireRoot` of that
+/// token with the same canonical paths as the atom query matching the whole
+/// token (it used to have no paths).
+#[test]
+fn unmatched_composite_first_token_has_atom_query_paths() {
+    let f = fixture("repeat_abcabca");
+    let [a, c, abca] = names(&f, ["a", "c", "abca"]);
+    let atoms = check(&f, "abcac");
+    assert_eq!(atoms.root_token(), abca);
+    assert!(atoms.is_entire_root());
+    let response = f.graph.find_ancestor(vec![abca, c]).unwrap();
+    assert_eq!(response.root_token(), abca);
+    assert!(response.is_entire_root());
+    assert_eq!(response.checkpoint_position(), pos(4));
+    assert_eq!(response.path(), atoms.path());
+    assert_eq!(start_steps(&response), vec![step(abca, 0, a)]);
+    assert_eq!(
+        response.path().end_path().unwrap().steps(),
+        &[step(abca, 3, a)]
+    );
+    assert!(response.cache.edges().next().is_none());
 }

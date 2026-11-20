@@ -79,8 +79,8 @@ impl Response {
         self.end.path.anchor()
     }
     /// For an `EntireRoot` match, the start path top-down (root entry
-    /// first); empty if only the first query token matched (the root is
-    /// that token). `None` for other coverages.
+    /// first); empty if only an atom first query token matched (the root is
+    /// that atom). `None` for other coverages.
     pub fn entire_root_start_path(&self) -> Option<Vec<OccurrenceLocation>> {
         match &self.end.path {
             PathCoverage::EntireRoot(end) => Some(

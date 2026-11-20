@@ -102,8 +102,8 @@ impl MatchedRange {
 }
 
 /// A whole root matched. `path` is `None` iff nothing beyond the first
-/// query token matched: the root is that token (legacy `EntireRoot` of
-/// `q0`).
+/// query token matched and that token is an atom (legacy `EntireRoot` of
+/// `q0`); an unmatched composite `q0` carries its canonical paths.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EntireRootEnd {
     pub root: Token,
@@ -163,16 +163,37 @@ impl PathCoverage {
             SpanCoverage::Range => Self::Range(range),
         }
     }
-    /// The first query token at `query_start` matched alone.
-    pub(crate) fn entire_token(
+    /// The first query token at `query_start` matched alone (legacy
+    /// `EntireRoot` of `q0`). An atom has no paths. A composite token gets
+    /// the canonical paths of the span `[0, width)` in itself (2.4: the
+    /// prefix child, i.e. `start_at(token, 0)`, and `end_at(token, width)`),
+    /// as the equivalent atom query matching the whole token returns them;
+    /// both are functions of root and span, no content is read.
+    pub(crate) fn entire_token<G: GraphKind>(
+        graph: &PositionedGraph<G>,
         token: Token,
         query_start: AtomPosition,
     ) -> Self {
-        Self::EntireRoot(EntireRootEnd {
-            root: token,
-            query_start,
-            path: None,
-        })
+        let Some(prefix) = graph.prefix_child(token) else {
+            return Self::EntireRoot(EntireRootEnd {
+                root: token,
+                query_start,
+                path: None,
+            });
+        };
+        let width = AtomPosition::from(token.width);
+        let start = StartPath::new(token, prefix.offset, prefix.child);
+        let end = EndPath::end_at(graph, token, width).expect("composite token has an end");
+        let entry_pos = UpPosition(query_start + prefix.child.width.0);
+        let state = ChildState {
+            entry_pos,
+            exit_pos: DownPosition(query_start),
+            start_pos: query_start,
+            path: RangePath::new(AtomPosition::default()..width, start, end),
+        };
+        let path = Self::from_child_state(graph, state, query_start + token.width.0);
+        debug_assert!(matches!(path, Self::EntireRoot(_)));
+        path
     }
     pub fn root(&self) -> Token {
         match self {
