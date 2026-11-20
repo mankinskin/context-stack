@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition`
 summary: Open work for the positioned-composition reader. Binding model rules, then the ordered steps: content-free model leftovers, positioned search (legacy architecture with positional sibling navigation) validated on v3 oracle fixtures, positioned insertion with seam discovery, fixed-retention reader, streaming retention, cutover.
-status: 📋 step 1 done; next step 2 (positioned search)
+status: 📋 steps 1–2 done; next step 3 (positioned insertion, plan drafted)
 date: 2026-11-20
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
 ---
@@ -92,26 +92,16 @@ gate). This roadmap holds no planning for this step.
 
 ## Step 3 — Positioned insertion and seam discovery (`context-insert`)
 
-Replaces row closure for the positioned backend. Inputs are `Response`s;
-occurrences and seam candidates come from their trace caches and end paths.
+Work package: [20261120_PLAN_POSITIONED_INSERT](20261120_PLAN_POSITIONED_INSERT.md)
+(legacy split/join/closure walkthrough, cover projection, single host update,
+merge with seam discovery, tasks, validation and gate). This roadmap holds no
+planning for this step.
 
-1. Align the accepted match with the committed suffix by offset.
-2. Project retained occurrences of both sides into the new owner's
-   coordinates (the whole occurrence if a side is a retained proper child,
-   otherwise its cover).
-3. **Seam discovery:** retained occurrences crossing the seam and not wholly
-   inside either side; traverse only beyond what the traces already cover.
-4. Deduplicate and prune by containment; keep partial overlaps.
-
-No complement interning, no wrapper vertices, no nested closure, no content
-expansion. Insertion from a `Response` that found a complete existing token
-yields that token instead of a new vertex. Preserve the accepted evidence
-(anchor occurrence, expansion path) for consumers.
-
-**Gate:** merging the oracle covers of overlapping observations reproduces
-the oracle composition and parent links of the combined vertex, including
-`seam_bcd`; inserting a token removed from a fixture graph from its
-`Response` reproduces the fixture.
+**Outcome:** `insert_match(Response)` turns a matched span into a token
+(existing root, or a new vertex with its unique minimal host updated), and
+`Cover::merge` combines two adjacent or overlapping covers including seam
+occurrences. Both are validated on every fixture; promotion of tokens with
+several hosts stays in step 5.
 
 ## Step 4 — Fixed-retention reader (`context-read`)
 

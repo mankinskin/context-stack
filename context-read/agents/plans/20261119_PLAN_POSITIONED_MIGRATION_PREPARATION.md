@@ -478,7 +478,7 @@ enumeration, `088971a` boundary search. No reader algorithm was added;
 `context_read::read` stays a stub. Notes:
 
 - APIs:
-  - `context_trace::positioned::fixtures::{fixture_snapshots, fixture_graphs, positioned_dir}`
+  - `context_trace::positioned::fixtures::{fixture_snapshots, fixture_graphs, fixtures_dir}`
     (`test-api`; replaces the private loader of the Step 2 model tests).
   - `PositionedGraph::read_interval(&self, &IntervalView) ->
     Option<Vec<AtomOf<G>>>` (`context-trace/src/positioned/read.rs`).
