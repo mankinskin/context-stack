@@ -42,3 +42,36 @@ fn name_map_addresses_every_fixture_vertex() {
         }
     }
 }
+
+#[cfg(debug_assertions)]
+#[test]
+fn debug_labels_equal_fixture_keys_and_resolve_names() {
+    use crate::graph::vertex::name_resolver::{
+        clear_token_name_resolver,
+        resolve_token_name,
+    };
+    for fixture in super::super::fixtures::v3_graphs() {
+        fixture.graph.register_name_resolver();
+        for (key, token) in &fixture.names {
+            let vertex = fixture.graph.vertex(token.index).unwrap();
+            assert_eq!(vertex.label(), key, "{}", fixture.name);
+            assert_eq!(resolve_token_name(token.index.0).as_deref(), Some(key.as_str()));
+            assert_eq!(
+                vertex.to_string(),
+                format!("#{}(w{}) {key:?}", token.index.0, token.width.0)
+            );
+        }
+        clear_token_name_resolver();
+    }
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn release_display_shows_index_and_width_only() {
+    for fixture in super::super::fixtures::v3_graphs() {
+        for token in fixture.names.values() {
+            let vertex = fixture.graph.vertex(token.index).unwrap();
+            assert_eq!(vertex.to_string(), format!("#{}(w{})", token.index.0, token.width.0));
+        }
+    }
+}

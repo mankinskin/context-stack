@@ -24,6 +24,8 @@ pub mod interchange;
 pub mod location;
 mod read;
 
+#[cfg(debug_assertions)]
+pub use self::graph::PositionedLabels;
 pub use self::{
     composition::{
         Composition,

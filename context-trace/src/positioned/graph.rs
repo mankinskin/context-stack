@@ -37,6 +37,11 @@ use crate::{
     VertexKey,
     graph::vertex::VertexIndex,
 };
+#[cfg(debug_assertions)]
+use crate::graph::vertex::name_resolver::{
+    TokenNameResolver,
+    set_token_name_resolver,
+};
 
 /// What a vertex consists of.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,6 +59,9 @@ pub struct PositionedVertex<G: GraphKind = BaseGraphKind> {
     pub(crate) node: VertexNode<AtomOf<G>>,
     /// Parent vertex → offsets at which this vertex occurs in it.
     pub(crate) parents: BTreeMap<VertexIndex, BTreeSet<AtomPosition>>,
+    /// Expanded content, for diagnostics only; never read by algorithms.
+    #[cfg(debug_assertions)]
+    pub(crate) label: String,
 }
 
 impl<G: GraphKind> PositionedVertex<G> {
@@ -81,6 +89,39 @@ impl<G: GraphKind> PositionedVertex<G> {
     }
     pub fn parents(&self) -> &BTreeMap<VertexIndex, BTreeSet<AtomPosition>> {
         &self.parents
+    }
+    /// Debug-only expanded content, for diagnostics.
+    #[cfg(debug_assertions)]
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+}
+
+/// Index and width; debug builds append the label.
+impl<G: GraphKind> fmt::Display for PositionedVertex<G> {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        write!(f, "#{}(w{})", self.index.0, self.width.0)?;
+        #[cfg(debug_assertions)]
+        write!(f, " {:?}", self.label)?;
+        Ok(())
+    }
+}
+
+/// Snapshot of the debug labels, resolving vertex index → label.
+#[cfg(debug_assertions)]
+#[derive(Clone, Debug)]
+pub struct PositionedLabels(Vec<String>);
+
+#[cfg(debug_assertions)]
+impl TokenNameResolver for PositionedLabels {
+    fn token_name(
+        &self,
+        index: usize,
+    ) -> Option<String> {
+        self.0.get(index).cloned()
     }
 }
 
@@ -226,6 +267,8 @@ impl<G: GraphKind> PositionedGraph<G> {
             index,
             key: VertexKey::default(),
             width: TokenWidth(1),
+            #[cfg(debug_assertions)]
+            label: atom.to_string(),
             node: VertexNode::Atom(atom),
             parents: BTreeMap::new(),
         });
@@ -249,6 +292,8 @@ impl<G: GraphKind> PositionedGraph<G> {
         }
         let index = VertexIndex(self.vertices.len());
         let width = composition.width();
+        #[cfg(debug_assertions)]
+        let label = self.composed_label(&composition);
         for occurrence in composition.occurrences() {
             self.vertices[occurrence.child.index.0]
                 .parents
@@ -260,10 +305,44 @@ impl<G: GraphKind> PositionedGraph<G> {
             index,
             key: VertexKey::default(),
             width,
+            #[cfg(debug_assertions)]
+            label,
             node: VertexNode::Composite(composition),
             parents: BTreeMap::new(),
         });
         Ok(Token::new(index, width))
+    }
+
+    /// Children's labels joined in order, each from the first position not
+    /// covered by the previous occurrences. Assumes one `char` per atom
+    /// label (true for `char` atoms).
+    #[cfg(debug_assertions)]
+    fn composed_label(
+        &self,
+        composition: &Composition,
+    ) -> String {
+        let mut label = String::new();
+        let mut end: usize = 0;
+        for occurrence in composition.occurrences() {
+            let child = &self.vertices[occurrence.child.index.0].label;
+            let skip = end.saturating_sub(occurrence.offset.0);
+            label.extend(child.chars().skip(skip));
+            end = end.max(occurrence.end().0);
+        }
+        label
+    }
+
+    /// Snapshot of all debug labels as a [`TokenNameResolver`].
+    #[cfg(debug_assertions)]
+    pub fn name_resolver(&self) -> PositionedLabels {
+        PositionedLabels(self.vertices.iter().map(|v| v.label.clone()).collect())
+    }
+
+    /// Install [`Self::name_resolver`] for the current thread, so tokens and
+    /// vertex indices display their labels (when `test-api` is enabled).
+    #[cfg(debug_assertions)]
+    pub fn register_name_resolver(&self) {
+        set_token_name_resolver(Box::new(self.name_resolver()));
     }
 
     /// `range` of `owner` as a view, if it lies within the owner.
