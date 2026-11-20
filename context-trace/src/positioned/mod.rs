@@ -14,6 +14,9 @@
 //!   [`PositionedGraph::prefix_child`], [`PositionedGraph::parent_occurrences`],
 //!   [`PositionedGraph::atom_token`], [`PositionedGraph::advance_end_path`]
 //!   (`navigate.rs`);
+//! - search paths ([`StartPath`], [`EndPath`], [`RangePath`], [`QueryPath`],
+//!   `path.rs`) and trace states / trace cache ([`ParentState`],
+//!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2;
 //! - boundary search (prefixes/postfixes with occurrence paths) lives in
 //!   `context_search::boundary`.
 
@@ -27,7 +30,9 @@ pub mod graph;
 pub mod interchange;
 pub mod location;
 mod navigate;
+pub mod path;
 mod read;
+pub mod trace;
 
 #[cfg(debug_assertions)]
 pub use self::graph::PositionedLabels;
@@ -52,6 +57,38 @@ pub use self::{
         IntervalView,
         OccurrenceLocation,
         OccurrencePath,
+    },
+    path::{
+        EndPath,
+        QueryPath,
+        RangePath,
+        SpanCoverage,
+        StartPath,
+    },
+    trace::{
+        QueryAnchor,
+        TraceCtx,
+        cache::{
+            TraceCache,
+            position::PositionCache,
+            vertex::VertexCache,
+        },
+        child::state::{
+            ChildState,
+            RootChildState,
+        },
+        state::{
+            IntoParentState,
+            StateAdvance,
+            parent::ParentState,
+        },
+        traceable::{
+            PostfixCommand,
+            PrefixCommand,
+            RangeCommand,
+            TraceCommand,
+            Traceable,
+        },
     },
 };
 

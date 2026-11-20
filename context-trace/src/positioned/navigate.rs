@@ -29,6 +29,23 @@ impl<G: GraphKind> PositionedGraph<G> {
         self.vertex(vertex)?.composition()
     }
 
+    /// The token (index and width) of a known vertex.
+    pub fn token(
+        &self,
+        vertex: impl HasVertexIndex,
+    ) -> Option<Token> {
+        self.vertex(vertex.vertex_index()).map(|v| v.token())
+    }
+
+    pub(crate) fn expect_token(
+        &self,
+        vertex: impl HasVertexIndex,
+    ) -> Token {
+        let vertex = vertex.vertex_index();
+        self.token(vertex)
+            .unwrap_or_else(|| panic!("unknown vertex {}", vertex.0))
+    }
+
     /// The largest retained proper descendant of `root` starting at `p`, and
     /// the occurrence steps from `root` down to it (offsets relative to each
     /// parent, summing to `p`).

@@ -340,20 +340,20 @@ positioned query path exists (2.2).
 
 ### 2.2 Paths and trace states (`context-trace`, `positioned::{path, trace}`)
 
-- [ ] `positioned/path.rs`: `StartPath { root, steps }` (stored bottom-up,
+- [x] `positioned/path.rs`: `StartPath { root, steps }` (stored bottom-up,
   raised in O(1); exposed top-down as `OccurrencePath`), `EndPath`,
   `RangePath { root: Token, span: Range<AtomPosition>, start, end }`,
   `QueryPath { pattern: Vec<Token>, position, end }` (Decision 6 b: descends
   into composite query tokens natively with `prefix_child` and
   `advance_end_path`, never by reading content).
-- [ ] `positioned/trace/state/parent.rs`: `ParentState { path: StartPath,
+- [x] `positioned/trace/state/parent.rs`: `ParentState { path: StartPath,
   span, root_pos, prev_pos }` with `advance_state` (`start_at(root,
   span.end)` → `RootChildState`, `Err(self)` at the root end) and
   `path_raise(P, o)` (canonical start-path rule, 2.4).
-- [ ] `positioned/trace/child/state.rs`: `ChildState { entry_pos, exit_pos,
+- [x] `positioned/trace/child/state.rs`: `ChildState { entry_pos, exit_pos,
   start_pos, path: RangePath }`, `RootChildState`, `advance_state` (end path
   via `advance_end_path(root, end, span.end)`), `parent_state()`.
-- [ ] `positioned/trace/cache/` (**Decision 4 a**): `TraceCache` with the
+- [x] `positioned/trace/cache/` (**Decision 4 a**): `TraceCache` with the
   legacy shape (`VertexCache { bottom_up, top_down }`, `PositionCache { top,
   bottom }`), keyed by the promoted `DirectedKey` with **query positions**
   as in legacy. Edges are labelled by the child's offset in its parent, so
@@ -362,11 +362,93 @@ positioned query path exists (2.2).
   position + `o` within one `Response`. Keys stay valid across raises and
   are comparable across chained searches. `Traceable` for start and end
   paths.
-- [ ] `PathCoverage` classification from `span`: `EntireRoot` iff
+- [x] `PathCoverage` classification from `span`: `EntireRoot` iff
   `span == 0..width`, `Prefix` iff `span.start == 0`, `Postfix` iff
   `span.end == width`, else `Range`.
 - **Tests:** raise arithmetic and coverage on the worked example and on
   `repeat_ababa` (`aba → ababa`); trace up edges agree with parent links.
+
+*Done (2026-11-20), `positioned/{path.rs, trace/}`, tests
+`positioned/tests/trace.rs` (7 tests).* Module layout mirrors
+`legacy::trace`: `trace/{state/{mod, parent}, child/{state, iterator},
+cache/{mod, key, new, position, vertex/{mod, positions}},
+traceable/{mod, role, root}}`. *Deviations and precisions:*
+
+- **Paths.** `StartPath { root, entry, start, steps }` stores the entry
+  child and start token (widths without graph lookups); `bottom_up()`,
+  `top_down()`, `to_occurrence_path()`, `start_offset()`, `entry_end()`,
+  `raise(parent, o, at_root_start)`. `EndPath { root, leaf, steps }` is
+  non-empty (built from `start_at`'s `(Token, steps)`), with `advance(p)`
+  (`advance_end_path`), `push_prefix` (graph-side decomposition) and
+  `simplify(end)`. `RangePath::new(span, start, end)`, `coverage()`,
+  `match_end_leaf()` (span end := end of the end leaf; the 2.3 compare
+  calls it on a match) and `simplify()`. `QueryPath` also stores the entry
+  index, the entry's query position and the leaf token; `prefix_child`,
+  `advance -> ControlFlow<()>`, `at_end()`. `SearchError::SingleIndex`
+  still carries only the token (2.3 decides whether it carries a
+  `QueryPath`).
+- **Coverage** is `positioned::SpanCoverage::of(span, width)` in
+  context-trace; the legacy-style `PathCoverage` enum with paths belongs to
+  `context-search` (2.3) and wraps it.
+- **States.** `ParentState` invariant: `span.end` is the end of the root
+  entry child and `root_pos` the query position there. `path_raise(P, o)`
+  maps `[s, e)` to `[o + s, o + width(R))` and adds `width(R) − e` to
+  `root_pos` (legacy adds the rest of the row): equal to `[o + s, o + e)`
+  for states at the root end, and correct for `ChildState::parent_state()`
+  of an exhausted root, which (as legacy) keeps only the start path with
+  `span.end` = entry end and `root_pos = entry_pos`. `prev_pos` = old
+  `root_pos`. `ParentState::new(start, parent, offset, query_pos)` and
+  `IntoParentState for Token` (query position 0, as legacy) build seeds.
+  `ChildState::advance_state` is `Err` iff `span.end == width(root)`; it
+  updates `exit_pos`. `ChildQueue` is ported; legacy `ChildIterator` (tied
+  to `HasGraph`) is not.
+- **Query positions** (`QueryAnchor { root, query }`: the match start in
+  the root ↔ its query position). Up keys: query position at the token
+  end (legacy kept the leaf's position on intermediate parents; equal when
+  the chain is end-aligned); the root's up key is `entry_pos`, as legacy.
+  Down keys: query position at the token start, **clamped to the match
+  start**: with overlaps an end-path child can start before the match
+  (e.g. `exit < span.start`; reached on the fixtures, counted by the
+  test). Its true offset is on the edge label.
+- **Cache.** `PositionCache.bottom: HashMap<DirectedKey, AtomPosition>`
+  (child key → child offset in the parent). `add_state` records the edge
+  even if the target key existed (legacy dropped it). `TraceCache::edges()`
+  lists `(parent key, child key, offset)`. Commands: `PostfixCommand { path:
+  StartPath, entry_pos }`, `PrefixCommand { path: EndPath, exit_pos }`,
+  `RangeCommand { path: RangePath, entry_pos }` (`From<ChildState>`);
+  positions are derived from one anchor, so `RangeCommand` has no separate
+  `exit_pos`.
+- **Tests.** Worked example (`repeat_abcabca`: raise to `abcabca@0/@3`,
+  spans, `root_pos`/`prev_pos`, canonical start path, `Prefix`/`Postfix`,
+  `@3` ends at once, end path `[(abcabca, 3, abca), (abca, 1, b)]`, exact
+  cache edges); `repeat_ababa` (`aba → ababa@0/@2`, overlap continuation,
+  `EntireRoot`, simplified end path `[(ababa, 2, aba)]`, prepend case for
+  `a@2`); exhaustive walk over every fixture, seed and raise chain (span
+  content, canonical start = widest climbed token at the match start,
+  maximal end trimming, coverage from strings, every cache edge is a
+  parent link and agrees with the fixture strings, cache entries for every
+  path vertex); `ChildState::advance_state` end paths equal `start_at` with
+  prefix-decomposed leaves; `QueryPath` over every pair of fixture tokens
+  with 0/1/2/mixed prefix splits (leaves equal query substrings and
+  `start_at` inside the query token) and full atom decomposition.
+- **Cache vs. insertion (risk "Step 3 needs data the trace cache lacks").**
+  Legacy insertion reads `VertexCache::{bottom_up, top_down}` positions and
+  the `bottom` edge labels (`split/vertex/mod.rs`:
+  `bottom_up_splits`/`top_down_splits` turn `SubLocation` into the child
+  token and child offset; `insert/outcome.rs::traced_prefix` follows
+  `sub_index == 0` edges; `top` is filled by the split stage itself). The
+  positioned shape carries the same information without row lookups: child
+  token in the key, child offset on the edge, `sub_index == 0` becomes
+  `offset == 0`. Caveats for step 3: (1) inner offsets need the query
+  position of the match start (`QueryAnchor::query`); legacy assumed 0 per
+  search, so the 2.3 `Response` must expose it (or keep query positions
+  search-relative); (2) for clamped down keys the inner offset comes from
+  absolute offsets (sum of edge labels plus `span`), not from the key;
+  (3) legacy splits every row of a node at a split position; with
+  overlapping compositions the occurrences crossing a split position that
+  are not on the traced paths are not in the cache and must be enumerated
+  structurally from the composition (`covering`/`occurrences_in`), which
+  is allowed (no content).
 
 ### 2.3 Search (`context-search` root modules)
 
@@ -412,17 +494,23 @@ Mirror legacy files one to one; drop visualization events.
 paths, as legacy returns them; no full paths down to atoms. Insertion only
 needs paths down to where a match boundary falls inside a token.
 
-- [ ] Start path from the **climbed chain** (the tokens raised through
+- [x] Start path from the **climbed chain** (the tokens raised through
   during the search), not rebuilt top-down: every climbed token below the
   root was matched to its end, so it lies inside the match. On raise of `R`
   via `(P, o)`: if the match starts at `R`'s start, the new start path is
   `[(P, o, R)]`; otherwise prepend `(P, o, R)`. Positioned form of the
   legacy rule that skips an offset-0 step with an empty sub path; "at the
   border" is `offset == 0` of the occurrence.
-- [ ] End path: stop at the first step whose child ends at `span.end`
+- [x] End path: stop at the first step whose child ends at `span.end`
   (positioned `simplify`; border is `offset + width == width(parent)`).
-- [ ] Invariant: each path stops at the largest token on it whose boundary
+- [x] Invariant: each path stops at the largest token on it whose boundary
   coincides with the span boundary.
+
+*Done for the path types (2026-11-20, with 2.2):* `StartPath::raise` /
+`ParentState::path_raise` implement the start rule, `EndPath::simplify` /
+`RangePath::simplify` the end rule; the exhaustive walk in
+`positioned/tests/trace.rs` checks both on every fixture. Applying them to
+search results is part of 2.3 and re-checked by 2.6.
 
 ### 2.5 Reuse
 
@@ -508,4 +596,4 @@ Visualization events are not ported.
 | Promotions break legacy | Re-exports; `legacy-tests` after each promotion |
 | Corrected pop rule wrong on overlaps | Equality test with `start_at` on all position pairs, including overlap fixtures (2.1) |
 | Canonical trimming wrong with overlaps | Maximal-trimming checks on all fixtures (2.6), incl. `seam_bcd`, `complex_overlap` |
-| Step 3 needs data the trace cache lacks | Offset-labelled edges plus `o` in the span; review the cache shape against `context-insert` before 2.3 ends |
+| Step 3 needs data the trace cache lacks | Offset-labelled edges plus `o` in the span; reviewed against `context-insert` in 2.2 (see the 2.2 notes): sufficient, provided the `Response` exposes the query position of the match start |
