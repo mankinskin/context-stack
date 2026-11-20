@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition` `#overlap` `#frequency` `#streaming`
 summary: Migrate the context stack from contiguous child-pattern rows to positioned compositions. Retained vertices store maximal child occurrences with offsets; overlaps are explicit and gaps/wrappers are never vertices. Introduce positioned locations and navigation, replace row-based overlap closure with an occurrence merge plus seam discovery, accumulate input in owned positioned covers, and only then add streaming retention with retrospective host updates.
-status: 🚧 phases 0-2 done (via the preparation plan); 2b clean slate done; next 2c.0 (test name map), then 2c (legacy-architecture search with positional sibling navigation), then 3
+status: 🗄️ history; open work is tracked in 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md
 revision: 5
 date: 2026-11-20
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
@@ -10,6 +10,9 @@ related: 20261116_PLAN_OVERLAP_PROVIDER_MIGRATION.md (row-based closure; superse
 ---
 
 # Plan: Positioned Composition Reader Migration
+
+> **Open work now lives in [20261120_PLAN_POSITIONED_READER_OPEN_WORK.md](20261120_PLAN_POSITIONED_READER_OPEN_WORK.md).**
+> This file is kept as design history and rationale.
 
 **Date:** 2026-11-18
 **Crates:** `context-trace` (model, locations, navigation), `context-search`
