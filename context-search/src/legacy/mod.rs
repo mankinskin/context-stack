@@ -9,6 +9,9 @@ pub use crate::*;
 
 pub(crate) mod compare;
 pub mod container;
+// Shadows the promoted root `cursor` on purpose; re-exports it plus the
+// row-specific cursor parts.
+#[allow(hidden_glob_reexports)]
 pub(crate) mod cursor;
 pub(crate) mod r#match;
 pub mod policy;

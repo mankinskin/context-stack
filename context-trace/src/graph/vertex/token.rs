@@ -41,16 +41,13 @@ use crate::legacy::{
             pattern::PatternLocation,
         },
     },
-    trace::cache::key::directed::{
-        down::{
-            DownKey,
-            DownPosition,
-        },
-        up::{
-            UpKey,
-            UpPosition,
-        },
-    },
+};
+#[cfg(feature = "legacy")]
+use crate::key::{
+    DownKey,
+    DownPosition,
+    UpKey,
+    UpPosition,
 };
 
 #[derive(

@@ -10,6 +10,10 @@
 //! - content reading: [`PositionedGraph::read_interval`] (`read.rs`);
 //! - occurrence enumeration in an interval:
 //!   [`PositionedGraph::occurrences_in`] (`enumerate.rs`);
+//! - local navigation for search: [`PositionedGraph::start_at`],
+//!   [`PositionedGraph::prefix_child`], [`PositionedGraph::parent_occurrences`],
+//!   [`PositionedGraph::atom_token`], [`PositionedGraph::advance_end_path`]
+//!   (`navigate.rs`);
 //! - boundary search (prefixes/postfixes with occurrence paths) lives in
 //!   `context_search::boundary`.
 
@@ -22,6 +26,7 @@ pub mod fixtures;
 pub mod graph;
 pub mod interchange;
 pub mod location;
+mod navigate;
 mod read;
 
 #[cfg(debug_assertions)]

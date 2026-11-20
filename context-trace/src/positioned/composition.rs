@@ -128,4 +128,23 @@ impl Composition {
     pub fn children(&self) -> impl Iterator<Item = VertexIndex> + '_ {
         self.0.iter().map(|o| o.child.index)
     }
+    /// The occurrence covering `position`: the last one with
+    /// `offset ≤ position` (binary search). Ends increase strictly with
+    /// offsets, so it reaches furthest among those; by gap-freedom it covers
+    /// `position`. `None` iff `position ≥ width`.
+    pub fn covering(
+        &self,
+        position: impl Into<AtomPosition>,
+    ) -> Option<&Occurrence> {
+        let position = position.into();
+        if position.0 >= self.width().0 {
+            return None;
+        }
+        let after = self.0.partition_point(|o| o.offset <= position);
+        Some(&self.0[after - 1])
+    }
+    /// The unique occurrence at offset 0.
+    pub fn prefix(&self) -> &Occurrence {
+        &self.0[0]
+    }
 }

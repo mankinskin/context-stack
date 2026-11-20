@@ -11,6 +11,13 @@ extern crate test;
 /// paths), independent of `legacy`.
 pub mod boundary;
 
+/// Cursor typestates and checkpoints shared with `legacy` (promoted, plan 2.0).
+pub mod cursor;
+
+/// Positioned search errors.
+pub mod error;
+pub use error::SearchError;
+
 /// Row-model search, fenced off from the model-agnostic root.
 #[cfg(feature = "legacy")]
 pub mod legacy;

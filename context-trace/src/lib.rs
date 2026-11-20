@@ -4,6 +4,8 @@
 pub mod direction;
 
 pub mod graph;
+/// Trace-cache keys (token + directed atom position), shared by both models.
+pub mod key;
 pub mod position;
 /// Positioned composition model (v3), independent of `legacy`.
 pub mod positioned;
@@ -88,6 +90,15 @@ pub use crate::{
         CompactFormat,
         format_utils::pretty,
         write_indent,
+    },
+    key::{
+        DirectedKey,
+        DirectedPosition,
+        DownKey,
+        DownPosition,
+        HasAtomPosition,
+        UpKey,
+        UpPosition,
     },
     position::AtomPosition,
 };

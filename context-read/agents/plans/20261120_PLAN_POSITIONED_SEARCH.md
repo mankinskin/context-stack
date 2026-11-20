@@ -273,13 +273,13 @@ them to the crate root and re-export them from `legacy` so legacy keeps
 compiling unchanged. Anything with row-specific behaviour is written new at
 the root, not promoted.
 
-- [ ] `context-search::cursor`: `CursorState`, `Matched`, `Candidate`,
+- [x] `context-search::cursor`: `CursorState`, `Matched`, `Candidate`,
   `Mismatched`, `Checkpointed<C, AtCheckpoint | HasCandidate>` and the
   traits `MarkMatchState`, `CursorStateMachine` (generic over the path
   type). Their row-specific impls stay in `legacy::cursor`.
-- [ ] `context-trace` root: `DirectedKey`, `UpKey`, `DownKey`,
+- [x] `context-trace` root: `DirectedKey`, `UpKey`, `DownKey`,
   `UpPosition`, `DownPosition` (token + atom position only).
-- [ ] **Decision 7.1.** A small error enum for positioned search at the
+- [x] **Decision 7.1.** A small error enum for positioned search at the
   crate root, with the legacy meanings: `SingleIndex` for a one-token query
   and `UnknownAtom` for an atom without a vertex; an empty query is rejected
   as legacy rejects it (check the legacy reason when porting `Searchable`).
@@ -289,19 +289,33 @@ the root, not promoted.
 Run `cargo test -p context-trace -p context-search --features legacy-tests`
 after each promotion.
 
+*Done (2026-11-20), deviations:* `PathCursor<P, S>` (generic over the path)
+was promoted too, with `HasCheckpoint`, `CandidateState` and
+`AtCheckpoint`/`HasCandidate`; its row-specific impls (`GraphRoot`,
+`MoveKey`, `MovePath`, `Display` via the legacy `CompactFormat` impl,
+`PatternCursor` aliases) and `ChildCursor` stay in `legacy::cursor`. The keys
+live in `context_trace::key` (re-exported at the root and from
+`legacy::trace::cache::key::directed`); `DirectedPosition` and
+`HasAtomPosition` moved with them (field type / shared accessor); the
+`MoveKey` impls stay in legacy. The error enum is
+`context_search::SearchError { EmptyPatterns, SingleIndex(Token),
+UnknownAtom }`: legacy rejects an empty query with `EmptyPatterns` (empty
+`Chars` give an empty pattern); `SingleIndex` carries only the token until the
+positioned query path exists (2.2).
+
 ### 2.1 Navigation primitives (`context-trace`, `positioned`)
 
-- [ ] `Composition::covering(p) -> Option<&Occurrence>` (binary search,
+- [x] `Composition::covering(p) -> Option<&Occurrence>` (binary search,
   last `offset ≤ p`) and `Composition::prefix() -> &Occurrence`.
-- [ ] `PositionedGraph::start_at(root, p) -> Option<(Token,
+- [x] `PositionedGraph::start_at(root, p) -> Option<(Token,
   Vec<OccurrenceLocation>)>`; `None` iff `p ≥ width(root)`. Iterative.
-- [ ] `PositionedGraph::prefix_child(v) -> Option<Occurrence>`.
-- [ ] `PositionedGraph::parent_occurrences(v) -> impl Iterator<Item =
+- [x] `PositionedGraph::prefix_child(v) -> Option<Occurrence>`.
+- [x] `PositionedGraph::parent_occurrences(v) -> impl Iterator<Item =
   (Token, AtomPosition)>` in deterministic order (parent width, index,
   offset).
-- [ ] `PositionedGraph::atom_token(&atom) -> Option<Token>`: read-only
+- [x] `PositionedGraph::atom_token(&atom) -> Option<Token>`: read-only
   lookup in the existing atom index (today only `insert_atom` touches it).
-- [ ] `PositionedGraph::advance_end_path(root, steps, p)`: the corrected pop
+- [x] `PositionedGraph::advance_end_path(root, steps, p)`: the corrected pop
   rule from "End-path update" (Decision 2 b, built in this phase). Truncates the old steps at the
   first step that is not `start_at`'s choice for `p` and descends from there
   with `start_at`. Shared by the graph-side and the query-side cursor.
@@ -313,6 +327,16 @@ after each promotion.
   longest first. `advance_end_path(root, start_at(root, p₀).steps, p)`
   equals `start_at(root, p)` for every vertex and every pair `p₀ < p`
   (including overlap fixtures such as `seam_bcd`, `complex_overlap`).
+- [x] Tests done (2026-11-20, `navigate.rs`, `tests/navigation.rs`), all v3
+  fixtures pass, occurrence completeness holds everywhere. *Deviations:*
+  `start_at` also returns `None` for an atom root (no proper descendant);
+  roots are `impl HasVertexIndex`, positions `impl Into<AtomPosition>`;
+  `advance_end_path` takes the old steps by value and returns the same
+  `Option<(Token, Vec<OccurrenceLocation>)>` as `start_at`;
+  `Composition::covering(p)` is `None` for `p ≥ width`. Extra tests:
+  `covering`, `parent_occurrences` (= maximal key occurrences by brute force),
+  `atom_token`; the `advance_end_path` test also asserts that a naive
+  legacy-style pop differs on `seam_bcd` and `complex_overlap`.
 
 ### 2.2 Paths and trace states (`context-trace`, `positioned::{path, trace}`)
 

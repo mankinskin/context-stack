@@ -9,10 +9,6 @@ use crate::{
             pattern_width,
         },
     },
-    legacy::trace::cache::key::directed::{
-        down::DownKey,
-        up::UpKey,
-    },
 };
 
 pub trait Wide {
@@ -71,20 +67,6 @@ impl Wide for VertexData {
 impl WideMut for VertexData {
     fn width_mut(&mut self) -> &mut TokenWidth {
         self.token.width_mut()
-    }
-}
-
-#[cfg(feature = "legacy")]
-impl Wide for UpKey {
-    fn width(&self) -> TokenWidth {
-        self.index.width()
-    }
-}
-
-#[cfg(feature = "legacy")]
-impl Wide for DownKey {
-    fn width(&self) -> TokenWidth {
-        self.index.width()
     }
 }
 

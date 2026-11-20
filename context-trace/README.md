@@ -44,12 +44,17 @@ also returns the fixture key → token name map), `diff.rs` (`diff` → `GraphDi
 read-only navigation `read.rs` (`PositionedGraph::read_interval`: content of an
 `IntervalView`, each position once) and `enumerate.rs`
 (`PositionedGraph::occurrences_in`: every retained occurrence inside an
-`IntervalView`, deduplicated by `(token, offset)`), `fixtures.rs` (`test-api`:
+`IntervalView`, deduplicated by `(token, offset)`), search navigation
+`navigate.rs` (`start_at`, `prefix_child`, `parent_occurrences`,
+`atom_token`, `advance_end_path`; `Composition::covering`/`prefix`), `fixtures.rs` (`test-api`:
 `v3_fixtures` and `v3_graphs` → `V3Graph { name, corpus, graph, names }`,
 shared with context-search). Tests round-trip and validate every v3 fixture
-of `context-read/tests/fixtures/v3` and check `read_interval` and
-`occurrences_in` on every fixture vertex and interval (`tests/navigation.rs`).
-Boundary search lives in `context_search::boundary`.
+of `context-read/tests/fixtures/v3` and check `read_interval`,
+`occurrences_in` and the search navigation primitives on every fixture vertex
+and position (`tests/navigation.rs`). Boundary search lives in
+`context_search::boundary`. Trace-cache keys (`DirectedKey`, `UpKey`,
+`DownKey`, `UpPosition`, `DownPosition`) live in the root module `key.rs`,
+re-exported from `legacy::trace::cache::key::directed`.
 
 **Binding rules** (`context-read/agents/plans/20261120_PLAN_POSITIONED_READER_OPEN_WORK.md`):
 

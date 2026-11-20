@@ -6,41 +6,45 @@ use std::ops::{
 use derive_more::derive::From;
 use derive_new::new;
 
-use crate::legacy::{
-    graph::vertex::token::Token,
-    path::mutators::move_path::key::AtomPosition,
-    trace::cache::key::directed::{
-        HasAtomPosition,
-        down::DownPosition,
+use crate::{
+    AtomPosition,
+    TokenWidth,
+    graph::vertex::{
+        token::Token,
+        wide::Wide,
     },
+    key::{
+        HasAtomPosition,
+        up::UpPosition,
+    },
+    logging::compact_format::CompactFormat,
 };
 
 #[derive(Clone, Debug, Copy, Hash, Eq, PartialEq, From)]
-pub struct UpPosition(pub AtomPosition);
+pub struct DownPosition(pub AtomPosition);
 
-impl UpPosition {
-    pub fn flipped(self) -> DownPosition {
-        DownPosition(self.0)
+impl DownPosition {
+    pub fn flipped(self) -> UpPosition {
+        UpPosition(self.0)
     }
 }
-
-impl From<UpPosition> for usize {
-    fn from(val: UpPosition) -> Self {
-        usize::from(val.0)
-    }
-}
-impl From<UpPosition> for AtomPosition {
-    fn from(val: UpPosition) -> Self {
+impl From<DownPosition> for AtomPosition {
+    fn from(val: DownPosition) -> Self {
         val.0
     }
 }
-impl From<usize> for UpPosition {
+impl From<DownPosition> for usize {
+    fn from(val: DownPosition) -> Self {
+        usize::from(val.0)
+    }
+}
+impl From<usize> for DownPosition {
     fn from(value: usize) -> Self {
         Self(value.into())
     }
 }
 
-impl AddAssign<usize> for UpPosition {
+impl AddAssign<usize> for DownPosition {
     fn add_assign(
         &mut self,
         rhs: usize,
@@ -49,7 +53,7 @@ impl AddAssign<usize> for UpPosition {
     }
 }
 
-impl Add<usize> for UpPosition {
+impl Add<usize> for DownPosition {
     type Output = Self;
     fn add(
         self,
@@ -59,16 +63,16 @@ impl Add<usize> for UpPosition {
     }
 }
 
-impl std::fmt::Display for UpPosition {
+impl std::fmt::Display for DownPosition {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter,
     ) -> std::fmt::Result {
-        write!(f, "↑{}", self.0)
+        write!(f, "↓{}", self.0)
     }
 }
 
-impl crate::legacy::logging::compact_format::CompactFormat for UpPosition {
+impl CompactFormat for DownPosition {
     fn fmt_compact(
         &self,
         f: &mut std::fmt::Formatter,
@@ -86,13 +90,19 @@ impl crate::legacy::logging::compact_format::CompactFormat for UpPosition {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy, new)]
-pub struct UpKey {
+pub struct DownKey {
     pub index: Token,
-    pub pos: UpPosition,
+    pub pos: DownPosition,
 }
 
-impl HasAtomPosition for UpKey {
+impl HasAtomPosition for DownKey {
     fn pos(&self) -> &AtomPosition {
         &self.pos.0
+    }
+}
+
+impl Wide for DownKey {
+    fn width(&self) -> TokenWidth {
+        self.index.width()
     }
 }
