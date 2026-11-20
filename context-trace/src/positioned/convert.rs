@@ -12,6 +12,7 @@ use super::{
     },
 };
 use crate::{
+    AtomPosition,
     GraphKind,
     Token,
     graph::vertex::VertexIndex,
@@ -45,9 +46,16 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
     }
 
     /// ID-free content-keyed covers of every vertex.
+    ///
+    /// Export only: the interchange format is keyed by content, so names are
+    /// read by traversal here and never stored in the graph.
     pub fn to_interchange(&self) -> PositionedGraphData {
         let name = |index: VertexIndex| -> String {
-            self.content(index)
+            let width = self.vertex(index).expect("vertex of this graph").width();
+            let view = self
+                .interval(index, AtomPosition::default()..width.into())
+                .expect("whole vertex is a valid interval");
+            self.read_interval(&view)
                 .expect("vertex of this graph")
                 .into_iter()
                 .collect()

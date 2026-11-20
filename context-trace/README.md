@@ -45,9 +45,14 @@ read-only navigation `read.rs` (`PositionedGraph::read_interval`: content of an
 (`PositionedGraph::occurrences_in`: every retained occurrence inside an
 `IntervalView`, deduplicated by `(token, offset)`), `fixtures.rs` (`test-api`:
 `v3_fixtures`/`v3_graphs` loader, shared with context-search). Tests
-round-trip every v3 fixture of `context-read/tests/fixtures/v3` and check the
-navigation APIs on every interval of every fixture vertex against brute-force
-string matching. Boundary search lives in `context_search::boundary`.
+round-trip every v3 fixture of `context-read/tests/fixtures/v3`; the navigation
+APIs have no tests yet (their earlier tests looked vertices up by content and
+were removed). Boundary search lives in `context_search::boundary`.
+
+**Model rules (reader plan rev 4):** no index stores expanded content (the
+only value-keyed index is atom value → atom vertex; composites are reached
+structurally, by search); expanded content is stored only in debug builds;
+search states are reused for insertion and adjacent searches.
 
 Foundational component of the context framework providing core graph 
 structures, path operations, and tracing capabilities. Implements 

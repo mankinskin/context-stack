@@ -98,16 +98,6 @@ pub enum PositionedError {
         expected: TokenWidth,
         found: TokenWidth,
     },
-    /// Overlapping children disagree on the atom at `position`.
-    ContentMismatch {
-        owner: Option<VertexIndex>,
-        position: AtomPosition,
-    },
-    /// Content already represented by `existing`.
-    DuplicateContent {
-        existing: VertexIndex,
-        duplicate: Option<VertexIndex>,
-    },
     /// Occurrence `child@offset` in `parent` lacks its reciprocal link (or
     /// the link has no occurrence).
     ParentLink {
@@ -144,18 +134,6 @@ impl fmt::Display for PositionedError {
                 "vertex {}: width {} expected, found {}",
                 vertex.0, expected.0, found.0
             ),
-            Self::ContentMismatch { owner: o, position } => {
-                write!(f, "{}: children disagree at position {position}", owner(o))
-            },
-            Self::DuplicateContent {
-                existing,
-                duplicate,
-            } => write!(
-                f,
-                "{} duplicates the content of vertex {}",
-                owner(duplicate),
-                existing.0
-            ),
             Self::ParentLink {
                 parent,
                 child,
@@ -179,19 +157,24 @@ impl std::error::Error for PositionedError {}
 /// Vertices are dense (`VertexIndex(i)` is slot `i`) and never removed. The
 /// only way to add a composite is [`Self::insert`], which accepts complete
 /// compositions only, so gap, wrapper or slice vertices cannot be built.
+///
+/// No index stores expanded content: the only value-keyed index maps atom
+/// values to atom vertices. Composite vertices are reached structurally
+/// (reader plan rev 4, R1/R2).
 /// Not internally synchronized; share it through [`PositionedGraphRef`].
 /// Compare graphs with [`super::diff`], not by identity.
 #[derive(Clone, Debug)]
 pub struct PositionedGraph<G: GraphKind = BaseGraphKind> {
     pub(crate) vertices: Vec<PositionedVertex<G>>,
-    pub(crate) by_content: HashMap<Vec<AtomOf<G>>, VertexIndex>,
+    /// Atom value → atom vertex.
+    pub(crate) atoms: HashMap<AtomOf<G>, VertexIndex>,
 }
 
 impl<G: GraphKind> Default for PositionedGraph<G> {
     fn default() -> Self {
         Self {
             vertices: Vec::new(),
-            by_content: HashMap::new(),
+            atoms: HashMap::new(),
         }
     }
 }
@@ -215,71 +198,28 @@ impl<G: GraphKind> PositionedGraph<G> {
     ) -> Result<&PositionedVertex<G>, PositionedError> {
         self.vertex(index).ok_or(PositionedError::UnknownVertex(index))
     }
-    /// The vertex whose content is `content`, if any.
-    pub fn find(
+    /// The child of `occurrence` exists and has the recorded width.
+    fn check_child(
         &self,
-        content: &[AtomOf<G>],
-    ) -> Option<Token> {
-        self.by_content
-            .get(content)
-            .map(|&index| self.vertices[index.0].token())
-    }
-
-    /// Content of a vertex, reconstructed from its composition.
-    pub fn content(
-        &self,
-        index: VertexIndex,
-    ) -> Option<Vec<AtomOf<G>>> {
-        match &self.vertex(index)?.node {
-            VertexNode::Atom(atom) => Some(vec![*atom]),
-            VertexNode::Composite(composition) =>
-                self.compose_content(composition, None).ok(),
+        occurrence: &Occurrence,
+    ) -> Result<(), PositionedError> {
+        let child = self.expect(occurrence.child.index)?;
+        if child.width != occurrence.child.width {
+            return Err(PositionedError::Width {
+                vertex: child.index,
+                expected: child.width,
+                found: occurrence.child.width,
+            });
         }
+        Ok(())
     }
-
-    /// Overlay the children's contents at their offsets; overlapping children
-    /// must agree. Coverage is guaranteed by [`Composition`].
-    fn compose_content(
-        &self,
-        composition: &Composition,
-        owner: Option<VertexIndex>,
-    ) -> Result<Vec<AtomOf<G>>, PositionedError> {
-        let mut content: Vec<Option<AtomOf<G>>> =
-            vec![None; composition.width().0];
-        for occurrence in composition.occurrences() {
-            let child = self.expect(occurrence.child.index)?;
-            if child.width != occurrence.child.width {
-                return Err(PositionedError::Width {
-                    vertex: child.index,
-                    expected: child.width,
-                    found: occurrence.child.width,
-                });
-            }
-            let atoms = self
-                .content(child.index)
-                .ok_or(PositionedError::UnknownVertex(child.index))?;
-            for (i, atom) in atoms.into_iter().enumerate() {
-                let slot = &mut content[occurrence.offset.0 + i];
-                match slot {
-                    Some(existing) if *existing != atom =>
-                        return Err(PositionedError::ContentMismatch {
-                            owner,
-                            position: occurrence.offset + i,
-                        }),
-                    _ => *slot = Some(atom),
-                }
-            }
-        }
-        Ok(content.into_iter().map(Option::unwrap).collect())
-    }
-
     /// Insert an atom, or return the existing vertex for it.
     pub fn insert_atom(
         &mut self,
         atom: AtomOf<G>,
     ) -> Token {
-        if let Some(token) = self.find(&[atom]) {
-            return token;
+        if let Some(&index) = self.atoms.get(&atom) {
+            return Token::new(index, 1);
         }
         let index = VertexIndex(self.vertices.len());
         self.vertices.push(PositionedVertex {
@@ -289,26 +229,23 @@ impl<G: GraphKind> PositionedGraph<G> {
             node: VertexNode::Atom(atom),
             parents: BTreeMap::new(),
         });
-        self.by_content.insert(vec![atom], index);
+        self.atoms.insert(atom, index);
         Token::new(index, 1)
     }
 
     /// Insert a composite from its complete composition and link its children.
     ///
-    /// Rejects incomplete or malformed compositions, unknown children,
-    /// disagreeing overlaps and content that already has a vertex.
+    /// Rejects incomplete or malformed compositions, unknown children and
+    /// children whose recorded width disagrees with the vertex. Checks
+    /// structure only; content is never expanded.
     pub fn insert(
         &mut self,
         occurrences: Vec<Occurrence>,
     ) -> Result<Token, PositionedError> {
         let composition = Composition::new(occurrences)
             .map_err(|error| PositionedError::Composition { owner: None, error })?;
-        let content = self.compose_content(&composition, None)?;
-        if let Some(&existing) = self.by_content.get(&content) {
-            return Err(PositionedError::DuplicateContent {
-                existing,
-                duplicate: None,
-            });
+        for occurrence in composition.occurrences() {
+            self.check_child(occurrence)?;
         }
         let index = VertexIndex(self.vertices.len());
         let width = composition.width();
@@ -326,7 +263,6 @@ impl<G: GraphKind> PositionedGraph<G> {
             node: VertexNode::Composite(composition),
             parents: BTreeMap::new(),
         });
-        self.by_content.insert(content, index);
         Ok(Token::new(index, width))
     }
 
@@ -357,11 +293,9 @@ impl<G: GraphKind> PositionedGraph<G> {
         })
     }
 
-    /// Check the oracle's structural rules 1-7 (rule 8, corpus roots, belongs
-    /// to the interchange snapshot), reciprocal parent links and one vertex
-    /// per content.
+    /// Check the structural composition rules, recorded widths and reciprocal
+    /// parent links. Content is never expanded.
     pub fn validate(&self) -> Result<(), PositionedError> {
-        let mut seen = HashMap::new();
         for (slot, vertex) in self.vertices.iter().enumerate() {
             let index = vertex.index;
             if index.0 != slot {
@@ -370,8 +304,8 @@ impl<G: GraphKind> PositionedGraph<G> {
                     vertex: index,
                 });
             }
-            let content = match &vertex.node {
-                VertexNode::Atom(atom) => {
+            match &vertex.node {
+                VertexNode::Atom(_) => {
                     if vertex.width.0 != 1 {
                         return Err(PositionedError::Width {
                             vertex: index,
@@ -379,7 +313,6 @@ impl<G: GraphKind> PositionedGraph<G> {
                             found: vertex.width,
                         });
                     }
-                    vec![*atom]
                 },
                 VertexNode::Composite(composition) => {
                     let error = |error| PositionedError::Composition {
@@ -397,6 +330,7 @@ impl<G: GraphKind> PositionedGraph<G> {
                         });
                     }
                     for occurrence in composition.occurrences() {
+                        self.check_child(occurrence)?;
                         let linked = self
                             .expect(occurrence.child.index)?
                             .parents
@@ -410,9 +344,8 @@ impl<G: GraphKind> PositionedGraph<G> {
                             });
                         }
                     }
-                    self.compose_content(composition, Some(index))?
                 },
-            };
+            }
             for (&parent, offsets) in &vertex.parents {
                 let composition = self.expect(parent)?.composition();
                 for &offset in offsets {
@@ -430,24 +363,6 @@ impl<G: GraphKind> PositionedGraph<G> {
                     }
                 }
             }
-            if let Some(existing) = seen.insert(content.clone(), index) {
-                return Err(PositionedError::DuplicateContent {
-                    existing,
-                    duplicate: Some(index),
-                });
-            }
-            if self.by_content.get(&content) != Some(&index) {
-                return Err(PositionedError::DuplicateContent {
-                    existing: self.by_content.get(&content).copied().unwrap_or(index),
-                    duplicate: Some(index),
-                });
-            }
-        }
-        if self.by_content.len() != self.vertices.len() {
-            return Err(PositionedError::Index {
-                slot: self.vertices.len(),
-                vertex: VertexIndex(self.by_content.len()),
-            });
         }
         Ok(())
     }

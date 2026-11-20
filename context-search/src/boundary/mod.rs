@@ -19,9 +19,6 @@ use context_trace::{
     },
 };
 
-#[cfg(test)]
-mod tests;
-
 /// A retained occurrence found by a boundary search.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BoundaryOccurrence {

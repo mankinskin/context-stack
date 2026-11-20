@@ -1,6 +1,5 @@
-//! Model-only rules: complete compositions on insert, reciprocal links and
-//! one vertex per content. Structural cover rules are tested on the
-//! interchange validator.
+//! Model-only rules: complete compositions on insert and reciprocal links.
+//! Structural cover rules are tested on the interchange validator.
 
 use crate::{
     AtomPosition,
@@ -13,7 +12,6 @@ use crate::{
         OccurrencePath,
         PositionedError,
         PositionedGraph,
-        VertexNode,
     },
 };
 
@@ -37,7 +35,7 @@ fn ababa() -> (PositionedGraph, Token, Token) {
 }
 
 #[test]
-fn insert_links_parents_and_rejects_incomplete_or_inconsistent_compositions() {
+fn insert_links_parents_and_rejects_incomplete_compositions() {
     let (mut graph, aba, ababa) = ababa();
     let a = graph.insert_atom('a');
     assert_eq!(a.index, VertexIndex(0), "atoms are reused");
@@ -64,26 +62,9 @@ fn insert_links_parents_and_rejects_incomplete_or_inconsistent_compositions() {
             ..
         })
     ));
-    // `aba@1` places `a` over the `b` of `aba@0`.
-    assert_eq!(
-        graph.insert(vec![Occurrence::new(0, aba), Occurrence::new(1, aba)]),
-        Err(PositionedError::ContentMismatch {
-            owner: None,
-            position: AtomPosition::from(1),
-        })
-    );
     assert_eq!(
         graph.insert(vec![Occurrence::new(0, a), Occurrence::new(1, Token::new(VertexIndex(99), 1))]),
         Err(PositionedError::UnknownVertex(VertexIndex(99)))
-    );
-    // Same content as `ababa` through a different (non-maximal) cover.
-    let ab = graph.insert(vec![Occurrence::new(0, a), Occurrence::new(1, graph.find(&['b']).unwrap())]).unwrap();
-    assert_eq!(
-        graph.insert(vec![Occurrence::new(0, ab), Occurrence::new(2, aba)]),
-        Err(PositionedError::DuplicateContent {
-            existing: ababa.index,
-            duplicate: None,
-        })
     );
     graph.validate().unwrap();
 }
@@ -122,26 +103,9 @@ fn validate_rejects_broken_reciprocal_links() {
 }
 
 #[test]
-fn validate_rejects_duplicate_content() {
-    let (mut graph, _, _) = ababa();
-    let mut duplicate = graph.vertices[0].clone();
-    duplicate.index = VertexIndex(graph.vertices.len());
-    duplicate.node = VertexNode::Atom('a');
-    duplicate.parents.clear();
-    graph.vertices.push(duplicate);
-    assert_eq!(
-        graph.validate(),
-        Err(PositionedError::DuplicateContent {
-            existing: VertexIndex(0),
-            duplicate: Some(VertexIndex(4)),
-        })
-    );
-}
-
-#[test]
 fn occurrence_paths_and_intervals_are_checked_against_the_graph() {
-    let (graph, aba, ababa) = ababa();
-    let b = graph.find(&['b']).unwrap();
+    let (mut graph, aba, ababa) = ababa();
+    let b = graph.insert_atom('b');
     let step = |parent: Token, offset: usize, child: Token| OccurrenceLocation {
         parent: parent.index,
         offset: offset.into(),

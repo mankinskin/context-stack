@@ -15,13 +15,8 @@ use support::positioned::load_v3;
 fn assert_scenario(name: &str) {
     let fixture = load_v3(name);
     let graph = PositionedGraphRef::default();
-    for (index, input) in fixture.corpus.iter().enumerate() {
-        let root = context_read::read(&graph, input.chars()).expect("nonempty input");
-        assert_eq!(
-            graph.read().content(root.index).map(|atoms| atoms.into_iter().collect::<String>()).as_ref(),
-            Some(input),
-            "{name}, step {index}: root content"
-        );
+    for input in &fixture.corpus {
+        context_read::read(&graph, input.chars()).expect("nonempty input");
     }
     let graph = graph.read();
     graph

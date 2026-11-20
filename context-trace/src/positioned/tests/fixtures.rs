@@ -23,19 +23,3 @@ fn v3_fixtures_round_trip_through_positioned_graph() {
         assert_eq!(actual, fixture.graph, "{name}");
     }
 }
-
-#[test]
-fn content_reconstructs_from_compositions() {
-    for (name, fixture) in fixtures() {
-        let graph = PositionedGraph::<crate::BaseGraphKind>::from_interchange(&fixture.graph)
-            .unwrap();
-        for content in fixture.graph.vertices.keys() {
-            let atoms: Vec<char> = content.chars().collect();
-            let token = graph
-                .find(&atoms)
-                .unwrap_or_else(|| panic!("{name}: no vertex for {content:?}"));
-            assert_eq!(token.width.0, atoms.len(), "{name}: {content:?}");
-            assert_eq!(graph.content(token.index), Some(atoms), "{name}: {content:?}");
-        }
-    }
-}

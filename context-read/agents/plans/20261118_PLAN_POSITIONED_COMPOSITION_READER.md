@@ -205,13 +205,30 @@ without the `legacy` feature.
 
 Corrects the Phase 1 scaffold; no new algorithms.
 
-- [ ] Remove `PositionedGraph::by_content` and `PositionedGraph::find`.
-  Replace with `atom_index: HashMap<Atom, VertexIndex>` and
-  `atom(&Atom) -> Option<Token>`; `insert_atom` uses it.
-- [ ] `insert(composition)` no longer expands content in release builds. It
-  checks only structure: `Composition` invariants, known children, recorded
-  widths, reciprocal links. Content agreement of overlapping children and
-  content uniqueness move into `#[cfg(debug_assertions)]` checks.
+**Clean slate (2026-11-19):** every content-based implementation was removed
+without replacement, so the correct model can be designed from scratch:
+`by_content`, `find`, `content`, `compose_content`, the `ContentMismatch` /
+`DuplicateContent` errors and the content checks in `insert`/`validate`.
+What remains is only structural: `Composition`, parent links, an atom-value
+index (`atoms: HashMap<Atom, VertexIndex>`, used by `insert_atom`),
+`read_interval`, `occurrences_in`, boundary search, and `from_interchange` /
+`to_interchange` (export names are read by traversal, never stored). Tests
+that looked vertices up by content were deleted, not rewritten: the
+`read_interval`, `occurrences_in` and boundary-search tests (8),
+`content_reconstructs_from_compositions` and
+`validate_rejects_duplicate_content`. The navigation APIs are untested until
+the model is redefined. The reader lane no longer asserts per-input root
+content; it still compares the final graph with the fixture. Workspace:
+542 passed / 0 failed / 444 ignored. The remaining items below are to be
+re-decided with the model guidance that follows; do not implement them
+ahead of it.
+
+- [x] Remove `PositionedGraph::by_content` and `PositionedGraph::find`;
+  `insert_atom` uses an atom-value index.
+- [x] `insert(composition)` no longer expands content. It checks only
+  structure: `Composition` invariants, known children, recorded widths;
+  parent links are written. (Content agreement and uniqueness checks were
+  removed, not moved into debug checks.)
   (Phase 2c replaces the public `insert(Vec<Occurrence>)` by insertion from a
   search state; a raw structural insert stays `pub(crate)`/`test-api` for
   fixture loading.)
@@ -219,8 +236,7 @@ Corrects the Phase 1 scaffold; no new algorithms.
   `PositionedVertex` (built from the children's labels at insertion); the
   graph registers itself as `TokenNameResolver` in debug builds. Release
   `Display` shows index and width only.
-- [ ] `content(index)` becomes a traversal (`read_interval` over the whole
-  vertex), documented as diagnostic/export only; no algorithm uses it.
+- [x] `content(index)` removed (export uses `read_interval` directly).
 - [ ] `validate()`: structural rules and reciprocal links always; the
   one-vertex-per-content and overlap-agreement rules only under
   `debug_assertions` or `test-api`, computed by traversal into a temporary

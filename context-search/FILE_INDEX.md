@@ -14,8 +14,8 @@ over `context_trace::positioned::PositionedGraph`:
 `boundary_occurrences(graph, owner, position, Boundary::{Start, End})`,
 `prefixes`, `postfixes` → `Vec<BoundaryOccurrence { token, path:
 OccurrencePath }>` (retained proper descendants touching the boundary, longest
-first, one evidence path each). `boundary/tests.rs` checks every v3 fixture
-vertex and position against brute-force string matching.
+first, one evidence path each). No tests yet: the earlier ones looked vertices
+up by content and were removed (reader plan rev 4, R1).
 
 **Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
