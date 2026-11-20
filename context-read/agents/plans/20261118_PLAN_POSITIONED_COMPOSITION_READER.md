@@ -1,9 +1,9 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition` `#overlap` `#frequency` `#streaming`
 summary: Migrate the context stack from contiguous child-pattern rows to positioned compositions. Retained vertices store maximal child occurrences with offsets; overlaps are explicit and gaps/wrappers are never vertices. Introduce positioned locations and navigation, replace row-based overlap closure with an occurrence merge plus seam discovery, accumulate input in owned positioned covers, and only then add streaming retention with retrospective host updates.
-status: 🚧 phases 0-2 done (via the preparation plan); phase 2b (content-free model) next, then 2c (search state), then 3
-revision: 4
-date: 2026-11-19
+status: 🚧 phases 0-2 done (via the preparation plan); 2b clean slate done; next 2c.0 (test name map), then 2c (legacy-architecture search with positional sibling navigation), then 3
+revision: 5
+date: 2026-11-20
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
 prerequisite: 20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md (Phase −1 legacy isolation, and Phases 0-2 below)
 related: 20261116_PLAN_OVERLAP_PROVIDER_MIGRATION.md (row-based closure; superseded for the positioned backend once Phase 4 below lands)
@@ -96,6 +96,21 @@ Consequences:
   force expectations come from fixture strings, not from graph lookups.
 
 Phases 2b and 2c below implement R1-R3 before any algorithm work (Phase 3).
+
+## Revision 5 (2026-11-20): search keeps the legacy architecture
+
+The rev-4 Phase 2c design (`SearchState` with a frontier, `continue_at`,
+`PositionedTrace`, comparing content by descent) is withdrawn. The positioned
+model only removes redundant links, so search keeps the legacy architecture:
+climb parent links from the first query token, compare next siblings with the
+query in a width-ordered queue, take the first (unique) match, extend it with
+the root cursor, and raise on root exhaustion. The result is a trace with an
+up path, a root span and a down path. Only sibling navigation changes
+(`start_at`, `prefix_child`, offset-labelled locations). Legacy names are
+kept (`ParentState`, `RootCursor`, `MatchResult`, `TraceCache`, `Response`).
+R3 is met as in legacy: `Response` seeds insertion and the next adjacent
+search. Phases 3 and 4 consume `Response`. A Python prototype confirmed the
+design on all v3 fixtures (Phase 2c, "Evidence").
 
 ---
 
@@ -230,7 +245,7 @@ ahead of it.
   parent links are written. (Content agreement and uniqueness checks were
   removed, not moved into debug checks.)
   (Phase 2c replaces the public `insert(Vec<Occurrence>)` by insertion from a
-  search state; a raw structural insert stays `pub(crate)`/`test-api` for
+  `Response`; a raw structural insert stays `pub(crate)`/`test-api` for
   fixture loading.)
 - [ ] Debug-only content: `#[cfg(debug_assertions)] label` on
   `PositionedVertex` (built from the children's labels at insertion); the
@@ -244,7 +259,7 @@ ahead of it.
 - [ ] `from_interchange` returns the graph plus a test/interchange name map
   (`BTreeMap<String, Token>`, `test-api`); `to_interchange` names vertices by
   traversal. Rewrite the Phase 1/2 tests that call `find(&atoms)` to use the
-  name map.
+  name map. Moved to Phase 2c.0 (prerequisite of the search tests).
 - [ ] Guard: a test (or `clippy::disallowed_methods`/review rule) that the
   positioned graph has no content-keyed field; document R1/R2 in the
   context-trace README.
@@ -254,61 +269,211 @@ stores expanded content in release (`cargo test --release -p context-trace
 --no-default-features --features test-api` passes and the release
 `PositionedVertex` has no label field); `--no-default-features` check green.
 
-### Phase 2c — Positioned search with reusable state (R1, R3)
+### Phase 2c — Positioned search: legacy architecture, positional sibling navigation (R1, R3)
 
-The positioned replacement for `Find`/`Response`/`TraceCache`. Lives in
-`context-search` (search) with the trace types in `context-trace`.
+**Design decision (rev 5, 2026-11-20).** The positioned model only removes
+redundant links: a vertex stores the children that are strictly necessary
+(maximal occurrences with offsets), but every descendant stays reachable, and
+parent links still reach every retained superstring. Therefore the legacy
+search/trace architecture is **kept as is**; only sibling navigation and the
+addressing of locations change. Do not redesign the algorithm.
 
-- **`PositionedTrace`** (successor of `TraceCache`): for each vertex entered,
-  the occurrences taken bottom-up (child → parent at offset) and top-down
-  (parent → child at offset), keyed by `(vertex, offset in the search root)`.
-  It is the only record of which structure the search visited; insertion and
-  continuation read it instead of re-traversing.
-- **`SearchState`** (successor of `Response`):
-  - `start`: query position; `matched`: the widest retained token matching
-    the query from `start`, with its `OccurrencePath`(s);
-  - `trace: PositionedTrace`;
-  - `frontier`: candidates climbed but not yet decided — parents in which
-    the matched token occurs and whose content continues past the matched end
-    (these are both the overlap candidates for the reader and the starting
-    points of the next search), each with its occurrence path;
-  - `end`: `Complete` (query consumed inside a retained token), `Mismatch {
-    at }` (next atom diverges from every candidate) or `QueryExhausted`
-    (input ended inside candidates; needed for streaming).
-- **Algorithm** (structural only, R1): start at the atom vertex of
-  `query[start]`, climb parent links (`parents: child → {parent → offsets}`),
-  compare the following query atoms against each candidate's content by
-  descending its composition with a positioned cursor (an `OccurrencePath`
-  to the child covering the next position — no content expansion), keep the
-  widest complete match, and stop when no candidate continues. Candidates
-  are pruned on the first diverging atom.
-- **Reuse API:**
-  - `search(graph, query) -> SearchState` (fresh);
-  - `SearchState::continue_at(self, graph, query) -> SearchState` for the
-    adjacent search starting at `matched` end: seeds from `frontier` and the
-    retained postfixes recorded in `trace`, never restarting from the atom
-    when the frontier already covers the position;
-  - `InsertRequest::from(SearchState)` (successor of
-    `InitInterval::from(Response)`): carries the occurrences for the new
-    composition and the parents whose reciprocal links change, taken from the
-    trace. `PositionedGraph::insert_from(InsertRequest)` is the only public
-    composite insertion; a search state that found a complete existing token
-    yields that token instead of an insert request (this is what makes
-    content uniqueness structural, see Revision 4).
-- **Tests:**
-  - every position of every v3 fixture's corpus texts and of random strings
-    over the fixture alphabet: `matched` equals the brute-force longest
-    retained prefix computed from the fixture *strings*;
-  - continuation: reading a whole text by `continue_at` yields the same
-    matches as fresh searches at each position, and a counting hook shows no
-    vertex entered twice across the chain beyond the frontier;
-  - insertion from a search state on a graph with a token removed from the
-    fixture reproduces the fixture's composition and parent links of that
-    token;
-  - no test uses content lookup (R1).
+#### Legacy algorithm (reference)
 
-**Gate:** all three test groups pass on every v3 fixture; the search and
-insertion code compiles in release without any content-keyed structure.
+Code in `context-search/src/legacy` and `context-trace/src/legacy/trace`.
+
+1. **Seed** (`DirectedTraversalPolicy::gen_parent_batch`, `policy.rs`): every
+   parent link of the first query token, `parent × (pattern_id, sub_index)`,
+   becomes a `ParentState { prev_pos, root_pos, path: IndexStartPath }` paired
+   with the query cursor (`ParentCompareState`).
+2. **Queue** (`match/mod.rs`, `SearchQueue`/`SearchNode`): a min-heap on the
+   root width, so the smallest context is compared first.
+3. **Next sibling** (`ParentState::advance_state`, `trace/state/parent.rs`):
+   `pattern[sub_index + 1]`. If the row ends, `Err` → `next_batch` raises
+   the state to the root's parents (`PathRaise::path_raise`, which extends the
+   start path upward and advances `root_pos`).
+4. **Compare** (`compare_leaf_tokens`, `compare/state/decomposition.rs`):
+   - equal tokens → `FoundMatch`;
+   - two different atoms → `Mismatch`;
+   - otherwise the wider side is decomposed into its prefix children (the
+     head of every row, widest first; `QueryMajor`/`GraphMajor`; both sides
+     on equal width) → `ChildCandidate`s are queued.
+5. **First match wins** (`SearchIterator::find_next_root_match`): the first
+   `FoundMatch` clears the queue. A non-frequent token sequence is unique
+   (otherwise it would be a token), so no other candidate can also match.
+6. **Root cursor** (`match/root_cursor/advance.rs`): query cursor and graph
+   end path advance together (`MovePath<Right, End>`: pop path nodes, next
+   index in the row, else move the root index). It ends with:
+   - `Conclusive(Exhausted)`: the query is consumed;
+   - `Conclusive(Mismatch)`: maximal match after progress;
+   - `Inconclusive`: the root is exhausted → parent batch of the root,
+     back to step 2 with the best match kept.
+7. **Result**: `MatchResult { path: PathCoverage (EntireRoot | Range |
+   Prefix | Postfix over an IndexRangePath = start path ↑, root row span,
+   end path ↓), cursor: checkpointed query cursor }`, traced into the
+   `TraceCache` (`VertexIndex → { bottom_up, top_down }` keyed by
+   `DirectedKey(token, Up/DownPosition)`, edges labelled with
+   `SubLocation(pattern_id, sub_index)`). `Response { cache, end }` seeds
+   insertion (`InitInterval::from(Response)`) and the next adjacent search.
+
+#### What changes in the positioned model
+
+| Legacy (rows) | Positioned |
+|---|---|
+| `ChildLocation(parent, pattern_id, sub_index)` | `OccurrenceLocation(parent, offset, child)`; no `pattern_id` |
+| parent links `parent → {(pattern_id, sub_index)}`; seed batch `parent × pattern index` | `parents: parent → {offset}`; seed batch `parent × offset` |
+| next sibling `pattern[i + 1]` | `start_at(root, p)` with `p = entry offset + width` of the matched part (below) |
+| `prefix_children()`: head of every row, several branches | `prefix_child()`: the single occurrence at offset 0; decomposition is one deterministic chain |
+| end path `MovePath`: pop, `index + 1`, else move root index | pop steps whose occurrence ends at or before `p`, then descend by `start_at`; root exhausted ⇔ `p == width(root)` |
+| `path_raise`: `root_pos += width(pattern[entry+1..])`, push `ChildLocation` | raising root `R` through link `(P, o)`: span `[s, e)` in `R` becomes `[o + s, o + e)` in `P`; push `OccurrenceLocation(P, o, R)` onto the start path |
+| `IndexRangePath`: start/end paths of `ChildLocation`s, root row with entry/exit index | `RangePath { root, start: Vec<OccurrenceLocation> (↑), end: Vec<OccurrenceLocation> (↓) }`; root span = absolute offsets, entry and exit occurrences may overlap |
+| `TraceCache` edges labelled `SubLocation` | same shape and keys (`DirectedKey`), edges labelled by occurrence offset |
+| `PathCoverage` from row indices | same four variants, classified by `span.start == 0` and `span.end == width(root)` |
+
+Unchanged:
+- seeding from the first query token;
+- the width-ordered queue and clearing it on the first match;
+- the three root-cursor outcomes and raising on `Inconclusive`;
+- the checkpoint/candidate query cursor;
+- the trace shape (up path, root span, down path);
+- `Response` as the reusable result (R3).
+
+**`start_at(R, p)`: the new sibling primitive.** It returns the largest
+retained token that starts at relative position `p` inside `R`, together with
+the descent steps. By the `Composition` invariants (sorted, no gaps, no
+containment, hence strictly increasing ends):
+
+1. Binary search (`partition_point`) for the last occurrence `C` with
+   `C.offset ≤ p`. `C` contains `p`, and among the occurrences containing `p`
+   it ends furthest.
+2. If `C.offset == p`, return `C.child`. Every other retained token starting
+   at `p` lies inside `C`, at offset 0, so it is a prefix and is reachable
+   through the `prefix_child` chain.
+3. Otherwise recurse into `start_at(C.child, p − C.offset)` and record the
+   step. Overlaps are handled without special cases: the next sibling may
+   lie inside a cover that started before `p`.
+
+Cost: O(depth · log(children)), without any content access (R1).
+
+**Evidence** (Python prototype on all 58 v3 fixtures; kept in the session
+files as `search_prototype.py`, not committed):
+- `start_at` returned the largest retained token occurring at `p` in all
+  706 `(vertex, position)` checks;
+- the algorithm above (climb from the first atom, width-ordered queue, first
+  match clears the queue, root cursor with `start_at`, raise on
+  exhaustion) matched the brute-force expectation for all 17,979 queries;
+- no query had an ambiguous expectation, and no query had two candidates
+  of equal width matching at the first comparison.
+
+#### Implementation steps
+
+New code lives at the crate roots (not in `legacy`), passes the
+`--no-default-features --features test-api` check, mirrors the legacy module
+layout and names (so the correspondence stays obvious), and does not port
+the visualization events (later, if needed).
+
+- [ ] **2c.0 Prerequisite (from Phase 2b).** `from_interchange` returns a
+  test-only name map `BTreeMap<String, Token>` (`test-api`). Search tests
+  translate brute-force string expectations into tokens with it; never
+  through the graph (R1).
+- [ ] **2c.1 Navigation primitives** (`context-trace`, `positioned`):
+  - `Composition::covering(p) -> &Occurrence` (binary search);
+  - `PositionedGraph::start_at(root, p) -> (Token, Vec<OccurrenceLocation>)`;
+  - `PositionedGraph::prefix_child(token) -> Option<Occurrence>`;
+  - `PositionedGraph::parent_occurrences(token) -> impl Iterator<Item =
+    (Token, AtomPosition)>`, in a deterministic order (width, index, offset).
+
+  Tests: `start_at` on every vertex and position of every v3 fixture equals
+  the brute-force largest fixture string occurring at `p` in the vertex
+  string; steps form a valid `OccurrencePath` (`contains_path`) whose
+  offsets sum to `p`.
+- [ ] **2c.2 Trace states** (`context-trace`, `positioned::trace`):
+  - `ParentState { root: Token, start: AtomPosition (entry), end:
+    AtomPosition, start_path }` with `advance_state` (sibling via
+    `start_at(root, end)`, `Err` when `end == width(root)`) and `path_raise`;
+  - `ChildState`/`RootChildState` over `RangePath`;
+  - `TraceCache` (same structure as legacy, offset-labelled edges);
+  - `PathCoverage` classification.
+- [ ] **2c.3 Search** (`context-search`, root modules `search`, `match`,
+  `compare`, `cursor`, `state`):
+  - `SearchQueue` (min-heap on root width), `SearchNode::{ParentCandidate,
+    ChildCandidate}`, `NodeConsumer`;
+  - `CompareState::compare_leaf_tokens` with the four cases, decomposing by
+    `prefix_child`;
+  - `RootCursor::advance_to_next_match` with the three outcomes, advancing
+    the end path by `start_at`;
+  - `MatchResult`, `Response { cache, end }`, and
+    `Find::find_ancestor(query)` for `PositionedGraphRef`.
+
+  Queries are token sequences. The reader passes atoms (resolved through the
+  atom index). Composite query tokens follow the `QueryMajor` decomposition.
+  `find_parent` is ported only when a consumer needs it.
+- [ ] **2c.4 Canonical paths.** Define the positioned analogue of the
+  legacy `simplify` and of the `path_raise` rule that omits a start-path
+  step at offset 0 when the sub path is empty. Candidate rule: a path stops
+  at the largest token whose boundary coincides with the span boundary. Fix
+  the rule by tests before Phase 3 consumes paths.
+- [ ] **2c.5 Reuse (R3).** `Response` is the only hand-off:
+  - Phase 3 builds its insertion init from `Response` (successor of
+    `InitInterval::from(Response)`) and reads occurrences from `cache`/`end`;
+  - the reader continues the next adjacent search at the query cursor's
+    checkpoint of `end`.
+
+  `PositionedGraph::insert` stays `pub(crate)`/`test-api` (fixture
+  loading). Public composite insertion goes through a `Response`.
+
+#### Validation against oracle fixtures
+
+All in `context-search` tests, loading fixtures via
+`context_trace::positioned::fixtures::v3_graphs()` plus the 2c.0 name map.
+Expectations are computed from the fixture **strings** (corpus and vertex
+keys), never from graph lookups or reader output.
+
+- **Brute-force expectation** for a query `q`:
+  - `k` = length of the longest prefix of `q` occurring in a corpus text;
+  - `root` = the minimal-width fixture vertex string containing `q[..k]`,
+    and `o` its offset there.
+
+  The test asserts that `(root, o)` is unique. If it is not, the oracle
+  contradicts the uniqueness assumption, and that must fail loudly.
+- **Query set per fixture:**
+  - every substring of every corpus text (complete matches, all coverage
+    kinds);
+  - every such substring extended by every alphabet atom (mismatch and
+    raise paths);
+  - seeded random strings over the alphabet (300 per fixture).
+- **Assertions per query:**
+  - `end.root == name_map[root]` and the span is `[o, o + k)`;
+  - `PathCoverage` is `EntireRoot` iff `o == 0 && k == |root|`, `Prefix` iff
+    `o == 0`, `Postfix` iff `o + k == |root|`, `Range` otherwise;
+  - the end reason is query exhausted iff `k == |q|`, mismatch otherwise;
+  - the start path ends at the atom `q[0]` at absolute offset `o`, the end
+    path at `q[k − 1]` at `o + k − 1`, and every step satisfies
+    `contains_path`;
+  - test-side diagnostic: `read_interval(root, o..o + k) == q[..k]`
+    (allowed in tests, R2);
+  - the trace cache has an entry for every vertex on both paths, and its up
+    edges agree with the parent links.
+- **Uniqueness probe:** a `test-api` counter records how often a second
+  equal-width candidate would also match at the first comparison. It must
+  be 0 on every fixture (0 in the prototype).
+- **Named cases** (mirroring the legacy search cases on oracle-consistent
+  graphs):
+  - `repeat_abcabca`: `abcab` matches through `abca@0`, raises to
+    `abcabca` and descends into the overlapping `abca@3` →
+    `Prefix(abcabca, 0..5)`;
+  - `repeat_ababa`: `abab` raises `aba → ababa`;
+  - `seam_bcd`: `bcd` and `abcd` (a span crossing the seam);
+  - `repeat_ababab` and `repeating_known` (`xyyxy`), the legacy
+    `cases/ababab.rs` and `cases/xyyxy.rs` corpora;
+  - `late_retention__2`.
+- **Continuation (R3):** for every corpus text, chained adjacent searches
+  starting at each `end` checkpoint give the same sequence of matches as
+  fresh searches at those positions.
+
+**Gate:** all of the above pass on every v3 fixture; release build without
+any content-keyed structure; `--no-default-features` check green. Only then
+does Phase 3 start.
 
 ### Phase 3 — Positioned merge and seam discovery in `context-insert`
 
@@ -326,8 +491,8 @@ No complement interning, no wrapper creation, no nested closure. Preserve the
 accepted evidence (anchor occurrence, expansion path) as in the overlap
 provider plan; only its consumer changes.
 
-Inputs are `SearchState`s (Phase 2c), not tokens: the occurrences to project
-and the seam candidates come from their traces and frontiers, so the merge
+Inputs are `Response`s (Phase 2c), not tokens: the occurrences to project
+and the seam candidates come from their trace caches and end paths, so the merge
 does not repeat the searches that found the two sides. Seam discovery may
 traverse only beyond what the traces already cover. No content expansion
 (R1/R2).
@@ -346,12 +511,12 @@ oracle composition of the combined vertex, including the seam case.
   extends the width and reconciles affected occurrences; an accepted overlap
   extends the same coordinate space. The real root vertex is published or
   reused only at the end of the input.
-- The reader drives one chain of search states per input: each next token
-  is found by `SearchState::continue_at` from the previous state, and the
-  committed root keeps the state of its committed suffix (its retained
-  postfixes with paths), so overlap expansion at the commit boundary reuses
-  it. Re-searching a position already covered by a state is a bug; the
-  Phase 2c counting hook is asserted in the reader tests.
+- The reader drives one chain of searches per input, as in legacy: each
+  next search starts at the query checkpoint of the previous `Response`,
+  and the committed root keeps the `Response` of its committed suffix (its
+  trace cache and end path), so overlap expansion at the commit boundary
+  reuses it. Re-searching a position already covered by a `Response` is a
+  bug; a `test-api` counter is asserted in the reader tests.
 - First milestone: read `abcabca` into one owned cover and publish
   `abcabca = abca@0, abca@3` without allocating `abc`, `bca`, `bc` or any
   wrapper vertex.
@@ -457,7 +622,9 @@ in the Linux codespace) and all tests pass; READMEs updated.
 | Retrospective updates are unbounded | Measure affected hosts; answer the Phase 5 open questions before committing to a data structure |
 | Large blast radius of the `context-trace` model change | Coexisting backends until Phase 6; no in-place rewrite of `ChildPatterns` |
 | Content-keyed shortcuts creep back (lookup tables, expanding content to compare) | R1/R2 in Revision 4; Phase 2b guard test; review rule: no algorithm calls `content`/`read_interval` |
-| Repeated traversals while reading many adjacent patterns | R3: `SearchState` continuation and `InsertRequest::from(SearchState)`; counting hook asserted in Phase 2c and Phase 4 tests |
+| Repeated traversals while reading many adjacent patterns | R3: `Response` seeds insertion and the next adjacent search (as legacy); continuation test in Phase 2c, counter asserted in Phase 4 |
+| Uniqueness assumption (a non-frequent sequence has one context) fails for some oracle output | Phase 2c asserts unique brute-force expectations and a zero tie counter on every fixture; a failure is an oracle/model issue, not something to work around in search |
+| Positioned search drifts from the legacy architecture | Rev 5: mirror legacy modules and names; only `start_at`/`prefix_child`/offset locations differ |
 
 ## 6. Non-goals
 
