@@ -151,6 +151,19 @@ pub enum PositionedError {
         slot: usize,
         vertex: VertexIndex,
     },
+    /// `first` and `second` denote the same content.
+    #[cfg(any(debug_assertions, feature = "test-api"))]
+    DuplicateContent {
+        first: VertexIndex,
+        second: VertexIndex,
+    },
+    /// Adjacent occurrences in `owner` denote different atoms on their overlap.
+    #[cfg(any(debug_assertions, feature = "test-api"))]
+    OverlapMismatch {
+        owner: VertexIndex,
+        left: Occurrence,
+        right: Occurrence,
+    },
 }
 
 impl fmt::Display for PositionedError {
@@ -187,6 +200,18 @@ impl fmt::Display for PositionedError {
             Self::Index { slot, vertex } => {
                 write!(f, "vertex {} stored at slot {slot}", vertex.0)
             },
+            #[cfg(any(debug_assertions, feature = "test-api"))]
+            Self::DuplicateContent { first, second } => write!(
+                f,
+                "vertices {} and {} have the same content",
+                first.0, second.0
+            ),
+            #[cfg(any(debug_assertions, feature = "test-api"))]
+            Self::OverlapMismatch { owner, left, right } => write!(
+                f,
+                "vertex {}: occurrences {}@{} and {}@{} disagree on their overlap",
+                owner.0, left.child.index.0, left.offset, right.child.index.0, right.offset
+            ),
         }
     }
 }
@@ -373,7 +398,10 @@ impl<G: GraphKind> PositionedGraph<G> {
     }
 
     /// Check the structural composition rules, recorded widths and reciprocal
-    /// parent links. Content is never expanded.
+    /// parent links.
+    ///
+    /// Debug and `test-api` builds additionally check content by traversal
+    /// (see [`Self::validate_content`]); release builds never expand content.
     pub fn validate(&self) -> Result<(), PositionedError> {
         for (slot, vertex) in self.vertices.iter().enumerate() {
             let index = vertex.index;
@@ -442,6 +470,62 @@ impl<G: GraphKind> PositionedGraph<G> {
                     }
                 }
             }
+        }
+        #[cfg(any(debug_assertions, feature = "test-api"))]
+        self.validate_content()?;
+        Ok(())
+    }
+
+    /// One vertex per content and overlap agreement, read by traversal into
+    /// a temporary set dropped on return. Assumes the structural checks of
+    /// [`Self::validate`] passed.
+    #[cfg(any(debug_assertions, feature = "test-api"))]
+    fn validate_content(&self) -> Result<(), PositionedError> {
+        let read = |owner: VertexIndex, range: Range<usize>| {
+            let view = IntervalView {
+                owner,
+                range: range.start.into()..range.end.into(),
+            };
+            self.read_interval(&view).expect("structurally valid interval")
+        };
+        let mut seen: HashMap<Vec<AtomOf<G>>, VertexIndex> = HashMap::new();
+        for vertex in &self.vertices {
+            if let Some(composition) = vertex.composition() {
+                // Ends increase strictly, so an occurrence overlapping a
+                // non-adjacent one also covers that overlap; checking adjacent
+                // pairs implies agreement of all pairs.
+                for pair in composition.occurrences().windows(2) {
+                    let (left, right) = (pair[0], pair[1]);
+                    let Some(overlap) = left.end().0.checked_sub(right.offset.0) else {
+                        continue;
+                    };
+                    let width = left.child.width.0;
+                    if read(left.child.index, width - overlap..width)
+                        != read(right.child.index, 0..overlap)
+                    {
+                        return Err(PositionedError::OverlapMismatch {
+                            owner: vertex.index,
+                            left,
+                            right,
+                        });
+                    }
+                }
+            }
+            let content = read(vertex.index, 0..vertex.width.0);
+            if content.len() != vertex.width.0 {
+                return Err(PositionedError::Width {
+                    vertex: vertex.index,
+                    expected: TokenWidth(content.len()),
+                    found: vertex.width,
+                });
+            }
+            if let Some(&first) = seen.get(&content) {
+                return Err(PositionedError::DuplicateContent {
+                    first,
+                    second: vertex.index,
+                });
+            }
+            seen.insert(content, vertex.index);
         }
         Ok(())
     }

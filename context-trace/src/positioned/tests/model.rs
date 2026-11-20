@@ -123,3 +123,45 @@ fn occurrence_paths_and_intervals_are_checked_against_the_graph() {
     assert!(graph.interval(ababa.index, range(1, 4)).is_some());
     assert!(graph.interval(ababa.index, range(3, 6)).is_none());
 }
+
+#[cfg(any(debug_assertions, feature = "test-api"))]
+#[test]
+fn validate_rejects_duplicate_content() {
+    let (mut graph, _, _) = ababa();
+    let a = graph.insert_atom('a');
+    let b = graph.insert_atom('b');
+    let ab = graph.insert(vec![Occurrence::new(0, a), Occurrence::new(1, b)]).unwrap();
+    graph.validate().unwrap();
+    let again = graph.insert(vec![Occurrence::new(0, a), Occurrence::new(1, b)]).unwrap();
+    assert_eq!(
+        graph.validate(),
+        Err(PositionedError::DuplicateContent {
+            first: ab.index,
+            second: again.index,
+        })
+    );
+}
+
+#[cfg(any(debug_assertions, feature = "test-api"))]
+#[test]
+fn validate_rejects_overlap_disagreement() {
+    let (mut graph, _, _) = ababa();
+    let a = graph.insert_atom('a');
+    let b = graph.insert_atom('b');
+    let c = graph.insert_atom('c');
+    let ab = graph.insert(vec![Occurrence::new(0, a), Occurrence::new(1, b)]).unwrap();
+    let ca = graph.insert(vec![Occurrence::new(0, c), Occurrence::new(1, a)]).unwrap();
+    graph.validate().unwrap();
+    // Structurally complete: `ab@0` and `ca@1` overlap at position 1 (`b` ≠ `c`).
+    let left = Occurrence::new(0, ab);
+    let right = Occurrence::new(1, ca);
+    let owner = graph.insert(vec![left, right]).unwrap();
+    assert_eq!(
+        graph.validate(),
+        Err(PositionedError::OverlapMismatch {
+            owner: owner.index,
+            left,
+            right,
+        })
+    );
+}
