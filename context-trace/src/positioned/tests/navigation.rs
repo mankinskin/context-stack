@@ -1,6 +1,6 @@
 //! `read_interval`, `occurrences_in` and the search navigation primitives
 //! (`start_at`, `end_at`, `prefix_child`, `parent_occurrences`, `atom_token`,
-//! `advance_end_path`) on every v3 fixture. Vertices are
+//! `advance_end_path`) on every fixture. Vertices are
 //! addressed through the name map; expectations come from brute-force string
 //! matching over the fixture keys.
 
@@ -13,7 +13,7 @@ use crate::{
         Occurrence,
         OccurrenceLocation,
         OccurrencePath,
-        fixtures::v3_graphs,
+        fixtures::fixture_graphs,
     },
 };
 
@@ -23,7 +23,7 @@ fn chars(s: &str) -> Vec<char> {
 
 #[test]
 fn read_interval_equals_fixture_substrings() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         for (key, token) in &fixture.names {
             let content = chars(key);
             for start in 0..=content.len() {
@@ -48,7 +48,7 @@ fn read_interval_equals_fixture_substrings() {
 
 #[test]
 fn occurrences_in_equals_all_fixture_key_occurrences() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         for (key, token) in &fixture.names {
             let content = chars(key);
             for start in 0..=content.len() {
@@ -99,7 +99,7 @@ fn longest_key_at<'a>(
 
 #[test]
 fn start_at_is_longest_key_starting_at_position() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let graph = &fixture.graph;
         for (key, token) in &fixture.names {
             let width = key.chars().count();
@@ -128,7 +128,7 @@ fn start_at_is_longest_key_starting_at_position() {
 
 #[test]
 fn end_at_is_longest_key_ending_at_position() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let graph = &fixture.graph;
         for (key, token) in &fixture.names {
             let content = chars(key);
@@ -167,7 +167,7 @@ fn end_at_is_longest_key_ending_at_position() {
 
 #[test]
 fn prefix_child_chain_is_all_prefix_keys_longest_first() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let graph = &fixture.graph;
         for (key, token) in &fixture.names {
             let content = chars(key);
@@ -194,7 +194,7 @@ fn prefix_child_chain_is_all_prefix_keys_longest_first() {
 
 #[test]
 fn covering_is_last_occurrence_starting_at_or_before() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         for vertex in fixture.graph.vertices() {
             let Some(composition) = vertex.composition() else {
                 continue;
@@ -226,7 +226,7 @@ fn find_all(
 
 #[test]
 fn parent_occurrences_are_maximal_key_occurrences() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let graph = &fixture.graph;
         for (key, token) in &fixture.names {
             let content = chars(key);
@@ -260,7 +260,7 @@ fn parent_occurrences_are_maximal_key_occurrences() {
 
 #[test]
 fn atom_token_finds_atoms_only() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         for (key, token) in &fixture.names {
             let mut atoms = key.chars();
             if let (Some(atom), None) = (atoms.next(), atoms.next()) {
@@ -275,7 +275,7 @@ fn atom_token_finds_atoms_only() {
 fn advance_end_path_equals_start_at() {
     let mut names = std::collections::BTreeSet::new();
     let mut corrected = 0;
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let graph = &fixture.graph;
         for (key, token) in &fixture.names {
             let width = key.chars().count();

@@ -1,4 +1,4 @@
-//! v3 interchange decoding and structural validation.
+//! Interchange decoding and structural validation.
 
 use serde_json::{
     Value,

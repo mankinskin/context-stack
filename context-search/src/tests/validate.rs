@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use context_trace::{
     graph::vertex::VertexIndex,
-    positioned::{fixtures::V3Graph, OccurrenceLocation, SpanCoverage},
+    positioned::{fixtures::FixtureGraph, OccurrenceLocation, SpanCoverage},
     AtomPosition, DirectedKey, DownPosition, Token, UpPosition,
 };
 use pretty_assertions::assert_eq;
@@ -16,12 +16,12 @@ use crate::{state::matched::PathCoverage, Response};
 
 /// Fixture strings indexed for brute-force lookups.
 pub(super) struct Oracle<'f> {
-    pub(super) f: &'f V3Graph,
+    pub(super) f: &'f FixtureGraph,
     keys: HashMap<VertexIndex, Vec<char>>,
 }
 
 impl<'f> Oracle<'f> {
-    pub(super) fn new(f: &'f V3Graph) -> Self {
+    pub(super) fn new(f: &'f FixtureGraph) -> Self {
         let keys = f
             .names
             .iter()

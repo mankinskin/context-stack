@@ -1,4 +1,4 @@
-//! Plan 2.6: exhaustive validation of positioned search on every v3
+//! Plan 2.6: exhaustive validation of positioned search on every
 //! fixture. Queries and expectations come only from the fixture strings
 //! (corpus texts and keys of the name map); every response is checked by
 //! [`validate`].
@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use context_trace::{
-    positioned::fixtures::{v3_graphs, V3Graph},
+    positioned::fixtures::{fixture_graphs, FixtureGraph},
     Token,
 };
 use pretty_assertions::assert_eq;
@@ -39,7 +39,7 @@ impl Rng {
 
 const RANDOM_QUERIES: usize = 300;
 
-fn alphabet(f: &V3Graph) -> Vec<char> {
+fn alphabet(f: &FixtureGraph) -> Vec<char> {
     f.names
         .keys()
         .filter(|key| key.chars().count() == 1)
@@ -54,7 +54,7 @@ fn substrings(text: &[char]) -> impl Iterator<Item = &[char]> {
 
 /// Query sets of 2.6: every substring of every corpus text, each extended
 /// by every alphabet atom, and seeded random strings over the alphabet.
-fn atom_queries(f: &V3Graph) -> [(&'static str, Vec<String>); 3] {
+fn atom_queries(f: &FixtureGraph) -> [(&'static str, Vec<String>); 3] {
     let alphabet = alphabet(f);
     let mut subs = BTreeSet::new();
     let mut extended = BTreeSet::new();
@@ -91,7 +91,7 @@ fn atom_queries(f: &V3Graph) -> [(&'static str, Vec<String>); 3] {
 fn atom_queries_match_brute_force() {
     let mut counts = [0usize; 3];
     let (mut probed, mut fixtures) = (0, 0);
-    for f in v3_graphs() {
+    for f in fixture_graphs() {
         let oracle = Oracle::new(&f);
         let mut unique = 0;
         for (i, (category, queries)) in atom_queries(&f).into_iter().enumerate() {
@@ -129,7 +129,7 @@ fn atom_queries_match_brute_force() {
 }
 
 /// Longest fixture key at the start of `text`.
-fn longest_key<'k>(f: &'k V3Graph, text: &[char]) -> (&'k String, Token) {
+fn longest_key<'k>(f: &'k FixtureGraph, text: &[char]) -> (&'k String, Token) {
     f.names
         .iter()
         .filter(|(key, _)| text.starts_with(&chars(key)))
@@ -139,7 +139,7 @@ fn longest_key<'k>(f: &'k V3Graph, text: &[char]) -> (&'k String, Token) {
 }
 
 /// `text` split greedily into the longest fixture keys.
-fn greedy_split(f: &V3Graph, mut text: &[char]) -> Vec<Token> {
+fn greedy_split(f: &FixtureGraph, mut text: &[char]) -> Vec<Token> {
     let mut tokens = vec![];
     while !text.is_empty() {
         let (key, token) = longest_key(f, text);
@@ -149,7 +149,7 @@ fn greedy_split(f: &V3Graph, mut text: &[char]) -> Vec<Token> {
     tokens
 }
 
-fn atoms(f: &V3Graph, text: &[char]) -> Vec<Token> {
+fn atoms(f: &FixtureGraph, text: &[char]) -> Vec<Token> {
     text.iter().map(|c| f.names[&c.to_string()]).collect()
 }
 
@@ -159,7 +159,7 @@ fn atoms(f: &V3Graph, text: &[char]) -> Vec<Token> {
 /// composite key at every position of every corpus substring, atoms
 /// around it), both extended by every alphabet atom (mismatches after or
 /// inside composite tokens), and every pair of fixture keys.
-fn composite_queries(f: &V3Graph) -> [(&'static str, BTreeSet<(String, Vec<Token>)>); 4] {
+fn composite_queries(f: &FixtureGraph) -> [(&'static str, BTreeSet<(String, Vec<Token>)>); 4] {
     let mut splits = BTreeSet::new();
     let mut mixed = BTreeSet::new();
     let keys: Vec<(Vec<char>, Token)> = f.names.iter().map(|(k, &t)| (chars(k), t)).collect();
@@ -219,7 +219,7 @@ fn composite_queries(f: &V3Graph) -> [(&'static str, BTreeSet<(String, Vec<Token
 fn composite_queries_equal_atom_queries() {
     let mut counts = [0usize; 4];
     let (mut searches, mut inside, mut unmatched_first) = (0, 0, 0);
-    for f in v3_graphs() {
+    for f in fixture_graphs() {
         let oracle = Oracle::new(&f);
         for (i, (category, queries)) in composite_queries(&f).into_iter().enumerate() {
             for (text, query) in queries {
@@ -292,7 +292,7 @@ fn composite_queries_equal_atom_queries() {
 #[test]
 fn chained_searches_equal_fresh_searches() {
     let (mut texts, mut chains) = (0, 0);
-    for f in v3_graphs() {
+    for f in fixture_graphs() {
         let oracle = Oracle::new(&f);
         let pairs = f
             .corpus

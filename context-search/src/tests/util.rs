@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use context_trace::{
     positioned::{
         fixtures::{
-            v3_graphs,
-            V3Graph,
+            fixture_graphs,
+            FixtureGraph,
         },
         OccurrenceLocation,
     },
@@ -15,8 +15,8 @@ use context_trace::{
     Token,
 };
 
-pub(super) fn fixture(name: &str) -> V3Graph {
-    v3_graphs()
+pub(super) fn fixture(name: &str) -> FixtureGraph {
+    fixture_graphs()
         .into_iter()
         .find(|f| f.name == name)
         .unwrap_or_else(|| panic!("fixture {name}"))

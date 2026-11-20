@@ -1,4 +1,4 @@
-//! Conversion between [`PositionedGraph`] and the v3 interchange.
+//! Conversion between [`PositionedGraph`] and the interchange format.
 
 use std::collections::BTreeMap;
 

@@ -52,7 +52,7 @@ absolute `span`, `QueryPath` into composite query tokens, `SpanCoverage`),
 trace states and cache `trace/` (mirrors `legacy/trace`: `ParentState`,
 `ChildState`/`RootChildState`, `TraceCache` with offset-labelled edges and
 query-position keys, `Traceable` commands; search plan 2.2), `fixtures.rs` (`test-api`:
-`v3_fixtures` and `v3_graphs` → `V3Graph { name, corpus, graph, names }`,
+`fixture_snapshots` and `fixture_graphs` → `FixtureGraph { name, corpus, graph, names }`,
 shared with context-search). Tests round-trip and validate every v3 fixture
 of `context-read/tests/fixtures/v3` and check `read_interval`,
 `occurrences_in` and the search navigation primitives on every fixture vertex

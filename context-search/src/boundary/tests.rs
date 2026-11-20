@@ -1,4 +1,4 @@
-//! Boundary search on every v3 fixture. Vertices are addressed through the
+//! Boundary search on every fixture. Vertices are addressed through the
 //! name map; expectations are the fixture keys starting (or ending) at the
 //! position by brute-force string matching.
 
@@ -9,7 +9,7 @@ use pretty_assertions::assert_eq;
 use context_trace::{
     AtomPosition,
     Token,
-    positioned::fixtures::v3_graphs,
+    positioned::fixtures::fixture_graphs,
 };
 
 use super::{
@@ -68,7 +68,7 @@ fn check_paths(
 
 #[test]
 fn boundary_occurrences_equal_fixture_keys_at_every_position() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         for (key, &owner) in &fixture.names {
             for position in 0..=owner.width.0 {
                 for boundary in [Boundary::Start, Boundary::End] {
@@ -96,7 +96,7 @@ fn boundary_occurrences_equal_fixture_keys_at_every_position() {
 
 #[test]
 fn prefixes_and_postfixes_equal_fixture_keys() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         for (key, &owner) in &fixture.names {
             let width = owner.width.0;
             for (found, position, boundary) in [

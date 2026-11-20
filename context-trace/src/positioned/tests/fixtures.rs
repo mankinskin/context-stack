@@ -1,15 +1,15 @@
-//! Round trip of every v3 reader fixture through [`PositionedGraph`].
+//! Round trip of every reader fixture through [`PositionedGraph`].
 
 use pretty_assertions::assert_eq;
 
 use crate::positioned::{
     PositionedGraph,
     diff,
-    fixtures::v3_fixtures as fixtures,
+    fixtures::fixture_snapshots as fixtures,
 };
 
 #[test]
-fn v3_fixtures_round_trip_through_positioned_graph() {
+fn fixtures_round_trip_through_positioned_graph() {
     for (name, fixture) in fixtures() {
         let graph = PositionedGraph::<crate::BaseGraphKind>::from_interchange(&fixture.graph)
             .unwrap_or_else(|error| panic!("{name}: {error}"));
@@ -26,7 +26,7 @@ fn v3_fixtures_round_trip_through_positioned_graph() {
 
 #[test]
 fn name_map_addresses_every_fixture_vertex() {
-    for fixture in super::super::fixtures::v3_graphs() {
+    for fixture in super::super::fixtures::fixture_graphs() {
         let name = &fixture.name;
         assert_eq!(fixture.names.len(), fixture.graph.vertex_count(), "{name}");
         for (key, token) in &fixture.names {
@@ -50,7 +50,7 @@ fn debug_labels_equal_fixture_keys_and_resolve_names() {
         clear_token_name_resolver,
         resolve_token_name,
     };
-    for fixture in super::super::fixtures::v3_graphs() {
+    for fixture in super::super::fixtures::fixture_graphs() {
         fixture.graph.register_name_resolver();
         for (key, token) in &fixture.names {
             let vertex = fixture.graph.vertex(token.index).unwrap();
@@ -68,7 +68,7 @@ fn debug_labels_equal_fixture_keys_and_resolve_names() {
 #[cfg(not(debug_assertions))]
 #[test]
 fn release_display_shows_index_and_width_only() {
-    for fixture in super::super::fixtures::v3_graphs() {
+    for fixture in super::super::fixtures::fixture_graphs() {
         for token in fixture.names.values() {
             let vertex = fixture.graph.vertex(token.index).unwrap();
             assert_eq!(vertex.to_string(), format!("#{}(w{})", token.index.0, token.width.0));

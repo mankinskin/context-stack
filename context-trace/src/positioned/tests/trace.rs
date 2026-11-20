@@ -1,5 +1,5 @@
 //! Paths, trace states and the trace cache (search plan 2.2, canonical
-//! rules 2.4) on the v3 fixtures. Vertices are addressed through the name
+//! rules 2.4) on the fixtures. Vertices are addressed through the name
 //! map; expectations come from the fixture strings.
 
 use std::{
@@ -31,8 +31,8 @@ use crate::{
         TraceCtx,
         Traceable,
         fixtures::{
-            V3Graph,
-            v3_graphs,
+            FixtureGraph,
+            fixture_graphs,
         },
     },
 };
@@ -41,15 +41,15 @@ fn chars(s: &str) -> Vec<char> {
     s.chars().collect()
 }
 
-fn fixture(name: &str) -> V3Graph {
-    v3_graphs()
+fn fixture(name: &str) -> FixtureGraph {
+    fixture_graphs()
         .into_iter()
         .find(|f| f.name == name)
         .unwrap_or_else(|| panic!("fixture {name}"))
 }
 
 /// Vertex index → fixture key (`Token`'s `Ord` compares widths only).
-fn keys(fixture: &V3Graph) -> BTreeMap<VertexIndex, String> {
+fn keys(fixture: &FixtureGraph) -> BTreeMap<VertexIndex, String> {
     fixture
         .names
         .iter()
@@ -274,7 +274,7 @@ fn span_coverage_classification() {
 /// Checks of one exhaustive walk: every seed `(token, parent, offset)` of
 /// every fixture, matched to the root end in every root reached by raising.
 struct Walk<'f> {
-    fixture: &'f V3Graph,
+    fixture: &'f FixtureGraph,
     keys: BTreeMap<VertexIndex, String>,
     clamped: usize,
     edges: usize,
@@ -452,7 +452,7 @@ impl Walk<'_> {
 #[test]
 fn trace_states_on_every_fixture() {
     let (mut clamped, mut edges) = (0, 0);
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let mut walk = Walk {
             keys: keys(&fixture),
             fixture: &fixture,
@@ -477,7 +477,7 @@ fn trace_states_on_every_fixture() {
 
 #[test]
 fn child_advance_state_equals_start_at() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let graph = &fixture.graph;
         for token in fixture.names.values() {
             for (parent, offset) in graph.parent_occurrences(*token) {
@@ -510,7 +510,7 @@ fn child_advance_state_equals_start_at() {
 /// Walk a query of fixture tokens, decomposing the leaf `depth(i)` times
 /// before each advance; every leaf is checked against the query string.
 fn walk_query(
-    fixture: &V3Graph,
+    fixture: &FixtureGraph,
     keys: &BTreeMap<VertexIndex, String>,
     pattern: &[Token],
     depth: impl Fn(usize) -> usize,
@@ -578,7 +578,7 @@ fn walk_query(
 
 #[test]
 fn query_path_through_composite_tokens() {
-    for fixture in v3_graphs() {
+    for fixture in fixture_graphs() {
         let keys = keys(&fixture);
         let tokens: Vec<Token> = fixture.names.values().copied().collect();
         for &first in &tokens {

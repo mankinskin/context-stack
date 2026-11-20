@@ -22,7 +22,7 @@ There is no root `pub use legacy::*`; `legacy` mirrors the root items
   `convert.rs` (`from_interchange`, `test-api` `from_interchange_named` name
   map), `diff.rs`, navigation `read.rs` (`PositionedGraph::read_interval`)
   and `enumerate.rs` (`PositionedGraph::occurrences_in`), `fixtures.rs`
-  (`test-api` v3 fixture loader, `V3Graph`), `tests/` (`fixtures.rs` round
+  (`test-api` v3 fixture loader, `FixtureGraph`), `tests/` (`fixtures.rs` round
   trip, name map, labels; `model.rs` model and validation rules;
   `navigation.rs` `read_interval`/`occurrences_in` on v3 fixtures;
   `guard.rs` no content-keyed field; `diff.rs`, `interchange.rs`).

@@ -1,4 +1,4 @@
-//! Content-keyed v3 interchange of the positioned model, independent of
+//! Content-keyed interchange of the positioned model, independent of
 //! vertex IDs.
 //!
 //! A [`PositionedGraphData`] stores, for every retained vertex, its maximal

@@ -1,9 +1,9 @@
-//! Positioned ancestor search on named v3 fixtures (mirroring
+//! Positioned ancestor search on named fixtures (mirroring
 //! `legacy/tests/search/ancestor.rs`), errors and continuation.
 //! Expectations come from the fixture strings via the name map.
 
 use context_trace::{
-    positioned::{fixtures::V3Graph, SpanCoverage},
+    positioned::{fixtures::FixtureGraph, SpanCoverage},
     AtomPosition, DirectedKey, DirectedPosition, DownPosition, HasAtomPosition, Token, UpPosition,
 };
 use pretty_assertions::assert_eq;
@@ -16,7 +16,7 @@ use crate::{search::stats::last_search_stats, Find, Response, SearchError};
 
 /// Search `query` and check it against the brute-force expectation (plan
 /// 2.6, [`validate`]) and the uniqueness counter.
-pub(super) fn check(f: &V3Graph, query: &str) -> Response {
+pub(super) fn check(f: &FixtureGraph, query: &str) -> Response {
     let context = format!("{}: {query}", f.name);
     let response = f
         .graph
@@ -28,7 +28,7 @@ pub(super) fn check(f: &V3Graph, query: &str) -> Response {
     response
 }
 
-fn names<const N: usize>(f: &V3Graph, keys: [&str; N]) -> [Token; N] {
+fn names<const N: usize>(f: &FixtureGraph, keys: [&str; N]) -> [Token; N] {
     keys.map(|key| f.names[key])
 }
 

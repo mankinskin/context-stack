@@ -647,7 +647,7 @@ atom query's canonical paths). (3) The 2.6 canonical-path spec holds with
 
 ### 2.6 Validation on v3 fixtures (`context-search/src/tests/`)
 
-Graphs from `context_trace::positioned::fixtures::v3_graphs()`, vertices
+Graphs from `context_trace::positioned::fixtures::fixture_graphs()`, vertices
 addressed only through the name map.
 
 - [x] **Expectation for `q`:** `k` = longest prefix of `q` occurring in a corpus

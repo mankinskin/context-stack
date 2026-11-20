@@ -118,7 +118,7 @@ one test per v3 manifest entry, calling only `context_read::read` (a stub
 until the positioned reader exists, so all scenario tests are
 `#[ignore = "positioned reader pending"]`) and comparing the final graph with
 the v3 fixture via `context_trace::positioned::diff`. The meta-test
-`v3_manifest_is_covered` (not ignored) requires a test for every manifest
+`manifest_is_covered` (not ignored) requires a test for every manifest
 entry, so a new v3 scenario must be registered in the `scenarios!` list.
 
 Legacy reader behavior tests live in [`tests/legacy_reader_behavior.rs`](tests/legacy_reader_behavior.rs).

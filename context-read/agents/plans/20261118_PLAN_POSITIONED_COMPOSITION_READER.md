@@ -428,7 +428,7 @@ the visualization events (later, if needed).
 #### Validation against oracle fixtures
 
 All in `context-search` tests, loading fixtures via
-`context_trace::positioned::fixtures::v3_graphs()` plus the 2c.0 name map.
+`context_trace::positioned::fixtures::fixture_graphs()` plus the 2c.0 name map.
 Expectations are computed from the fixture **strings** (corpus and vertex
 keys), never from graph lookups or reader output.
 

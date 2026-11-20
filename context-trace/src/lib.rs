@@ -7,7 +7,7 @@ pub mod graph;
 /// Trace-cache keys (token + directed atom position), shared by both models.
 pub mod key;
 pub mod position;
-/// Positioned composition model (v3), independent of `legacy`.
+/// Positioned composition model, independent of `legacy`.
 pub mod positioned;
 
 // Logging utilities (tracing and formatting)

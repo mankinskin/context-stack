@@ -1,5 +1,5 @@
 //! Black-box tests of the positioned reader: only the public
-//! `context_read::read` API and the authoritative v3 oracle fixtures
+//! `context_read::read` API and the authoritative positioned oracle fixtures
 //! (`tests/fixtures/v3`). Each scenario reads all inputs in order into one
 //! graph and compares the final graph with the fixture via
 //! `context_trace::positioned::diff`.
@@ -10,10 +10,10 @@
 mod support;
 
 use context_trace::positioned::{diff, PositionedGraphRef};
-use support::positioned::load_v3;
+use support::positioned::load_positioned;
 
 fn assert_scenario(name: &str) {
-    let fixture = load_v3(name);
+    let fixture = load_positioned(name);
     let graph = PositionedGraphRef::default();
     for input in &fixture.corpus {
         context_read::read(&graph, input.chars()).expect("nonempty input");
@@ -105,9 +105,9 @@ scenarios!(
     substring_input,
 );
 
-/// Every v3 manifest entry has exactly one scenario test above.
+/// Every positioned manifest entry has exactly one scenario test above.
 #[test]
-fn v3_manifest_is_covered() {
+fn manifest_is_covered() {
     let mut names = std::collections::BTreeSet::new();
     for scenario in support::positioned::scenarios() {
         assert!(names.insert(scenario.name), "duplicate scenario");
@@ -115,5 +115,5 @@ fn v3_manifest_is_covered() {
     let tests: std::collections::BTreeSet<String> =
         SCENARIO_NAMES.iter().map(ToString::to_string).collect();
     assert_eq!(tests.len(), SCENARIO_NAMES.len(), "duplicate scenario test");
-    assert_eq!(names, tests, "v3 manifest and reader tests differ");
+    assert_eq!(names, tests, "positioned manifest and reader tests differ");
 }

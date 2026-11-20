@@ -1,6 +1,6 @@
 //! Deliberately malformed data tests the fixture validator, not reader semantics.
 //! Each lane is checked against its own manifest: the frozen v2 lane for
-//! completeness, the v3 lane also for being in sync with the current `ngrams`
+//! completeness, the positioned lane also for being in sync with the current `ngrams`
 //! oracle.
 #[allow(dead_code)]
 mod support;
@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 use support::legacy::{self, load, seed, token, v2_dir, GraphData};
 use support::{
     fixture_names,
-    positioned::{self, load_v3, v3_dir, PositionedGraphSnapshot},
+    positioned::{self, load_positioned, positioned_dir, PositionedGraphSnapshot},
 };
 
 #[cfg(feature = "legacy")]
@@ -64,25 +64,25 @@ fn v2_fixtures_match_frozen_manifest_exactly() {
 }
 
 #[test]
-fn v3_fixtures_match_manifest_exactly() {
+fn positioned_fixtures_match_manifest_exactly() {
     let mut expected = BTreeSet::new();
     for scenario in positioned::scenarios() {
         assert!(expected.insert(scenario.name), "duplicate scenario");
     }
     assert_eq!(
-        fixture_names(&v3_dir()),
+        fixture_names(&positioned_dir()),
         expected,
-        "v3 fixtures must be exactly one per scenario"
+        "positioned fixtures must be exactly one per scenario"
     );
 }
 
 #[test]
-fn v3_fixtures_are_valid_and_match_the_oracle() {
+fn positioned_fixtures_are_valid_and_match_the_oracle() {
     for scenario in positioned::scenarios() {
-        let fixture = load_v3(&scenario.name);
+        let fixture = load_positioned(&scenario.name);
         assert_eq!(
             fixture.corpus, scenario.inputs,
-            "{}: v3 corpus must equal the scenario inputs",
+            "{}: positioned corpus must equal the scenario inputs",
             scenario.name
         );
         let parsed = parse_corpus(
@@ -94,7 +94,7 @@ fn v3_fixtures_are_valid_and_match_the_oracle() {
         assert_eq!(
             PositionedGraphSnapshot::new(scenario.inputs, parsed.graph),
             fixture,
-            "{}: v3 fixture is out of sync with the oracle; regenerate it",
+            "{}: positioned fixture is out of sync with the oracle; regenerate it",
             scenario.name
         );
     }
