@@ -126,3 +126,6 @@ pub fn postfixes<G: GraphKind>(
     let width = graph.vertex(owner)?.width();
     boundary_occurrences(graph, owner, width.into(), Boundary::End)
 }
+
+#[cfg(test)]
+mod tests;
