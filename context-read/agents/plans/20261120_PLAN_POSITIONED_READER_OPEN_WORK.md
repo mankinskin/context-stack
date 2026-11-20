@@ -83,114 +83,12 @@ release `PositionedVertex` has no label field.
 
 ## Step 2 — Positioned search (`context-trace`, `context-search`)
 
-### Legacy algorithm being preserved
+Work package: [20261120_PLAN_POSITIONED_SEARCH](20261120_PLAN_POSITIONED_SEARCH.md)
+(legacy algorithm, positional navigation, decisions, tasks, validation and
+gate). This roadmap holds no planning for this step.
 
-1. **Seed:** each parent link of the first query token becomes a
-   `ParentState` paired with the query cursor (`gen_parent_batch`).
-2. **Queue:** min-heap on root width; smallest context first.
-3. **Next sibling:** `ParentState::advance_state`; if the root is exhausted,
-   raise to the root's parents (`path_raise`, extends the start path).
-4. **Compare** (`compare_leaf_tokens`): equal tokens match; different atoms
-   mismatch; otherwise decompose the wider side (both on equal width) into
-   prefix children and queue them.
-5. **First match wins:** the first match clears the queue (uniqueness).
-6. **Root cursor:** query and end path advance together; ends with query
-   exhausted, mismatch after progress (maximal match), or root exhausted
-   (raise and continue from step 2, keeping the best match).
-7. **Result:** `MatchResult { PathCoverage (EntireRoot | Range | Prefix |
-   Postfix) over start path ↑, root span, end path ↓; checkpointed cursor }`,
-   traced into `TraceCache`, returned as `Response`.
-
-### Positional adaptation
-
-| Legacy (rows) | Positioned |
-|---|---|
-| `ChildLocation(parent, pattern_id, sub_index)` | `OccurrenceLocation(parent, offset, child)` |
-| seed batch `parent × (pattern_id, sub_index)` | seed batch `parent × offset` |
-| next sibling `pattern[i + 1]` | `start_at(root, end of matched span)` |
-| prefix children: head of every row | `prefix_child`: the occurrence at offset 0 (one chain) |
-| end path `MovePath`: pop, `index + 1`, else move root | pop steps ending at or before `p`, descend by `start_at`; root exhausted ⇔ `p == width(root)` |
-| `path_raise` via row widths | raise `R` through `(P, o)`: span `[s, e)` → `[o + s, o + e)`; push `OccurrenceLocation(P, o, R)` |
-| `IndexRangePath` with row entry/exit indices | `RangePath { root, start ↑, end ↓ }` with absolute offsets; entry and exit occurrences may overlap |
-| `TraceCache` edges labelled `SubLocation` | same keys (`DirectedKey`), edges labelled by offset |
-| `PathCoverage` from row indices | same variants, from `span.start == 0` and `span.end == width(root)` |
-
-**`start_at(R, p)`:** the largest retained token starting at `p` in `R`.
-Find the last occurrence `C` with `C.offset ≤ p` (binary search; ends
-increase strictly). If `C.offset == p`, return `C.child`; otherwise recurse
-into `start_at(C.child, p − C.offset)` and record the step.
-O(depth · log(children)), no content access.
-
-A Python prototype of this design (session files, `search_prototype.py`)
-matched brute force on all v3 fixtures: 706/706 `start_at` checks, 17,979/
-17,979 queries, no ambiguous expectations, no equal-width ties at the first
-match.
-
-### Tasks
-
-- [ ] **2.1 Navigation primitives** (`context-trace`, `positioned`):
-  `Composition::covering(p)`, `PositionedGraph::start_at(root, p) -> (Token,
-  Vec<OccurrenceLocation>)`, `prefix_child(token)`,
-  `parent_occurrences(token)` in deterministic order (width, index, offset).
-  Tests: `start_at` on every vertex and position of every v3 fixture equals
-  the brute-force largest fixture string occurring at `p`; steps form a
-  valid `OccurrencePath` (`contains_path`) whose offsets sum to `p`.
-- [ ] **2.2 Trace states** (`context-trace`, `positioned::trace`):
-  `ParentState` (`advance_state` via `start_at`, `path_raise`),
-  `ChildState`/`RootChildState` over `RangePath`, offset-labelled
-  `TraceCache`, `PathCoverage` classification.
-- [ ] **2.3 Search** (`context-search` root modules `search`, `match`,
-  `compare`, `cursor`, `state`): `SearchQueue`,
-  `SearchNode::{ParentCandidate, ChildCandidate}`, `NodeConsumer`,
-  `CompareState::compare_leaf_tokens` (decomposing by `prefix_child`),
-  `RootCursor::advance_to_next_match` (end path via `start_at`),
-  `MatchResult`, `Response`, `Find::find_ancestor` for
-  `PositionedGraphRef`. Queries are token sequences; the reader passes atoms
-  resolved through the atom index; composite query tokens use the
-  `QueryMajor` decomposition. Visualization events are not ported.
-  `find_parent` only when a consumer needs it.
-- [ ] **2.4 Canonical paths:** the positioned analogue of legacy `simplify`
-  and of the `path_raise` rule omitting an offset-0 step with an empty sub
-  path. Candidate rule: a path stops at the largest token whose boundary
-  coincides with the span boundary. Fix by tests.
-- [ ] **2.5 Reuse:** `Response` is the only hand-off; the next adjacent
-  search continues at the `end` cursor checkpoint.
-  `PositionedGraph::insert` stays `pub(crate)`/`test-api` (fixture loading);
-  public composite insertion goes through a `Response` (step 3).
-
-### Validation on v3 fixtures
-
-In `context-search` tests, loading graphs via
-`context_trace::positioned::fixtures::v3_graphs()` and the step 1 name map.
-
-- **Expectation for query `q`:** `k` = longest prefix of `q` occurring in a
-  corpus text; `root` = minimal-width fixture vertex string containing
-  `q[..k]`, at offset `o`. Assert `(root, o)` is unique; a failure is an
-  oracle/model issue, not something to work around in search.
-- **Queries per fixture:** every substring of every corpus text; each
-  substring extended by every alphabet atom; 300 seeded random strings over
-  the alphabet.
-- **Per query:**
-  - `end.root == name_map[root]`, span `[o, o + k)`;
-  - `PathCoverage`: `EntireRoot` iff `o == 0 && k == |root|`, `Prefix` iff
-    `o == 0`, `Postfix` iff `o + k == |root|`, else `Range`;
-  - end reason: query exhausted iff `k == |q|`, else mismatch;
-  - start path ends at atom `q[0]` at offset `o`, end path at `q[k − 1]` at
-    `o + k − 1`, every step passes `contains_path`;
-  - diagnostic: `read_interval(root, o..o + k) == q[..k]`;
-  - the trace cache has entries for every vertex on both paths; up edges
-    agree with parent links.
-- **Uniqueness counter** (`test-api`): equal-width candidates also matching
-  at the first comparison; must be 0 on every fixture.
-- **Named cases:** `repeat_abcabca` (`abcab` raises `abca → abcabca`,
-  descends into `abca@3`, `Prefix(0..5)`), `repeat_ababa` (`abab` raises
-  `aba → ababa`), `seam_bcd` (`bcd`, `abcd`), `repeat_ababab`,
-  `repeating_known` (`xyyxy`), `late_retention__2`.
-- **Continuation:** chained searches from each `end` checkpoint over every
-  corpus text give the same matches as fresh searches at those positions.
-
-**Gate:** all of the above pass on every v3 fixture; no content-keyed
-structure in release; `--no-default-features` check green.
+**Outcome:** `Find::find_ancestor` on `PositionedGraphRef` returns a reusable
+`Response { cache, end }`, validated on every v3 fixture.
 
 ## Step 3 — Positioned insertion and seam discovery (`context-insert`)
 
