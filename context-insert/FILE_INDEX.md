@@ -9,6 +9,8 @@ paths below refer to `src/legacy/…`.
 
 **Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
+Python prototypes of positioned insertion (split graph and join, merge, invariant checks) with an execution manual: `agents/prototypes/README.md`.
+
 **Generated:** 2025-11-23  
 **Updated:** 2025-11-23 (Post-Workspace Reorganization)  
 **Git Commit:** f23260f  
