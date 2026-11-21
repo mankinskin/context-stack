@@ -29,10 +29,14 @@ use crate::{
     DownPosition,
     GraphKind,
     HasAtomPosition,
+    Token,
     UpKey,
     UpPosition,
 };
-use cache::TraceCache;
+use cache::{
+    TraceCache,
+    new::NewTraceEdge,
+};
 use traceable::{
     TraceCommand,
     Traceable,
@@ -71,14 +75,65 @@ pub struct BottomUp;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TopDown;
 
-pub trait TraceDirection {
+/// Direction of trace edges (legacy `TraceDirection`), chosen by the path
+/// role ([`PathRole::Direction`](super::path::PathRole::Direction)).
+pub trait TraceDirection: Sized {
+    type Pos: Copy;
     type Key: TraceKey;
+    fn key(
+        token: Token,
+        pos: Self::Pos,
+    ) -> Self::Key;
+    /// The edge between `parent` and its `child` at `offset`.
+    fn edge(
+        parent: Self::Key,
+        child: Self::Key,
+        offset: AtomPosition,
+    ) -> NewTraceEdge<Self>;
+    /// Reorder edges collected top-down into trace order.
+    fn trace_order<T>(top_down: &mut [T]);
 }
+/// Edges from the child (`prev`) to the parent (`target`), traced from the
+/// leaf upwards.
 impl TraceDirection for BottomUp {
+    type Pos = UpPosition;
     type Key = UpKey;
+    fn key(
+        token: Token,
+        pos: UpPosition,
+    ) -> UpKey {
+        UpKey::new(token, pos)
+    }
+    fn edge(
+        parent: UpKey,
+        child: UpKey,
+        offset: AtomPosition,
+    ) -> NewTraceEdge<Self> {
+        NewTraceEdge::new(child, parent, offset)
+    }
+    fn trace_order<T>(top_down: &mut [T]) {
+        top_down.reverse();
+    }
 }
+/// Edges from the parent (`prev`) to the child (`target`), traced from the
+/// root downwards.
 impl TraceDirection for TopDown {
+    type Pos = DownPosition;
     type Key = DownKey;
+    fn key(
+        token: Token,
+        pos: DownPosition,
+    ) -> DownKey {
+        DownKey::new(token, pos)
+    }
+    fn edge(
+        parent: DownKey,
+        child: DownKey,
+        offset: AtomPosition,
+    ) -> NewTraceEdge<Self> {
+        NewTraceEdge::new(parent, child, offset)
+    }
+    fn trace_order<T>(_top_down: &mut [T]) {}
 }
 
 /// Correspondence between absolute offsets in a root and query positions:

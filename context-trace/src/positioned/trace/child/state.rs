@@ -62,11 +62,11 @@ pub struct ChildState {
 
 impl ChildState {
     pub fn root(&self) -> Token {
-        self.path.root
+        self.path.root()
     }
     /// Root offsets ↔ query positions of this match.
     pub fn anchor(&self) -> QueryAnchor {
-        let entry_end = self.path.start.entry_end();
+        let entry_end = self.path.start.root_child_end();
         QueryAnchor {
             root: self.path.span.start,
             query: AtomPosition(self.entry_pos.0.0 - (entry_end.0 - self.path.span.start.0)),
@@ -78,7 +78,7 @@ impl ChildState {
     pub fn parent_state(&self) -> ParentState {
         ParentState {
             path: self.path.start.clone(),
-            span: self.path.span.start..self.path.start.entry_end(),
+            span: self.path.span.start..self.path.start.root_child_end(),
             prev_pos: self.entry_pos,
             root_pos: self.entry_pos,
         }
@@ -95,8 +95,8 @@ impl StateAdvance for ChildState {
         graph: &PositionedGraph<G>,
     ) -> Result<Self, Self> {
         let end = self.path.span.end;
-        if self.path.end.advance(graph, end) {
-            self.exit_pos = self.anchor().down(self.path.end.root_exit().offset);
+        if self.path.end.advance(graph, end).is_continue() {
+            self.exit_pos = self.anchor().down(self.path.end.root_child_offset());
             Ok(self)
         } else {
             Err(self)

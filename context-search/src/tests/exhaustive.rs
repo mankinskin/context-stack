@@ -150,8 +150,8 @@ impl Depth {
         let start = response
             .path()
             .start_path()
-            .map_or(0, |p| p.bottom_up().len());
-        let end = response.path().end_path().map_or(0, |p| p.steps().len());
+            .map_or(0, |p| p.len());
+        let end = response.path().end_path().map_or(0, |p| p.len());
         *self.histogram.entry((start, end)).or_default() += 1;
         self.start = self.start.max(start);
         self.end = self.end.max(end);
@@ -482,7 +482,7 @@ fn composite_queries_equal_atom_queries() {
                         break;
                     }
                     offset = *c.checkpoint_position();
-                    inside += usize::from(!c.query_cursor().path().end().is_empty());
+                    inside += usize::from(!c.query_cursor().path().is_empty());
                     composite = f.graph.find_ancestor(c.query_cursor());
                     stats = last_search_stats();
                     atom = f.graph.find_ancestor(a.query_cursor());

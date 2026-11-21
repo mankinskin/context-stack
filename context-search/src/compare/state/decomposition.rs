@@ -39,7 +39,7 @@ impl CompareState<Candidate, Candidate> {
     ) -> CompareLeafResult {
         let g = self.child.current().child_state.path.end.leaf();
         let q = self.query.current().path.leaf();
-        stats::record_compare(self.query.current().path.position());
+        stats::record_compare(self.query.current().path.leaf_offset());
         if g.index == q.index {
             return CompareLeafResult::Finished(CompareEndResult::FoundMatch(self.mark_match()));
         }
@@ -72,17 +72,17 @@ impl CompareState<Candidate, Candidate> {
                 .child_state
                 .path
                 .end
-                .push_prefix(graph);
+                .push_border_child(graph);
             debug_assert!(split, "wider graph leaf is composite");
             stats::record_graph_prefix_descent(
-                self.child.current().child_state.path.end.steps().len(),
+                self.child.current().child_state.path.end.len(),
             );
         }
         if matches!(
             self.mode,
             PathPairMode::QueryMajor | PathPairMode::BothMajor
         ) {
-            let split = self.query.current_mut().prefix_child(graph);
+            let split = self.query.current_mut().push_border_child(graph);
             debug_assert!(split, "wider query leaf is composite");
             stats::record_query_prefix_descent();
         }

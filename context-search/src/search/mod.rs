@@ -115,7 +115,7 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
             // No parent match: the first query token alone.
             let cursor = self.query.clone();
             MatchResult::new(
-                PathCoverage::entire_token(graph, cursor.path().leaf(), cursor.path().position()),
+                PathCoverage::entire_token(graph, cursor.path().leaf(), cursor.path().leaf_offset()),
                 CheckpointedCursor::AtCheckpoint(Checkpointed::new(cursor)),
             )
         });
@@ -127,8 +127,8 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
             end,
         };
         stats::record_path_lens(
-            response.path().start_path().map_or(0, |p| p.bottom_up().len()),
-            response.path().end_path().map_or(0, |p| p.steps().len()),
+            response.path().start_path().map_or(0, |p| p.len()),
+            response.path().end_path().map_or(0, |p| p.len()),
         );
         response
     }

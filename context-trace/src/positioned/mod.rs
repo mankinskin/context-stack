@@ -15,8 +15,8 @@
 //!   [`PositionedGraph::parent_occurrences`],
 //!   [`PositionedGraph::atom_token`], [`PositionedGraph::advance_end_path`]
 //!   (`navigate.rs`);
-//! - search paths ([`StartPath`], [`EndPath`], [`RangePath`], [`QueryPath`],
-//!   `path.rs`) and trace states / trace cache ([`ParentState`],
+//! - search paths (role-generic [`RolePath`] with aliases [`StartPath`],
+//!   [`EndPath`], [`QueryPath`]; [`RangePath`], `path/`) and trace states / trace cache ([`ParentState`],
 //!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2;
 //! - boundary search (prefixes/postfixes with occurrence paths) lives in
 //!   `context_search::boundary`.
@@ -60,10 +60,17 @@ pub use self::{
         OccurrencePath,
     },
     path::{
+        End,
         EndPath,
+        HasRolePath,
+        PathRole,
+        PathRoot,
         QueryPath,
+        QueryRoot,
         RangePath,
+        RolePath,
         SpanCoverage,
+        Start,
         StartPath,
     },
     trace::{
@@ -83,6 +90,7 @@ pub use self::{
             StateAdvance,
             parent::ParentState,
         },
+        TraceDirection,
         traceable::{
             PostfixCommand,
             PrefixCommand,

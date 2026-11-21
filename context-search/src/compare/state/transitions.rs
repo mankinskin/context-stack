@@ -89,8 +89,8 @@ impl CompareState<Candidate, Matched> {
         {
             Ok(child_state) => {
                 crate::search::stats::record_path_lens(
-                    child_state.path.start.bottom_up().len(),
-                    child_state.path.end.steps().len(),
+                    child_state.path.start.len(),
+                    child_state.path.end.len(),
                 );
                 let mut state = CompareState {
                     child: Checkpointed::with_candidate(

@@ -66,7 +66,7 @@ impl<Q: CursorState, I: CursorState> CompareState<Q, I> {
     pub(crate) fn current_target(&self) -> DownKey {
         DownKey::new(
             self.child.current().child_state.path.end.leaf(),
-            DownPosition(self.query.current().path.position()),
+            DownPosition(self.query.current().path.leaf_offset()),
         )
     }
 }

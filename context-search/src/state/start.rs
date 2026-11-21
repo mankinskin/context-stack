@@ -32,7 +32,7 @@ use crate::{
 };
 
 /// A query cursor at its first token `start_token` (the cursor's leaf, at
-/// query position `cursor.path.position()`).
+/// query position `cursor.path.leaf_offset()`).
 #[derive(Debug)]
 pub(crate) struct StartCtx<'g, G: GraphKind, K: SearchKind> {
     pub(crate) graph: &'g PositionedGraph<G>,
@@ -70,7 +70,7 @@ impl<'g, G: GraphKind, K: SearchKind> StartCtx<'g, G, K> {
             return Err(SearchError::SingleIndex(self.start_token));
         }
         let start = self.start_token;
-        let position = self.cursor.path.position();
+        let position = self.cursor.path.leaf_offset();
         let batch = K::Policy::gen_parent_batch(self.graph, start, |parent, offset| {
             ParentState::new(start, parent, offset, position)
         });

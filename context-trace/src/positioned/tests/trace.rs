@@ -149,8 +149,8 @@ fn worked_example_repeat_abcabca() {
         assert_eq!(state.root_pos.0, pos(4));
         assert_eq!(state.prev_pos.0, pos(1));
         // The match starts at `abca`'s start: canonical path `[(abcabca, o, abca)]`.
-        assert_eq!(state.path.bottom_up(), &[step(abcabca, o, abca)]);
-        assert_eq!(state.path.start(), abca);
+        assert_eq!(state.path.steps(), &[step(abcabca, o, abca)]);
+        assert_eq!(state.path.leaf(), abca);
     }
     assert_eq!(
         SpanCoverage::of(&raised[0].span, abcabca.width),
@@ -221,7 +221,7 @@ fn raise_repeat_ababa() {
         state.path_raise(ababa, pos(o));
         assert_eq!(state.span, pos(o)..pos(o + 3));
         assert_eq!(state.root_pos.0, pos(3));
-        assert_eq!(state.path.bottom_up(), &[step(ababa, o, aba)]);
+        assert_eq!(state.path.steps(), &[step(ababa, o, aba)]);
         assert_eq!(SpanCoverage::of(&state.span, ababa.width), coverage);
     }
 
@@ -251,9 +251,9 @@ fn raise_repeat_ababa() {
         state.path_raise(ababa, pos(o));
         assert_eq!(state.span, pos(o + 2)..pos(o + 3));
         assert_eq!(state.root_pos.0, pos(1));
-        assert_eq!(state.path.bottom_up(), &[step(aba, 2, a), step(ababa, o, aba)]);
-        assert_eq!(state.path.start(), a);
-        assert_eq!(state.path.start_offset(), pos(o + 2));
+        assert_eq!(state.path.steps(), &[step(aba, 2, a), step(ababa, o, aba)]);
+        assert_eq!(state.path.leaf(), a);
+        assert_eq!(state.path.leaf_offset(), pos(o + 2));
         assert_eq!(SpanCoverage::of(&state.span, ababa.width), coverage);
     }
 }
@@ -313,8 +313,8 @@ impl Walk<'_> {
         );
         assert_eq!(self.substr(root, s..e), matched, "{context}");
         assert_eq!(state.anchor().query, pos(0), "{context}");
-        assert_eq!(state.path.start_offset(), state.span.start, "{context}");
-        assert_eq!(state.path.entry_end(), state.span.end, "{context}");
+        assert_eq!(state.path.leaf_offset(), state.span.start, "{context}");
+        assert_eq!(state.path.root_child_end(), state.span.end, "{context}");
         assert!(graph.contains_path(&state.path.to_occurrence_path()), "{context}");
         // Canonical start path: it stops at the largest climbed token
         // starting at the match start, and no intermediate token starts there.
@@ -324,11 +324,11 @@ impl Walk<'_> {
             .max_by_key(|(t, _)| t.width)
             .unwrap()
             .0;
-        assert_eq!(state.path.start(), expected_start, "{context}");
+        assert_eq!(state.path.leaf(), expected_start, "{context}");
         let mut at = 0;
         for step in state.path.top_down() {
             at += step.offset.0;
-            if step.child != state.path.start().index {
+            if step.child != state.path.leaf().index {
                 assert_ne!(at, s, "{context}: intermediate token at the match start");
             }
         }
@@ -387,7 +387,7 @@ impl Walk<'_> {
             assert_eq!(state.path.end.leaf(), leaf, "{context}");
             assert_eq!(state.path.end.steps(), &steps[..], "{context}");
             assert_eq!(state.path.end.leaf_offset(), p, "{context}");
-            let exit = state.path.end.root_exit().offset.0;
+            let exit = state.path.end.root_child_offset().0;
             if exit < state.path.span.start.0 {
                 self.clamped += 1;
             }
@@ -414,7 +414,7 @@ impl Walk<'_> {
             let end = &state.path.end;
             assert!(cache.exists(&UpKey::new(root, state.entry_pos).into()), "{context}");
             assert!(cache.exists(&DownKey::new(root, state.exit_pos).into()), "{context}");
-            for step in start.bottom_up().iter().chain(end.steps()) {
+            for step in start.bottom_up().chain(end.steps()) {
                 assert!(cache.exists_vertex(step.child), "{context}: {step:?}");
             }
             match state.advance_state(graph) {
@@ -487,7 +487,7 @@ fn child_advance_state_equals_start_at() {
                 };
                 // Advance by single atoms, decomposing the end leaf first.
                 loop {
-                    while state.path.end.push_prefix(graph) {}
+                    while state.path.end.push_border_child(graph) {}
                     state.match_end_leaf();
                     let p = state.path.span.end;
                     match state.child_state.clone().advance_state(graph) {
@@ -522,12 +522,12 @@ fn walk_query(
     let mut entry_start = 0;
     let mut i = 0;
     loop {
-        let p = path.position().0;
+        let p = path.leaf_offset().0;
         let leaf = chars(&keys[&path.leaf().index]);
         assert_eq!(&query[p..p + leaf.len()], &leaf[..], "{context} @ {p}");
         // The leaf is `start_at(pattern[entry], local)` or the token itself.
         let token = pattern[path.entry()];
-        if path.end().is_empty() {
+        if path.steps().is_empty() {
             assert_eq!(path.leaf(), token);
             if path.entry() > 0 {
                 entry_start = p;
@@ -535,7 +535,7 @@ fn walk_query(
         }
         for _ in 0..depth(i) {
             let before = path.leaf();
-            let split = path.prefix_child(graph);
+            let split = path.push_border_child(graph);
             assert_eq!(split, before.width.0 > 1, "{context}");
             if split {
                 let prefix = chars(&keys[&path.leaf().index]);
@@ -543,8 +543,8 @@ fn walk_query(
                 assert_eq!(&query[p..p + prefix.len()], &prefix[..], "{context}");
             }
         }
-        if !path.end().is_empty() {
-            let steps = path.end();
+        if !path.steps().is_empty() {
+            let steps = path.steps();
             assert_eq!(steps[0].parent, token.index, "{context}");
             assert!(graph.contains_path(
                 &crate::positioned::OccurrencePath::new(steps.to_vec()).unwrap()
@@ -554,9 +554,9 @@ fn walk_query(
         }
         let end = path.leaf_end();
         let entry = path.entry();
-        match path.advance(graph) {
+        match path.advance_leaf(graph) {
             ControlFlow::Continue(()) => {
-                assert_eq!(path.position(), end, "{context}");
+                assert_eq!(path.leaf_offset(), end, "{context}");
                 let local = end.0 - entry_start;
                 if path.entry() == entry {
                     let (expected, _) = graph.start_at(token, local).unwrap();
@@ -603,9 +603,9 @@ fn query_path_atoms_of_composite() {
     let mut path = QueryPath::new(pattern).unwrap();
     let mut atoms = String::new();
     loop {
-        while path.prefix_child(graph) {}
+        while path.push_border_child(graph) {}
         atoms.push_str(&keys[&path.leaf().index]);
-        if path.advance(graph).is_break() {
+        if path.advance_leaf(graph).is_break() {
             break;
         }
     }

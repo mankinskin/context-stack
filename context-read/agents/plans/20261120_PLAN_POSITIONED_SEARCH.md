@@ -368,7 +368,7 @@ positioned query path exists (2.2).
 - **Tests:** raise arithmetic and coverage on the worked example and on
   `repeat_ababa` (`aba → ababa`); trace up edges agree with parent links.
 
-*Done (2026-11-20), `positioned/{path.rs, trace/}`, tests
+*Done (2026-11-20), `positioned/{path.rs, trace/}` (paths since 2.7 role-generic in `positioned/path/`), tests
 `positioned/tests/trace.rs` (7 tests).* Module layout mirrors
 `legacy::trace`: `trace/{state/{mod, parent}, child/{state, iterator},
 cache/{mod, key, new, position, vertex/{mod, positions}},
@@ -747,6 +747,46 @@ search, util}.rs` (replaces the 2.3 smoke sweep `sweep.rs`).*
   overlap chain) give response paths of up to 7 steps; depth counters in
   `search/stats.rs` with coverage floors in `exhaustive.rs`, named pins in
   `tests/deep.rs`.
+
+### 2.7 Role-generic positioned paths (2026-11-21)
+
+The four path structs of 2.2 are re-expressed as one role-generic path,
+mirroring the legacy `PathRole` / `RolePath<R>` / `RootedRolePath<R, Root>`
+/ `RootedRangePath<Root>` design (`context-trace/src/positioned/path/`):
+
+- `PathRole` (`Start`, `End`; `role.rs`): `Direction` (`BottomUp` /
+  `TopDown` trace edges), storage order (start bottom-up so a raise pushes,
+  end top-down so a descent pushes; `top_down`/`bottom_up`, `push_root`,
+  `push_leaf`, `keep_top`), span `boundary` (start/end), canonical border
+  predicate `at_border`/`spans_border` (used by raise, simplify and
+  `SpanCoverage::of` = `(Start at border, End at border)`), `locate`
+  (`start_at`/`end_at`) and `trace_pos` (up keys at the token end, down
+  keys at the token start, clamped). `BorderChild` (end: `prefix_child`).
+- `PathRoot` (`root.rs`): a graph `Token` (no next root child) or
+  `QueryRoot { pattern, entry, entry_position }` (next root child = next
+  pattern token; legacy `PatternEndPath` root).
+- `RolePath<R, Root = Token>` (`role_path.rs`) with aliases `StartPath`,
+  `EndPath`, `QueryPath = RolePath<End, QueryRoot>`: shared accessors
+  (`root_child`, `root_child_offset/_end`, `leaf`, `leaf_offset/_end`,
+  `steps` in storage order, `top_down`, `bottom_up`, `to_occurrence_path`),
+  one `raise` (canonical rule via `spans_border`), one
+  `push_border_child` (replaces `EndPath::push_prefix` and
+  `QueryPath::prefix_child`), one `advance(p)` (`advance_end_path` tail,
+  else `PathRoot::next_root_child`, else `Break`; replaces
+  `EndPath::advance` and `QueryPath::advance`), `simplify`, `locate`.
+- `RangePath<Root = Token>` (`range.rs`): `span`, `start`, `end`;
+  `HasRolePath<Start>` / `HasRolePath<End>`; `simplify_role::<R>`,
+  `canonicalize::<R>` (search results canonicalise `End` only).
+- Tracing: one walk `trace_role_path::<R>` (`trace/traceable/role.rs`,
+  replaces the start/end sub-path and root-entry/exit walks) emitting
+  `NewTraceEdge<R::Direction>` in trace order (`TraceDirection::{key,
+  edge, trace_order}`).
+- Dimension readiness: position arithmetic of paths is confined to
+  `role.rs` (`offset_sum`, `token_end`, `boundary`, `at_border`,
+  `trace_pos`), so a later space abstraction only replaces these.
+
+Behaviour is unchanged (exhaustive suite: paths and cache edges compared
+exactly).
 
 ## Gate
 

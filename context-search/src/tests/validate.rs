@@ -159,7 +159,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
         return;
     };
     let path = &range.path;
-    assert_eq!(path.root, root, "{context}");
+    assert_eq!(path.root(), root, "{context}");
     assert_eq!(path.span, span(o, o + k), "{context}");
     let width = |v: VertexIndex| oracle.key(v).len();
 
@@ -171,10 +171,10 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
     );
     assert_eq!(start[0].0.parent, root.index, "{context}");
     let &(last, s_offset) = start.last().unwrap();
-    assert_eq!(last.child, path.start.start().index, "{context}");
+    assert_eq!(last.child, path.start.leaf().index, "{context}");
     assert_eq!(s_offset, o, "{context}: start token at o");
     assert_eq!(
-        path.start.start(),
+        path.start.leaf(),
         oracle.largest_starting_at(&r, o),
         "{context}: start path ends at the largest token at o"
     );
@@ -193,7 +193,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
             "{context}: start path token {step:?}"
         );
     }
-    let mut v = path.start.start();
+    let mut v = path.start.leaf();
     while let Some(prefix) = graph.prefix_child(v) {
         assert!(
             r[o..].starts_with(oracle.key(prefix.child.index)),

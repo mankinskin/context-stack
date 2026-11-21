@@ -2,7 +2,7 @@
 //!
 //! As in legacy, `atom_position` is the query position at the end of the
 //! leaf (the number of query atoms consumed once the leaf is matched). It is
-//! kept equal to [`QueryPath::leaf_end`] by every operation here.
+//! kept equal to [`QueryPath::leaf_end`](context_trace::positioned::RolePath::leaf_end) by every operation here.
 
 use std::{
     marker::PhantomData,
@@ -40,21 +40,22 @@ impl<S: CursorState> PathCursor<QueryPath, S> {
         self.atom_position
     }
     /// Move to the largest query token starting at the leaf end
-    /// ([`QueryPath::advance`]). `Break` (unchanged) at the query end.
+    /// ([`RolePath::advance_leaf`](context_trace::positioned::RolePath::advance_leaf)).
+    /// `Break` (unchanged) at the query end.
     pub fn advance<G: GraphKind>(
         &mut self,
         graph: &PositionedGraph<G>,
     ) -> ControlFlow<()> {
-        let flow = self.path.advance(graph);
+        let flow = self.path.advance_leaf(graph);
         self.atom_position = self.path.leaf_end();
         flow
     }
     /// Split the leaf into its prefix child (query-side decomposition).
-    pub fn prefix_child<G: GraphKind>(
+    pub fn push_border_child<G: GraphKind>(
         &mut self,
         graph: &PositionedGraph<G>,
     ) -> bool {
-        let split = self.path.prefix_child(graph);
+        let split = self.path.push_border_child(graph);
         self.atom_position = self.path.leaf_end();
         split
     }

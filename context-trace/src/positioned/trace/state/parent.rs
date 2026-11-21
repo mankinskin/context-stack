@@ -109,9 +109,8 @@ impl ParentState {
         let width = self.root().width().0;
         self.prev_pos = self.root_pos;
         self.root_pos += width - self.span.end.0;
-        let at_root_start = self.span.start.0 == 0;
+        self.path.raise(parent, offset, &self.span);
         self.span = offset + self.span.start.0..offset + width;
-        self.path.raise(parent, offset, at_root_start);
     }
 }
 
@@ -127,8 +126,8 @@ impl StateAdvance for ParentState {
             return Err(self);
         };
         let anchor = self.anchor();
-        let entry_pos = anchor.up(self.path.entry_end());
-        let exit_pos = anchor.down(end.root_exit().offset);
+        let entry_pos = anchor.up(self.path.root_child_end());
+        let exit_pos = anchor.down(end.root_child_offset());
         Ok(RootChildState {
             child_state: ChildState {
                 entry_pos,

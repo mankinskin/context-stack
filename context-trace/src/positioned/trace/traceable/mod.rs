@@ -1,7 +1,6 @@
 //! Tracing paths into the cache (legacy `trace::traceable`).
 
 pub mod role;
-pub mod root;
 
 use crate::{
     AtomPosition,
@@ -10,8 +9,11 @@ use crate::{
     UpPosition,
     positioned::{
         path::{
+            End,
             EndPath,
+            HasRolePath,
             RangePath,
+            Start,
             StartPath,
         },
         trace::{
@@ -21,14 +23,7 @@ use crate::{
         },
     },
 };
-use role::{
-    trace_end_sub_path,
-    trace_start_sub_path,
-};
-use root::{
-    trace_root_entry,
-    trace_root_exit,
-};
+use role::trace_role_path;
 
 #[derive(Debug, Clone)]
 pub enum TraceCommand {
@@ -43,10 +38,10 @@ fn start_anchor(
     path: &StartPath,
     entry_pos: UpPosition,
 ) -> QueryAnchor {
-    let start = path.start_offset();
+    let start = path.leaf_offset();
     QueryAnchor {
         root: start,
-        query: AtomPosition(entry_pos.0.0 - (path.entry_end().0 - start.0)),
+        query: AtomPosition(entry_pos.0.0 - (path.root_child_end().0 - start.0)),
     }
 }
 
@@ -96,8 +91,7 @@ impl Traceable for PostfixCommand {
         ctx: &mut TraceCtx<'_, G>,
     ) {
         let anchor = start_anchor(&self.path, self.entry_pos);
-        trace_start_sub_path(ctx, &self.path, anchor);
-        trace_root_entry(ctx, &self.path, anchor);
+        trace_role_path(ctx, &self.path, anchor);
     }
 }
 
@@ -108,10 +102,9 @@ impl Traceable for PrefixCommand {
     ) {
         let anchor = QueryAnchor {
             root: AtomPosition::default(),
-            query: AtomPosition(self.exit_pos.0.0 - self.path.root_exit().offset.0),
+            query: AtomPosition(self.exit_pos.0.0 - self.path.root_child_offset().0),
         };
-        let exit = trace_root_exit(ctx, &self.path, anchor);
-        trace_end_sub_path(ctx, &self.path, anchor, exit);
+        trace_role_path(ctx, &self.path, anchor);
     }
 }
 
@@ -122,10 +115,8 @@ impl Traceable for RangeCommand {
     ) {
         let anchor = start_anchor(&self.path.start, self.entry_pos);
         debug_assert_eq!(anchor.root, self.path.span.start);
-        trace_start_sub_path(ctx, &self.path.start, anchor);
-        trace_root_entry(ctx, &self.path.start, anchor);
-        let exit = trace_root_exit(ctx, &self.path.end, anchor);
-        trace_end_sub_path(ctx, &self.path.end, anchor, exit);
+        trace_role_path(ctx, HasRolePath::<Start>::role_path(&self.path), anchor);
+        trace_role_path(ctx, HasRolePath::<End>::role_path(&self.path), anchor);
     }
 }
 

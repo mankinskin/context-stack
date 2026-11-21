@@ -1,68 +1,61 @@
-//! Sub paths below the root (legacy `traceable::role`): up edges along the
-//! start path, down edges along the end path.
+//! Role paths into the cache (legacy `traceable::role` and
+//! `traceable::root`): one walk for both roles. Start paths emit up edges,
+//! end paths down edges ([`PathRole::Direction`]); the role supplies the
+//! key positions ([`PathRole::trace_pos`]).
 
 use crate::{
     AtomPosition,
-    DownKey,
     GraphKind,
-    UpKey,
     graph::vertex::wide::Wide,
     positioned::{
         path::{
-            EndPath,
-            StartPath,
+            PathRole,
+            RolePath,
         },
         trace::{
-            BottomUp,
             QueryAnchor,
-            TopDown,
             TraceCtx,
-            cache::new::NewTraceEdge,
+            TraceDirection,
+            cache::new::{
+                EditKind,
+                NewTraceEdge,
+            },
         },
     },
 };
 
-/// Up edges below the root entry, from the start token upwards. Every
-/// key's position is the query position at its token's end.
-pub(crate) fn trace_start_sub_path<G: GraphKind>(
+/// Edges along `path` including the root edge, in trace order (bottom-up
+/// for start paths, top-down for end paths).
+///
+/// Every token's key position is the role position of the token
+/// ([`PathRole::trace_pos`]: up keys at the token end, down keys at the
+/// token start clamped to the match start). The root key takes the
+/// position of the root child's key. Edges are labelled by the child
+/// offset in its parent.
+pub(crate) fn trace_role_path<R: PathRole, G: GraphKind>(
     ctx: &mut TraceCtx<'_, G>,
-    path: &StartPath,
+    path: &RolePath<R>,
     anchor: QueryAnchor,
-) {
-    // (parent key, child key, offset), top-down.
-    let mut edges = Vec::new();
-    let mut parent_start = path.root_entry().offset;
-    let mut parent = UpKey::new(path.entry(), anchor.up(path.entry_end()));
-    for step in path.top_down().skip(1) {
+) where
+    NewTraceEdge<R::Direction>: Into<EditKind>,
+{
+    let mut edges = Vec::with_capacity(path.len());
+    let mut parent = (path.root(), None);
+    let mut start = AtomPosition::default();
+    for step in path.top_down() {
         let child = ctx.graph.expect_token(step.child);
-        let start = parent_start + step.offset.0;
-        let key = UpKey::new(child, anchor.up(start + child.width().0));
-        edges.push((parent, key, step.offset));
-        parent = key;
-        parent_start = start;
+        start += step.offset.0;
+        let pos = R::trace_pos(&anchor, start, child.width());
+        let (parent_token, parent_pos) = parent;
+        edges.push(R::Direction::edge(
+            R::Direction::key(parent_token, parent_pos.unwrap_or(pos)),
+            R::Direction::key(child, pos),
+            step.offset,
+        ));
+        parent = (child, Some(pos));
     }
-    for (target, prev, offset) in edges.into_iter().rev() {
-        ctx.cache.add_state(NewTraceEdge::<BottomUp>::new(prev, target, offset));
+    R::Direction::trace_order(&mut edges);
+    for edge in edges {
+        ctx.cache.add_state(edge);
     }
-}
-
-/// Down edges below the root exit. Every key's position is the query
-/// position at its token's start (clamped to the match start).
-pub(crate) fn trace_end_sub_path<G: GraphKind>(
-    ctx: &mut TraceCtx<'_, G>,
-    path: &EndPath,
-    anchor: QueryAnchor,
-    exit: DownKey,
-) -> DownKey {
-    let mut parent_start: AtomPosition = path.root_exit().offset;
-    let mut prev = exit;
-    for step in &path.steps()[1..] {
-        let child = ctx.graph.expect_token(step.child);
-        let start = parent_start + step.offset.0;
-        let target = DownKey::new(child, anchor.down(start));
-        ctx.cache.add_state(NewTraceEdge::<TopDown>::new(prev, target, step.offset));
-        prev = target;
-        parent_start = start;
-    }
-    prev
 }

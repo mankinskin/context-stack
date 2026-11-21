@@ -17,6 +17,7 @@ use std::ops::Range;
 use context_trace::{
     positioned::{
         ChildState,
+        End,
         EndPath,
         PositionedGraph,
         PostfixCommand,
@@ -132,8 +133,8 @@ impl PathCoverage {
         end_pos: AtomPosition,
     ) -> Self {
         let anchor = state.anchor();
-        state.path.canonicalize_end(graph);
-        state.exit_pos = anchor.down(state.path.end.root_exit().offset);
+        state.path.canonicalize::<End, G>(graph);
+        state.exit_pos = anchor.down(state.path.end.root_child_offset());
         let target = DownKey::new(
             state.path.end.leaf(),
             anchor.down(state.path.end.leaf_offset()),
@@ -154,7 +155,7 @@ impl PathCoverage {
         debug_assert_eq!(range.anchor(), anchor, "query positions agree");
         match range.path.coverage() {
             SpanCoverage::EntireRoot => Self::EntireRoot(EntireRootEnd {
-                root: range.path.root,
+                root: range.path.root(),
                 query_start: range.query_start(),
                 path: Some(range),
             }),
@@ -198,7 +199,7 @@ impl PathCoverage {
     pub fn root(&self) -> Token {
         match self {
             Self::EntireRoot(end) => end.root,
-            Self::Range(r) | Self::Postfix(r) | Self::Prefix(r) => r.path.root,
+            Self::Range(r) | Self::Postfix(r) | Self::Prefix(r) => r.path.root(),
         }
     }
     /// The matched range with paths; `None` for an unmatched first token.

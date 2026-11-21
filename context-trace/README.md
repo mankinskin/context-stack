@@ -47,8 +47,14 @@ read-only navigation `read.rs` (`PositionedGraph::read_interval`: content of an
 `IntervalView`, deduplicated by `(token, offset)`), search navigation
 `navigate.rs` (`start_at`, `prefix_child`, `parent_occurrences`,
 `atom_token`, `advance_end_path`, `token`; `Composition::covering`/`prefix`),
-search paths `path.rs` (`StartPath` bottom-up, `EndPath`, `RangePath` with
-absolute `span`, `QueryPath` into composite query tokens, `SpanCoverage`),
+search paths `path/` (role-generic `RolePath<R: PathRole, Root: PathRoot>`
+mirroring legacy `RolePath`/`RootedRolePath`: roles `Start`/`End` carry
+the trace direction, storage order (start bottom-up, end top-down), span
+boundary, canonical border predicate, `locate` and trace key positions;
+roots are a graph `Token` or a `QueryRoot` pattern; aliases `StartPath`,
+`EndPath`, `QueryPath = RolePath<End, QueryRoot>`; `RangePath<Root>` with
+absolute `span` and `HasRolePath<Start/End>`; `SpanCoverage`; position
+arithmetic confined to `path/role.rs` for later multi-dimensional inputs),
 trace states and cache `trace/` (mirrors `legacy/trace`: `ParentState`,
 `ChildState`/`RootChildState`, `TraceCache` with offset-labelled edges and
 query-position keys, `Traceable` commands; search plan 2.2), `fixtures.rs` (`test-api`:

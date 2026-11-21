@@ -99,7 +99,7 @@ impl SearchNode {
     /// Offset of the root child the start path enters through.
     fn root_entry_offset(&self) -> AtomPosition {
         match self {
-            Self::ParentCandidate(state) => state.parent_state.path.root_entry().offset,
+            Self::ParentCandidate(state) => state.parent_state.path.root_child_offset(),
             Self::ChildCandidate(state) => {
                 state
                     .child
@@ -107,8 +107,7 @@ impl SearchNode {
                     .child_state
                     .path
                     .start
-                    .root_entry()
-                    .offset
+                    .root_child_offset()
             },
         }
     }
