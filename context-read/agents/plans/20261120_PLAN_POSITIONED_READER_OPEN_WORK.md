@@ -93,15 +93,16 @@ gate). This roadmap holds no planning for this step.
 ## Step 3 — Positioned insertion and seam discovery (`context-insert`)
 
 Work package: [20261120_PLAN_POSITIONED_INSERT](20261120_PLAN_POSITIONED_INSERT.md)
-(legacy split/join/closure walkthrough, cover projection, single host update,
-merge with seam discovery, tasks, validation and gate). This roadmap holds no
-planning for this step.
+(legacy split/join/closure walkthrough, split graph seeded from the
+response and joined bottom-up, merge with seam discovery, tasks, validation
+and gate). This roadmap holds no planning for this step.
 
 **Outcome:** `insert_match(Response)` turns a matched span into a token
-(existing root, or a new vertex with its unique minimal host updated), and
+(existing root, or a new vertex plus the intersection tokens of every vertex
+its borders cut through, built by a split graph and a bottom-up join), and
 `Cover::merge` combines two adjacent or overlapping covers including seam
-occurrences. Both are validated on every fixture; promotion of tokens with
-several hosts stays in step 5.
+occurrences. Both are validated on every fixture; insertion is checked
+against the oracle graph of the extended corpus.
 
 ## Step 4 — Fixed-retention reader (`context-read`)
 
