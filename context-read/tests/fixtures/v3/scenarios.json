@@ -56,5 +56,13 @@
   {"name":"late_retention__1","inputs":["vis"]},
   {"name":"late_retention__2","inputs":["vis","vim"]},
   {"name":"duplicate_observation","inputs":["abcabc","abcabc"]},
-  {"name":"substring_input","inputs":["abcabc","bca"]}
+  {"name":"substring_input","inputs":["abcabc","bca"]},
+  {"name":"deep_chains","inputs":["ef","def","cdef","bcdef","abcdef","gh","ghi","ghij","ghijk","ghijkl","abcdefghijkl"]},
+  {"name":"deep_prefix_chain","inputs":["ab","abc","abcd","abcde","abcdef","abcdefg","abcdefgh"]},
+  {"name":"deep_suffix_chain","inputs":["gh","fgh","efgh","defgh","cdefgh","bcdefgh","abcdefgh"]},
+  {"name":"deep_overlap_chain","inputs":["ab","bc","abc","bcd","abcd","bcde","abcde","bcdef","abcdef","bcdefg","abcdefg"]},
+  {"name":"deep_rotations","inputs":["abcdefg","bcdefga","cdefgab","defgabc","efgabcd","fgabcde","gabcdef"]},
+  {"name":"deep_fibonacci","inputs":["abaababaabaab"]},
+  {"name":"deep_thue_morse","inputs":["abbabaabbaababbabaab"]},
+  {"name":"deep_nested_repeat","inputs":["ababXababYababXabab"]}
 ]

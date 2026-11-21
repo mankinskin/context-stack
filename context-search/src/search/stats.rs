@@ -8,6 +8,14 @@
 //! - `compared_positions`: query positions (leaf starts) of every leaf
 //!   comparison, in order. Shows that a continuation never re-reads
 //!   positions before its checkpoint.
+//! - depth counters: `parent_raises` (states raised into a parent
+//!   occurrence), `graph_prefix_descents` (graph-side decompositions,
+//!   `RolePath::push_border_child` of the end path), `query_prefix_descents`
+//!   (query-side decompositions, `push_border_child` of the query path), and the maximal start / end path
+//!   lengths of any state of the search (raised states, entered and advanced
+//!   child states, decompositions) and of the response.
+//!
+//! The uniqueness probe records none of them.
 
 use context_trace::AtomPosition;
 
@@ -33,6 +41,11 @@ pub struct SearchStats {
     pub equal_width_candidates: usize,
     pub equal_width_first_matches: usize,
     pub compared_positions: Vec<AtomPosition>,
+    pub parent_raises: usize,
+    pub graph_prefix_descents: usize,
+    pub query_prefix_descents: usize,
+    pub max_start_path_len: usize,
+    pub max_end_path_len: usize,
 }
 
 /// Counters of the last search started on this thread.
@@ -47,12 +60,50 @@ pub(crate) fn reset() {
     imp::STATS.with(|stats| *stats.borrow_mut() = SearchStats::default());
 }
 
+/// Apply `_f` to the counters unless probing (no-op outside test builds).
 #[inline]
-pub(crate) fn record_compare(_position: AtomPosition) {
+fn update(_f: impl FnOnce(&mut SearchStats)) {
     #[cfg(any(test, feature = "test-api"))]
     if !imp::PROBING.with(|probing| probing.get()) {
-        imp::STATS.with(|stats| stats.borrow_mut().compared_positions.push(_position));
+        imp::STATS.with(|stats| _f(&mut stats.borrow_mut()));
     }
+}
+
+#[inline]
+pub(crate) fn record_compare(position: AtomPosition) {
+    update(|stats| stats.compared_positions.push(position));
+}
+
+/// A state raised into a parent occurrence, with its new start path length.
+#[inline]
+pub(crate) fn record_raise(start_len: usize) {
+    update(|stats| {
+        stats.parent_raises += 1;
+        stats.max_start_path_len = stats.max_start_path_len.max(start_len);
+    });
+}
+
+/// A graph-side prefix descent, with the new end path length.
+#[inline]
+pub(crate) fn record_graph_prefix_descent(end_len: usize) {
+    update(|stats| {
+        stats.graph_prefix_descents += 1;
+        stats.max_end_path_len = stats.max_end_path_len.max(end_len);
+    });
+}
+
+#[inline]
+pub(crate) fn record_query_prefix_descent() {
+    update(|stats| stats.query_prefix_descents += 1);
+}
+
+/// Path lengths of a state (start path, end path; 0 if absent).
+#[inline]
+pub(crate) fn record_path_lens(start_len: usize, end_len: usize) {
+    update(|stats| {
+        stats.max_start_path_len = stats.max_start_path_len.max(start_len);
+        stats.max_end_path_len = stats.max_end_path_len.max(end_len);
+    });
 }
 
 #[cfg(any(test, feature = "test-api"))]

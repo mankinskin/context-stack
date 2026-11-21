@@ -74,6 +74,9 @@ impl CompareState<Candidate, Candidate> {
                 .end
                 .push_prefix(graph);
             debug_assert!(split, "wider graph leaf is composite");
+            stats::record_graph_prefix_descent(
+                self.child.current().child_state.path.end.steps().len(),
+            );
         }
         if matches!(
             self.mode,
@@ -81,6 +84,7 @@ impl CompareState<Candidate, Candidate> {
         ) {
             let split = self.query.current_mut().prefix_child(graph);
             debug_assert!(split, "wider query leaf is composite");
+            stats::record_query_prefix_descent();
         }
         self.target = self.current_target();
     }

@@ -33,6 +33,7 @@ pub trait DirectedTraversalPolicy: Sized + Debug {
         let batch = Self::gen_parent_batch(graph, parent.root(), |p, o| {
             let mut parent = parent.clone();
             parent.path_raise(p, o);
+            crate::search::stats::record_raise(parent.path.bottom_up().len());
             parent
         });
         (!batch.is_empty()).then_some(batch)

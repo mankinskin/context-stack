@@ -742,6 +742,11 @@ search, util}.rs` (replaces the 2.3 smoke sweep `sweep.rs`).*
   start-token cache entry (`TraceCache::new(q0)`), inherent to the query.
 - **No oracle/model issues:** every expectation had a unique minimal root
   and offset; no other implementation bug was found.
+- **Deep fixture coverage (2026-11-21):** `deep_*` v3 fixtures (chains,
+  prefix/suffix chains, rotations, nested repeats, Fibonacci, Thue–Morse,
+  overlap chain) give response paths of up to 7 steps; depth counters in
+  `search/stats.rs` with coverage floors in `exhaustive.rs`, named pins in
+  `tests/deep.rs`.
 
 ## Gate
 

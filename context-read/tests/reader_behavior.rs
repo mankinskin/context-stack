@@ -103,6 +103,14 @@ scenarios!(
     late_retention__2,
     duplicate_observation,
     substring_input,
+    deep_chains,
+    deep_prefix_chain,
+    deep_suffix_chain,
+    deep_overlap_chain,
+    deep_rotations,
+    deep_fibonacci,
+    deep_thue_morse,
+    deep_nested_repeat,
 );
 
 /// Every positioned manifest entry has exactly one scenario test above.

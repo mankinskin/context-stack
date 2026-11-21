@@ -59,6 +59,10 @@ impl ParentCompareState {
         match self.parent_state.advance_state(graph) {
             Ok(next) => {
                 let child_state = next.child_state;
+                crate::search::stats::record_path_lens(
+                    child_state.path.start.bottom_up().len(),
+                    child_state.path.end.steps().len(),
+                );
                 let target = DownKey::new(
                     child_state.path.end.leaf(),
                     DownPosition(self.cursor.current().path.position()),

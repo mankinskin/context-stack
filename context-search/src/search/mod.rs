@@ -122,10 +122,15 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
         let cache = std::mem::replace(&mut self.matches.trace_ctx.cache, TraceCache::default());
         let mut ctx = TraceCtx::new(graph, cache);
         (&end).trace(&mut ctx);
-        Response {
+        let response = Response {
             cache: ctx.cache,
             end,
-        }
+        };
+        stats::record_path_lens(
+            response.path().start_path().map_or(0, |p| p.bottom_up().len()),
+            response.path().end_path().map_or(0, |p| p.steps().len()),
+        );
+        response
     }
 
     /// Advance in the matched root until the query, the root or the match

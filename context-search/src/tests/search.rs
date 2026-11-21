@@ -28,13 +28,13 @@ pub(super) fn check(f: &FixtureGraph, query: &str) -> Response {
     response
 }
 
-fn names<const N: usize>(f: &FixtureGraph, keys: [&str; N]) -> [Token; N] {
+pub(super) fn names<const N: usize>(f: &FixtureGraph, keys: [&str; N]) -> [Token; N] {
     keys.map(|key| f.names[key])
 }
 
 /// Cache edges `(parent key, child key, child offset)`, narrowest parent
 /// first.
-fn edges(response: &Response) -> Vec<(DirectedKey, DirectedKey, AtomPosition)> {
+pub(super) fn edges(response: &Response) -> Vec<(DirectedKey, DirectedKey, AtomPosition)> {
     let mut edges: Vec<_> = response
         .cache
         .edges()
@@ -46,7 +46,7 @@ fn edges(response: &Response) -> Vec<(DirectedKey, DirectedKey, AtomPosition)> {
     edges
 }
 
-fn start_steps(response: &Response) -> Vec<context_trace::positioned::OccurrenceLocation> {
+pub(super) fn start_steps(response: &Response) -> Vec<context_trace::positioned::OccurrenceLocation> {
     response
         .path()
         .start_path()
