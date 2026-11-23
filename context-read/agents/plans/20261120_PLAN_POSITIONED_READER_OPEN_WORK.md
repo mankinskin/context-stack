@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition`
 summary: Open work for the positioned-composition reader. Binding model rules, then the ordered steps: content-free model leftovers, positioned search (legacy architecture with positional sibling navigation) validated on v3 oracle fixtures, positioned insertion, reader (legacy loop with positioned root edits), streaming retention, cutover.
-status: 📋 steps 1–2 done; next step 3 (positioned insertion, plan revision 3); reader plan drafted
+status: 📋 steps 1–3 done; next step 4 (reader); reader plan drafted
 date: 2026-11-20
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
 ---
@@ -106,6 +106,11 @@ join, invariants, `GraphEdit`, tasks, validation and gate; revision 2 with
 the legacy walkthrough:
 [20261120_PLAN_POSITIONED_INSERT](20261120_PLAN_POSITIONED_INSERT.md)).
 This roadmap holds no planning for this step.
+
+- [x] **Done (2026-11-23).** `context_insert::{insert_match, insert,
+  insert_next_match}` with split graph, join and `GraphEdit`; `Response`
+  carries the graph generation. Insert gate 1,379/1,379 against the oracle
+  graphs of the insert lane.
 
 **Outcome:** `insert_match(Response)` turns a matched span into a token so
 that the graph equals the oracle graph of the corpus plus the span: an

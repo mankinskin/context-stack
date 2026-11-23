@@ -75,3 +75,21 @@ fn release_display_shows_index_and_width_only() {
         }
     }
 }
+
+#[test]
+fn insert_cases_extend_their_base_by_a_non_vertex_query() {
+    let cases = super::super::fixtures::insert_cases();
+    assert!(!cases.is_empty());
+    for case in cases {
+        let name = &case.name;
+        assert!(!case.base.names.contains_key(&case.query), "{name}");
+        assert!(case.expected.names.contains_key(&case.query), "{name}");
+        let mut corpus = case.base.corpus.clone();
+        corpus.push(case.query.clone());
+        assert_eq!(case.expected.corpus, corpus, "{name}");
+        case.expected
+            .graph
+            .validate()
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+    }
+}

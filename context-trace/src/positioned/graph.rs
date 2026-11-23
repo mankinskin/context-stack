@@ -1,4 +1,4 @@
-//! Positioned graph storage, insertion and validation.
+//! Positioned graph storage and validation; mutation lives in `super::edit`.
 
 use std::{
     collections::{
@@ -125,7 +125,7 @@ impl TokenNameResolver for PositionedLabels {
     }
 }
 
-/// Insertion or validation failure.
+/// Edit or validation failure.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PositionedError {
     Composition {
@@ -164,6 +164,23 @@ pub enum PositionedError {
         left: Occurrence,
         right: Occurrence,
     },
+    /// Adjacent occurrences in `owner` overlap, but their overlap is not a
+    /// vertex (G4).
+    #[cfg(any(debug_assertions, feature = "test-api"))]
+    OverlapNotVertex {
+        owner: VertexIndex,
+        left: Occurrence,
+        right: Occurrence,
+    },
+    /// The vertex has parents, so its width must not change.
+    HasParents(VertexIndex),
+    /// `occurrence` does not lie where the edit of `vertex` requires it.
+    OutsideVertex {
+        vertex: VertexIndex,
+        occurrence: Occurrence,
+    },
+    /// The edit would change the width of `vertex`.
+    WidthChange { vertex: VertexIndex },
 }
 
 impl fmt::Display for PositionedError {
@@ -212,6 +229,21 @@ impl fmt::Display for PositionedError {
                 "vertex {}: occurrences {}@{} and {}@{} disagree on their overlap",
                 owner.0, left.child.index.0, left.offset, right.child.index.0, right.offset
             ),
+            #[cfg(any(debug_assertions, feature = "test-api"))]
+            Self::OverlapNotVertex { owner, left, right } => write!(
+                f,
+                "vertex {}: the overlap of {}@{} and {}@{} is not a vertex",
+                owner.0, left.child.index.0, left.offset, right.child.index.0, right.offset
+            ),
+            Self::HasParents(vertex) => write!(f, "vertex {} has parents", vertex.0),
+            Self::OutsideVertex { vertex, occurrence } => write!(
+                f,
+                "occurrence {}@{} lies outside the editable range of vertex {}",
+                occurrence.child.index.0, occurrence.offset, vertex.0
+            ),
+            Self::WidthChange { vertex } => {
+                write!(f, "edit would change the width of vertex {}", vertex.0)
+            },
         }
     }
 }
@@ -220,9 +252,10 @@ impl std::error::Error for PositionedError {}
 
 /// Positioned composition graph with its own storage.
 ///
-/// Vertices are dense (`VertexIndex(i)` is slot `i`) and never removed. The
-/// only way to add a composite is [`Self::insert`], which accepts complete
-/// compositions only, so gap, wrapper or slice vertices cannot be built.
+/// Vertices are dense (`VertexIndex(i)` is slot `i`) and never removed.
+/// Vertices and compositions change only through `GraphEdit`
+/// ([`Self::edit`]), whose operations accept complete compositions only, so
+/// gap, wrapper or slice vertices cannot be built.
 ///
 /// No index stores expanded content: the only value-keyed index maps atom
 /// values to atom vertices. Composite vertices are reached structurally
@@ -234,6 +267,8 @@ pub struct PositionedGraph<G: GraphKind = BaseGraphKind> {
     pub(crate) vertices: Vec<PositionedVertex<G>>,
     /// Atom value → atom vertex.
     pub(crate) atoms: HashMap<AtomOf<G>, VertexIndex>,
+    /// Bumped by the first mutation of every edit.
+    pub(crate) generation: u64,
 }
 
 impl<G: GraphKind> Default for PositionedGraph<G> {
@@ -241,6 +276,7 @@ impl<G: GraphKind> Default for PositionedGraph<G> {
         Self {
             vertices: Vec::new(),
             atoms: HashMap::new(),
+            generation: 0,
         }
     }
 }
@@ -258,14 +294,14 @@ impl<G: GraphKind> PositionedGraph<G> {
     ) -> Option<&PositionedVertex<G>> {
         self.vertices.get(index.0)
     }
-    fn expect(
+    pub(crate) fn expect(
         &self,
         index: VertexIndex,
     ) -> Result<&PositionedVertex<G>, PositionedError> {
         self.vertex(index).ok_or(PositionedError::UnknownVertex(index))
     }
     /// The child of `occurrence` exists and has the recorded width.
-    fn check_child(
+    pub(crate) fn check_child(
         &self,
         occurrence: &Occurrence,
     ) -> Result<(), PositionedError> {
@@ -279,83 +315,11 @@ impl<G: GraphKind> PositionedGraph<G> {
         }
         Ok(())
     }
-    /// Insert an atom, or return the existing vertex for it.
-    pub fn insert_atom(
-        &mut self,
-        atom: AtomOf<G>,
-    ) -> Token {
-        if let Some(&index) = self.atoms.get(&atom) {
-            return Token::new(index, 1);
-        }
-        let index = VertexIndex(self.vertices.len());
-        self.vertices.push(PositionedVertex {
-            index,
-            key: VertexKey::default(),
-            width: TokenWidth(1),
-            #[cfg(debug_assertions)]
-            label: atom.to_string(),
-            node: VertexNode::Atom(atom),
-            parents: BTreeMap::new(),
-        });
-        self.atoms.insert(atom, index);
-        Token::new(index, 1)
-    }
-
-    /// Insert a composite from its complete composition and link its children
-    /// (`test-api` only; same checks as the crate-internal
-    /// `insert_composition`).
-    #[cfg(any(test, feature = "test-api"))]
-    pub fn insert(
-        &mut self,
-        occurrences: Vec<Occurrence>,
-    ) -> Result<Token, PositionedError> {
-        self.insert_composition(occurrences)
-    }
-
-    /// Insert a composite from its complete composition and link its children.
-    ///
-    /// Rejects incomplete or malformed compositions, unknown children and
-    /// children whose recorded width disagrees with the vertex. Checks
-    /// structure only; content is never expanded. Crate-internal (search plan
-    /// 2.5): public composite insertion goes through a search `Response`
-    /// (roadmap step 3); tests use [`Self::insert`] (`test-api`).
-    pub(crate) fn insert_composition(
-        &mut self,
-        occurrences: Vec<Occurrence>,
-    ) -> Result<Token, PositionedError> {
-        let composition = Composition::new(occurrences)
-            .map_err(|error| PositionedError::Composition { owner: None, error })?;
-        for occurrence in composition.occurrences() {
-            self.check_child(occurrence)?;
-        }
-        let index = VertexIndex(self.vertices.len());
-        let width = composition.width();
-        #[cfg(debug_assertions)]
-        let label = self.composed_label(&composition);
-        for occurrence in composition.occurrences() {
-            self.vertices[occurrence.child.index.0]
-                .parents
-                .entry(index)
-                .or_default()
-                .insert(occurrence.offset);
-        }
-        self.vertices.push(PositionedVertex {
-            index,
-            key: VertexKey::default(),
-            width,
-            #[cfg(debug_assertions)]
-            label,
-            node: VertexNode::Composite(composition),
-            parents: BTreeMap::new(),
-        });
-        Ok(Token::new(index, width))
-    }
-
     /// Children's labels joined in order, each from the first position not
     /// covered by the previous occurrences. Assumes one `char` per atom
     /// label (true for `char` atoms).
     #[cfg(debug_assertions)]
-    fn composed_label(
+    pub(crate) fn composed_label(
         &self,
         composition: &Composition,
     ) -> String {
@@ -410,86 +374,123 @@ impl<G: GraphKind> PositionedGraph<G> {
         })
     }
 
+    /// Structure, width and reciprocal links of the vertex stored at `slot`.
+    pub(crate) fn validate_vertex(
+        &self,
+        slot: usize,
+        vertex: &PositionedVertex<G>,
+    ) -> Result<(), PositionedError> {
+        let index = vertex.index;
+        if index.0 != slot {
+            return Err(PositionedError::Index {
+                slot,
+                vertex: index,
+            });
+        }
+        match &vertex.node {
+            VertexNode::Atom(_) => {
+                if vertex.width.0 != 1 {
+                    return Err(PositionedError::Width {
+                        vertex: index,
+                        expected: TokenWidth(1),
+                        found: vertex.width,
+                    });
+                }
+            },
+            VertexNode::Composite(composition) => {
+                let error = |error| PositionedError::Composition {
+                    owner: Some(index),
+                    error,
+                };
+                // Order is guaranteed by construction; re-check the rest.
+                Composition::new(composition.occurrences().to_vec())
+                    .map_err(error)?;
+                if composition.width() != vertex.width {
+                    return Err(PositionedError::Width {
+                        vertex: index,
+                        expected: composition.width(),
+                        found: vertex.width,
+                    });
+                }
+                for occurrence in composition.occurrences() {
+                    self.check_child(occurrence)?;
+                    let linked = self
+                        .expect(occurrence.child.index)?
+                        .parents
+                        .get(&index)
+                        .is_some_and(|offsets| offsets.contains(&occurrence.offset));
+                    if !linked {
+                        return Err(PositionedError::ParentLink {
+                            parent: index,
+                            child: occurrence.child.index,
+                            offset: occurrence.offset,
+                        });
+                    }
+                }
+            },
+        }
+        for (&parent, offsets) in &vertex.parents {
+            let composition = self.expect(parent)?.composition();
+            for &offset in offsets {
+                let present = composition.is_some_and(|c| {
+                    c.occurrences()
+                        .iter()
+                        .any(|o| o.offset == offset && o.child.index == index)
+                });
+                if !present {
+                    return Err(PositionedError::ParentLink {
+                        parent,
+                        child: index,
+                        offset,
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Check the structural composition rules, recorded widths and reciprocal
     /// parent links.
     ///
     /// Debug and `test-api` builds additionally check content by traversal
-    /// (see [`Self::validate_content`]); release builds never expand content.
+    /// and overlap closure (G4) (see [`Self::validate_content`]); release
+    /// builds never expand content.
     pub fn validate(&self) -> Result<(), PositionedError> {
         for (slot, vertex) in self.vertices.iter().enumerate() {
-            let index = vertex.index;
-            if index.0 != slot {
-                return Err(PositionedError::Index {
-                    slot,
-                    vertex: index,
-                });
-            }
-            match &vertex.node {
-                VertexNode::Atom(_) => {
-                    if vertex.width.0 != 1 {
-                        return Err(PositionedError::Width {
-                            vertex: index,
-                            expected: TokenWidth(1),
-                            found: vertex.width,
-                        });
-                    }
-                },
-                VertexNode::Composite(composition) => {
-                    let error = |error| PositionedError::Composition {
-                        owner: Some(index),
-                        error,
-                    };
-                    // Order is guaranteed by construction; re-check the rest.
-                    Composition::new(composition.occurrences().to_vec())
-                        .map_err(error)?;
-                    if composition.width() != vertex.width {
-                        return Err(PositionedError::Width {
-                            vertex: index,
-                            expected: composition.width(),
-                            found: vertex.width,
-                        });
-                    }
-                    for occurrence in composition.occurrences() {
-                        self.check_child(occurrence)?;
-                        let linked = self
-                            .expect(occurrence.child.index)?
-                            .parents
-                            .get(&index)
-                            .is_some_and(|offsets| offsets.contains(&occurrence.offset));
-                        if !linked {
-                            return Err(PositionedError::ParentLink {
-                                parent: index,
-                                child: occurrence.child.index,
-                                offset: occurrence.offset,
-                            });
-                        }
-                    }
-                },
-            }
-            for (&parent, offsets) in &vertex.parents {
-                let composition = self.expect(parent)?.composition();
-                for &offset in offsets {
-                    let present = composition.is_some_and(|c| {
-                        c.occurrences()
-                            .iter()
-                            .any(|o| o.offset == offset && o.child.index == index)
-                    });
-                    if !present {
-                        return Err(PositionedError::ParentLink {
-                            parent,
-                            child: index,
-                            offset,
-                        });
-                    }
-                }
-            }
+            self.validate_vertex(slot, vertex)?;
         }
         #[cfg(any(debug_assertions, feature = "test-api"))]
         self.validate_content()?;
         Ok(())
     }
 
-    /// One vertex per content and overlap agreement, read by traversal into
+    /// G4, structurally: for adjacent overlapping `L@l`, `R@r`, the largest
+    /// token starting at `r − l` in `L` ends at `|L|`, i.e. the overlap is a
+    /// vertex. Non-adjacent pairs are not checked.
+    #[cfg(any(debug_assertions, feature = "test-api"))]
+    pub(crate) fn check_overlap_closure(
+        &self,
+        owner: VertexIndex,
+        occurrences: &[Occurrence],
+    ) -> Result<(), PositionedError> {
+        for pair in occurrences.windows(2) {
+            let (left, right) = (pair[0], pair[1]);
+            if right.offset >= left.end() {
+                continue;
+            }
+            let start = right.offset.0 - left.offset.0;
+            let closed = self
+                .start_at(left.child.index, start)
+                .is_some_and(|(token, _)| start + token.width.0 == left.child.width.0);
+            if !closed {
+                return Err(PositionedError::OverlapNotVertex { owner, left, right });
+            }
+        }
+        Ok(())
+    }
+
+    /// One vertex per content, overlap agreement and overlap closure (G4),
+    /// read by traversal into
     /// a temporary set dropped on return. Assumes the structural checks of
     /// [`Self::validate`] passed.
     #[cfg(any(debug_assertions, feature = "test-api"))]
@@ -523,6 +524,7 @@ impl<G: GraphKind> PositionedGraph<G> {
                         });
                     }
                 }
+                self.check_overlap_closure(vertex.index, composition.occurrences())?;
             }
             let content = read(vertex.index, 0..vertex.width.0);
             if content.len() != vertex.width.0 {

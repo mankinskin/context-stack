@@ -111,6 +111,10 @@ scenarios!(
     deep_fibonacci,
     deep_thue_morse,
     deep_nested_repeat,
+    insert_small_periodic,
+    insert_shared_vertex,
+    insert_periodic,
+    insert_deep_borders,
 );
 
 /// Every positioned manifest entry has exactly one scenario test above.

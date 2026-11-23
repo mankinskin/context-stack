@@ -79,7 +79,7 @@ impl std::error::Error for CompositionError {}
 ///
 /// The constructor is the only way to build one, so a `Composition` is
 /// complete by construction. Content agreement with the children is checked
-/// by [`super::PositionedGraph::insert`].
+/// by `GraphEdit::create` (debug and `test-api` builds).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Composition(Vec<Occurrence>);
 
@@ -156,8 +156,42 @@ impl Composition {
         }
         self.0.get(self.0.partition_point(|o| o.end() < end))
     }
+    /// Occurrences strictly containing `position` (`offset < position < end`),
+    /// a contiguous range because offsets and ends both increase strictly
+    /// (two binary searches). Empty if `position` lies on a child border
+    /// between non-overlapping occurrences or outside `(0, width)`.
+    pub fn crossing(
+        &self,
+        position: impl Into<AtomPosition>,
+    ) -> &[Occurrence] {
+        let position = position.into();
+        let lo = self.0.partition_point(|o| o.end() <= position);
+        let hi = self.0.partition_point(|o| o.offset < position);
+        &self.0[lo..hi]
+    }
     /// The unique occurrence at offset 0.
     pub fn prefix(&self) -> &Occurrence {
         &self.0[0]
     }
+}
+
+/// The maximal occurrences of `occurrences`: sorted by `(start, wider
+/// first)`, an occurrence is kept only if it ends after all earlier ones.
+/// Drops duplicates and occurrences contained in others; partial overlaps
+/// are kept.
+pub fn maximal(mut occurrences: Vec<Occurrence>) -> Vec<Occurrence> {
+    occurrences.sort_by(|a, b| {
+        a.offset
+            .cmp(&b.offset)
+            .then(b.child.width().cmp(&a.child.width()))
+    });
+    let mut reach = AtomPosition::default();
+    let mut kept: Vec<Occurrence> = Vec::with_capacity(occurrences.len());
+    for occurrence in occurrences {
+        if occurrence.end() > reach {
+            reach = occurrence.end();
+            kept.push(occurrence);
+        }
+    }
+    kept
 }

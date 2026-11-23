@@ -67,6 +67,7 @@ fn positioned_graph_has_no_content_keyed_field() {
         &[
             ("vertices", "Vec<PositionedVertex<G>>"),
             ("atoms", "HashMap<AtomOf<G>, VertexIndex>"),
+            ("generation", "u64"),
         ],
         &[],
     );
@@ -81,4 +82,40 @@ fn positioned_graph_has_no_content_keyed_field() {
         ],
         &["label"],
     );
+}
+
+/// Only `context-insert` and `context-read` may enable `context-trace/edit`
+/// (insert plan D8): neither through a dependency's feature list nor
+/// through one of their own features.
+#[test]
+fn only_insertion_and_the_reader_enable_the_edit_feature() {
+    const ALLOWED: [&str; 2] = ["context-insert", "context-read"];
+    let output = std::process::Command::new(env!("CARGO"))
+        .args(["metadata", "--format-version", "1", "--no-deps"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("cargo metadata");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let metadata: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let packages = metadata["packages"].as_array().unwrap();
+    assert!(packages.iter().any(|p| p["name"] == "context-trace"));
+    let mut users = std::collections::BTreeSet::new();
+    for package in packages {
+        let name = package["name"].as_str().unwrap();
+        let by_dependency = package["dependencies"].as_array().unwrap().iter().any(|dependency| {
+            dependency["name"] == "context-trace"
+                && dependency["features"].as_array().unwrap().iter().any(|f| f == "edit")
+        });
+        let by_feature = package["features"].as_object().unwrap().values().any(|enables| {
+            enables.as_array().unwrap().iter().any(|f| {
+                f == "context-trace/edit" || f == "context-trace?/edit"
+            })
+        });
+        if by_dependency || by_feature {
+            users.insert(name);
+        }
+    }
+    for user in &users {
+        assert!(ALLOWED.contains(user), "{user} must not enable context-trace/edit");
+    }
 }

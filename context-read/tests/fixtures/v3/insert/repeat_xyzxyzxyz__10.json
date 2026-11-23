@@ -1,0 +1,62 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "xyzxyzxyz",
+    "yzxyz"
+  ],
+  "vertices": {
+    "x": [],
+    "xyz": [
+      [
+        0,
+        "x"
+      ],
+      [
+        1,
+        "yz"
+      ]
+    ],
+    "xyzxyz": [
+      [
+        0,
+        "xyz"
+      ],
+      [
+        1,
+        "yzxyz"
+      ]
+    ],
+    "xyzxyzxyz": [
+      [
+        0,
+        "xyzxyz"
+      ],
+      [
+        3,
+        "xyzxyz"
+      ]
+    ],
+    "y": [],
+    "yz": [
+      [
+        0,
+        "y"
+      ],
+      [
+        1,
+        "z"
+      ]
+    ],
+    "yzxyz": [
+      [
+        0,
+        "yz"
+      ],
+      [
+        2,
+        "xyz"
+      ]
+    ],
+    "z": []
+  }
+}

@@ -264,6 +264,7 @@ fn errors() {
 fn positioned_graph_ref() {
     let f = fixture("repeat_abcabca");
     let expected = f.graph.find_ancestor("abcab".chars()).unwrap();
+    assert_eq!(expected.generation(), f.graph.generation());
     let graph = context_trace::positioned::PositionedGraphRef::new(f.graph);
     assert_eq!(graph.find_ancestor("abcab".chars()).unwrap(), expected);
 }

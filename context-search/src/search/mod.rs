@@ -125,6 +125,7 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
         let response = Response {
             cache: ctx.cache,
             end,
+            generation: graph.generation(),
         };
         stats::record_path_lens(
             response.path().start_path().map_or(0, |p| p.len()),

@@ -64,5 +64,9 @@
   {"name":"deep_rotations","inputs":["abcdefg","bcdefga","cdefgab","defgabc","efgabcd","fgabcde","gabcdef"]},
   {"name":"deep_fibonacci","inputs":["abaababaabaab"]},
   {"name":"deep_thue_morse","inputs":["abbabaabbaababbabaab"]},
-  {"name":"deep_nested_repeat","inputs":["ababXababYababXabab"]}
+  {"name":"deep_nested_repeat","inputs":["ababXababYababXabab"]},
+  {"name":"insert_small_periodic","inputs":["ababab"]},
+  {"name":"insert_shared_vertex","inputs":["acabcabcab","bcabcb"]},
+  {"name":"insert_periodic","inputs":["ababababa"]},
+  {"name":"insert_deep_borders","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa"]}
 ]

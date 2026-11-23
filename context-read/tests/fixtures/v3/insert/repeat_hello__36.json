@@ -1,0 +1,74 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "helloXXhello",
+    "elloXXh"
+  ],
+  "vertices": {
+    "X": [],
+    "e": [],
+    "ello": [
+      [
+        0,
+        "e"
+      ],
+      [
+        1,
+        "l"
+      ],
+      [
+        2,
+        "l"
+      ],
+      [
+        3,
+        "o"
+      ]
+    ],
+    "elloXXh": [
+      [
+        0,
+        "ello"
+      ],
+      [
+        4,
+        "X"
+      ],
+      [
+        5,
+        "X"
+      ],
+      [
+        6,
+        "h"
+      ]
+    ],
+    "h": [],
+    "hello": [
+      [
+        0,
+        "h"
+      ],
+      [
+        1,
+        "ello"
+      ]
+    ],
+    "helloXXhello": [
+      [
+        0,
+        "hello"
+      ],
+      [
+        1,
+        "elloXXh"
+      ],
+      [
+        7,
+        "hello"
+      ]
+    ],
+    "l": [],
+    "o": []
+  }
+}

@@ -24,6 +24,7 @@
 pub mod composition;
 mod convert;
 pub mod diff;
+mod edit;
 mod enumerate;
 #[cfg(any(test, feature = "test-api"))]
 pub mod fixtures;
@@ -35,6 +36,9 @@ pub mod path;
 mod read;
 pub mod trace;
 
+#[cfg(feature = "edit")]
+#[doc(hidden)]
+pub use self::edit::GraphEdit;
 #[cfg(debug_assertions)]
 pub use self::graph::PositionedLabels;
 pub use self::{
@@ -42,10 +46,15 @@ pub use self::{
         Composition,
         CompositionError,
         Occurrence,
+        maximal,
     },
     diff::{
         GraphDiff,
         diff,
+    },
+    edit::{
+        Publication,
+        VertexEdit,
     },
     graph::{
         PositionedError,

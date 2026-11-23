@@ -1,7 +1,8 @@
 //! Deliberately malformed data tests the fixture validator, not reader semantics.
 //! Each lane is checked against its own manifest: the frozen v2 lane for
 //! completeness, the positioned lane also for being in sync with the current `ngrams`
-//! oracle.
+//! oracle, the insert lane (`v3/insert`) also for its manifest being the
+//! enumeration of the current positioned fixtures.
 #[allow(dead_code)]
 mod support;
 
@@ -98,4 +99,43 @@ fn positioned_fixtures_are_valid_and_match_the_oracle() {
             scenario.name
         );
     }
+}
+
+#[test]
+fn insert_fixtures_match_manifest_and_enumeration() {
+    use context_trace::positioned::fixtures::{insert_dir, insert_manifest, manifest};
+    let entries = manifest(&insert_dir());
+    let mut expected = BTreeSet::new();
+    for entry in &entries {
+        assert!(expected.insert(entry.name.clone()), "duplicate insert case");
+    }
+    assert_eq!(
+        fixture_names(&insert_dir()),
+        expected,
+        "insert fixtures must be exactly one per manifest entry"
+    );
+    let bases: std::collections::BTreeMap<String, Vec<String>> = positioned::scenarios()
+        .into_iter()
+        .map(|scenario| (scenario.name, scenario.inputs))
+        .collect();
+    for entry in &entries {
+        let path = insert_dir().join(format!("{}.json", entry.name));
+        let fixture: PositionedGraphSnapshot =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        fixture
+            .validate()
+            .unwrap_or_else(|error| panic!("{}: invalid insert fixture: {error}", entry.name));
+        assert_eq!(fixture.corpus, entry.inputs, "{}: corpus must equal the inputs", entry.name);
+        let (scenario, _) = entry.name.rsplit_once("__").unwrap();
+        let base = &bases[scenario];
+        assert!(
+            entry.inputs.len() == base.len() + 1 && entry.inputs.starts_with(base),
+            "{}: inputs must be the corpus of {scenario} plus the query",
+            entry.name
+        );
+    }
+    assert!(
+        entries == insert_manifest(),
+        "insert manifest differs from the enumeration of the v3 fixtures; regenerate the insert lane"
+    );
 }

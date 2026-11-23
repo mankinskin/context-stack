@@ -30,13 +30,22 @@ use crate::{
 /// Query positions are absolute in the query (see
 /// [`state::matched`](crate::state::matched)): the match start in the root
 /// (`span().start`) is the query position [`Self::query_start`].
+///
+/// [`Self::generation`] is the graph generation the search ran under (insert
+/// plan rev 3, R6/D9); insertion rejects a response of another generation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Response {
     pub cache: TraceCache,
     pub end: MatchResult,
+    pub(crate) generation: u64,
 }
 
 impl Response {
+    /// Graph generation under which the search ran
+    /// ([`PositionedGraph::generation`](context_trace::positioned::PositionedGraph::generation)).
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
     /// Root of the final match.
     pub fn root_token(&self) -> Token {
         self.end.root_parent()

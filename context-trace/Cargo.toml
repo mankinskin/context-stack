@@ -10,6 +10,9 @@ legacy = []
 # Run the legacy row-model test suite (ignored by default).
 legacy-tests = ["legacy"]
 test-api = []
+# Hidden mutation layer `positioned::GraphEdit`; only context-insert and
+# context-read may enable it (guard test in `positioned::tests::guard`).
+edit = []
 
 [dependencies]
 
@@ -54,6 +57,10 @@ version = "^1.4"
 git = "https://github.com/mankinskin/petgraph"
 
 [dev-dependencies]
+
+[[example]]
+name = "insert_manifest"
+required-features = ["test-api"]
 
 [dependencies.serde]
 features = ["derive"]

@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-insert` `#context-trace` `#context-search` `#positioned-composition` `#insert` `#split` `#join`
 summary: Positioned insertion, revision 3 (supersedes revision 2 in 20261120_PLAN_POSITIONED_INSERT). insert_match(Response) turns a matched span into a token so that the graph equals the oracle graph of the corpus plus the span. Split positions with a start/end role are seeded from the response and pushed into every child occurrence containing them (legacy rule); required intervals are derived per vertex (target, postfix, prefix, overlap); a bottom-up join creates the new tokens through GraphEdit and returns a Publication. Defines the graph invariants, the response guarantees and why every created token is new, unique and complete. GraphEdit is the only mutation layer (atom, create, add_occurrences, extend), vertex-local and strictly checked, used only by insertion and the reader; insert_atom, insert and insert_composition are removed. Responses carry a generation stamp; no rollback; expected graphs are generated oracle fixture files (v3/insert lane). Root expansion (the legacy seam operation) belongs to the reader plan.
-status: 📋 ready for implementation — revision 3 (reviews 2026-11-22/23 applied, §0); decisions D1–D3, D5–D11 confirmed
+status: ✅ implemented (tasks 3.0–3.5, 2026-11-23) — revision 3; insert gate 1,379/1,379; deviations in §16
 date: 2026-11-22
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (step 3)
 supersedes: 20261120_PLAN_POSITIONED_INSERT.md (revision 2)
@@ -325,7 +325,7 @@ pub enum InsertOutcome {
     Created { token: Token, response: Response, publication: Publication },
 }
 pub struct Publication {
-    /// Created tokens in creation order (increasing width); the last is `N`.
+    /// Created tokens in creation (join) order; the last is `N` (§16).
     pub created: Vec<Token>,
     /// One entry per changed existing vertex.
     pub edits: Vec<VertexEdit>,
@@ -605,29 +605,29 @@ after the roadmap step and run in order.
 
 ### 3.0 Crate setup
 
-- [ ] `context-trace/Cargo.toml`: non-default feature `edit` (§8.3, D8).
-- [ ] `context-insert/Cargo.toml`: depend on `context-trace` (with `edit`)
+- [x] `context-trace/Cargo.toml`: non-default feature `edit` (§8.3, D8).
+- [x] `context-insert/Cargo.toml`: depend on `context-trace` (with `edit`)
   and `context-search` without `test-api`. Add `test-api =
   ["context-trace/test-api", "context-search/test-api"]` and enable it in
   `[dev-dependencies]`. Forward it from `legacy-tests` if the legacy tests
   need it.
-- [ ] Root modules `split/`, `join/`, `insert/`, and `InsertError`.
-- [ ] `cargo test -p context-insert --features legacy-tests` stays green.
+- [x] Root modules `split/`, `join/`, `insert/`, and `InsertError`.
+- [x] `cargo test -p context-insert --features legacy-tests` stays green.
 
 ### 3.1 `context-trace`: edit layer, generation, validation, fixtures
 
-- [ ] `composition.rs`: `maximal`, `Composition::crossing(p)`.
-- [ ] `edit.rs`: `GraphEdit` with `atom`, `create`, `add_occurrences`,
+- [x] `composition.rs`: `maximal`, `Composition::crossing(p)`.
+- [x] `edit.rs`: `GraphEdit` with `atom`, `create`, `add_occurrences`,
   `extend`, `finish` (§8.2, §8.4), `Publication`, `VertexEdit`;
   `PositionedGraph::edit()` (`pub` with feature `edit`, else `pub(crate)`)
   and `generation()`; the new `PositionedError` variants.
-- [ ] Remove `insert_atom`, `insert` and `insert_composition`; migrate
+- [x] Remove `insert_atom`, `insert` and `insert_composition`; migrate
   `convert.rs` and `tests/model.rs` (§8.5). `from_interchange` becomes
   `test-api`.
-- [ ] Guard test: no workspace crate other than `context-insert` and
+- [x] Guard test: no workspace crate other than `context-insert` and
   `context-read` enables `context-trace/edit` (§8.3).
-- [ ] `validate()`: structural G4 check (`OverlapNotVertex`).
-- [ ] Insert fixtures (D11, task 3.1.1) and the loader
+- [x] `validate()`: structural G4 check (`OverlapNotVertex`).
+- [x] Insert fixtures (D11, task 3.1.1) and the loader
   `insert_cases() -> Vec<InsertCase { name, base: FixtureGraph, query: String, expected: FixtureGraph }>`
   in `context_trace::positioned::fixtures`.
 - **Tests:**
@@ -683,11 +683,11 @@ after the roadmap step and run in order.
 
 ### 3.2 Split graph (`context-insert/src/split/`)
 
-- [ ] `SplitGraph`, `SplitVertex`, `Roles` (§4.1).
+- [x] `SplitGraph`, `SplitVertex`, `Roles` (§4.1).
   `SplitGraph::from_response(&PositionedGraph, &Response)`: seed, path
   edges, propagation (§4.2). Required intervals derived by
   `SplitVertex::intervals(is_root)` (§4.3).
-- [ ] `test-api` counter: positions that are not path edges.
+- [x] `test-api` counter: positions that are not path edges.
 - **Tests** (every insert case; expectations from strings through the name
   map): every required interval's string is a vertex of the base graph or a
   new vertex of the expected graph, and every new vertex of the expected
@@ -696,7 +696,7 @@ after the roadmap step and run in order.
 
 ### 3.3 Join (`context-insert/src/join/`)
 
-- [ ] Frontier, interval resolution, pieces, `maximal`, node update
+- [x] Frontier, interval resolution, pieces, `maximal`, node update
   through one `GraphEdit` (§5). Debug assertions for J1–J3: a composed
   interval is not inside a child, no composition is created twice, and each
   composition has at least 2 occurrences.
@@ -704,9 +704,9 @@ after the roadmap step and run in order.
 
 ### 3.4 `insert_match` (`context-insert/src/insert/`)
 
-- [ ] `context-search`: `Response::generation()`, recorded under the read
+- [x] `context-search`: `Response::generation()`, recorded under the read
   guard (part of `Response` equality).
-- [ ] `InsertOutcome`, `insert_match` under one write guard: generation check,
+- [x] `InsertOutcome`, `insert_match` under one write guard: generation check,
   `EntireRoot` → `Complete`/`NoExpansion`, otherwise split, join, `finish` →
   `Created`. Wrappers `insert`, `insert_next_match`.
 - **Tests:**
@@ -722,10 +722,10 @@ after the roadmap step and run in order.
 
 ### 3.5 Documentation
 
-- [ ] `context-insert/README.md`: positioned API section. Mark
+- [x] `context-insert/README.md`: positioned API section. Mark
   `HIGH_LEVEL_GUIDE.md` as legacy-only and fix its `end_bound` statement
   (`cursor_position()`).
-- [ ] Roadmap step 3 ticked, INDEX status updated, deviations recorded here.
+- [x] Roadmap step 3 ticked, INDEX status updated, deviations recorded here.
 
 ## 13. Gate
 
@@ -781,3 +781,30 @@ cases need them). This is an optimization, not part of the design.
 | Fixture volume (about 1,250 small files) | D11: generated by two commands and checked against the enumeration; never edited by hand |
 | Removing `insert`/`insert_atom` breaks positioned tests that build graphs by hand | §8.5 migration in task 3.1; the gate's `--no-default-features --features test-api` check covers every positioned crate |
 | Cargo feature change breaks legacy builds | 3.0 runs the legacy suite first |
+
+## 16. Implementation notes and deviations (2026-11-23)
+
+Implemented in `context-insert/src/{split,join,insert}/` (tests in
+`context-insert/src/tests/`) and `context-search` (`Response::generation`).
+The insert gate passes on all 1,379 cases of the insert lane (66 v3
+fixtures plus the named scenarios), with no `InsertError`; the Rust split
+statistics equal the prototype's on the same cases.
+
+| Measure (1,379 cases) | Value |
+|---|---|
+| Non-root split positions / from response path edges / off the paths | 3,248 / 2,316 (71.3%) / 932 |
+| New tokens | 2,450 (prototype: 2,450) |
+
+The 75% of §4.2 and §11 were measured on the original 1,247 cases.
+
+| # | Plan | Implementation | Why |
+|---|---|---|---|
+| 1 | §7: `Publication.created` "in creation order (increasing width)" | Creation order is join order: split nodes in increasing `(width, index)`, inside a node intervals in increasing width. It is not globally increasing in width: `sequence__25` (`hypergraph, hyper, graph`; `ergra`) creates `gra` (node `graph`) before `er` (node `hyper`, same width, higher index). `N` is always last. §7 comment corrected | The join order only needs children before parents |
+| 2 | §7: `InsertError` has `StaleResponse` and `Composition` | Third variant `Search(SearchError)` | The wrappers `insert`, `insert_next_match` search first and must report `UnknownAtom` / `EmptyPatterns` |
+| 3 | §4: `SplitGraph::from_response` | Returns `Option<SplitGraph>`, `None` for `EntireRoot` | `EntireRoot` has no split graph; `insert_match` handles it before splitting |
+| 4 | §12 3.2: `test-api` counter | `SplitGraph::stats() -> SplitStats { positions, path_positions }` (`cfg(any(test, feature = "test-api"))`), not a global counter | Per-response, no shared state |
+| 5 | §4.2 step 3 assertion | Debug builds record every `(child, position, role)` pushed through `crossing(p)` and assert that each path-edge position is among them; `path_positions` also asserts that every path step except the last strictly contains the border (R4, R5) | — |
+| 6 | §6 J2 "a debug assertion checks this" | Debug-only linear scan over the compositions created in this insertion, besides `GraphEdit::create`'s `DuplicateContent` check. Not used by the algorithm | — |
+| 7 | §5.2 "that entry exists" | A missing resolved child interval panics (invariant bug); a rejected `GraphEdit` operation is debug-asserted and returned as `InsertError::Composition`. In that case the edit is dropped without `finish` (generation already bumped, earlier operations stay; D10) | D10 |
+| 8 | §13 gate | Also runs `cargo test -p context-read` | Requested with the implementation |
+

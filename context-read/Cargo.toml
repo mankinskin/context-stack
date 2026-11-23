@@ -52,7 +52,7 @@ nrfind = "1"
 ngram = "0.1"
 csv = "1"
 derivative = "^2.2"
-context-trace = { path = "../context-trace", default-features = false, features = ["test-api"] }
+context-trace = { path = "../context-trace", default-features = false, features = ["test-api", "edit"] }
 context-search = { path = "../context-search", default-features = false, features = ["test-api"] }
 context-insert = { path = "../context-insert", default-features = false, features = ["test-api"] }
 derive_builder = "^0.20"

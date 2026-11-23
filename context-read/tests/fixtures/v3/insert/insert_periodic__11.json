@@ -1,0 +1,91 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "ababababa",
+    "babababa"
+  ],
+  "vertices": {
+    "a": [],
+    "aba": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "ba"
+      ]
+    ],
+    "ababa": [
+      [
+        0,
+        "aba"
+      ],
+      [
+        1,
+        "baba"
+      ]
+    ],
+    "abababa": [
+      [
+        0,
+        "ababa"
+      ],
+      [
+        1,
+        "bababa"
+      ]
+    ],
+    "ababababa": [
+      [
+        0,
+        "abababa"
+      ],
+      [
+        1,
+        "babababa"
+      ]
+    ],
+    "b": [],
+    "ba": [
+      [
+        0,
+        "b"
+      ],
+      [
+        1,
+        "a"
+      ]
+    ],
+    "baba": [
+      [
+        0,
+        "ba"
+      ],
+      [
+        1,
+        "aba"
+      ]
+    ],
+    "bababa": [
+      [
+        0,
+        "baba"
+      ],
+      [
+        1,
+        "ababa"
+      ]
+    ],
+    "babababa": [
+      [
+        0,
+        "bababa"
+      ],
+      [
+        1,
+        "abababa"
+      ]
+    ]
+  }
+}

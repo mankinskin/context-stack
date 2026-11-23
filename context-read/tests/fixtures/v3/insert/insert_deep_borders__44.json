@@ -1,0 +1,229 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "baaabababba",
+    "abaaabbaabba",
+    "aabbaabbaabbaa",
+    "abbaabb"
+  ],
+  "vertices": {
+    "a": [],
+    "aa": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "a"
+      ]
+    ],
+    "aab": [
+      [
+        0,
+        "aa"
+      ],
+      [
+        1,
+        "ab"
+      ]
+    ],
+    "aabb": [
+      [
+        0,
+        "aab"
+      ],
+      [
+        1,
+        "abb"
+      ]
+    ],
+    "aabba": [
+      [
+        0,
+        "aabb"
+      ],
+      [
+        1,
+        "abba"
+      ]
+    ],
+    "aabbaa": [
+      [
+        0,
+        "aabba"
+      ],
+      [
+        1,
+        "abbaa"
+      ]
+    ],
+    "aabbaabba": [
+      [
+        0,
+        "aabbaa"
+      ],
+      [
+        1,
+        "abbaabb"
+      ],
+      [
+        4,
+        "aabba"
+      ]
+    ],
+    "aabbaabbaa": [
+      [
+        0,
+        "aabbaabba"
+      ],
+      [
+        4,
+        "aabbaa"
+      ]
+    ],
+    "aabbaabbaabbaa": [
+      [
+        0,
+        "aabbaabbaa"
+      ],
+      [
+        4,
+        "aabbaabbaa"
+      ]
+    ],
+    "ab": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "b"
+      ]
+    ],
+    "aba": [
+      [
+        0,
+        "ab"
+      ],
+      [
+        1,
+        "ba"
+      ]
+    ],
+    "abaaabbaabba": [
+      [
+        0,
+        "aba"
+      ],
+      [
+        1,
+        "baaab"
+      ],
+      [
+        3,
+        "aabbaabba"
+      ]
+    ],
+    "abab": [
+      [
+        0,
+        "aba"
+      ],
+      [
+        2,
+        "ab"
+      ]
+    ],
+    "abb": [
+      [
+        0,
+        "ab"
+      ],
+      [
+        2,
+        "b"
+      ]
+    ],
+    "abba": [
+      [
+        0,
+        "abb"
+      ],
+      [
+        2,
+        "ba"
+      ]
+    ],
+    "abbaa": [
+      [
+        0,
+        "abba"
+      ],
+      [
+        2,
+        "baa"
+      ]
+    ],
+    "abbaabb": [
+      [
+        0,
+        "abbaa"
+      ],
+      [
+        3,
+        "aabb"
+      ]
+    ],
+    "b": [],
+    "ba": [
+      [
+        0,
+        "b"
+      ],
+      [
+        1,
+        "a"
+      ]
+    ],
+    "baa": [
+      [
+        0,
+        "ba"
+      ],
+      [
+        1,
+        "aa"
+      ]
+    ],
+    "baaab": [
+      [
+        0,
+        "baa"
+      ],
+      [
+        2,
+        "aab"
+      ]
+    ],
+    "baaabababba": [
+      [
+        0,
+        "baaab"
+      ],
+      [
+        3,
+        "abab"
+      ],
+      [
+        5,
+        "abab"
+      ],
+      [
+        7,
+        "abba"
+      ]
+    ]
+  }
+}

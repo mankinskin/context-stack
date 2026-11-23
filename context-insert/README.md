@@ -17,6 +17,52 @@ propagates to the lower crates) whenever a change touches `legacy` code or
 promotes something out of it. Do not use `-- --ignored` for this: it also runs
 the pending positioned reader lane and slow sweeps.
 
+## Positioned insertion
+
+Plan: `context-read/agents/plans/20261122_PLAN_POSITIONED_INSERT.md`
+(revision 3). Root modules, independent of `legacy`:
+
+- **`insert/`**: `insert_match(&PositionedGraphRef, Response) ->
+  Result<InsertOutcome, InsertError>` makes the span `[o, e)` of one search
+  response a token, so that the graph equals the oracle graph of the corpus
+  plus the span. Under one write guard: generation check
+  (`InsertError::StaleResponse` if the graph changed after the search),
+  `EntireRoot` → `Complete` (query exhausted) or `NoExpansion` (graph
+  unchanged), otherwise split, join and `GraphEdit::finish` →
+  `Created { token, response, publication }`. It never searches. Wrappers
+  `insert_next_match(graph, query)` and `insert(graph, query) -> Token`
+  search first (`InsertError::Search`) and insert only the matched part.
+- **`split/`**: `SplitGraph::from_response(&PositionedGraph, &Response)`
+  (read-only). The root gets the span borders as split positions with a
+  role (`Roles { start, end }`); positions of the response path edges are
+  taken from the paths, and top-down in decreasing `(width, index)` every
+  position is pushed into every child occurrence strictly containing it
+  (`Composition::crossing`). `SplitVertex::intervals(is_root)` derives the
+  required intervals: the target at the root; postfixes, prefixes and their
+  overlaps elsewhere.
+- **`join/`**: `join(&mut GraphEdit, &SplitGraph) -> Token`. Split nodes in
+  increasing `(width, index)`, intervals in increasing width: an interval
+  inside a child resolves to that child or the child's resolved interval;
+  otherwise `maximal(pieces)` is created with `GraphEdit::create`. Each node
+  then gets its new tokens through one `GraphEdit::add_occurrences`. The
+  target `N` is created last.
+
+```rust
+use context_insert::{insert_match, InsertOutcome};
+use context_search::Find;
+
+let response = graph.find_ancestor(query)?;
+match insert_match(&graph, response)? {
+    InsertOutcome::Created { token, publication, .. } => { /* publication.created ends with token */ },
+    InsertOutcome::Complete { token, .. } | InsertOutcome::NoExpansion { token, .. } => { /* existing root */ },
+}
+```
+
+No content- or composition-keyed lookups and no `read_interval` in the
+algorithm; vertices are addressed by `VertexIndex`. Tests (`src/tests/`)
+run every case of the insert lane (`context-read/tests/fixtures/v3/insert`)
+against its oracle graph.
+
 Graph insertion operations for the context framework. Handles the 
 complex process of inserting new patterns into existing graph structures 
 through sophisticated splitting, joining, and interval management operations.

@@ -15,7 +15,7 @@ legacy-tests = [
     "context-search/legacy-tests",
     "context-trace/legacy-tests",
 ]
-test-api = []
+test-api = ["context-trace/test-api", "context-search/test-api"]
 
 [dependencies]
 derive-new = "0.7.0"
@@ -29,5 +29,9 @@ pretty_assertions = "1.4"
 tracing = { version = "^0.1", features = ["attributes", "valuable"] }
 tracing-subscriber = "0.3"
 
+context-search = { path = "../context-search", default-features = false }
+context-trace = { path = "../context-trace", default-features = false, features = ["edit"] }
+
+[dev-dependencies]
 context-search = { path = "../context-search", default-features = false, features = ["test-api"] }
-context-trace = { path = "../context-trace", default-features = false, features = ["test-api"] }
+context-trace = { path = "../context-trace", default-features = false, features = ["test-api", "edit"] }

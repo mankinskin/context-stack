@@ -9,6 +9,8 @@ pub use crate::*;
 
 pub mod insert;
 pub mod interval;
+// Shadows the positioned root module `join` from the glob above.
+#[allow(hidden_glob_reexports)]
 pub(crate) mod join;
 pub mod overlap;
 pub mod split;

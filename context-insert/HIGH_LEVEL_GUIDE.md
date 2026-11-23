@@ -1,5 +1,12 @@
 # Context-Insert: High-Level Overview
 
+> **Legacy only.** This guide describes the row-model insertion in
+> `context_insert::legacy` (`InitInterval`, split cache, join frontier). The
+> positioned insertion (`insert_match`, split graph with roles, bottom-up
+> join through `GraphEdit`) is documented in the crate
+> [README](README.md#positioned-insertion) and in
+> `context-read/agents/plans/20261122_PLAN_POSITIONED_INSERT.md`.
+
 > **Graph modification engine for inserting new patterns into existing hypergraph structures.**
 
 ## What is Context-Insert?
@@ -58,11 +65,13 @@ let init = InitInterval::from(incomplete_response);
 **What does it mean?**
 - **root**: The pattern that partially matched
 - **cache**: Trace information from the search
-- **end_bound**: Position in root token where we need to extend (uses checkpoint_position!)
+- **end_bound**: Position in root token where we need to extend
 
-**Critical:** `end_bound` comes from `checkpoint_position()`, not `cursor_position()`:
-- `checkpoint_position()` - Confirmed match extent (for insertion boundaries) ✓
-- `cursor_position()` - Advanced exploration position (for consecutive searches) ✗
+`end_bound` comes from `cursor_position()` (`legacy/interval/init.rs`): the
+query position of the candidate if present, else of the checkpoint. For an
+`EntireRoot` match it equals the token width.
+- `checkpoint_position()` - Confirmed match extent
+- `cursor_position()` - Candidate position if the cursor advanced, else the checkpoint
 
 ### 3. Split-Join Architecture
 
@@ -480,25 +489,20 @@ if !response.query_exhausted() {
 **Two position types in Response:**
 
 ```rust
-// For insertion boundaries (confirmed match extent)
-response.checkpoint_position() -> AtomPosition  // ✓ Use this!
+// Confirmed match extent
+response.checkpoint_position() -> AtomPosition
 
-// For consecutive searches (advanced exploration)
-response.cursor_position() -> AtomPosition      // ✗ Not for insertion!
+// Candidate position if the cursor advanced, else the checkpoint
+response.cursor_position() -> AtomPosition
 ```
-
-**Why the distinction?**
-- Search can advance query cursor speculatively (exploring parents)
-- If parent exploration needed, cursor advances but checkpoint doesn't
-- Insertion must use **confirmed boundary** (checkpoint)
-- Consecutive searches use **exploration position** (cursor)
 
 **Current implementation:**
 ```rust
-// In init.rs - CORRECT implementation
+// legacy/interval/init.rs
 impl From<Response> for InitInterval {
     fn from(state: Response) -> Self {
-        let end_bound = state.checkpoint_position();  // ✓ Correct!
+        // For EntireRoot matches this equals the token width.
+        let end_bound = state.cursor_position();
         // ...
     }
 }
@@ -568,7 +572,7 @@ if !response.query_exhausted() {
 |--------------|-----------------|---------|
 | `root_token()` | `root` | Pattern that partially matched |
 | `cache` | `cache` | Parent-child relationships discovered during search |
-| `checkpoint_position()` | `end_bound` | Confirmed match extent (not cursor!) |
+| `cursor_position()` | `end_bound` | Candidate position, else the checkpoint |
 
 ### Trace Cache Reuse
 
@@ -611,7 +615,7 @@ Search Phase:
 
 Conversion to InitInterval:
   root = heldld
-  end_bound = 3                (from checkpoint_position!)
+  end_bound = 3                (from cursor_position)
   cache = { heldld => TD{2 => ld}, ld => TD{2 => l}, ... }
 
 Split Phase:
@@ -888,7 +892,7 @@ let result = graph.insert_init(
 ## Known Issues / Questions
 
 See `QUESTIONS_FOR_AUTHOR.md` for:
-1. **end_bound semantics** - Clarification needed on cursor_position vs end_bound
+1. **end_bound semantics** - Resolved: `end_bound` is `cursor_position()`
 2. **PathEnum variants** - How to handle Range/Postfix/Prefix
 3. **RangeRole system** - Complete explanation of role purposes
 4. **Split-join details** - Deeper algorithm documentation needed

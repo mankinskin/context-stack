@@ -190,6 +190,31 @@ Do not edit expected graph data by hand. Empty and single-character API
 contracts are tested directly because the oracle does not support all such
 corpora.
 
+#### Insert fixtures (`v3/insert`)
+
+The insert lane holds one oracle graph per positioned insert case
+([insert plan](agents/plans/20261122_PLAN_POSITIONED_INSERT.md), task 3.1.1):
+for every v3 scenario and every substring (2+ atoms) of a vertex string that
+is not a vertex, the entry `<scenario>__<k>` with inputs `corpus + [query]`
+(`k` numbers the scenario's queries from 1 in `(width, string)` order). The
+enumeration asserts that every query has a unique minimal host. Regenerate
+the lane after any change to the v3 fixtures (from the workspace root):
+
+```bash
+# Rewrite v3/insert/scenarios.json and delete the old case files:
+cargo run -p context-trace --features test-api --example insert_manifest
+# One oracle graph per case:
+cargo run --release -p ngrams --bin ngrams -- \
+  --file context-read/tests/fixtures/v3/insert/scenarios.json \
+  --out context-read/tests/fixtures/v3/insert
+```
+
+`fixture_validation` requires exactly one file per insert manifest entry, a
+corpus equal to the entry's inputs that extends its base scenario's corpus by
+the query, and a manifest equal to a fresh enumeration of the current v3
+fixtures. Tests load the cases with
+`context_trace::positioned::fixtures::insert_cases()`.
+
 Specialized cursor, closure-path, scheduling, and sink precondition contracts
 live in [`src/tests/cursor.rs`](src/tests/cursor.rs), using oracle-backed graph
 seeds. They are **not** alternative specifications of reader graph semantics.

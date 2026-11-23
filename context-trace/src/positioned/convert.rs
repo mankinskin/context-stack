@@ -1,26 +1,31 @@
 //! Conversion between [`PositionedGraph`] and the interchange format.
 
+#[cfg(any(test, feature = "test-api"))]
 use std::collections::BTreeMap;
 
+#[cfg(any(test, feature = "test-api"))]
 use super::{
     Occurrence,
+    interchange::PositionedCover,
+};
+use super::{
     PositionedGraph,
     VertexNode,
-    interchange::{
-        PositionedCover,
-        PositionedGraphData,
-    },
+    interchange::PositionedGraphData,
 };
+#[cfg(any(test, feature = "test-api"))]
+use crate::Token;
 use crate::{
     AtomPosition,
     GraphKind,
-    Token,
     graph::vertex::VertexIndex,
 };
 
 impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
-    /// Build a graph from structurally valid interchange data, inserting
-    /// vertices bottom-up by width.
+    /// Build a graph from structurally valid interchange data through one
+    /// `GraphEdit` (atoms, then composites by increasing width) and validate
+    /// it (`test-api`: its users are fixture loaders).
+    #[cfg(any(test, feature = "test-api"))]
     pub fn from_interchange(data: &PositionedGraphData) -> Result<Self, String> {
         Self::build_from_interchange(data).map(|(graph, _)| graph)
     }
@@ -42,29 +47,35 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
         })
     }
 
+    #[cfg(any(test, feature = "test-api"))]
     fn build_from_interchange(
         data: &PositionedGraphData,
     ) -> Result<(Self, BTreeMap<&str, Token>), String> {
         data.validate()?;
-        let mut order: Vec<(&String, &PositionedCover)> = data.vertices.iter().collect();
-        order.sort_by_key(|(content, _)| (content.chars().count(), *content));
+        let (atoms, mut composites): (Vec<_>, Vec<_>) = data
+            .vertices
+            .iter()
+            .partition(|(_, cover): &(&String, &PositionedCover)| cover.is_empty());
+        composites.sort_by_key(|(content, _)| (content.chars().count(), *content));
         let mut graph = Self::default();
         let mut tokens: BTreeMap<&str, Token> = BTreeMap::new();
-        for (content, cover) in order {
-            let token = if cover.is_empty() {
-                let atom = content.chars().next().expect("validated nonempty");
-                graph.insert_atom(atom)
-            } else {
-                let occurrences = cover
-                    .iter()
-                    .map(|(offset, child)| Occurrence::new(*offset, tokens[child.as_str()]))
-                    .collect();
-                graph
-                    .insert_composition(occurrences)
-                    .map_err(|error| format!("{content:?}: {error}"))?
-            };
+        let mut edit = graph.edit();
+        for (content, _) in atoms {
+            let atom = content.chars().next().expect("validated nonempty");
+            tokens.insert(content, edit.atom(atom));
+        }
+        for (content, cover) in composites {
+            let occurrences = cover
+                .iter()
+                .map(|(offset, child)| Occurrence::new(*offset, tokens[child.as_str()]))
+                .collect();
+            let token = edit
+                .create(occurrences)
+                .map_err(|error| format!("{content:?}: {error}"))?;
             tokens.insert(content, token);
         }
+        edit.finish();
+        graph.validate().map_err(|error| error.to_string())?;
         Ok((graph, tokens))
     }
 
