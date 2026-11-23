@@ -33,9 +33,11 @@ Plan: `context-read/agents/plans/20261122_PLAN_POSITIONED_INSERT.md`
   `insert_next_match(graph, query)` and `insert(graph, query) -> Token`
   search first (`InsertError::Search`) and insert only the matched part.
 - **`split/`**: `SplitGraph::from_response(&PositionedGraph, &Response)`
-  (read-only). The root gets the span borders as split positions with a
-  role (`Roles { start, end }`); positions of the response path edges are
-  taken from the paths, and top-down in decreasing `(width, index)` every
+  = `SplitGraph::from_trace(graph, root, span, &response.cache)`
+  (read-only, legacy `InitInterval`). The root gets the span borders as
+  split positions with a role (`Roles { start, end }`); the positions of
+  the traced edges (the search's start and end paths in its `TraceCache`)
+  are read from the cache, and top-down in decreasing `(width, index)` every
   position is pushed into every child occurrence strictly containing it
   (`Composition::crossing`). `SplitVertex::intervals(is_root)` derives the
   required intervals: the target at the root; postfixes, prefixes and their

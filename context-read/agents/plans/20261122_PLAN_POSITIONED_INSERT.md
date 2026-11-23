@@ -189,11 +189,22 @@ the augmentation step. It tells which side of the split lies inside the span.
    how `covering` and `ending_at` already work (one `partition_point`
    each). It only replaces a scan over all children; the split rule is "every
    occurrence strictly containing `p`", however it is found.
-3. **Response reuse:** every step of the response's start path except the
-   last is a split edge `(parent, a, child)`. It gives the child the
-   position `p_parent − a` with role S; the end path does the same with
-   role E. The split run starts from these edges (asserted in debug builds)
-   and adds the other crossing children from `crossing(p)`. On the gate,
+3. **Response reuse (trace cache):** every step of the response's start
+   path except the last is a split edge `(parent, a, child)`. It gives the
+   child the position `p_parent − a` with role S; the end path does the
+   same with role E. These edges are read from the response's
+   `TraceCache`, the subgraph the search traced for the final match (as
+   legacy `InitInterval { root, cache, end_bound }` seeds the split cache):
+   `SplitGraph::from_trace(graph, root, span, &cache)` walks the root's up
+   entries from `o` (role S) and its down entries from `e` (role E), giving
+   each child its parent's position minus the edge label, and stops at the
+   leaf (position on its border). Key positions only identify entries;
+   down keys are clamped to the match start and do not give offsets. The
+   split run starts from these edges (asserted in debug builds) and adds
+   the other crossing children from `crossing(p)`. The traced positions
+   equal the path-step positions on every insert case (split test). A
+   merged cache of several traced matches seeds one split graph the same
+   way (for the reader). On the gate,
    1,969 of 2,632 non-root positions (75%) are path edges.
 4. **Termination and size:** widths strictly decrease along pushes. No
    vertex had more than 2 S and 2 E positions. The split phase is read-only.
@@ -567,7 +578,7 @@ interval `[1,3)` gives `ba`, the overlap of `aba` and `bab` in `abab` and of
 | Legacy | Positioned (rev 3) |
 |---|---|
 | `materialize(Response)` → `Complete` / `NoExpansion` / `Created` | `insert_match(Response)`, same outcomes |
-| `InitInterval { root, cache, end_bound }` | `SplitGraph::from_response` (root, span, path edges) |
+| `InitInterval { root, cache, end_bound }` | `SplitGraph::from_trace(graph, root, span, &cache)` (traced edges labelled by child offset); `from_response` passes the response's root, span and cache |
 | `SplitVertexCache` (positions per vertex) / `SplitPositionCache` (`top`, per-row `(sub_index, inner_offset)`) | `SplitVertex` (positions per vertex) with `Roles`; the child location is the occurrence offset |
 | `RootMode` Prefix/Postfix/Infix; root augmentation (inner and wrapper offsets, required ranges) | Roles S/E; derived intervals (target only at the root; postfix, prefix, overlap elsewhere) |
 | split queue: push a position into the child containing it, for every row | push a position into every occurrence that strictly contains it |
@@ -807,4 +818,5 @@ The 75% of §4.2 and §11 were measured on the original 1,247 cases.
 | 6 | §6 J2 "a debug assertion checks this" | Debug-only linear scan over the compositions created in this insertion, besides `GraphEdit::create`'s `DuplicateContent` check. Not used by the algorithm | — |
 | 7 | §5.2 "that entry exists" | A missing resolved child interval panics (invariant bug); a rejected `GraphEdit` operation is debug-asserted and returned as `InsertError::Composition`. In that case the edit is dropped without `finish` (generation already bumped, earlier operations stay; D10) | D10 |
 | 8 | §13 gate | Also runs `cargo test -p context-read` | Requested with the implementation |
+| 9 | §4.2 step 3: path edges from `response.path()` | (2026-11-23) Seeded from `response.cache` by `SplitGraph::from_trace`; `from_response` delegates. The split test asserts that the traced positions equal the path-step positions on all 1,379 cases; the gate is unchanged (1,379 / 1,379, 2,450 tokens) | Legacy shape (`InitInterval` takes the cache); the `TraceCache` gets its consumer, and merged caches can seed one split graph |
 

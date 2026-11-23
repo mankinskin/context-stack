@@ -20,9 +20,10 @@ use context_trace::{
     Token,
     TokenWidth,
     graph::vertex::VertexIndex,
+    DirectedKey,
     positioned::{
-        OccurrenceLocation,
         PositionedGraph,
+        TraceCache,
     },
 };
 
@@ -157,13 +158,13 @@ impl SplitStats {
     }
 }
 
-/// `(child, position, role)` given by the edges of the response paths.
-type PathPosition = (VertexIndex, AtomPosition, Roles);
+/// `(child, position, role)` given by the edges of the trace cache.
+pub(crate) type PathPosition = (VertexIndex, AtomPosition, Roles);
 
 impl SplitGraph {
-    /// Seed the root with the span borders, take the positions of the
-    /// response path edges and propagate (§4.2). `None` for an `EntireRoot`
-    /// response, which has no split graph.
+    /// Split graph of a response (legacy `InitInterval::from(Response)`):
+    /// [`Self::from_trace`] with the response's root, span and trace cache.
+    /// `None` for an `EntireRoot` response, which has no split graph.
     pub fn from_response<G: GraphKind>(
         graph: &PositionedGraph<G>,
         response: &Response,
@@ -171,16 +172,25 @@ impl SplitGraph {
         if response.is_entire_root() {
             return None;
         }
-        let root = response.root_token();
-        let span = response.span();
-        let path = response.path();
-        let mut on_paths: Vec<PathPosition> = Vec::new();
-        if let Some(start) = path.start_path() {
-            on_paths.extend(path_positions(graph, start.top_down(), span.start, Roles::START));
-        }
-        if let Some(end) = path.end_path() {
-            on_paths.extend(path_positions(graph, end.top_down(), span.end, Roles::END));
-        }
+        Some(Self::from_trace(
+            graph,
+            response.root_token(),
+            response.span(),
+            &response.cache,
+        ))
+    }
+    /// Seed the root with the span borders, take the positions of the
+    /// traced edges below the root and propagate (§4.2). `cache` is the
+    /// subgraph traced by the search: the edges of its start path (up
+    /// entries) and end path (down entries).
+    pub fn from_trace<G: GraphKind>(
+        graph: &PositionedGraph<G>,
+        root: Token,
+        span: Range<AtomPosition>,
+        cache: &TraceCache,
+    ) -> Self {
+        debug_assert!(*span.start > 0 || *span.end < root.width.0, "EntireRoot has no split graph");
+        let on_paths = traced_positions(cache, root, span.clone());
 
         let mut nodes = BTreeMap::new();
         let mut root_node = SplitVertex::new(root.width);
@@ -243,11 +253,11 @@ impl SplitGraph {
         for &(child, position, roles) in &on_paths {
             debug_assert!(
                 pushed.contains(&(child, position, roles.start)),
-                "response path edge to {child:?} at {position} is not a split edge",
+                "traced edge to {child:?} at {position} is not a split edge",
             );
         }
 
-        Some(Self {
+        Self {
             root,
             #[cfg(any(test, feature = "test-api"))]
             stats: SplitStats {
@@ -264,7 +274,7 @@ impl SplitGraph {
             },
             span,
             nodes,
-        })
+        }
     }
     pub fn root(&self) -> Token {
         self.root
@@ -303,25 +313,58 @@ impl SplitGraph {
     }
 }
 
-/// Split positions of the response path edges: every step except the last
-/// gives its child the border position relative to the child (R4, R5).
-fn path_positions<'a, G: GraphKind>(
-    graph: &PositionedGraph<G>,
-    steps: impl ExactSizeIterator<Item = &'a OccurrenceLocation>,
-    border: AtomPosition,
-    roles: Roles,
+/// Split positions given by the traced edges (R4, R5): walk the cache from
+/// the root, up entries from the span start (start path), down entries from
+/// the span end (end path). A child's position is its parent's minus the
+/// edge offset; the key positions only identify entries (down keys are
+/// clamped to the match start and do not give offsets). The walk stops at
+/// the leaf, which has the border on its own border.
+pub(crate) fn traced_positions(
+    cache: &TraceCache,
+    root: Token,
+    span: Range<AtomPosition>,
 ) -> Vec<PathPosition> {
-    let last = steps.len().saturating_sub(1);
-    let mut position = border;
+    fn walk(
+        cache: &TraceCache,
+        key: &DirectedKey,
+        position: AtomPosition,
+        roles: Roles,
+        out: &mut Vec<PathPosition>,
+    ) {
+        let Some(entry) = cache.get(key) else {
+            return;
+        };
+        for (child, &offset) in &entry.bottom {
+            debug_assert!(offset <= position, "traced child {child:?} starts after the border");
+            let inner = position - *offset;
+            let width = AtomPosition::from(child.index.width);
+            debug_assert!(inner <= width, "traced child {child:?} ends before the border");
+            if *inner == 0 || inner == width {
+                continue;
+            }
+            out.push((child.index.index, inner, roles));
+            walk(cache, child, inner, roles, out);
+        }
+    }
     let mut out = Vec::new();
-    for step in steps.take(last) {
-        position -= *step.offset;
-        let width = graph.vertex(step.child).expect("path vertex").width().0;
-        debug_assert!(
-            0 < *position && *position < width,
-            "path step {step:?} does not strictly contain the border",
-        );
-        out.push((step.child, position, roles));
+    let Some(entry) = cache.get_vertex(root) else {
+        return out;
+    };
+    let mut entries: Vec<(DirectedKey, AtomPosition, Roles)> = Vec::new();
+    entries.extend(
+        entry
+            .bottom_up
+            .keys()
+            .map(|&p| (DirectedKey::up(root, p), span.start, Roles::START)),
+    );
+    entries.extend(
+        entry
+            .top_down
+            .keys()
+            .map(|&p| (DirectedKey::down(root, p), span.end, Roles::END)),
+    );
+    for (key, border, roles) in entries {
+        walk(cache, &key, border, roles, &mut out);
     }
     out
 }

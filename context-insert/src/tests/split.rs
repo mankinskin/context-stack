@@ -16,14 +16,16 @@ use super::{
     slice,
 };
 use crate::split::{
+    traced_positions,
     Roles,
     SplitGraph,
     SplitStats,
 };
 
 /// Every required interval is a base vertex or a new vertex of the expected
-/// graph, every new vertex is some interval, path edges are split edges
-/// and the graph is unchanged.
+/// graph, every new vertex is some interval, the trace cache gives exactly
+/// the positions of the response path edges, path edges are split edges and
+/// the graph is unchanged.
 #[test]
 fn split_every_insert_case() {
     let cases = insert_cases();
@@ -66,10 +68,12 @@ fn split_every_insert_case() {
             (path.start_path().unwrap().top_down().collect::<Vec<_>>(), response.span().start, Roles::START),
             (path.end_path().unwrap().top_down().collect::<Vec<_>>(), response.span().end, Roles::END),
         ];
+        let mut from_paths = BTreeSet::new();
         for (steps, border, role) in borders {
             let mut position = border;
             for step in &steps[..steps.len() - 1] {
                 position -= *step.offset;
+                from_paths.insert((step.child, position, role));
                 let roles = split.node(step.child).and_then(|n| n.positions().get(&position));
                 assert!(
                     roles.is_some_and(|r| (r.start || !role.start) && (r.end || !role.end)),
@@ -78,6 +82,11 @@ fn split_every_insert_case() {
                 );
             }
         }
+        let traced: BTreeSet<_> =
+            traced_positions(&response.cache, response.root_token(), response.span())
+                .into_iter()
+                .collect();
+        assert_eq!(traced, from_paths, "{}: traced edges differ from the response paths", case.name);
         assert_eq!(graph.generation(), generation, "{}", case.name);
         assert!(diff(&before, &graph.to_interchange()).is_empty(), "{}", case.name);
         stats.positions += split.stats().positions;
