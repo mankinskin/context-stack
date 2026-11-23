@@ -7,9 +7,8 @@
 //! atom types ([`crate::VertexIndex`], [`crate::Token`], [`crate::GraphKind`]).
 //!
 //! Read-only navigation (reader plan Phase 2) is split into separate APIs:
-//! - content reading: [`PositionedGraph::read_interval`] (`read.rs`);
-//! - occurrence enumeration in an interval:
-//!   [`PositionedGraph::occurrences_in`] (`enumerate.rs`);
+//! - content reading (debug and `test-api` builds):
+//!   [`PositionedGraph::read_interval`] (`read.rs`);
 //! - local navigation for search: [`PositionedGraph::start_at`],
 //!   [`PositionedGraph::end_at`], [`PositionedGraph::prefix_child`],
 //!   [`PositionedGraph::parent_occurrences`],
@@ -17,15 +16,14 @@
 //!   (`navigate.rs`);
 //! - search paths (role-generic [`RolePath`] with aliases [`StartPath`],
 //!   [`EndPath`], [`QueryPath`]; [`RangePath`], `path/`) and trace states / trace cache ([`ParentState`],
-//!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2;
-//! - boundary search (prefixes/postfixes with occurrence paths) lives in
-//!   `context_search::boundary`.
+//!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2.
 
 pub mod composition;
+#[cfg(any(test, feature = "test-api"))]
 mod convert;
+#[cfg(any(test, feature = "test-api"))]
 pub mod diff;
 mod edit;
-mod enumerate;
 #[cfg(any(test, feature = "test-api"))]
 pub mod fixtures;
 pub mod graph;
@@ -33,6 +31,7 @@ pub mod interchange;
 pub mod location;
 mod navigate;
 pub mod path;
+#[cfg(any(debug_assertions, test, feature = "test-api"))]
 mod read;
 pub mod trace;
 
@@ -41,16 +40,19 @@ pub mod trace;
 pub use self::edit::GraphEdit;
 #[cfg(debug_assertions)]
 pub use self::graph::PositionedLabels;
+#[cfg(any(debug_assertions, test, feature = "test-api"))]
+pub use self::location::IntervalView;
+#[cfg(any(test, feature = "test-api"))]
+pub use self::diff::{
+    GraphDiff,
+    diff,
+};
 pub use self::{
     composition::{
         Composition,
         CompositionError,
         Occurrence,
         maximal,
-    },
-    diff::{
-        GraphDiff,
-        diff,
     },
     edit::{
         Publication,
@@ -63,11 +65,7 @@ pub use self::{
         PositionedVertex,
         VertexNode,
     },
-    location::{
-        IntervalView,
-        OccurrenceLocation,
-        OccurrencePath,
-    },
+    location::OccurrenceLocation,
     path::{
         End,
         EndPath,

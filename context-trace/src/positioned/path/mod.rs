@@ -14,7 +14,7 @@
 //!   pattern token);
 //! - [`RolePath<R, Root>`] (`role_path.rs`): one path struct with the
 //!   shared accessors and mutators (raise, border-child descent, advance,
-//!   simplify, locate); aliases [`StartPath`] (climbs from the match start
+//!   locate); aliases [`StartPath`] (climbs from the match start
 //!   to a root), [`EndPath`] (descends from the root to the token at the
 //!   match end) and [`QueryPath`] (a position inside a query);
 //! - [`RangePath<Root>`] (`range.rs`): both role paths with the matched

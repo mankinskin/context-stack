@@ -7,7 +7,6 @@ use std::{
         HashMap,
     },
     fmt,
-    ops::Range,
     sync::{
         Arc,
         RwLock,
@@ -16,16 +15,17 @@ use std::{
     },
 };
 
-use super::{
-    composition::{
-        Composition,
-        CompositionError,
-        Occurrence,
-    },
-    location::{
-        IntervalView,
-        OccurrencePath,
-    },
+#[cfg(any(debug_assertions, test, feature = "test-api"))]
+use std::ops::Range;
+
+#[cfg(any(debug_assertions, test, feature = "test-api"))]
+use super::location::IntervalView;
+#[cfg(any(test, feature = "test-api"))]
+use super::location::OccurrenceLocation;
+use super::composition::{
+    Composition,
+    CompositionError,
+    Occurrence,
 };
 use crate::{
     AtomOf,
@@ -38,10 +38,9 @@ use crate::{
     graph::vertex::VertexIndex,
 };
 #[cfg(debug_assertions)]
-use crate::graph::vertex::name_resolver::{
-    TokenNameResolver,
-    set_token_name_resolver,
-};
+use crate::graph::vertex::name_resolver::TokenNameResolver;
+#[cfg(all(debug_assertions, any(test, feature = "test-api")))]
+use crate::graph::vertex::name_resolver::set_token_name_resolver;
 
 /// What a vertex consists of.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -261,7 +260,7 @@ impl std::error::Error for PositionedError {}
 /// values to atom vertices. Composite vertices are reached structurally
 /// (reader plan rev 4, R1/R2).
 /// Not internally synchronized; share it through [`PositionedGraphRef`].
-/// Compare graphs with [`super::diff`], not by identity.
+/// Compare graphs with `diff` (`test-api`), not by identity.
 #[derive(Clone, Debug)]
 pub struct PositionedGraph<G: GraphKind = BaseGraphKind> {
     pub(crate) vertices: Vec<PositionedVertex<G>>,
@@ -342,12 +341,13 @@ impl<G: GraphKind> PositionedGraph<G> {
 
     /// Install [`Self::name_resolver`] for the current thread, so tokens and
     /// vertex indices display their labels (when `test-api` is enabled).
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, any(test, feature = "test-api")))]
     pub fn register_name_resolver(&self) {
         set_token_name_resolver(Box::new(self.name_resolver()));
     }
 
     /// `range` of `owner` as a view, if it lies within the owner.
+    #[cfg(any(debug_assertions, test, feature = "test-api"))]
     pub fn interval(
         &self,
         owner: VertexIndex,
@@ -358,12 +358,13 @@ impl<G: GraphKind> PositionedGraph<G> {
             .then_some(IntervalView { owner, range })
     }
 
-    /// Whether every step of `path` is a stored occurrence.
-    pub fn contains_path(
+    /// Whether every step is a stored occurrence.
+    #[cfg(any(test, feature = "test-api"))]
+    pub fn contains_path<'a>(
         &self,
-        path: &OccurrencePath,
+        steps: impl IntoIterator<Item = &'a OccurrenceLocation>,
     ) -> bool {
-        path.steps().iter().all(|step| {
+        steps.into_iter().all(|step| {
             self.vertex(step.parent)
                 .and_then(PositionedVertex::composition)
                 .is_some_and(|composition| {

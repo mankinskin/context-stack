@@ -9,15 +9,8 @@ default-on `legacy` feature, and are imported as `context_search::legacy::…`
 row types and are promoted to the root only when positioned code needs them.
 The module paths below refer to `src/legacy/…`.
 
-**Positioned (root, no legacy dependency):** `src/boundary/` — boundary search
-over `context_trace::positioned::PositionedGraph`:
-`boundary_occurrences(graph, owner, position, Boundary::{Start, End})`,
-`prefixes`, `postfixes` → `Vec<BoundaryOccurrence { token, path:
-OccurrencePath }>` (retained proper descendants touching the boundary, longest
-first, one evidence path each). `src/boundary/tests.rs` checks every v3
-fixture vertex and position against the fixture keys, addressed through the
-`test-api` name map. `src/cursor/` — cursor typestates promoted from
-`legacy::cursor` (`CursorState`, `Matched`, `Candidate`, `Mismatched`,
+**Positioned (root, no legacy dependency):** `src/cursor/` — cursor
+typestates promoted from `legacy::cursor` (`CursorState`, `Matched`, `Candidate`, `Mismatched`,
 `PathCursor<P, S>`, `Checkpointed<C, AtCheckpoint | HasCandidate>`,
 `MarkMatchState`, `CursorStateMachine`), re-exported by `legacy::cursor`,
 which keeps the row-specific impls. `src/error.rs` — `SearchError

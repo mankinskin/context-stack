@@ -166,7 +166,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
     // Start path: canonical and maximally trimmed.
     let start = absolute(path.start.top_down());
     assert!(
-        graph.contains_path(&path.start.to_occurrence_path()),
+        graph.contains_path(path.start.top_down()),
         "{context}: start path"
     );
     assert_eq!(start[0].0.parent, root.index, "{context}");
@@ -206,7 +206,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
     // End path: largest token ending at o + k (2.4 deviation), trimmed.
     let end = absolute(path.end.steps());
     assert!(
-        graph.contains_path(&path.end.to_occurrence_path()),
+        graph.contains_path(path.end.top_down()),
         "{context}: end path"
     );
     assert_eq!(end[0].0.parent, root.index, "{context}");

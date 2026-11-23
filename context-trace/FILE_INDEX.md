@@ -16,15 +16,15 @@ There is no root `pub use legacy::*`; `legacy` mirrors the root items
   `#[cfg(feature = "legacy")]`.
 - **`positioned/` (root, no legacy dependency):** `interchange.rs` (v3
   format + structural validator), `composition.rs` (`Occurrence`,
-  `Composition`), `location.rs` (`OccurrenceLocation`, `OccurrencePath`,
+  `Composition`), `location.rs` (`OccurrenceLocation`,
   `IntervalView`), `graph.rs` (`PositionedGraph`, `PositionedGraphRef`,
   validation, debug-only labels and `PositionedLabels` name resolver),
-  `convert.rs` (`from_interchange`, `test-api` `from_interchange_named` name
-  map), `diff.rs`, navigation `read.rs` (`PositionedGraph::read_interval`)
-  and `enumerate.rs` (`PositionedGraph::occurrences_in`), `fixtures.rs`
+  `convert.rs` (`test-api`: `from_interchange`, `from_interchange_named` name
+  map, `to_interchange`), `diff.rs` (`test-api`), content reading `read.rs`
+  (debug and `test-api`: `PositionedGraph::read_interval`), `fixtures.rs`
   (`test-api` v3 fixture loader, `FixtureGraph`), `tests/` (`fixtures.rs` round
   trip, name map, labels; `model.rs` model and validation rules;
-  `navigation.rs` `read_interval`/`occurrences_in` on v3 fixtures;
+  `navigation.rs` `read_interval` and navigation on v3 fixtures;
   `guard.rs` no content-keyed field; `diff.rs`, `interchange.rs`).
 - **`legacy/`:** `direction/pattern.rs` (`PatternDirection`), `graph/`
   (`Hypergraph`, `HypergraphRef`, getters, insert, snapshot, validation,

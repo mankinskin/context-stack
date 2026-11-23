@@ -27,10 +27,7 @@ use crate::{
     graph::vertex::wide::Wide,
     positioned::{
         graph::PositionedGraph,
-        location::{
-            OccurrenceLocation,
-            OccurrencePath,
-        },
+        location::OccurrenceLocation,
     },
 };
 
@@ -142,28 +139,6 @@ impl<R: PathRole, Root: PathRoot> RolePath<R, Root> {
         self.root_child = self.root.root_child(graph, R::root_step(&self.steps), self.leaf);
         true
     }
-    /// Positioned `simplify`: stop at the first step (top-down) whose child
-    /// has its role border at `boundary` (for end paths the largest token
-    /// on this path ending at the match end). Unchanged if no step does.
-    /// Search results use the path-independent [`Self::locate`] instead
-    /// (2.4).
-    pub fn simplify<G: GraphKind>(
-        &mut self,
-        graph: &PositionedGraph<G>,
-        boundary: impl Into<AtomPosition>,
-    ) {
-        let boundary = boundary.into();
-        let mut offset = self.root.steps_root_offset();
-        let found = self.top_down().enumerate().find_map(|(i, step)| {
-            offset += step.offset.0;
-            let child = graph.expect_token(step.child);
-            R::at_border(offset, child.width(), boundary).then_some((i, child))
-        });
-        if let Some((i, child)) = found {
-            R::keep_top(&mut self.steps, i + 1);
-            self.leaf = child;
-        }
-    }
 }
 
 impl<R: PathRole> RolePath<R, Token> {
@@ -194,7 +169,7 @@ impl<R: PathRole> RolePath<R, Token> {
     ) -> Self {
         debug_assert!(steps.first().is_some_and(|s| s.parent == root.index));
         debug_assert!(steps.last().is_some_and(|s| s.child == leaf.index));
-        debug_assert!(OccurrencePath::new(steps.clone()).is_some());
+        debug_assert!(steps.windows(2).all(|w| w[0].child == w[1].parent));
         let root_child = root.root_child(graph, steps.first(), leaf);
         Self {
             root,
@@ -240,10 +215,6 @@ impl<R: PathRole> RolePath<R, Token> {
     /// The occurrence of the root child in the root.
     pub fn root_child_location(&self) -> &OccurrenceLocation {
         R::root_step(&self.steps).expect("graph-rooted path has a step")
-    }
-    pub fn to_occurrence_path(&self) -> OccurrencePath {
-        OccurrencePath::new(self.top_down().copied().collect())
-            .expect("role path is a connected chain")
     }
     /// Raise to `parent`, where the root occurs at `offset`; `span` is the
     /// matched span in the old root.

@@ -157,6 +157,11 @@ Legacy `postfix_iter` walks the widest last child over all rows; with rows
 that is not always every postfix token. Positioned compositions make it
 complete without extra work.
 
+> **Note (2026-11-23):** the `context_search::boundary` module
+> (`prefixes`/`postfixes`/`boundary_occurrences`) was removed. When the reader
+> is implemented, `postfixes(v)` above is computed directly as this chain of
+> last children (G2), not through a boundary search.
+
 The search query `[P, rest]` starts with the token `P`, so the search
 climbs from `P`'s parents. The input root is a vertex, so occurrences of
 `P` inside the input itself are found as well (self-repeats, §3.6).

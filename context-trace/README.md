@@ -37,14 +37,13 @@ fence to `rust,ignore` via `cfg_attr(not(feature = "legacy-tests"), doc = …)`.
 `interchange.rs` (v3 `PositionedGraphData`/`PositionedGraphSnapshot` and the
 structural validator, re-exported by `ngrams::output`), `composition.rs`
 (`Occurrence`, `Composition`), `location.rs` (`OccurrenceLocation`,
-`OccurrencePath`, `IntervalView`), `graph.rs` (`PositionedGraph`,
+`IntervalView`), `graph.rs` (`PositionedGraph`,
 `PositionedVertex`, `PositionedGraphRef = Arc<RwLock<_>>`), `convert.rs`
-(`from_interchange`/`to_interchange`; `test-api` `from_interchange_named`
-also returns the fixture key → token name map), `diff.rs` (`diff` → `GraphDiff`),
-read-only navigation `read.rs` (`PositionedGraph::read_interval`: content of an
-`IntervalView`, each position once) and `enumerate.rs`
-(`PositionedGraph::occurrences_in`: every retained occurrence inside an
-`IntervalView`, deduplicated by `(token, offset)`), search navigation
+(`test-api`: `from_interchange`/`to_interchange`; `from_interchange_named`
+also returns the fixture key → token name map), `diff.rs` (`test-api`:
+`diff` → `GraphDiff`), content reading `read.rs` (debug and `test-api`
+builds: `PositionedGraph::read_interval`, content of an `IntervalView`, each
+position once), search navigation
 `navigate.rs` (`start_at`, `prefix_child`, `parent_occurrences`,
 `atom_token`, `advance_end_path`, `token`; `Composition::covering`/`prefix`),
 search paths `path/` (role-generic `RolePath<R: PathRole, Root: PathRoot>`
@@ -60,11 +59,10 @@ trace states and cache `trace/` (mirrors `legacy/trace`: `ParentState`,
 query-position keys, `Traceable` commands; search plan 2.2), `fixtures.rs` (`test-api`:
 `fixture_snapshots` and `fixture_graphs` → `FixtureGraph { name, corpus, graph, names }`,
 shared with context-search). Tests round-trip and validate every v3 fixture
-of `context-read/tests/fixtures/v3` and check `read_interval`,
-`occurrences_in` and the search navigation primitives on every fixture vertex
-and position (`tests/navigation.rs`), and paths, trace states and trace
-cache on every fixture (`tests/trace.rs`). Boundary search lives in
-`context_search::boundary`. Trace-cache keys (`DirectedKey`, `UpKey`,
+of `context-read/tests/fixtures/v3` and check `read_interval` and the
+search navigation primitives on every fixture vertex and position
+(`tests/navigation.rs`), and paths, trace states and trace cache on every
+fixture (`tests/trace.rs`). Trace-cache keys (`DirectedKey`, `UpKey`,
 `DownKey`, `UpPosition`, `DownPosition`) live in the root module `key.rs`,
 re-exported from `legacy::trace::cache::key::directed`.
 
@@ -81,8 +79,10 @@ re-exported from `legacy::trace::cache::key::directed`.
   the children's labels at insertion; `PositionedGraph::name_resolver` /
   `register_name_resolver` install it as `TokenNameResolver`) exists only
   under `debug_assertions`; release `Display` shows index and width only.
-  `read_interval` is for export, tests, diagnostics and debug/test validation,
-  never for algorithms.
+  `read_interval`, `interval` and `IntervalView` exist only under
+  `debug_assertions` or `test-api` (export, tests, diagnostics and debug/test
+  validation), never for algorithms; `to_interchange`, `diff`,
+  `contains_path` and `register_name_resolver` are `test-api` only.
 - **Validation.** `validate()` always checks the structural rules and
   reciprocal parent links. Under `debug_assertions` or `test-api` it also
   checks one vertex per content (`DuplicateContent`) and overlap agreement

@@ -11,7 +11,6 @@ use crate::{
         CompositionError,
         Occurrence,
         OccurrenceLocation,
-        OccurrencePath,
         PositionedError,
         PositionedGraph,
         VertexNode,
@@ -120,13 +119,8 @@ fn occurrence_paths_and_intervals_are_checked_against_the_graph() {
         offset: offset.into(),
         child: child.index,
     };
-    let path = OccurrencePath::new(vec![step(ababa, 2, aba), step(aba, 1, b)]).unwrap();
-    assert!(graph.contains_path(&path));
-    assert_eq!(path.offset(), AtomPosition::from(3));
-    assert_eq!((path.root(), path.target()), (ababa.index, b.index));
-    let absent = OccurrencePath::new(vec![step(ababa, 1, aba)]).unwrap();
-    assert!(!graph.contains_path(&absent));
-    assert!(OccurrencePath::new(vec![step(ababa, 2, aba), step(ababa, 0, aba)]).is_none());
+    assert!(graph.contains_path(&[step(ababa, 2, aba), step(aba, 1, b)]));
+    assert!(!graph.contains_path(&[step(ababa, 1, aba)]));
 
     let range = |start: usize, end: usize| AtomPosition::from(start)..AtomPosition::from(end);
     assert!(graph.interval(ababa.index, range(1, 4)).is_some());

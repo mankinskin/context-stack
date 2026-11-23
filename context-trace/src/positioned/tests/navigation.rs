@@ -1,4 +1,4 @@
-//! `read_interval`, `occurrences_in` and the search navigation primitives
+//! `read_interval` and the search navigation primitives
 //! (`start_at`, `end_at`, `prefix_child`, `parent_occurrences`, `atom_token`,
 //! `advance_end_path`) on every fixture. Vertices are
 //! addressed through the name map; expectations come from brute-force string
@@ -10,9 +10,8 @@ use crate::{
     AtomPosition,
     Token,
     positioned::{
-        Occurrence,
         OccurrenceLocation,
-        OccurrencePath,
+        PositionedGraph,
         fixtures::fixture_graphs,
     },
 };
@@ -46,40 +45,22 @@ fn read_interval_equals_fixture_substrings() {
     }
 }
 
-#[test]
-fn occurrences_in_equals_all_fixture_key_occurrences() {
-    for fixture in fixture_graphs() {
-        for (key, token) in &fixture.names {
-            let content = chars(key);
-            for start in 0..=content.len() {
-                for end in start..=content.len() {
-                    let interval = &content[start..end];
-                    let mut expected: Vec<Occurrence> = fixture
-                        .names
-                        .iter()
-                        .filter(|(other, _)| *other != key)
-                        .flat_map(|(other, other_token)| {
-                            let other = chars(other);
-                            (0..interval.len().saturating_sub(other.len() - 1))
-                                .filter(move |&p| interval[p..p + other.len()] == other[..])
-                                .map(move |p| Occurrence::new(start + p, *other_token))
-                        })
-                        .collect();
-                    expected.sort_by_key(|o| (o.offset, o.child.width));
-                    let view = fixture
-                        .graph
-                        .interval(token.index, start.into()..end.into())
-                        .unwrap();
-                    assert_eq!(
-                        fixture.graph.occurrences_in(&view),
-                        Some(expected),
-                        "{}: {key:?}[{start}..{end}]",
-                        fixture.name
-                    );
-                }
-            }
-        }
-    }
+/// Checks that `steps` is a stored chain from `root` to `target` and
+/// returns the offset of `target` in `root`.
+fn chain_offset(
+    graph: &PositionedGraph,
+    steps: &[OccurrenceLocation],
+    root: Token,
+    target: Token,
+    context: &str,
+) -> AtomPosition {
+    assert!(steps.windows(2).all(|w| w[0].child == w[1].parent), "{context}");
+    assert!(graph.contains_path(steps), "{context}");
+    assert_eq!(steps.first().map(|s| s.parent), Some(root.index), "{context}");
+    assert_eq!(steps.last().map(|s| s.child), Some(target.index), "{context}");
+    steps
+        .iter()
+        .fold(AtomPosition::default(), |sum, step| sum + step.offset.0)
 }
 
 /// Longest fixture key other than `owner` starting at `position` of
@@ -113,11 +94,11 @@ fn start_at_is_longest_key_starting_at_position() {
                 };
                 let (found, steps) = found.unwrap_or_else(|| panic!("{context}: None"));
                 assert_eq!(found, expected, "{context}");
-                let path = OccurrencePath::new(steps).expect(&context);
-                assert!(graph.contains_path(&path), "{context}");
-                assert_eq!(path.root(), token.index, "{context}");
-                assert_eq!(path.target(), expected.index, "{context}");
-                assert_eq!(path.offset(), AtomPosition::from(p), "{context}");
+                assert_eq!(
+                    chain_offset(graph, &steps, *token, expected, &context),
+                    AtomPosition::from(p),
+                    "{context}"
+                );
             }
             for p in [width, width + 1] {
                 assert_eq!(graph.start_at(*token, p), None, "{}: {key:?} @ {p}", fixture.name);
@@ -151,12 +132,8 @@ fn end_at_is_longest_key_ending_at_position() {
                 };
                 let (found, steps) = found.unwrap_or_else(|| panic!("{context}: None"));
                 assert_eq!(found, expected, "{context}");
-                let path = OccurrencePath::new(steps).expect(&context);
-                assert!(graph.contains_path(&path), "{context}");
-                assert_eq!(path.root(), token.index, "{context}");
-                assert_eq!(path.target(), expected.index, "{context}");
                 assert_eq!(
-                    path.offset() + expected.width.0,
+                    chain_offset(graph, &steps, *token, expected, &context) + expected.width.0,
                     AtomPosition::from(e),
                     "{context}"
                 );

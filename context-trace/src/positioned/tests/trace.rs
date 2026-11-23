@@ -18,6 +18,7 @@ use crate::{
     graph::vertex::VertexIndex,
     positioned::{
         ChildState,
+        End,
         EndPath,
         IntoParentState,
         OccurrenceLocation,
@@ -170,8 +171,6 @@ fn worked_example_repeat_abcabca() {
     state.match_end_leaf();
     assert_eq!(state.path.span, pos(0)..pos(5));
     assert_eq!(state.path.coverage(), SpanCoverage::Prefix);
-    state.path.simplify(graph);
-    assert_eq!(state.path.end.steps(), &end);
 
     // Up edges along `[(abcabca, 0, abca)]` at query position 4 (end of
     // `abca`), down edges along the end path at the query positions of the
@@ -238,8 +237,8 @@ fn raise_repeat_ababa() {
     assert_eq!(state.path.span, pos(0)..pos(5));
     assert_eq!(state.path.coverage(), SpanCoverage::EntireRoot);
     assert!(state.clone().advance_state(graph).is_err());
-    // Canonical end path: stop at `aba@2`, which ends at the match end.
-    state.path.simplify(graph);
+    // Canonical end path: the largest token ending at the match end, `aba@2`.
+    state.path.canonicalize::<End, _>(graph);
     assert_eq!(state.path.end.steps(), &[step(ababa, 2, aba)]);
     assert_eq!(state.path.end.leaf(), aba);
 
@@ -315,7 +314,7 @@ impl Walk<'_> {
         assert_eq!(state.anchor().query, pos(0), "{context}");
         assert_eq!(state.path.leaf_offset(), state.span.start, "{context}");
         assert_eq!(state.path.root_child_end(), state.span.end, "{context}");
-        assert!(graph.contains_path(&state.path.to_occurrence_path()), "{context}");
+        assert!(graph.contains_path(state.path.top_down()), "{context}");
         // Canonical start path: it stops at the largest climbed token
         // starting at the match start, and no intermediate token starts there.
         let expected_start = climbed
@@ -397,15 +396,15 @@ impl Walk<'_> {
                 "{context}"
             );
             state.match_end_leaf();
-            let mut simplified = state.path.clone();
-            simplified.simplify(graph);
-            let end = &simplified.end;
-            assert!(graph.contains_path(&end.to_occurrence_path()), "{context}");
-            assert_eq!(end.leaf_end(), simplified.span.end, "{context}");
+            let mut canonical = state.path.clone();
+            canonical.canonicalize::<End, _>(graph);
+            let end = &canonical.end;
+            assert!(graph.contains_path(end.top_down()), "{context}");
+            assert_eq!(end.leaf_end(), canonical.span.end, "{context}");
             for (i, step) in end.steps().iter().enumerate().take(end.steps().len() - 1) {
                 let at: usize = end.steps()[..=i].iter().map(|s| s.offset.0).sum();
                 let width = graph.token(step.child).unwrap().width.0;
-                assert_ne!(at + width, simplified.span.end.0, "{context}: not maximal");
+                assert_ne!(at + width, canonical.span.end.0, "{context}: not maximal");
             }
             let cache = trace(graph, &state);
             self.check_edges(&cache, &context);
@@ -546,9 +545,7 @@ fn walk_query(
         if !path.steps().is_empty() {
             let steps = path.steps();
             assert_eq!(steps[0].parent, token.index, "{context}");
-            assert!(graph.contains_path(
-                &crate::positioned::OccurrencePath::new(steps.to_vec()).unwrap()
-            ));
+            assert!(graph.contains_path(steps), "{context}");
             let offset: usize = steps.iter().map(|s| s.offset.0).sum();
             assert_eq!(entry_start + offset, p, "{context}");
         }

@@ -1,31 +1,28 @@
-//! Conversion between [`PositionedGraph`] and the interchange format.
+//! Conversion between [`PositionedGraph`] and the interchange format
+//! (`test-api`: fixture loading and test comparison).
 
-#[cfg(any(test, feature = "test-api"))]
 use std::collections::BTreeMap;
 
-#[cfg(any(test, feature = "test-api"))]
 use super::{
     Occurrence,
-    interchange::PositionedCover,
-};
-use super::{
     PositionedGraph,
     VertexNode,
-    interchange::PositionedGraphData,
+    interchange::{
+        PositionedCover,
+        PositionedGraphData,
+    },
 };
-#[cfg(any(test, feature = "test-api"))]
-use crate::Token;
 use crate::{
     AtomPosition,
     GraphKind,
+    Token,
     graph::vertex::VertexIndex,
 };
 
 impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
     /// Build a graph from structurally valid interchange data through one
     /// `GraphEdit` (atoms, then composites by increasing width) and validate
-    /// it (`test-api`: its users are fixture loaders).
-    #[cfg(any(test, feature = "test-api"))]
+    /// it.
     pub fn from_interchange(data: &PositionedGraphData) -> Result<Self, String> {
         Self::build_from_interchange(data).map(|(graph, _)| graph)
     }
@@ -34,7 +31,6 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
     ///
     /// Tests translate string expectations into tokens only through this
     /// map; it is returned to the caller and never stored in the graph.
-    #[cfg(any(test, feature = "test-api"))]
     pub fn from_interchange_named(
         data: &PositionedGraphData,
     ) -> Result<(Self, BTreeMap<String, Token>), String> {
@@ -47,7 +43,6 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
         })
     }
 
-    #[cfg(any(test, feature = "test-api"))]
     fn build_from_interchange(
         data: &PositionedGraphData,
     ) -> Result<(Self, BTreeMap<&str, Token>), String> {

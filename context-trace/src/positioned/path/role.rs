@@ -9,8 +9,7 @@
 //!   end paths top-down (a descent pushes); [`PathRole::top_down`] and
 //!   [`PathRole::bottom_up`] iterate either way;
 //! - the span boundary ([`PathRole::boundary`]) and the border predicate
-//!   ([`PathRole::at_border`]) of the canonical rules (raise, simplify,
-//!   coverage);
+//!   ([`PathRole::at_border`]) of the canonical rules (raise, coverage);
 //! - how a path is located from a root and a position ([`PathRole::locate`]);
 //! - the trace direction and key positions of its cache edges.
 //!
@@ -87,11 +86,6 @@ pub trait PathRole: 'static + Debug + Clone + Copy + Default + PartialEq + Eq + 
     fn push_leaf(
         steps: &mut Vec<OccurrenceLocation>,
         step: OccurrenceLocation,
-    );
-    /// Keep the first `n` steps top-down.
-    fn keep_top(
-        steps: &mut Vec<OccurrenceLocation>,
-        n: usize,
     );
 
     /// The boundary of `span` this role addresses.
@@ -172,12 +166,6 @@ impl PathRole for Start {
     ) {
         steps.insert(0, step);
     }
-    fn keep_top(
-        steps: &mut Vec<OccurrenceLocation>,
-        n: usize,
-    ) {
-        steps.drain(..steps.len() - n);
-    }
     fn boundary(span: &Range<AtomPosition>) -> AtomPosition {
         span.start
     }
@@ -230,12 +218,6 @@ impl PathRole for End {
         step: OccurrenceLocation,
     ) {
         steps.push(step);
-    }
-    fn keep_top(
-        steps: &mut Vec<OccurrenceLocation>,
-        n: usize,
-    ) {
-        steps.truncate(n);
     }
     fn boundary(span: &Range<AtomPosition>) -> AtomPosition {
         span.end

@@ -7,10 +7,6 @@
 
 extern crate test;
 
-/// Positioned-model boundary search (prefixes/postfixes with occurrence
-/// paths), independent of `legacy`.
-pub mod boundary;
-
 /// Cursor typestates and checkpoints shared with `legacy` (promoted, plan 2.0).
 pub mod cursor;
 

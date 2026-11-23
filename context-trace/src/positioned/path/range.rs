@@ -120,25 +120,6 @@ impl<Root: PathRoot> RangePath<Root> {
     pub fn match_end_leaf(&mut self) {
         self.span.end = self.end.leaf_end();
     }
-    /// Trim the path of role `R` at the first token with its border at the
-    /// span boundary (2.2 positioned `simplify`; depends on the descent the
-    /// path took).
-    pub fn simplify_role<R: PathRole, G: GraphKind>(
-        &mut self,
-        graph: &PositionedGraph<G>,
-    ) where
-        Self: HasRolePath<R, Root = Root>,
-    {
-        let boundary = self.boundary::<R>();
-        <Self as HasRolePath<R>>::role_path_mut(self).simplify(graph, boundary);
-    }
-    /// [`Self::simplify_role`] of the end path.
-    pub fn simplify<G: GraphKind>(
-        &mut self,
-        graph: &PositionedGraph<G>,
-    ) {
-        self.simplify_role::<End, G>(graph);
-    }
 }
 
 impl RangePath<Token> {
