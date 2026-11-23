@@ -42,6 +42,11 @@ strings seen so far.
   only under `#[cfg(debug_assertions)]`. Reading content by traversal
   (`read_interval`) is allowed for export, tests and diagnostics, never in
   an algorithm.
+- **Mutation only through `GraphEdit`.** Vertices and compositions change
+  only through the vertex-local, checked `GraphEdit` layer, used only by
+  insertion and the reader (insert plan
+  [D8](20261122_PLAN_POSITIONED_INSERT.md)); there are no other mutation
+  functions.
 - **Search results are reusable.** Search returns `Response { cache:
   TraceCache, end: MatchResult }`. Insertion and the next adjacent search
   consume it and never repeat the traversal that produced it.

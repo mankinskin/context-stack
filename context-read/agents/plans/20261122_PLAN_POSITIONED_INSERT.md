@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-insert` `#context-trace` `#context-search` `#positioned-composition` `#insert` `#split` `#join`
-summary: Positioned insertion, revision 3 (supersedes revision 2 in 20261120_PLAN_POSITIONED_INSERT). insert_match(Response) turns a matched span into a token so that the graph equals the oracle graph of the corpus plus the span. Split positions with a start/end role are seeded from the response and pushed into every child occurrence containing them (legacy rule); required intervals are derived per vertex (target, postfix, prefix, overlap); a bottom-up join creates the new tokens through GraphEdit and returns a Publication. Defines the graph invariants, the response guarantees and why every created token is new, unique and complete. GraphEdit is a strict, vertex-local edit layer shared only by insertion and the reader (create, add_occurrences, extend). Root expansion (the legacy seam operation) belongs to the reader plan.
-status: 📋 draft — revision 3 (review 2026-11-22 applied, §0); D1–D3, D5 carried over, D4 replaced by D6; P1–P4 proposed
+summary: Positioned insertion, revision 3 (supersedes revision 2 in 20261120_PLAN_POSITIONED_INSERT). insert_match(Response) turns a matched span into a token so that the graph equals the oracle graph of the corpus plus the span. Split positions with a start/end role are seeded from the response and pushed into every child occurrence containing them (legacy rule); required intervals are derived per vertex (target, postfix, prefix, overlap); a bottom-up join creates the new tokens through GraphEdit and returns a Publication. Defines the graph invariants, the response guarantees and why every created token is new, unique and complete. GraphEdit is the only mutation layer (atom, create, add_occurrences, extend), vertex-local and strictly checked, used only by insertion and the reader; insert_atom, insert and insert_composition are removed. Responses carry a generation stamp; no rollback; expected graphs are generated oracle fixture files (v3/insert lane). Root expansion (the legacy seam operation) belongs to the reader plan.
+status: 📋 ready for implementation — revision 3 (reviews 2026-11-22/23 applied, §0); decisions D1–D3, D5–D11 confirmed
 date: 2026-11-22
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (step 3)
 supersedes: 20261120_PLAN_POSITIONED_INSERT.md (revision 2)
@@ -27,7 +27,7 @@ accurate and is not repeated here.
 (execution manual in the prototypes
 [README](../../../context-insert/agents/prototypes/README.md)).
 
-## 0. Review changes (2026-11-22)
+## 0. Review changes (2026-11-22, 2026-11-23)
 
 | # | Question | Resolution |
 |---|---|---|
@@ -35,6 +35,7 @@ accurate and is not repeated here.
 | 2 | The seam scan was not the legacy seam operation | Removed from both plans. The reader keeps legacy root expansion (largest postfix token first, search `[postfix, rest]`, insert the accepted match, integrate it into the root), see [reader plan](20261122_PLAN_POSITIONED_READER.md) §3.2. Insertion is unaffected: it inserts one match, whichever step found it |
 | 3 | `GraphEdit` must not become a second way to build graphs | §8 rewritten: a vertex-local edit layer with three checked operations (`create`, `add_occurrences`, `extend`), callable only by insertion and the reader (feature-gated, guard test). Tables of which algorithm uses which operation |
 | 4 | Reader integration | The reader inserts every accepted match with `insert_match`; response roots may be the input root, an owned parentless vertex (22 of 57 insertions in reader prototype R0). The reader holds no response or path across an edit, so no `Publication::translate` is needed (§7) |
+| 5 | Decisions on P1–P4 (2026-11-23) | Confirmed as D8–D11 (§14): `GraphEdit` is the only way to change vertices and compositions, the other mutation functions are removed (§8.5); generation stamp as safeguard; no rollback, failures are prevented by the implementation and the invariants; expected graphs are generated fixture files (task 3.1.1) |
 
 ## 1. Changes from revision 2
 
@@ -44,7 +45,7 @@ accurate and is not repeated here.
 | 2 | Uniqueness of new tokens: reuse a token whose composition was already created in this insertion | New tokens are **provably new and pairwise distinct** (§6, J1–J2). Reuse by composition is replaced by a debug assertion | The invariants (G2, G5) imply it. The prototype never created a composition twice |
 | 3 | Invariants listed informally (F1–F4, I2) | Graph invariants G1–G5, response guarantees R1–R5 and join postconditions J1–J6 (§3, §6) | The algorithm is now described in terms of what it may assume and what it must establish |
 | 4 | `Cover`, cover projection, `Cover::merge` with seam scan (task 3.5) | **Removed.** Tokens crossing a junction of the read input are found by the reader's root expansion (legacy `expand_root`), reader plan §3.2 | Insertion never needs a seam: the host contains the whole span. The reader keeps the legacy seam operation, which needs no cover merge |
-| 5 | `GraphEdit { create, recompose, finish }`, `Publication::translate` | `GraphEdit { create, add_occurrences, extend, finish }` (§8), a strict layer shared by insertion and the reader. The `Publication` is the insert result. **No translation** | The join needs `create` and `add_occurrences`; the reader's owned root needs `extend`. No caller holds paths across an insertion (reader plan §4.3) |
+| 5 | `GraphEdit { create, recompose, finish }`, `Publication::translate` | `GraphEdit { atom, create, add_occurrences, extend, finish }` (§8), the only mutation layer, shared by insertion and the reader. The `Publication` is the insert result. **No translation** | The join needs `create` and `add_occurrences`; the reader's owned root needs `extend`. No caller holds paths across an insertion (reader plan §4.3) |
 | 6 | Navigation counter for intersection pushes | Counter of split positions that are not on a response path edge | Measures how much of the split graph the response provides (75%) |
 
 ## 2. Goal and contract
@@ -117,7 +118,7 @@ superstrings and retain it.
 | R3 | `EntireRoot` ⇔ `[o, e) = [0, |R|)`. |
 | R4 | **Start path:** a connected chain of occurrences from `R` down to the largest token starting at `o`. Every step except the last has a child that strictly contains `o`. |
 | R5 | **End path:** a connected chain from `R` down to the largest token ending at `e` (canonical, `RolePath::end_at`). Every step except the last has a child that strictly contains `e`. |
-| R6 | (new, P2) `response.generation()` is the graph generation under which the search ran. |
+| R6 | (new, D9) `response.generation()` is the graph generation under which the search ran. |
 
 ### 3.3 Consequences used by the algorithm
 
@@ -203,7 +204,7 @@ rule, that piece always exists. Pushing only along `covering`/`ending_at`
 fails 208 of 1,247 cases (`split_positions.py --paths-only`). Positions that
 are not on a path never bound a newly composed interval. Their tokens are
 existing tokens, and as pieces they were always discarded by `maximal` (347
-pieces). Skipping them is a possible optimization (P4), not part of the
+pieces). Skipping them is a possible optimization (§14, open), not part of the
 design.
 
 ### 4.3 Required intervals (derived, not stored)
@@ -337,7 +338,7 @@ pub struct VertexEdit {
 ```
 
 `InsertError`: `StaleResponse` (generation mismatch) and
-`Composition(PositionedError)` (a violated invariant; see P3).
+`Composition(PositionedError)` (a violated invariant, i.e. a bug; D10).
 
 Convenience wrappers as in legacy: `insert(graph, query) -> Result<Token,
 _>` and `insert_next_match(graph, query) -> Result<InsertOutcome, _>` search
@@ -346,16 +347,24 @@ continues from the response's checkpoint. No path translation through a
 `Publication` is planned: the reader keeps only tokens and offsets across
 an edit (reader plan §4.3).
 
-## 8. `GraphEdit`: the shared edit layer
+## 8. `GraphEdit`: the only mutation layer (D8)
 
 ### 8.1 Principle
 
-Only two algorithms change compositions: insertion (`insert_match`) and
-the reader (`read`). They are the authorities for graph-level correctness:
-completeness (G2), unique minimal hosts (G5) and which strings become
-tokens. `GraphEdit` is not a way to build or repair graphs. It is the small
-set of **vertex-local** updates both algorithms share, so that link
-maintenance, maximality, generation and validation exist once:
+Vertices and compositions are changed **only** through `GraphEdit` (D8).
+No other function adds a vertex, changes a composition or edits a parent
+link; the current bypasses (`insert_atom`, `insert`, `insert_composition`)
+are removed (§8.5).
+
+Only two algorithms use the layer to change a graph: insertion
+(`insert_match`) and the reader (`read`). They are the authorities for
+graph-level correctness: completeness (G2), unique minimal hosts (G5) and
+which strings become tokens. The only other user is the import of a
+validated oracle snapshot (`from_interchange`, test-api, §8.5), which
+reproduces a graph the oracle already built. `GraphEdit` is not a way to
+build or repair graphs. It is the small set of **vertex-local** updates the
+algorithms share, so that link maintenance, maximality, generation and
+validation exist once:
 
 - every operation changes one vertex, plus the parent links of the children
   it adds or removes;
@@ -366,53 +375,52 @@ maintenance, maximality, generation and validation exist once:
   wholesale, removes an occurrence without a containing replacement, or
   changes the string of a vertex that has parents.
 
+Failures are prevented, not repaired (D10): a rejected operation means an
+algorithm or invariant bug. There is no rollback.
+
 ### 8.2 Operations and their users
 
 | Operation | Effect | Preconditions (rejected otherwise) | Insertion | Reader |
 |---|---|---|---|---|
-| `create(occurrences) -> Token` | new composite vertex; children gain parent links | `Composition::new` (sorted, gap-free, no containment, at least 2); children exist with matching widths. Debug: the string is new (G1), every overlap in the composition is a vertex (G4) | every composed interval (§5.2 step 2), `N` last | a new root: `[R@0, t@|R|]` after appending to an adopted token, `maximal([R@0, E@o])` after an expansion (reader plan §3.4) |
-| `add_occurrences(v, added)` | `comp(v) := maximal(comp(v) ∪ added)`; contained occurrences move under the added ones (lose the link to `v`) | `v` is composite; each added occurrence lies inside `[0, |v|)` and its child exists with a matching width; the width is unchanged. Debug: the added token's string equals `v[x, x + |t|)`, G4 for the result | node update (§5.2 step 3) of every split node and of the root | only through `insert_match` (the input root as split node or response root) |
-| `extend(v, t@o) -> Token` | `comp(v) := maximal(comp(v) ∪ {t@o})`, `|v| := o + |t|` | `v` is composite and **has no parents** (no composition contains it, so its width may change); `o ≤ |v| < o + |t|`. Debug: `t` agrees with `v` on `[o, |v|)`, G4 for the result | — | the owned input root: `Append` (`o = |v|`) and `Expand` (`o = |v| − |P|`) |
+| `atom(value) -> Token` | the atom vertex for `value`; existing atoms are returned unchanged (no mutation, no generation bump) | — | — | atoms seen for the first time (reader plan §1.2) |
+| `create(occurrences) -> Token` | new composite vertex; children gain parent links | `Composition::new` (sorted, gap-free, no containment, at least 2); children exist with matching widths. Debug: the string is new (G1, `DuplicateContent`), adjacent occurrences agree on their overlap (`OverlapMismatch`), every overlap is a vertex (G4, `OverlapNotVertex`) | every composed interval (§5.2 step 2), `N` last | a new root: `[R@0, t@|R|]` after appending to an adopted token, `maximal([R@0, E@o])` after an expansion (reader plan §3.4) |
+| `add_occurrences(v, added)` | `comp(v) := maximal(comp(v) ∪ added)`; contained occurrences move under the added ones (lose the link to `v`) | `v` is composite; each added occurrence lies inside `[0, |v|)` (`OutsideVertex`) and its child exists with a matching width; the width is unchanged (`WidthChange`). Debug: the added token's string equals `v[x, x + |t|)`, G4 for the result | node update (§5.2 step 3) of every split node and of the root | only through `insert_match` (the input root as split node or response root) |
+| `extend(v, t@o) -> Token` | `comp(v) := maximal(comp(v) ∪ {t@o})`, `|v| := o + |t|` | `v` is composite and **has no parents** (`HasParents`; no composition contains it, so its width may change); `o ≤ |v| < o + |t|` (`OutsideVertex`). Debug: `t` agrees with `v` on `[o, |v|)`, G4 for the result | — | the owned input root: `Append` (`o = |v|`) and `Expand` (`o = |v| − |P|`) |
 | `finish() -> Publication` | validation of touched vertices (debug/test-api) and the record | — | returned in `InsertOutcome::Created` | discarded (the reader keeps tokens only) |
-
-`insert_atom` stays outside the layer: it creates an atom, changes no
-composition and does not bump the generation. The raw
-`PositionedGraph::insert` stays `test-api` only, to build test graphs from
-fixtures.
 
 How the algorithms use it:
 
 - **Insertion:** `insert_match` takes the write guard, checks the
-  response's generation, opens one `GraphEdit`, and runs the join: for each
-  split node in increasing width, `create` for each composed interval, then
-  one `add_occurrences` with the node's new tokens. `finish` returns the
-  `Publication` (`created` in creation order, `N` last; `edits` per changed
-  vertex).
-- **Reader:** each commit (reader plan §3.4) opens one `GraphEdit`: `extend`
-  for an owned root, `create` for a new root, then `finish`. Matches that
-  are not tokens are inserted by `insert_match` before the commit, never by
-  the reader's own edits.
+  response's generation (D9), opens one `GraphEdit`, and runs the join: for
+  each split node in increasing width, `create` for each composed interval,
+  then one `add_occurrences` with the node's new tokens. `finish` returns
+  the `Publication` (`created` in creation order, `N` last; `edits` per
+  changed vertex).
+- **Reader:** new atoms through `atom`; each commit (reader plan §3.4)
+  opens one `GraphEdit`: `extend` for an owned root, `create` for a new
+  root, then `finish`. Matches that are not tokens are inserted by
+  `insert_match` before the commit, never by the reader's own edits.
 
-### 8.3 Access
+### 8.3 Access (D8)
 
-Rust cannot make a `pub` item visible to exactly two downstream crates.
-Proposal (P1):
+Rust cannot make a `pub` item visible to exactly two downstream crates:
 
 - `GraphEdit` and `PositionedGraph::edit()` live in
-  `context-trace/src/positioned/edit.rs` behind the non-default feature
-  `edit`, `#[doc(hidden)]`.
+  `context-trace/src/positioned/edit.rs`. They are `pub` only with the
+  non-default feature `edit` (`#[doc(hidden)]`) and `pub(crate)` otherwise,
+  so context-trace's own import and tests use them without the feature.
 - Only `context-insert` and `context-read` enable `context-trace/edit`. A
   guard test (next to the step 1 content-index guard) reads `cargo metadata`
   and fails if any other workspace crate enables it.
-- The workspace's public mutation API is `insert_atom`, `insert_match` (and
-  its wrappers `insert`, `insert_next_match`) and `read`.
+- The workspace's public mutation API is `insert_match` (and its wrappers
+  `insert`, `insert_next_match`) and `read`. Tests obtain graphs from
+  fixtures (`fixture_graphs`, `insert_cases`).
 
 ### 8.4 Implementation (`context-trace/src/positioned/edit.rs`)
 
 ```rust
 impl<G: GraphKind> PositionedGraph<G> {
-    #[cfg(feature = "edit")]
-    #[doc(hidden)]
+    /// `pub` with feature `edit` (doc-hidden), `pub(crate)` otherwise.
     pub fn edit(&mut self) -> GraphEdit<'_, G>;
     pub fn generation(&self) -> u64;
 }
@@ -425,8 +433,11 @@ pub struct GraphEdit<'g, G: GraphKind> {
 impl<G: GraphKind> GraphEdit<'_, G> {
     /// Read access for the join while edits are applied.
     pub fn graph(&self) -> &PositionedGraph<G>;
-    /// Wraps `insert_composition` (`Composition::new`, child checks, parent
-    /// links, debug label) and records the token in `publication.created`.
+    /// Existing atom, or a new atom vertex (bumps the generation).
+    pub fn atom(&mut self, value: AtomOf<G>) -> Token;
+    /// `Composition::new`, child checks, parent links, debug label (the
+    /// former `insert_composition`); records the token in
+    /// `publication.created`.
     pub fn create(&mut self, occurrences: Vec<Occurrence>) -> Result<Token, PositionedError>;
     /// Same width; records a `VertexEdit`.
     pub fn add_occurrences(&mut self, vertex: VertexIndex, added: Vec<Occurrence>)
@@ -439,24 +450,40 @@ impl<G: GraphKind> GraphEdit<'_, G> {
 }
 ```
 
+- New `PositionedError` variants: `OverlapNotVertex { owner, left, right }`
+  (debug/test-api, like `OverlapMismatch`), `HasParents(VertexIndex)`,
+  `OutsideVertex { vertex, occurrence }`, `WidthChange { vertex }`.
 - `maximal(Vec<Occurrence>) -> Vec<Occurrence>` moves into
   `composition.rs` (shared by `add_occurrences`, `extend` and the join).
   `Composition::crossing(p)` is added next to `covering`/`ending_at` (§4.2).
 - Parent links store `(parent, offset)` without the parent's width, so
   `extend` touches only the links of added and removed children. Tokens
   held by callers carry the old width; `extend` returns the new token.
-- The generation is bumped by the **first** mutation of an edit, so a
+- The generation (D9) is bumped by the **first** mutation of an edit, so a
   dropped `GraphEdit` still invalidates older responses. `finish` does not
-  bump it again.
+  bump it again. Returning an existing atom is not a mutation.
 - `finish` validates in debug and test-api builds: structure and links of
   touched vertices and their children, and G4 for touched compositions. G4
   is checked structurally: for adjacent overlapping `L@l`, `R@r`, the
   largest token at `r − l` in `L` (`start_at`) must end at `|L|`.
-- No rollback (P3). Edits are applied node by node under the write guard,
-  because parents need their children's new tokens. After the first edit,
-  an error can only come from a violated invariant; it is returned and
-  debug-asserted.
-- `insert_composition` stays `pub(crate)`.
+- No rollback (D10). Edits are applied node by node under the write guard,
+  because parents need their children's new tokens. A rejected operation is
+  a bug: `insert_match` returns it as `InsertError::Composition` and
+  debug-asserts; the gate requires that no case returns an error.
+
+### 8.5 Removed mutation paths and their migration (task 3.1)
+
+| Current | Change |
+|---|---|
+| `PositionedGraph::insert_atom` (`pub`) | removed; `GraphEdit::atom` |
+| `PositionedGraph::insert` (`test-api`) | removed; tests use fixtures or, inside context-trace, `edit()` |
+| `PositionedGraph::insert_composition` (`pub(crate)`) | removed; its body becomes `GraphEdit::create` |
+| `convert.rs` `build_from_interchange` | builds through one `GraphEdit` (`atom`, `create` bottom-up by width) and calls `validate()` at the end. `from_interchange` becomes `test-api` (its only users are fixture loaders); a production import is decided at cutover (roadmap step 6) |
+| `tests/model.rs` | the `ababa` helper builds through `edit()`. `insert_links_parents_and_rejects_incomplete_compositions` asserts the same errors from `GraphEdit::create` (`TooFew`, `Gap`, `Contained`, `UnknownVertex`). `validate_rejects_duplicate_content` and `validate_rejects_overlap_disagreement` can no longer build their graphs through the layer (debug `create` rejects them): they assert the rejection by `create`, and corrupt fields directly for the `validate()` check, as `validate_rejects_broken_reciprocal_links` already does |
+| graph.rs doc comment ("the only way to add a composite is `Self::insert`") | points to `GraphEdit` |
+
+The row model (`context-trace::legacy`, context-api, legacy insert and
+reader) has its own `Hypergraph` and is not affected.
 
 ## 9. Worked examples
 
@@ -511,6 +538,30 @@ Response: span `[3, 10)`. Start path `root → abab@3` (the leaf starts at
 from the off-path position, and `maximal` drops it because `abab@0`
 contains it. The root becomes `abcaba@0, abababc@3, abcaba@7`.
 
+### 9.3 Both roles at one position (`insert_small_periodic`)
+
+Corpus `ababab`; query `baba`. The graph has `ab = a@0, b@1`,
+`abab = ab@0, ab@2` and `ababab = abab@0, abab@2`. Response: root `ababab`,
+span `[1, 5)`; start path `ababab → abab@0 → ab@0 → b@1`, end path
+`ababab → abab@2 → ab@2 → a@0`.
+
+| Node | Positions | Origin | Intervals |
+|---|---|---|---|
+| `ababab` | `1:S`, `5:E` | seed | `[1,5)` |
+| `abab` | `1:S`, `3:E` | `1` lies inside `abab@0`, `5` inside `abab@2`: two occurrences of one vertex | `[1,3)`, `[0,3)`, `[1,4)` |
+| `ab` | `1:S`, `1:E` | `1:S` inside `ab@0`, `3:E` inside `ab@2`: one position with both roles | `[0,1)`, `[1,2)` |
+
+| Node | Interval → token | Node after |
+|---|---|---|
+| `ab` | `[0,1)` → `a`, `[1,2)` → `b` (inside atom children) | unchanged |
+| `abab` | `[1,3)` → `ba = b@0, a@1`; `[0,3)` → `aba = ab@0, ba@1` (`a@2` dropped by `maximal`); `[1,4)` → `bab = ba@0, ab@1` (`b@0` dropped) | `aba@0, bab@1` (`ab@0`, `ab@2` removed, reachable through `aba`, `bab`) |
+| root | `[1,5)` → `baba = bab@0, aba@1` | `abab@0, baba@1, abab@2` |
+
+`Publication`: `created = [ba, aba, bab, baba]`; `edits`: `abab` (added
+`aba@0, bab@1`, removed `ab@0, ab@2`), `ababab` (added `baba@1`). The overlap
+interval `[1,3)` gives `ba`, the overlap of `aba` and `bab` in `abab` and of
+`bab` and `aba` in `baba` (G4).
+
 ## 10. Legacy mapping
 
 | Legacy | Positioned (rev 3) |
@@ -554,7 +605,7 @@ after the roadmap step and run in order.
 
 ### 3.0 Crate setup
 
-- [ ] `context-trace/Cargo.toml`: non-default feature `edit` (§8.3).
+- [ ] `context-trace/Cargo.toml`: non-default feature `edit` (§8.3, D8).
 - [ ] `context-insert/Cargo.toml`: depend on `context-trace` (with `edit`)
   and `context-search` without `test-api`. Add `test-api =
   ["context-trace/test-api", "context-search/test-api"]` and enable it in
@@ -563,30 +614,72 @@ after the roadmap step and run in order.
 - [ ] Root modules `split/`, `join/`, `insert/`, and `InsertError`.
 - [ ] `cargo test -p context-insert --features legacy-tests` stays green.
 
-### 3.1 `context-trace`: edits, generation, validation, fixtures
+### 3.1 `context-trace`: edit layer, generation, validation, fixtures
 
 - [ ] `composition.rs`: `maximal`, `Composition::crossing(p)`.
-- [ ] `edit.rs` (feature `edit`): `GraphEdit` with `create`,
-  `add_occurrences`, `extend`, `finish` (§8.2, §8.4), `Publication`,
-  `VertexEdit`, `PositionedGraph::generation()`.
+- [ ] `edit.rs`: `GraphEdit` with `atom`, `create`, `add_occurrences`,
+  `extend`, `finish` (§8.2, §8.4), `Publication`, `VertexEdit`;
+  `PositionedGraph::edit()` (`pub` with feature `edit`, else `pub(crate)`)
+  and `generation()`; the new `PositionedError` variants.
+- [ ] Remove `insert_atom`, `insert` and `insert_composition`; migrate
+  `convert.rs` and `tests/model.rs` (§8.5). `from_interchange` becomes
+  `test-api`.
 - [ ] Guard test: no workspace crate other than `context-insert` and
   `context-read` enables `context-trace/edit` (§8.3).
-- [ ] `validate()`: structural G4 check.
-- [ ] Insert fixtures (`test-api`):
-  - named scenarios in `context-read/tests/fixtures/v3/scenarios.json`
-    with minimal corpora: `insert_shared_vertex`, `insert_periodic`,
-    `insert_deep_borders` (the oracle derives the repeated children);
-  - one insert case per fixture and per non-vertex substring, with corpus
-    `corpus + [query]` (storage: P4);
-  - `insert_cases() -> Vec<InsertCase { base, query, expected }>` loaded
-    through `context_trace::positioned::fixtures`.
-- **Tests:** `create`/`add_occurrences`/`extend` keep `validate()` green
-  and maintain links; each rejects inputs outside its preconditions
-  (`add_occurrences`: width change, occurrence outside the vertex;
-  `extend`: a vertex with parents, an occurrence that does not reach past
-  the end; debug: disagreeing content, an overlap that is not a vertex); the
-  generation bumps once per edit; G4 holds on every fixture and fails on a
-  test-api graph that violates it.
+- [ ] `validate()`: structural G4 check (`OverlapNotVertex`).
+- [ ] Insert fixtures (D11, task 3.1.1) and the loader
+  `insert_cases() -> Vec<InsertCase { name, base: FixtureGraph, query: String, expected: FixtureGraph }>`
+  in `context_trace::positioned::fixtures`.
+- **Tests:**
+  - each operation keeps `validate()` green and maintains links (added
+    children gain `(v, offset)`, removed ones lose it);
+  - each rejects inputs outside its preconditions: `create` (`TooFew`,
+    `Gap`, `Contained`, `UnknownVertex`; debug: `DuplicateContent`,
+    `OverlapMismatch`, `OverlapNotVertex`), `add_occurrences`
+    (`OutsideVertex`, `WidthChange`), `extend` (`HasParents`,
+    `OutsideVertex`);
+  - `atom` returns existing atoms without a generation bump; the generation
+    bumps once per mutating edit, also for a dropped edit;
+  - `validate()` passes on every fixture (now including G4) and reports
+    `OverlapNotVertex` on a graph corrupted by field access;
+  - `maximal` (duplicates, containment, partial overlaps kept) and
+    `crossing(p)` against a brute-force filter on every fixture composition
+    and every `p`.
+
+#### 3.1.1 Insert fixtures (D11)
+
+- **Lane.** `context-read/tests/fixtures/v3/insert/` with its own manifest
+  `scenarios.json` (the v3 loaders read only files directly in `v3/`, so
+  the lanes do not mix). One entry per insert case:
+  `{"name": "<scenario>__<k>", "inputs": corpus + [query]}`. The scenario
+  is a v3 manifest entry, the base graph is its v3 fixture and the query is
+  the last input. `k` numbers the scenario's cases in `(width, string)`
+  order of the query (queries may contain characters not allowed in file
+  names).
+- **Cases.** For every v3 scenario: every substring (2+ atoms) of a vertex
+  string that is not a vertex. Its unique minimal host (G5) is asserted
+  while enumerating. 1,247 cases on the current 66 fixtures, plus those of
+  the new named scenarios.
+- **Generation.** `cargo run -p context-trace --features test-api --example
+  insert_manifest` enumerates the cases from the checked-in v3 fixtures
+  (fixture strings are test tooling, not algorithm input) and writes the
+  manifest. Then
+  `./target/release/ngrams --file context-read/tests/fixtures/v3/insert/scenarios.json --out context-read/tests/fixtures/v3/insert`
+  writes one oracle graph per case. The context-read README documents both
+  commands next to the v3 regeneration.
+- **Named scenarios** in the v3 manifest (minimal corpora, the oracle
+  derives the repeated children): `insert_small_periodic` (`ababab`; query
+  `baba`), `insert_shared_vertex` (`acabcabcab, bcabcb`; `abcabca`),
+  `insert_periodic` (`ababababa`; `bababab`), `insert_deep_borders`
+  (`baaabababba, abaaabbaabba, aabbaabbaabbaa`; `bbaabbaabb`). Their insert
+  cases are generated like all others; the named tests (3.4) pick them by
+  query. They are also registered in the `scenarios!` list of
+  `context-read/tests/reader_behavior.rs`.
+- **Validation** (third lane in `context-read/tests/fixture_validation.rs`):
+  exactly one file per manifest entry; each corpus equals its entry's
+  inputs and starts with the base scenario's corpus; the manifest equals the
+  enumeration from the current v3 fixtures, so a changed or new v3 scenario
+  fails until the insert lane is regenerated.
 
 ### 3.2 Split graph (`context-insert/src/split/`)
 
@@ -665,14 +758,18 @@ New in revision 3:
 | D6 | (replaces D4) The split graph stores split positions with roles, not intervals. Positions are pushed into every crossing child (legacy rule). Intervals are derived per vertex. |
 | D7 | Insertion handles a single match. Finding matches, including tokens crossing a junction of the read input (legacy root expansion), belongs to the reader ([reader plan](20261122_PLAN_POSITIONED_READER.md) §3.2). No cover merge or seam scan. |
 
-Proposed:
+Confirmed 2026-11-23:
 
-| # | Topic | Proposal |
-|---|---|---|
-| P1 | Mutation authority | Only insertion and the reader change compositions, through the vertex-local `GraphEdit` layer (`create`, `add_occurrences`, `extend`, `finish`) with checked preconditions, behind the hidden feature `edit` enabled only by `context-insert` and `context-read` (guard test). Raw `insert` stays `test-api` (§8). |
-| P2 | Stale responses | Generation stamp in `Response`, checked by `insert_match`, bumped by the first mutation of a `GraphEdit`. |
-| P3 | Failure atomicity | No rollback; errors after the first edit mean a violated invariant (returned and debug-asserted). |
-| P4 | Insert expectations | One oracle graph per insert case under `fixtures/v3/insert/` (about 1,250 small files from the existing CLI), or a delta format (new vertices and changed compositions), which needs an `ngrams` change. Optimization, not design: skip positions that are not path edges once a proof shows their pieces are always contained (§4.2). |
+| # | Decision |
+|---|---|
+| D8 | (P1) Vertices and compositions change only through `GraphEdit` (`atom`, `create`, `add_occurrences`, `extend`, `finish`): vertex-local operations with checked preconditions. `insert_atom`, `insert` and `insert_composition` are removed (§8.5). Only insertion and the reader use the layer; outside context-trace it requires the hidden feature `edit`, enabled only by context-insert and context-read (guard test). |
+| D9 | (P2) Safeguard against stale responses: `Response` carries the graph generation of its search; `insert_match` rejects a mismatch (`StaleResponse`); the first mutation of a `GraphEdit` bumps the generation. |
+| D10 | (P3) No rollback. Failures are prevented by a correct implementation and the invariants; a rejected operation is a bug, returned and debug-asserted, and the gate requires that no case returns an error. |
+| D11 | (P4) Expected graphs are generated oracle fixture files: one per insert case in the `v3/insert` lane (task 3.1.1). |
+
+Open (not blocking): skip split positions that are not on a response path
+once a proof shows their pieces are always contained (§4.2; 0 of 232
+cases need them). This is an optimization, not part of the design.
 
 ## 15. Risks
 
@@ -680,6 +777,7 @@ Proposed:
 |---|---|
 | G5 or G4 fails for some oracle output, or after a reader insertion | Checked on every fixture and insert case; the gate asserts that the root is the brute-force minimal host; formal argument against the frequency rule still open |
 | Completeness (G2) is not structurally validated | Oracle diff on every insert case; J4 argument |
-| Partial edits after an internal error | P3; the gate requires no error |
-| Fixture volume | P4; cases are generated, not maintained by hand |
+| Partial edits after an internal error | D10: prevented by invariants and debug checks; the gate requires no error |
+| Fixture volume (about 1,250 small files) | D11: generated by two commands and checked against the enumeration; never edited by hand |
+| Removing `insert`/`insert_atom` breaks positioned tests that build graphs by hand | §8.5 migration in task 3.1; the gate's `--no-default-features --features test-api` check covers every positioned crate |
 | Cargo feature change breaks legacy builds | 3.0 runs the legacy suite first |

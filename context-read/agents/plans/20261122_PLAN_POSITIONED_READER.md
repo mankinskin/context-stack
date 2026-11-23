@@ -251,7 +251,7 @@ vertex (the root is the response root; insert plan §2). Prototype: 22 of
 | expansion match is not a token | `insert_match(response)`; the root may be the response root |
 | match is a token | no call (`EntireRoot`); legacy `insert_next_match` returns `Complete`/`NoExpansion` |
 | root edits | `GraphEdit::extend` / `GraphEdit::create` (insert plan §8), not insertion |
-| new atoms | `insert_atom` |
+| new atoms | `GraphEdit::atom` (insert plan D8: no mutation outside the layer) |
 
 The reader uses only the returned token. The `Publication` is not needed:
 after `insert_match`, the reader reads the root's composition from the
