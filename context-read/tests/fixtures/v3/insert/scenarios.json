@@ -1377,5 +1377,22 @@
   {"name":"insert_deep_borders__85","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa","abbaabbaabba"]},
   {"name":"insert_deep_borders__86","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa","bbaabbaabbaa"]},
   {"name":"insert_deep_borders__87","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa","aabbaabbaabba"]},
-  {"name":"insert_deep_borders__88","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa","abbaabbaabbaa"]}
+  {"name":"insert_deep_borders__88","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa","abbaabbaabbaa"]},
+  {"name":"seam_overlap_append__1","inputs":["abcd","bcde","xabcdey","ab"]},
+  {"name":"seam_overlap_append__2","inputs":["abcd","bcde","xabcdey","bc"]},
+  {"name":"seam_overlap_append__3","inputs":["abcd","bcde","xabcdey","cd"]},
+  {"name":"seam_overlap_append__4","inputs":["abcd","bcde","xabcdey","de"]},
+  {"name":"seam_overlap_append__5","inputs":["abcd","bcde","xabcdey","ey"]},
+  {"name":"seam_overlap_append__6","inputs":["abcd","bcde","xabcdey","xa"]},
+  {"name":"seam_overlap_append__7","inputs":["abcd","bcde","xabcdey","abc"]},
+  {"name":"seam_overlap_append__8","inputs":["abcd","bcde","xabcdey","cde"]},
+  {"name":"seam_overlap_append__9","inputs":["abcd","bcde","xabcdey","dey"]},
+  {"name":"seam_overlap_append__10","inputs":["abcd","bcde","xabcdey","xab"]},
+  {"name":"seam_overlap_append__11","inputs":["abcd","bcde","xabcdey","cdey"]},
+  {"name":"seam_overlap_append__12","inputs":["abcd","bcde","xabcdey","xabc"]},
+  {"name":"seam_overlap_append__13","inputs":["abcd","bcde","xabcdey","abcde"]},
+  {"name":"seam_overlap_append__14","inputs":["abcd","bcde","xabcdey","bcdey"]},
+  {"name":"seam_overlap_append__15","inputs":["abcd","bcde","xabcdey","xabcd"]},
+  {"name":"seam_overlap_append__16","inputs":["abcd","bcde","xabcdey","abcdey"]},
+  {"name":"seam_overlap_append__17","inputs":["abcd","bcde","xabcdey","xabcde"]}
 ]

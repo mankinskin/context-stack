@@ -6,8 +6,9 @@ The row reader (`pipeline/`, `expansion/`, `request.rs`, `segment.rs`,
 `input.rs`, `src/tests/`) lives in `src/legacy/`, gated by the default-on
 `legacy` feature. Public API: `context_read::legacy::{read, ReadCtx,
 ReadSequenceIter, SegmentResult, IntoReadInput}`; the unqualified
-`context_read::read` is the positioned reader (an unimplemented stub until
-reader plan Phase 3+). Black-box tests:
+`context_read::read` is the positioned reader
+([reader plan](agents/plans/20261122_PLAN_POSITIONED_READER.md), phases
+R1–R3: `segment.rs`, `root.rs`, `forward.rs`, `expand.rs`, `read.rs`). Black-box tests:
 `tests/legacy_reader_behavior.rs` (v2 fixtures; 6 known failures are
 `#[ignore = "legacy known failure: …"]`) and `tests/fixture_validation.rs`;
 `tests/support/` is split into `legacy.rs` (v2), `positioned.rs` (v3) and a
@@ -114,10 +115,14 @@ root and uses whole-root closure, preventing cycles.
 ### Tests and oracle fixtures
 
 Positioned reader tests live in [`tests/reader_behavior.rs`](tests/reader_behavior.rs):
-one test per v3 manifest entry, calling only `context_read::read` (a stub
-until the positioned reader exists, so all scenario tests are
-`#[ignore = "positioned reader pending"]`) and comparing the final graph with
-the v3 fixture via `context_trace::positioned::diff`. The meta-test
+one test per v3 manifest entry, calling only `context_read::read` and
+comparing the final graph with the v3 fixture via
+`context_trace::positioned::diff`. The scenarios with provisional retention
+(reader plan §5: `repeat_abcabca`, `repeat_ababa`, `insert_periodic`) are
+`#[ignore = "provisional retention (reader plan §5)"]` until step 5.
+`read_gate` reads every case of the read lane (below) and passes iff exactly
+the expected deviations (`READ_DEVIATIONS`) fail; the worked examples of the
+plan (§2) also assert their step traces (`context_read::read_traced`). The meta-test
 `manifest_is_covered` (not ignored) requires a test for every manifest
 entry, so a new v3 scenario must be registered in the `scenarios!` list.
 
@@ -185,7 +190,8 @@ fixture per manifest entry, a corpus equal to the scenario inputs (order and
 multiplicity), structural validity, and equality with a fresh `parse_corpus`
 run. Each fixture (both lanes) records the corpus and one complete final
 oracle graph in a top-level `vertices` object. To add a scenario, add its corpus to the v3
-manifest, regenerate v3, and review the JSON diff against hand expectations.
+manifest, regenerate v3, the insert lane and the read lane (below), and review
+the JSON diff against hand expectations.
 Do not edit expected graph data by hand. Empty and single-character API
 contracts are tested directly because the oracle does not support all such
 corpora.
@@ -215,6 +221,28 @@ the query, and a manifest equal to a fresh enumeration of the current v3
 fixtures. Tests load the cases with
 `context_trace::positioned::fixtures::insert_cases()`.
 
+#### Read fixtures (`v3/read`)
+
+The read lane holds one oracle graph per read
+([reader plan](agents/plans/20261122_PLAN_POSITIONED_READER.md) §9.1): for
+every v3 scenario with `n ≥ 2` inputs and every `k ∈ 1..=n`, the entry
+`<scenario>__<k>` with inputs `inputs[..k]`. Case `k` reads `inputs[k−1]` into
+the graph of case `k−1` (the empty graph for `k = 1`). Regenerate the lane
+after any change to the v3 manifest (from the workspace root):
+
+```bash
+# Rewrite v3/read/scenarios.json and delete the old case files:
+cargo run -p context-trace --features test-api --example read_manifest
+# One oracle graph per case:
+cargo run --release -p ngrams --bin ngrams -- \
+  --file context-read/tests/fixtures/v3/read/scenarios.json \
+  --out context-read/tests/fixtures/v3/read
+```
+
+`fixture_validation` requires exactly one file per read manifest entry and a
+manifest equal to the one derived from the v3 manifest. Tests load the cases
+with `context_trace::positioned::fixtures::read_cases()`.
+
 Specialized cursor, closure-path, scheduling, and sink precondition contracts
 live in [`src/tests/cursor.rs`](src/tests/cursor.rs), using oracle-backed graph
 seeds. They are **not** alternative specifications of reader graph semantics.
@@ -226,6 +254,7 @@ Run the suites separately:
 
 ```bash
 cargo test -p context-read --test reader_behavior
+cargo test -p context-read --test reader_behavior read_gate
 cargo test -p context-read --test legacy_reader_behavior
 cargo test -p context-read --test fixture_validation
 cargo test -p context-read --lib

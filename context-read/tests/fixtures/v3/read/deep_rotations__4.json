@@ -1,0 +1,156 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "abcdefg",
+    "bcdefga",
+    "cdefgab",
+    "defgabc"
+  ],
+  "vertices": {
+    "a": [],
+    "ab": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "b"
+      ]
+    ],
+    "abc": [
+      [
+        0,
+        "ab"
+      ],
+      [
+        1,
+        "bc"
+      ]
+    ],
+    "abcdefg": [
+      [
+        0,
+        "abc"
+      ],
+      [
+        1,
+        "bcdefg"
+      ]
+    ],
+    "b": [],
+    "bc": [
+      [
+        0,
+        "b"
+      ],
+      [
+        1,
+        "c"
+      ]
+    ],
+    "bcdefg": [
+      [
+        0,
+        "bc"
+      ],
+      [
+        1,
+        "cdefg"
+      ]
+    ],
+    "bcdefga": [
+      [
+        0,
+        "bcdefg"
+      ],
+      [
+        1,
+        "cdefga"
+      ]
+    ],
+    "c": [],
+    "cdefg": [
+      [
+        0,
+        "c"
+      ],
+      [
+        1,
+        "defg"
+      ]
+    ],
+    "cdefga": [
+      [
+        0,
+        "cdefg"
+      ],
+      [
+        1,
+        "defga"
+      ]
+    ],
+    "cdefgab": [
+      [
+        0,
+        "cdefga"
+      ],
+      [
+        1,
+        "defgab"
+      ]
+    ],
+    "d": [],
+    "defg": [
+      [
+        0,
+        "d"
+      ],
+      [
+        1,
+        "e"
+      ],
+      [
+        2,
+        "f"
+      ],
+      [
+        3,
+        "g"
+      ]
+    ],
+    "defga": [
+      [
+        0,
+        "defg"
+      ],
+      [
+        4,
+        "a"
+      ]
+    ],
+    "defgab": [
+      [
+        0,
+        "defga"
+      ],
+      [
+        4,
+        "ab"
+      ]
+    ],
+    "defgabc": [
+      [
+        0,
+        "defgab"
+      ],
+      [
+        4,
+        "abc"
+      ]
+    ],
+    "e": [],
+    "f": [],
+    "g": []
+  }
+}

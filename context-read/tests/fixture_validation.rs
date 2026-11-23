@@ -2,7 +2,8 @@
 //! Each lane is checked against its own manifest: the frozen v2 lane for
 //! completeness, the positioned lane also for being in sync with the current `ngrams`
 //! oracle, the insert lane (`v3/insert`) also for its manifest being the
-//! enumeration of the current positioned fixtures.
+//! enumeration of the current positioned fixtures, the read lane (`v3/read`)
+//! also for its manifest being derived from the positioned manifest.
 #[allow(dead_code)]
 mod support;
 
@@ -138,4 +139,25 @@ fn insert_fixtures_match_manifest_and_enumeration() {
         entries == insert_manifest(),
         "insert manifest differs from the enumeration of the v3 fixtures; regenerate the insert lane"
     );
+}
+
+#[test]
+fn read_fixtures_match_manifest_and_derivation() {
+    use context_trace::positioned::fixtures::{manifest, read_cases, read_dir, read_manifest};
+    let entries = manifest(&read_dir());
+    let mut expected = BTreeSet::new();
+    for entry in &entries {
+        assert!(expected.insert(entry.name.clone()), "duplicate read case");
+    }
+    assert_eq!(
+        fixture_names(&read_dir()),
+        expected,
+        "read fixtures must be exactly one per manifest entry"
+    );
+    assert!(
+        entries == read_manifest(),
+        "read manifest differs from the v3 manifest; regenerate the read lane"
+    );
+    // Loads every case: corpus = inputs, base = the previous case's graph.
+    assert_eq!(read_cases().len(), entries.len());
 }

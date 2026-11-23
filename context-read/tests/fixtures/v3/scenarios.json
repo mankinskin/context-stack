@@ -68,5 +68,6 @@
   {"name":"insert_small_periodic","inputs":["ababab"]},
   {"name":"insert_shared_vertex","inputs":["acabcabcab","bcabcb"]},
   {"name":"insert_periodic","inputs":["ababababa"]},
-  {"name":"insert_deep_borders","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa"]}
+  {"name":"insert_deep_borders","inputs":["baaabababba","abaaabbaabba","aabbaabbaabbaa"]},
+  {"name":"seam_overlap_append","inputs":["abcd","bcde","xabcdey"]}
 ]

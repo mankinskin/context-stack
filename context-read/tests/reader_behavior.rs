@@ -4,12 +4,19 @@
 //! graph and compares the final graph with the fixture via
 //! `context_trace::positioned::diff`.
 //!
-//! All scenario tests are ignored until the positioned reader exists; the
-//! manifest coverage test runs now.
+//! The read lane (`tests/fixtures/v3/read`, one oracle graph per read of a
+//! multi-input scenario) is checked by `read_gate`; the worked examples of
+//! the reader plan (§2) also check their step traces. Scenarios with
+//! provisional retention (reader plan §5) are ignored until step 5.
 #[allow(dead_code)]
 mod support;
 
-use context_trace::positioned::{diff, PositionedGraphRef};
+use context_read::{Commit, Step, StepKind};
+use context_trace::positioned::{
+    diff,
+    fixtures::{read_cases, ReadCase},
+    PositionedGraph, PositionedGraphRef,
+};
 use support::positioned::load_positioned;
 
 fn assert_scenario(name: &str) {
@@ -32,11 +39,11 @@ fn assert_scenario(name: &str) {
 }
 
 macro_rules! scenarios {
-    ($($name:ident),* $(,)?) => {
+    ($($(#[$attr:meta])* $name:ident),* $(,)?) => {
         const SCENARIO_NAMES: &[&str] = &[$(stringify!($name)),*];
         $(
         #[test]
-        #[ignore = "positioned reader pending"]
+        $(#[$attr])*
         #[allow(non_snake_case)] // `<name>__<n>` prefix fixtures
         fn $name() {
             assert_scenario(stringify!($name));
@@ -96,7 +103,9 @@ scenarios!(
     closure_forward_seed,
     closure_nested_seed,
     closure_tail_seed,
+    #[ignore = "provisional retention (reader plan §5)"]
     repeat_abcabca,
+    #[ignore = "provisional retention (reader plan §5)"]
     repeat_ababa,
     seam_bcd,
     late_retention__1,
@@ -113,8 +122,10 @@ scenarios!(
     deep_nested_repeat,
     insert_small_periodic,
     insert_shared_vertex,
+    #[ignore = "provisional retention (reader plan §5)"]
     insert_periodic,
     insert_deep_borders,
+    seam_overlap_append,
 );
 
 /// Every positioned manifest entry has exactly one scenario test above.
@@ -128,4 +139,130 @@ fn manifest_is_covered() {
         SCENARIO_NAMES.iter().map(ToString::to_string).collect();
     assert_eq!(tests.len(), SCENARIO_NAMES.len(), "duplicate scenario test");
     assert_eq!(names, tests, "positioned manifest and reader tests differ");
+}
+
+/// Read-lane cases whose oracle graph differs from the reader's by
+/// provisional retention (reader plan §5); fixed by the prototype rerun.
+const READ_DEVIATIONS: &[&str] = &["insert_deep_borders__1"];
+
+/// Read `case.input` into its base graph; the differences from the oracle
+/// graph, if any.
+fn read_case(case: &ReadCase) -> Result<(), String> {
+    let base = match &case.base {
+        Some(base) => PositionedGraph::from_interchange(&base.graph)
+            .map_err(|error| format!("invalid base: {error}"))?,
+        None => PositionedGraph::default(),
+    };
+    let graph = PositionedGraphRef::new(base);
+    let root = context_read::read(&graph, case.input.chars()).ok_or("no root")?;
+    let graph = graph.read();
+    graph
+        .validate()
+        .map_err(|error| format!("invalid graph: {error}"))?;
+    if root.width.0 != case.input.chars().count() {
+        return Err(format!("root width {}", root.width.0));
+    }
+    let difference = diff(&case.expected.graph, &graph.to_interchange());
+    if difference.is_empty() {
+        Ok(())
+    } else {
+        Err(difference.to_string())
+    }
+}
+
+/// Every read of the read lane equals its oracle graph, except exactly the
+/// expected deviations (reader plan §9.1): a new and a fixed deviation both
+/// fail.
+#[test]
+fn read_gate() {
+    let cases = read_cases();
+    assert!(!cases.is_empty());
+    let mut failures = Vec::new();
+    for case in &cases {
+        let result = std::panic::catch_unwind(|| read_case(case))
+            .unwrap_or_else(|_| Err("panicked".to_string()));
+        if let Err(error) = result {
+            failures.push((case.name.clone(), error));
+        }
+    }
+    let failed: Vec<&str> = failures.iter().map(|(name, _)| name.as_str()).collect();
+    assert!(
+        failed == READ_DEVIATIONS,
+        "{} of {} read cases fail, expected deviations {:?}:\n{}",
+        failures.len(),
+        cases.len(),
+        READ_DEVIATIONS,
+        failures
+            .iter()
+            .map(|(name, error)| format!("{name}: {error}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
+/// Read every input of scenario `name` into one graph; the steps of the
+/// last read. The final graph must equal the scenario's oracle graph.
+fn trace_scenario(name: &str) -> Vec<Step> {
+    let fixture = load_positioned(name);
+    let graph = PositionedGraphRef::default();
+    let (last, earlier) = fixture.corpus.split_last().expect("nonempty corpus");
+    for input in earlier {
+        context_read::read(&graph, input.chars()).expect("nonempty input");
+    }
+    let (_, steps) = context_read::read_traced(&graph, last.chars());
+    let graph = graph.read();
+    graph.validate().unwrap();
+    let difference = diff(&fixture.graph, &graph.to_interchange());
+    assert!(difference.is_empty(), "{}: {}", name, difference);
+    steps
+}
+
+fn step(kind: StepKind, commit: Commit, root: usize) -> Step {
+    Step { kind, commit, root }
+}
+
+/// `xabcdey` on `abcd, bcde`: append `x`; forward `abcd`; expansion
+/// `bcd → bcde`, in place; append `y` in place (reader plan §2).
+#[test]
+fn seam_overlap_append_steps() {
+    use {Commit::*, StepKind::*};
+    assert_eq!(
+        trace_scenario("seam_overlap_append"),
+        vec![
+            step(Unknown, Adopt, 1),
+            step(Forward(4), NewRoot, 5),
+            step(Expansion { postfix: 3, expansion: 4 }, InPlace, 6),
+            step(Unknown, InPlace, 7),
+        ]
+    );
+}
+
+/// `abcabca` on `abc`: forward `abc`; forward `abc` (new root); expansion
+/// `abc → abca`, inserted into the root and integrated in place.
+#[test]
+fn accepted_materialization_steps() {
+    use {Commit::*, StepKind::*};
+    assert_eq!(
+        trace_scenario("accepted_materialization"),
+        vec![
+            step(Forward(3), Adopt, 3),
+            step(Forward(3), NewRoot, 6),
+            step(Expansion { postfix: 3, expansion: 4 }, InPlace, 7),
+        ]
+    );
+}
+
+/// `aaa`: append `a`; forward `a` (new root `aa`); self-expansion
+/// `a → aa` (`E` is the root), a new root.
+#[test]
+fn repeat_aaa_steps() {
+    use {Commit::*, StepKind::*};
+    assert_eq!(
+        trace_scenario("repeat_aaa"),
+        vec![
+            step(Unknown, Adopt, 1),
+            step(Forward(1), NewRoot, 2),
+            step(Expansion { postfix: 1, expansion: 2 }, NewRoot, 3),
+        ]
+    );
 }

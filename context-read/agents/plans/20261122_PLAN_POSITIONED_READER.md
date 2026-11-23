@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#positioned-composition` `#reader` `#expansion`
 summary: Positioned reader (roadmap steps 4–5), revision 2. The legacy reader loop is kept unchanged (segments; per step root-postfix expansion first, else forward match; every accepted match inserted; commit before the next search). Only root edits change: the root stays the input's own vertex, an owned root grows in place through GraphEdit::extend, the postfix chain is the chain of last children, and closure is one composition update without complements. Prototype R0 (read_legacy_port.py) reproduces the oracle on 164 of 166 fixture reads; the 2 others are provisional retention (roadmap step 5). Integration with insertion revision 3.
-status: 📋 draft revision 2.1 — algorithm fixed by legacy and prototype R0; insertion implemented; tasks R1–R3 ready
+status: 🚧 revision 2.1 — R1–R3 implemented (step 4 gate green with 4 expected provisional-retention deviations); R4 open
 date: 2026-11-23
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (steps 4–5)
 depends_on: 20261122_PLAN_POSITIONED_INSERT.md (revision 3), 20261120_PLAN_POSITIONED_SEARCH.md (done)
@@ -326,6 +326,8 @@ use.
   Nothing special: insertion edits the root's composition through
   `add_occurrences` (same width).
 - `GraphEdit::extend` in the shared edit layer (insert plan §8). **Done.**
+- **Used as is by R1–R3** (2026-11-23): no change to `context-insert` or
+  `context-search` was needed.
 - `insert_next_match` with no edit for `EntireRoot` (covered by
   `entire_root_outcomes`). **Done.** The fallback "no parent of the first
   token continues" (`[P, x]` with no extension) returns
@@ -342,6 +344,13 @@ reads. The two exceptions are **provisional tokens**:
 |---|---|---|
 | `repeat_abcabca` | `abc` (repeat in `abcabc`) | `abca = a@0, b@1, c@2, a@3`, no `abc` |
 | `repeat_ababa` | `ab` (repeat in `abab`) | `aba = a@0, b@1, a@2`, no `ab` |
+| `insert_periodic` | `ab`, `abab`, `ababab` (repeats in `ababababa`) | `aba = a@0, b@1, a@2`, no `ab`, `abab`, `ababab` |
+| `insert_deep_borders`, read 1 (`baaabababba`) | `aba` | `abab = ab@0, ba@1`, no `aba` |
+
+The last two rows come from the four `insert_*` scenarios added after the
+first prototype run (§6, rerun 2026-11-23). The final graph of
+`insert_deep_borders` equals the oracle again (a later input makes `aba`
+frequent), so only its read-lane case `insert_deep_borders__1` deviates.
 
 A prefix of the input makes the token frequent; at the end of the input all
 its occurrences lie inside one larger token, so the oracle does not retain
@@ -357,6 +366,18 @@ inside one other token is dissolved into that token). This replaces the
 milestone (`abcabca` without `abc`), which needs the step 5 rule.
 
 ## 6. Evidence (prototype R0)
+
+**Rerun on the current manifest (R2, 2026-11-23; 70 scenarios before
+`seam_overlap_append`, 173 reads):** 169 / 173 reads equal the oracle; 4
+mismatches, all "only extra tokens" (provisional retention, §5):
+`repeat_abcabca`, `repeat_ababa`, `insert_periodic`, `insert_deep_borders`
+read 1. Forward searches / expansion probes 171 / 131; insertions 72, 31 with
+the input root as host; commits append in place / new root `[R, t]` 146 /
+154; closures in place / new root / self-expansion 31 / 24 / 12; G1, G2, G4
+violations and errors 0. The Rust reader (R3) reproduces exactly these
+deviations.
+
+First run (2026-11-22):
 
 `python3 read_legacy_port.py` reads every input of every v3 scenario into
 the graph of its predecessors and compares with the oracle. The numbers
@@ -400,10 +421,28 @@ part of R2 and fixes the expected-deviation list of §9.1.
 | Phase | Content | Exit |
 |---|---|---|
 | R0 | Prototype `read_legacy_port.py` | **Done** (§6) |
-| R1 | Positioned `segment.rs` and `RootManager` with the commits of §3.4 (`GraphEdit::extend`, `insert_next_match` and the probe-rejection test exist, §4.4) | Unit tests: commits keep `validate()` green; ownership rules |
-| R2 | Forward match and segments (§3.3), no expansion; read lane fixtures and loader (§9.1); new scenario `seam_overlap_append` (§9.2); prototype rerun on the current manifest | Read-lane cases whose prototype trace has no accepted expansion equal their oracle graph |
-| R3 | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate (§9): every read-lane case and every scenario of `context-read/tests/reader_behavior.rs` equals its oracle graph, except the expected deviations of §5 |
+| R1 **Done** | Positioned `segment.rs` and `RootManager` with the commits of §3.4 (`GraphEdit::extend`, `insert_next_match` and the probe-rejection test exist, §4.4) | Unit tests: commits keep `validate()` green; ownership rules |
+| R2 **Done** | Forward match and segments (§3.3), no expansion; read lane fixtures and loader (§9.1); new scenario `seam_overlap_append` (§9.2); prototype rerun on the current manifest | Read-lane cases whose prototype trace has no accepted expansion equal their oracle graph |
+| R3 **Done** | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate (§9): every read-lane case and every scenario of `context-read/tests/reader_behavior.rs` equals its oracle graph, except the expected deviations of §5 |
 | R4 | Step 5: demotion of provisional tokens, streaming retention | Roadmap step 5 gate |
+
+**Status (2026-11-23).** R1–R3 implemented in `context-read/src/{segment,
+root, forward, expand, read}.rs`. Step 4 gate: all 140 read-lane cases equal
+their oracle graph except `insert_deep_borders__1`; all 71 scenarios of
+`reader_behavior.rs` pass except `repeat_abcabca`, `repeat_ababa` and
+`insert_periodic` (ignored, provisional retention, §5). Deviations from the
+plan text:
+
+- **Expected deviations.** §5 listed two; the prototype rerun on the current
+  manifest (§6) gives four (the `insert_*` scenarios were added after the
+  first run). `insert_periodic` is ignored in the scenario macro like the
+  other two; `insert_deep_borders__1` is the read-lane deviation list.
+- **Adopting an existing `R[0, o) + E`** (§3.4, last row) is decided in
+  `expand` by the lookup `find_complete([R] ++ rest[..|E| − |P|])` after the
+  accepted probe, which yields `ReplaceRoot`; `RootManager::commit` never
+  searches (legacy rule). Never taken on the fixtures.
+- **Step trace.** `context_read::read_traced` returns the committed steps
+  (`Step { kind, commit, root }`) for the worked-example tests.
 
 ### 8.1 Module layout (`context-read/src`, outside `legacy`)
 
@@ -446,9 +485,9 @@ expected graph, token or composition by hand. Three test levels:
 Test changes for the gate:
 
 - `context-read/tests/reader_behavior.rs`: remove `#[ignore = "positioned
-  reader pending"]` from the scenario macro; `repeat_abcabca` and
-  `repeat_ababa` get `#[ignore = "provisional retention (reader plan §5)"]`
-  until R4 (P-R1).
+  reader pending"]` from the scenario macro; `repeat_abcabca`,
+  `repeat_ababa` and `insert_periodic` (§5, rerun) get
+  `#[ignore = "provisional retention (reader plan §5)"]` until R4 (P-R1).
 - New read-lane gate (§9.1).
 - Unit tests next to the modules (R1/R2): `segment` (unknown/known runs,
   a repeat inside one input becomes known), `root` (each row of the §3.4
@@ -495,7 +534,8 @@ read lane checks each read on its own, as the prototype does.
   `validate()`, `diff` against `expected`. Like `insert_gate`, it collects
   all failures and reports them together; it passes iff the failing case
   names equal the expected-deviation list (§5, fixed by the prototype rerun
-  in R2), so a new deviation and a fixed deviation both fail it.
+  in R2: `insert_deep_borders__1`), so a new deviation and a fixed deviation
+  both fail it.
 
 ### 9.2 New scenario `seam_overlap_append`
 
