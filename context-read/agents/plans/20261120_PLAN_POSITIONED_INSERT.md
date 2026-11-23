@@ -1,13 +1,22 @@
 ---
 tags: `#plan` `#context-insert` `#context-trace` `#context-search` `#positioned-composition` `#insert` `#split` `#join` `#seam`
 summary: Complete work package for positioned insertion (roadmap step 3; all planning for this step lives here). Explains the legacy row-based insertion (InitInterval, split cache, join frontier, select/publish, overlap closure, reader use) and its positioned successor - a split graph of required intervals seeded from the search response's root span, start path and end path, joined bottom-up by a width frontier into intersection tokens and the new token - plus merge with seam discovery, ordered tasks in context-trace and context-insert, and a gate against oracle graphs of the extended corpus.
-status: 📋 draft — revision 2; decisions D1–D5 confirmed, P1–P6 proposed
+status: 🗄️ superseded by 20261122_PLAN_POSITIONED_INSERT.md (revision 3); Part A (legacy walkthrough) remains the reference
 date: 2026-11-20 (revision 2: 2026-11-21)
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (step 3)
 depends_on: 20261120_PLAN_POSITIONED_SEARCH.md (done)
 ---
 
 # Plan: Positioned Insertion
+
+> **Superseded (2026-11-22)** by revision 3,
+> [20261122_PLAN_POSITIONED_INSERT](20261122_PLAN_POSITIONED_INSERT.md):
+> split positions with roles instead of interval sets, explicit invariants,
+> `GraphEdit` defined. Seam scan and cover merge (below) are dropped: the
+> reader keeps the legacy root expansion,
+> [20261122_PLAN_POSITIONED_READER](20261122_PLAN_POSITIONED_READER.md).
+> Part A below (legacy insertion) is still accurate and is referenced from
+> revision 3.
 
 **Crates:** `context-trace` (graph edits, publication record, overlap-closure
 validation, insert fixtures), `context-insert` (split graph, join, insertion

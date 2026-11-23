@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#context-trace` `#positioned-composition`
-summary: Open work for the positioned-composition reader. Binding model rules, then the ordered steps: content-free model leftovers, positioned search (legacy architecture with positional sibling navigation) validated on v3 oracle fixtures, positioned insertion with seam discovery, fixed-retention reader, streaming retention, cutover.
-status: 📋 steps 1–2 done; next step 3 (positioned insertion, plan drafted)
+summary: Open work for the positioned-composition reader. Binding model rules, then the ordered steps: content-free model leftovers, positioned search (legacy architecture with positional sibling navigation) validated on v3 oracle fixtures, positioned insertion, reader (legacy loop with positioned root edits), streaming retention, cutover.
+status: 📋 steps 1–2 done; next step 3 (positioned insertion, plan revision 3); reader plan drafted
 date: 2026-11-20
 depends_on: ../../../ngrams/agents/plans/20261118_PLAN_POSITIONED_COMPOSITION_ORACLE.md
 ---
@@ -28,7 +28,10 @@ strings seen so far.
 - A sequence of tokens that is not itself a token is unique in the graph,
   because a repeated sequence would be frequent and therefore a token.
 - Gaps, wrappers, slices, accumulation buffers and lookup results are never
-  vertices.
+  vertices. The input being read is not a buffer: as in legacy, it is
+  represented by its own vertex (the root) at all times, which grows in
+  place while it is owned and parentless
+  ([reader plan](20261122_PLAN_POSITIONED_READER.md) §3.4).
 
 ## Binding rules
 
@@ -90,42 +93,46 @@ gate). This roadmap holds no planning for this step.
 **Outcome:** `Find::find_ancestor` on `PositionedGraphRef` returns a reusable
 `Response { cache, end }`, validated on every v3 fixture.
 
-## Step 3 — Positioned insertion and seam discovery (`context-insert`)
+## Step 3 — Positioned insertion (`context-insert`)
 
-Work package: [20261120_PLAN_POSITIONED_INSERT](20261120_PLAN_POSITIONED_INSERT.md)
-(legacy split/join/closure walkthrough, split graph seeded from the
-response and joined bottom-up, merge with seam discovery, tasks, validation
-and gate). This roadmap holds no planning for this step.
+Work package: [20261122_PLAN_POSITIONED_INSERT](20261122_PLAN_POSITIONED_INSERT.md)
+(revision 3: split positions with roles seeded from the response, bottom-up
+join, invariants, `GraphEdit`, tasks, validation and gate; revision 2 with
+the legacy walkthrough:
+[20261120_PLAN_POSITIONED_INSERT](20261120_PLAN_POSITIONED_INSERT.md)).
+This roadmap holds no planning for this step.
 
-**Outcome:** `insert_match(Response)` turns a matched span into a token
-(existing root, or a new vertex plus the intersection tokens of every vertex
-its borders cut through, built by a split graph and a bottom-up join), and
-`Cover::merge` combines two adjacent or overlapping covers including seam
-occurrences. Both are validated on every fixture; insertion is checked
-against the oracle graph of the extended corpus.
+**Outcome:** `insert_match(Response)` turns a matched span into a token so
+that the graph equals the oracle graph of the corpus plus the span: an
+existing root, or a new vertex plus the overlap tokens of every vertex its
+borders cut through, built by a split graph and a bottom-up join. Validated
+against the oracle graph of the extended corpus on every insert case.
+Tokens crossing a junction of the read input are found by the reader's
+root expansion (step 4).
 
-## Step 4 — Fixed-retention reader (`context-read`)
+## Step 4 — Reader (`context-read`)
+
+Work package: [20261122_PLAN_POSITIONED_READER](20261122_PLAN_POSITIONED_READER.md)
+(revision 2: the legacy reader loop with positioned root edits; prototype
+R0 reproduces the oracle on 164 of 166 fixture reads). This roadmap holds
+no planning for this step.
 
 - Implement `context_read::read(&PositionedGraphRef, impl IntoIterator<Item
-  = char>) -> Option<Token>` behind a backend switch; un-ignore the
-  positioned lane in `context-read/tests/reader_behavior.rs`.
-- The retained identity set per corpus is supplied from the fixture (not
-  the offsets); the reader discovers occurrences, accumulates, merges and
-  publishes covers itself.
-- `RootManager` keeps ownership and commit boundary; the in-progress root
-  is an owned positioned cover with a committed width. Append extends the
-  width and reconciles affected occurrences; an accepted overlap extends the
-  same coordinate space. The root vertex is published or reused only at
-  input end.
-- One chain of searches per input: each search starts at the checkpoint of
-  the previous `Response`; the committed root keeps the `Response` of its
-  committed suffix for overlap expansion. A `test-api` counter asserts no
-  position covered by a `Response` is searched again.
-- First milestone: `abcabca` publishes `abcabca = abca@0, abca@3` without
-  allocating `abc`, `bca`, `bc` or any wrapper.
+  = char>) -> Option<Token>`; un-ignore the positioned lane in
+  `context-read/tests/reader_behavior.rs`.
+- The legacy loop is kept: per step, root expansion (largest postfix token
+  first) before the forward match; every accepted match that is not a token
+  is inserted with `insert_match`; each span is committed before the next
+  search. `RootManager` keeps ownership: the root is the input's vertex, an
+  owned root grows through `GraphEdit::extend`.
+- The former milestone "`abcabca` publishes `abcabca = abca@0, abca@3`
+  without allocating `abc`" needs the demotion of provisional tokens (step
+  5): the legacy loop retains `abc` while reading `abcabc`. Proposal P-R1
+  of the reader plan: step 4 lists `repeat_abcabca` and `repeat_ababa` as
+  expected deviations; they become the entry tests of step 5.
 
 **Gate:** complete-graph equality (`diff` against `to_interchange`) with v3
-fixtures for all scenarios under supplied retention.
+fixtures for all scenarios except the expected deviations of P-R1.
 
 ## Step 5 — Streaming retention and retrospective updates
 
@@ -192,7 +199,7 @@ kernel build verified elsewhere; READMEs updated.
 | Positioned search drifts from the legacy architecture | Mirror legacy modules and names; only `start_at`/`prefix_child`/offset locations differ |
 | Uniqueness assumption fails for some oracle output | Unique-expectation assertion and zero tie counter on every fixture (step 2) |
 | Repeated traversals over adjacent patterns | `Response` reuse; continuation test (step 2), counter (step 4) |
-| Seam occurrences missed when merging side covers | Explicit seam discovery and `seam_bcd` (step 3) |
+| Tokens crossing a junction of the read input are missed | Legacy root expansion over all postfix tokens, largest first (step 4, reader plan §3.2); G2 checked on every root edit in prototype R0 |
 | Batch frequency disagrees with append-only retention | Step 4 supplies retention; step 5 resolves divergence before cutover |
 | Retrospective updates unbounded | Measure affected hosts before choosing data structures (step 5) |
 | Large blast radius of the model change | Backends coexist until step 6 |

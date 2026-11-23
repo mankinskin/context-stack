@@ -1,8 +1,12 @@
 # Positioned insert prototypes
 
 Python prototypes behind the positioned insertion plan
-([20261120_PLAN_POSITIONED_INSERT](../../../context-read/agents/plans/20261120_PLAN_POSITIONED_INSERT.md),
-roadmap step 3). They validate algorithms on the v3 oracle fixtures before
+([20261122_PLAN_POSITIONED_INSERT](../../../context-read/agents/plans/20261122_PLAN_POSITIONED_INSERT.md),
+revision 3, roadmap step 3; revision 2:
+[20261120_PLAN_POSITIONED_INSERT](../../../context-read/agents/plans/20261120_PLAN_POSITIONED_INSERT.md))
+and the positioned reader plan
+([20261122_PLAN_POSITIONED_READER](../../../context-read/agents/plans/20261122_PLAN_POSITIONED_READER.md),
+prototype R0). They validate algorithms on the v3 oracle fixtures before
 the Rust implementation and produce the plan's evidence numbers. They are
 reference material, not tests: the Rust gate (plan task 3.4) replaces them.
 
@@ -41,17 +45,53 @@ cached per corpus within one run; a gate takes a few seconds.
 
 | Script | Status | Plan reference |
 |---|---|---|
-| [split_join.py](split_join.py) | **accepted** insert algorithm: split graph from the response, bottom-up join | Part B, D4, tasks 3.2–3.4 |
+| [split_positions.py](split_positions.py) | **accepted** insert algorithm (rev 3): split positions with roles pushed into every crossing child, intervals derived per vertex, bottom-up join | rev 3 §4–§5, tasks 3.2–3.4 |
+| [split_join.py](split_join.py) | superseded (rev 2): split graph of stored intervals with interval closure | rev 2 Part B |
 | [two_chains.py](two_chains.py) | rejected: start chain, then end chain, edits in place | Evidence, D4 |
 | [naive_chains.py](naive_chains.py) | rejected: both response paths as they were before the insertion | Evidence (counterexample) |
 | [descend_closure.py](descend_closure.py) | superseded: recursive closure with host descent; streaming read mode | revision 1 → 2, D1 |
-| [cover_merge.py](cover_merge.py) | read-only cover projection and merge with seam scan | Part B "Merge", task 3.5 |
+| [read_legacy_port.py](read_legacy_port.py) | **accepted** reader prototype R0: the legacy reader loop (segments, root-postfix expansion, forward match) with positioned root edits; uses `split_positions.py` as `insert_match` | [reader plan](../../../context-read/agents/plans/20261122_PLAN_POSITIONED_READER.md) §3–§6 |
+| [cover_merge.py](cover_merge.py) | rejected for the reader: read-only cover merge with an offset seam scan (first reader draft); the reader keeps the legacy root-postfix expansion instead | reader plan §0 |
 | [invariants.py](invariants.py) | F3 (unique minimal host) and I2 (overlap closure) on all fixtures | Part B "Facts and invariants" |
 | [find_examples.py](find_examples.py) | search for deep insert examples with minimal corpora | named fixtures of task 3.1 |
 | [oracle_diff.py](oracle_diff.py) | oracle graph changes when inputs are appended | deriving expectations |
 | [common.py](common.py) | oracle wrapper, fixtures, search stand-ins, navigation, named examples | — |
 
-### split_join.py (accepted)
+### split_positions.py (accepted, revision 3)
+
+```sh
+python3 split_positions.py                          # gate over all insert cases
+python3 split_positions.py --no-overlaps            # without overlap intervals (expected to fail)
+python3 split_positions.py --paths-only             # push only along covering/ending_at (expected to fail)
+python3 split_positions.py --example insert_shared_vertex
+python3 split_positions.py --query abababc abcabababcaba
+```
+
+Expected gate output:
+
+```
+cases: 1247
+cases with positions off the response paths: 232
+changed vertices: 1969
+changed vertices that are not split nodes: 0
+created twice: 0
+max E positions per node: 2
+max S positions per node: 2
+new: 2119
+new tokens that are not N, a prefix or a postfix of N: 0
+off-path positions bounding a composed interval: 0
+ok: 1247
+resolved inside a child: 1942
+split nodes: 3397
+split positions: 2632
+split positions from response path edges: 1969
+```
+
+`--no-overlaps` gives `ok: 1187`, `mismatch: 60`; `--paths-only` gives
+`ok: 1039`, `error: 208`. The trace marks split positions that are not on a
+response path with `*`.
+
+### split_join.py (superseded by split_positions.py)
 
 ```sh
 python3 split_join.py                                   # gate over all insert cases
@@ -116,7 +156,43 @@ paths: 1247`; in streaming mode `ok: 98`, `mismatch: 2` (repeats inside the
 new input, `abc` + `abcabcabc` and `abc` + `abcabca`, which belong to the
 reader's in-progress cover, not to insertion).
 
-### cover_merge.py
+### read_legacy_port.py (accepted, reader prototype R0)
+
+```sh
+python3 read_legacy_port.py                       # read every fixture scenario input by input
+python3 read_legacy_port.py --no-seam-bound       # also probe postfixes wider than the consumed run
+python3 read_legacy_port.py abc abcabca           # trace reading these inputs in order
+python3 read_legacy_port.py abcd bcde xabcdey
+```
+
+Each input is read into the graph of its predecessors (the reader's own
+result; after a mismatch the scenario continues from the oracle graph) and
+compared with the oracle graph. Every owned-root edit is checked against the
+brute-force complete composition (G2) and overlap closure (G4). Expected gate
+output (identical with `--no-seam-bound`: the bound never filters a postfix
+on the fixtures):
+
+```
+append in place: 140
+closure in place: 22
+closure new root: 23
+closure new root (self-expansion): 8
+expansion probes: 105
+forward searches: 160
+inserted: 57
+inserted into the input root: 22
+mismatch: only extra tokens (provisional retention): 2
+new root [root, t]: 147
+reads equal to the oracle: 164
+scenarios: 66
+```
+
+followed by the two mismatches, `repeat_abcabca` (extra `abc`) and
+`repeat_ababa` (extra `ab`): tokens retained by a prefix of the input and
+no longer frequent at its end (reader plan §5). No `G2`, `G4` or `error`
+line means none.
+
+### cover_merge.py (rejected for the reader)
 
 ```sh
 python3 cover_merge.py                    # projection + merge
