@@ -36,6 +36,7 @@ positioned model changes in the root edits.
 | 4 | Publication of the input at the end through `GraphEdit::create` | No publication step: the root is the input's vertex at all times | Follows from 1 |
 | 5 | `Cover::of_match`, `Cover::merge`, `Publication::translate` planned here | Not needed | The reader holds only tokens and offsets across an edit, never paths (§4.3) |
 | 6 | (rev 2.1) Forward match and probes written as "search, then `insert_match` unless `EntireRoot`" | One call `insert_next_match(query)` for both; a probe is rejected by comparing widths | `insert_match` is already a no-op for `EntireRoot` (legacy `materialize`), so the reader does not repeat that branch (§3.2, §3.3) |
+| 7 | (rev 2.1) Gate on the final graph of each scenario; worked examples with hand-written expectations | Plus a generated read lane (one oracle graph per read) and examples bound to fixture scenarios | The target semantics are per read; every expected graph comes from the oracle (§9) |
 
 ## 1. Legacy reader (`context-read/src/legacy`)
 
@@ -97,14 +98,15 @@ positioned model changes in the root edits.
 with one known exception: tokens that a prefix of `I` makes frequent but
 `I` as a whole does not (provisional retention, §5).
 
-Oracle examples, read with the prototype:
+Oracle examples, read with the prototype. Each is a v3 fixture scenario
+(the expected graphs come from the oracle, never from this table; §9):
 
-| Corpus `C` | Read `I` | Steps (prototype trace) | Result |
-|---|---|---|---|
-| `abcd, bcde` | `xabcdey` | append `x`; forward `abcd`; expansion `bcd → bcde@2`; append `y` | `xabcdey = x@0, abcd@1, bcde@2, y@6` = oracle |
-| `abc` | `abcabca` | forward `abc`; forward `abc` (new root `abc@0, abc@3`); expansion `abc → abca@3` (inserted into the root) | `abcabca = abca@0, abca@3`, `abca = abc@0, a@3` = oracle |
-| (empty) | `aaa` | append `a` (unknown); forward `a` (new root `aa`); expansion `a → aa@1`, a self-expansion (`E` is the root) | `aaa = aa@0, aa@1` = oracle |
-| (empty) | `abcabca` | as with corpus `abc`, but `abc` is created by the read itself | extra token `abc`; the oracle has `abca = a@0, b@1, c@2, a@3` (§5) |
+| Fixture | Corpus `C` | Read `I` | Steps (prototype trace) | Result |
+|---|---|---|---|---|
+| `seam_overlap_append` (new, §9.2) | `abcd, bcde` | `xabcdey` | append `x`; forward `abcd`; expansion `bcd → bcde@2`; append `y` | `xabcdey = x@0, abcd@1, bcde@2, y@6` = oracle |
+| `accepted_materialization` | `abc` | `abcabca` | forward `abc`; forward `abc` (new root `abc@0, abc@3`); expansion `abc → abca@3` (inserted into the root) | `abcabca = abca@0, abca@3`, `abca = abc@0, a@3` = oracle |
+| `repeat_aaa` | (empty) | `aaa` | append `a` (unknown); forward `a` (new root `aa`); expansion `a → aa@1`, a self-expansion (`E` is the root) | `aaa = aa@0, aa@1` = oracle |
+| `repeat_abcabca` | (empty) | `abcabca` | as with corpus `abc`, but `abc` is created by the read itself | extra token `abc`; the oracle has `abca = a@0, b@1, c@2, a@3` (§5) |
 
 ## 3. Algorithm in the positioned model
 
@@ -357,7 +359,11 @@ milestone (`abcabca` without `abc`), which needs the step 5 rule.
 ## 6. Evidence (prototype R0)
 
 `python3 read_legacy_port.py` reads every input of every v3 scenario into
-the graph of its predecessors and compares with the oracle:
+the graph of its predecessors and compares with the oracle. The numbers
+below are from the run on the 66 scenarios of 2026-11-22; the manifest now
+has 70 scenarios and 173 reads (the four `insert_*` scenarios were added
+for the insert plan). Rerunning the prototype on the current manifest is
+part of R2 and fixes the expected-deviation list of §9.1.
 
 | Check | Result |
 |---|---|
@@ -395,8 +401,8 @@ the graph of its predecessors and compares with the oracle:
 |---|---|---|
 | R0 | Prototype `read_legacy_port.py` | **Done** (§6) |
 | R1 | Positioned `segment.rs` and `RootManager` with the commits of §3.4 (`GraphEdit::extend`, `insert_next_match` and the probe-rejection test exist, §4.4) | Unit tests: commits keep `validate()` green; ownership rules |
-| R2 | Forward match and segments (§3.3), no expansion | Named cases without expansion (`abcd, bcde` read as inputs; `abc` then `abcabc`) |
-| R3 | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate: every scenario of `context-read/tests/reader_behavior.rs` equals its v3 fixture (`diff` of the whole graph), except the expected deviations of §5 |
+| R2 | Forward match and segments (§3.3), no expansion; read lane fixtures and loader (§9.1); new scenario `seam_overlap_append` (§9.2); prototype rerun on the current manifest | Read-lane cases whose prototype trace has no accepted expansion equal their oracle graph |
+| R3 | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate (§9): every read-lane case and every scenario of `context-read/tests/reader_behavior.rs` equals its oracle graph, except the expected deviations of §5 |
 | R4 | Step 5: demotion of provisional tokens, streaming retention | Roadmap step 5 gate |
 
 ### 8.1 Module layout (`context-read/src`, outside `legacy`)
@@ -428,20 +434,73 @@ Complete-graph equality with the v3 fixtures for every scenario except the
 expected deviations; `validate()` after every read; no algorithm reads
 content or builds content-keyed structures.
 
+Every expected graph is an oracle fixture (`ngrams`); no test states an
+expected graph, token or composition by hand. Three test levels:
+
+| Level | Source | Checks |
+|---|---|---|
+| Read lane (§9.1) | `v3/read/`, one oracle graph per read | each single read: `read(oracle(C[..k−1]), I_k) = oracle(C[..k])`, `validate()` |
+| Scenarios | `v3/<name>.json` (existing) | whole corpus read into an empty graph equals the scenario's oracle graph, `validate()` |
+| Unit tests | base graphs from `fixture_graphs()` | structure only: step traces, ownership, generation, `validate()` |
+
 Test changes for the gate:
 
 - `context-read/tests/reader_behavior.rs`: remove `#[ignore = "positioned
   reader pending"]` from the scenario macro; `repeat_abcabca` and
   `repeat_ababa` get `#[ignore = "provisional retention (reader plan §5)"]`
   until R4 (P-R1).
+- New read-lane gate (§9.1).
 - Unit tests next to the modules (R1/R2): `segment` (unknown/known runs,
   a repeat inside one input becomes known), `root` (each row of the §3.4
   table; `extend` only while owned; `validate()` after each commit),
   `expand` (`postfixes` equals all postfix tokens; a rejected probe leaves
   the generation unchanged), `forward` (one atom left; `[R, t]` adopted only
-  when complete).
-- The worked examples of §2 as named tests with the expected step trace
-  (`xabcdey` on `abcd, bcde`; `abcabca` on `abc`; `aaa`).
+  when complete). Base graphs come from `fixture_graphs()`, not from
+  hand-built graphs.
+- The worked examples of §2 as named tests on their fixture scenarios
+  (`seam_overlap_append`, `accepted_materialization`, `repeat_aaa`): the
+  test asserts the step trace (forward / expansion / commit kinds and
+  widths); the resulting graph is compared with the oracle fixture.
 - Insert and search gates (insert plan §13) stay green: the reader changes
   no code in `context-insert`/`context-search` except the probe-rejection
   test.
+
+### 9.1 Read lane (per-read oracle fixtures)
+
+The scenario tests compare only the graph after the last input. The
+target semantics (§2) are per read, and a wrong intermediate graph can
+converge or fail late without pointing to the read that caused it. The
+read lane checks each read on its own, as the prototype does.
+
+- **Lane.** `context-read/tests/fixtures/v3/read/` with its own manifest
+  `scenarios.json` (separate from the v3 and insert lanes, as in insert
+  plan §3.1.1). For every v3 scenario with `n ≥ 2` inputs and every
+  `k ∈ 1..=n`: `{"name": "<scenario>__<k>", "inputs": inputs[..k]}`.
+  Single-input scenarios are not repeated: their only read is the scenario
+  test. Current manifest: 34 multi-input scenarios, 137 cases (140 with §9.2).
+- **Base.** Case `k` reads `inputs[k−1]` into the graph of case `k−1`
+  (`k = 1`: the empty graph) and compares with the graph of case `k`.
+- **Generation.** `cargo run -p context-trace --features test-api --example
+  read_manifest` writes the manifest from the v3 manifest (prefixes only,
+  no enumeration). Then
+  `./target/release/ngrams --file context-read/tests/fixtures/v3/read/scenarios.json --out context-read/tests/fixtures/v3/read`
+  writes one oracle graph per case. The context-read README documents both
+  commands next to the v3 and insert regeneration.
+- **Loader.** `context_trace::positioned::fixtures::read_cases() ->
+  Vec<ReadCase { name, base: Option<PositionedGraphSnapshot>, input:
+  String, expected: PositionedGraphSnapshot }>` next to `insert_cases()`
+  (test-api); no loader in `context-read`.
+- **Gate test.** `read_gate` in `context-read/tests/reader_behavior.rs`:
+  for every case, `PositionedGraphRef::new(base)`, `read(&graph, input)`,
+  `validate()`, `diff` against `expected`. Like `insert_gate`, it collects
+  all failures and reports them together; it passes iff the failing case
+  names equal the expected-deviation list (§5, fixed by the prototype rerun
+  in R2), so a new deviation and a fixed deviation both fail it.
+
+### 9.2 New scenario `seam_overlap_append`
+
+The example `xabcdey` on `abcd, bcde` (§2) has no fixture. Add it to the
+v3 manifest as `{"name": "seam_overlap_append", "inputs": ["abcd", "bcde",
+"xabcdey"]}` (minimal corpus: the oracle derives `bcd`), regenerate its v3
+fixture and its read-lane cases, and add it to the scenario macro
+(`manifest_is_covered`).
