@@ -35,6 +35,7 @@ use crate::{
     InsertOutcome,
     insert,
     insert_match,
+    insert_next_match,
 };
 
 /// Insert the case's query and check the result against the expected
@@ -273,6 +274,31 @@ fn entire_root_outcomes() {
         "{outcome:?}"
     );
     assert_eq!(insert(&graph, "ab".chars()).unwrap().index, names["ab"].index);
+
+    assert_eq!(graph.read().generation(), generation);
+    assert!(diff(&before, &graph.read().to_interchange()).is_empty());
+}
+
+/// A probe `[P, x]` that does not extend beyond `P` (the search falls back
+/// to `P` alone) returns `NoExpansion { token: P }` and edits nothing
+/// (reader plan §3.2: rejected probes do not edit the graph).
+#[test]
+fn rejected_probe_outcome() {
+    let case = insert_case("insert_small_periodic", "baba");
+    let names = case.base.names.clone();
+    let graph = PositionedGraphRef::new(case.base.graph);
+    let before = graph.read().to_interchange();
+    let generation = graph.read().generation();
+
+    // `ababab` has no parents; `bb` does not occur.
+    for (first, next) in [("ababab", "a"), ("b", "b")] {
+        let outcome =
+            insert_next_match(&graph, vec![names[first], names[next]]).unwrap();
+        assert!(
+            matches!(outcome, InsertOutcome::NoExpansion { token, .. } if token.index == names[first].index),
+            "[{first}, {next}]: {outcome:?}"
+        );
+    }
 
     assert_eq!(graph.read().generation(), generation);
     assert!(diff(&before, &graph.read().to_interchange()).is_empty());

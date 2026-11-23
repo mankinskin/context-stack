@@ -1,8 +1,8 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#positioned-composition` `#reader` `#expansion`
 summary: Positioned reader (roadmap steps 4–5), revision 2. The legacy reader loop is kept unchanged (segments; per step root-postfix expansion first, else forward match; every accepted match inserted; commit before the next search). Only root edits change: the root stays the input's own vertex, an owned root grows in place through GraphEdit::extend, the postfix chain is the chain of last children, and closure is one composition update without complements. Prototype R0 (read_legacy_port.py) reproduces the oracle on 164 of 166 fixture reads; the 2 others are provisional retention (roadmap step 5). Integration with insertion revision 3.
-status: 📋 draft revision 2 — algorithm fixed by legacy and prototype R0; tasks R1–R3 ready after the insert plan
-date: 2026-11-22
+status: 📋 draft revision 2.1 — algorithm fixed by legacy and prototype R0; insertion implemented; tasks R1–R3 ready
+date: 2026-11-23
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (steps 4–5)
 depends_on: 20261122_PLAN_POSITIONED_INSERT.md (revision 3), 20261120_PLAN_POSITIONED_SEARCH.md (done)
 ---
@@ -35,6 +35,7 @@ positioned model changes in the root edits.
 | 3 | Retention decision (`Retention` trait, "maximal on both sides" hypothesis) | None in the loop: every accepted match (forward or expansion) is inserted, as legacy `materialize` does | Legacy has no separate retention step. Prototype: 164 of 166 reads equal the oracle; the 2 others are provisional retention (§5) |
 | 4 | Publication of the input at the end through `GraphEdit::create` | No publication step: the root is the input's vertex at all times | Follows from 1 |
 | 5 | `Cover::of_match`, `Cover::merge`, `Publication::translate` planned here | Not needed | The reader holds only tokens and offsets across an edit, never paths (§4.3) |
+| 6 | (rev 2.1) Forward match and probes written as "search, then `insert_match` unless `EntireRoot`" | One call `insert_next_match(query)` for both; a probe is rejected by comparing widths | `insert_match` is already a no-op for `EntireRoot` (legacy `materialize`), so the reader does not repeat that branch (§3.2, §3.3) |
 
 ## 1. Legacy reader (`context-read/src/legacy`)
 
@@ -124,9 +125,14 @@ read(graph, chars):
   return root.token
 ```
 
-Searches are positioned search (`Find::find_ancestor`) with token queries.
-Every non-token match is turned into a token by `insert_match(response)`
-(insert plan revision 3), which consumes the search's response.
+Forward matches and expansion probes are one call each,
+`insert_next_match(graph, query)` (`context-insert`, legacy name): positioned
+search (`Find::find_ancestor`) followed by `insert_match(response)` (insert
+plan revision 3). `insert_match` returns `Complete`/`NoExpansion` without
+editing the graph (no generation bump) when the match is already a token
+(`EntireRoot`), and `Created` after making it one otherwise. So the reader
+never branches on "is it a token yet". The only search without insertion is
+the `[root, t]` lookup of §3.3.
 
 ### 3.2 Root expansion (successor of `expand_root`)
 
@@ -135,12 +141,26 @@ expand(root, rest, cursor):
   if cursor == 0: return None
   for P in postfixes(root.token):                 # largest first
     if |P| > cursor: continue                     # seam bound (legacy)
-    response := search([P] ++ rest)
-    if response matches more than |P|:
-      E := token of response (insert_match if not EntireRoot)
+    E := insert_next_match([P] ++ rest)?.token()
+    if |E| > |P|:
       return Expand { postfix: P, expansion: E }  # consumes |E| − |P|
+    # |E| == |P|: E == P, rejected
   return None
 ```
+
+**Rejected probes do not edit the graph.** The query starts with `P`, so
+every match starts at `P`'s start and `|E| ≥ |P|`:
+
+| Search result | Outcome | Probe |
+|---|---|---|
+| no parent of `P` continues with `rest` (search falls back to `P` alone) | `NoExpansion { token: P }`, no edit | rejected |
+| match beyond `P` is an existing token `E` | `Complete`/`NoExpansion { token: E }`, no edit | accepted |
+| match beyond `P` is not a token | `Created { token: E }` | accepted |
+
+Only an accepted probe can create a token, and it creates exactly the
+expansion `E`. This is legacy `expand_root` ("rejected probes do not mutate
+the graph"). The query always has at least two tokens (`rest` is not
+empty), so `SingleIndex` does not occur.
 
 **Postfix chain.** `postfixes(v)` is the chain of last occurrences:
 `d1 = comp(v).last`, `d2 = comp(d1).last`, … down to an atom
@@ -168,11 +188,23 @@ climbs from `P`'s parents. The input root is a vertex, so occurrences of
 
 ### 3.3 Forward match (successor of `match_forward`)
 
-`response := search(rest)` gives the longest occurring prefix `I[j, m)`.
-`EntireRoot` (or a single atom): the token `t` exists. Otherwise
-`t := insert_match(response)`. The span is `Append(t)`, or
-`ReplaceRoot { token: Y }` if `[root, t]` is a token `Y` (complete search
-of `[root, t]`, legacy `find_complete`).
+```text
+forward(root, rest):
+  t := match insert_next_match(rest):
+         Ok(outcome)                          => outcome.token()   # longest occurring prefix I[j, m), now a token
+         Err(Search(SingleIndex(a)))          => a                 # |rest| == 1 (legacy match_forward)
+  if root is some R and find_complete([R, t]) is some Y:
+    return ReplaceRoot { token: Y }
+  return Append(t)
+```
+
+`find_complete([R, t])` is a lookup, not an insertion (legacy
+`overlap::find_complete`): `find_ancestor([R, t])`, accepted only if the
+response is `EntireRoot` with the query exhausted. It must not use
+`insert_next_match`: a match of `R` plus a proper prefix of `t` would be
+inserted as a token that the read does not observe as a unit. Other search
+errors (`UnknownAtom`, `EmptyPatterns`) cannot occur: segments create atoms
+before the run, and `rest` is not empty.
 
 ### 3.4 Root commit (successor of `RootManager::commit`)
 
@@ -250,15 +282,20 @@ vertex (the root is the response root; insert plan §2). Prototype: 22 of
 
 ### 4.1 Calls
 
-| Reader | Insertion (revision 3) |
-|---|---|
-| forward match is not a token | `insert_match(response)` → `Created { token, .. }` |
-| expansion match is not a token | `insert_match(response)`; the root may be the response root |
-| match is a token | no call (`EntireRoot`); legacy `insert_next_match` returns `Complete`/`NoExpansion` |
-| root edits | `GraphEdit::extend` / `GraphEdit::create` (insert plan §8), not insertion |
-| new atoms | `GraphEdit::atom` (insert plan D8: no mutation outside the layer) |
+| Reader | Call | Graph change |
+|---|---|---|
+| forward match | `insert_next_match(rest)` | `Created` if the prefix was not a token; none for `Complete`/`NoExpansion` |
+| forward match, one atom left | `insert_next_match(rest)` → `Err(Search(SingleIndex(a)))` → `a` | none |
+| expansion probe | `insert_next_match([P] ++ rest)` | `Created` only for an accepted probe whose match is not a token; the root may be the response root |
+| `[root, t]` is a token? | `find_ancestor([R, t])`, complete only | none (lookup) |
+| root edits | `GraphEdit::extend` / `GraphEdit::create` (insert plan §8), not insertion | owned root grows, or a new root |
+| new atoms | `GraphEdit::atom` (insert plan D8: no mutation outside the layer) | new atom vertex |
 
-The reader uses only the returned token. The `Publication` is not needed:
+All of these exist: `insert_next_match`/`insert`/`insert_match` in
+`context-insert/src/insert/mod.rs`, `GraphEdit::{atom, create, extend}` in
+`context-trace/src/positioned/edit.rs`.
+
+The reader uses only `InsertOutcome::token()`. The `Publication` is not needed:
 after `insert_match`, the reader reads the root's composition from the
 graph again (it may have changed when the root was a split node or host).
 
@@ -272,7 +309,9 @@ next search runs on a valid graph.
 ### 4.3 No stale state
 
 Each search runs after the previous commit, and its response is consumed
-by `insert_match` before the next edit. Across edits the reader keeps only
+by `insert_match` inside the same `insert_next_match` call before the next
+edit (the read lock of the search is released before `insert_match` takes
+the write lock; the generation check covers that gap). Across edits the reader keeps only
 tokens (`root`, `P`, `E`) and input offsets; tokens never change their
 string. So no response is stale (generation check, insert plan P2) and
 no path translation is needed. Legacy needed `Publication::translate_chain`
@@ -284,7 +323,12 @@ use.
 - A response whose root is the input root (an owned, parentless vertex).
   Nothing special: insertion edits the root's composition through
   `add_occurrences` (same width).
-- `GraphEdit::extend` in the shared edit layer (insert plan §8).
+- `GraphEdit::extend` in the shared edit layer (insert plan §8). **Done.**
+- `insert_next_match` with no edit for `EntireRoot` (covered by
+  `entire_root_outcomes`). **Done.** The fallback "no parent of the first
+  token continues" (`[P, x]` with no extension) returns
+  `NoExpansion { token: P }` without a generation bump:
+  `rejected_probe_outcome` in `context-insert/src/tests/insert.rs`. **Done.**
 
 ## 5. Retention
 
@@ -350,10 +394,27 @@ the graph of its predecessors and compares with the oracle:
 | Phase | Content | Exit |
 |---|---|---|
 | R0 | Prototype `read_legacy_port.py` | **Done** (§6) |
-| R1 | `GraphEdit::extend` (with insert plan task 3.1); `context-read` crate setup; promote `segment.rs`/`input.rs` out of `legacy` if needed; positioned `RootManager` with the commits of §3.4 | Unit tests: commits keep `validate()` green; ownership rules |
+| R1 | Positioned `segment.rs` and `RootManager` with the commits of §3.4 (`GraphEdit::extend`, `insert_next_match` and the probe-rejection test exist, §4.4) | Unit tests: commits keep `validate()` green; ownership rules |
 | R2 | Forward match and segments (§3.3), no expansion | Named cases without expansion (`abcd, bcde` read as inputs; `abc` then `abcabc`) |
 | R3 | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate: every scenario of `context-read/tests/reader_behavior.rs` equals its v3 fixture (`diff` of the whole graph), except the expected deviations of §5 |
 | R4 | Step 5: demotion of provisional tokens, streaming retention | Roadmap step 5 gate |
+
+### 8.1 Module layout (`context-read/src`, outside `legacy`)
+
+Mirrors the legacy modules; new code only, nothing moved out of `legacy`
+(the legacy segmenter depends on `HypergraphRef`).
+
+| File | Legacy counterpart | Content |
+|---|---|---|
+| `read.rs` | `pipeline/mod.rs` (`ReadCtx`), `expansion/block.rs` | `read(graph, chars)`: the loop of §3.1 |
+| `segment.rs` | `segment.rs`, `input.rs` | `segments(graph, chars) -> Vec<Segment { unknown: Vec<Token>, known: Vec<Token> }>`: an atom is *unknown* if `atom_token` has no vertex for it at the time it is read; it is created with `GraphEdit::atom` at once, so a later repeat in the same input is *known* (legacy `NewAtomIndex::{New, Known}`) |
+| `root.rs` | `pipeline/root.rs` | `RootManager { root: Option<Token>, owned: bool }`, `Span::{Append(t), ReplaceRoot(Y), Expand { postfix, expansion }}`, `commit(&mut self, graph, span)` = table §3.4 through one `GraphEdit` per commit |
+| `expand.rs` | `expansion/mod.rs` (`expand_root`) | `postfixes(graph, root)` (chain of last children, §3.2) and the probe loop |
+| `forward.rs` | `expansion/mod.rs` (`match_forward`), `overlap::find_complete` | `forward(graph, root, rest) -> Span` (§3.3) |
+
+Locks: `RootManager::commit` takes the write lock for one `GraphEdit` and
+releases it; `insert_next_match` and `find_ancestor` take their own locks.
+The reader never holds a lock across these calls.
 
 ## 9. Gate (step 4)
 
@@ -366,3 +427,21 @@ cargo test -p context-read --features legacy-tests
 Complete-graph equality with the v3 fixtures for every scenario except the
 expected deviations; `validate()` after every read; no algorithm reads
 content or builds content-keyed structures.
+
+Test changes for the gate:
+
+- `context-read/tests/reader_behavior.rs`: remove `#[ignore = "positioned
+  reader pending"]` from the scenario macro; `repeat_abcabca` and
+  `repeat_ababa` get `#[ignore = "provisional retention (reader plan §5)"]`
+  until R4 (P-R1).
+- Unit tests next to the modules (R1/R2): `segment` (unknown/known runs,
+  a repeat inside one input becomes known), `root` (each row of the §3.4
+  table; `extend` only while owned; `validate()` after each commit),
+  `expand` (`postfixes` equals all postfix tokens; a rejected probe leaves
+  the generation unchanged), `forward` (one atom left; `[R, t]` adopted only
+  when complete).
+- The worked examples of §2 as named tests with the expected step trace
+  (`xabcdey` on `abcd, bcde`; `abcabca` on `abc`; `aaa`).
+- Insert and search gates (insert plan §13) stay green: the reader changes
+  no code in `context-insert`/`context-search` except the probe-rejection
+  test.
