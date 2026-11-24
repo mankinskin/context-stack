@@ -269,15 +269,16 @@ impl<T: GraphRead + ?Sized> GraphRead for &T { … }   // as legacy `HasGraph fo
 /// A cheap `Copy` reference to one vertex. Carries the graph reference, so
 /// it can navigate. Index, width and token come from the shared accessors
 /// (`HasVertexIndex`, `Wide`, `ToToken`).
-pub trait VertexRead<'a>: Copy + HasVertexIndex + Wide {
+pub trait VertexRead<'a>: Copy + Debug + HasVertexIndex + Wide {
     type Kind: GraphKind;
     type Composition: CompositionRead<Index = Self::Index>;
-    type Parents: Iterator<Item = (Token<Self::Index>, AtomPosition)>;
 
     /// Exactly one of atom value or composition.
     fn node(self) -> NodeRef<'a, AtomOf<Self::Kind>, Self::Composition>;
-    fn parents(self) -> Self::Parents;                   // unordered
+    fn parents(self) -> impl Iterator<Item = (Token<Self::Index>, AtomPosition)>; // unordered
     fn parent_count(self) -> usize { self.parents().count() }
+    /// Link check of validation; stores override the linear default.
+    fn is_parent_at(self, parent: Self::Index, offset: AtomPosition) -> bool { … }
     fn state(self) -> VertexState;                       // Committed | Staged
     /// Another vertex of the same graph (child or parent).
     fn resolve(self, i: Self::Index) -> Option<Self>;
@@ -348,6 +349,15 @@ pub struct Generation { pub base: u64, pub stage: u64 }
   `postfix(&self) -> &Occurrence` (`self.0.last()`; never empty, a
   composition has ≥ 2 occurrences). It replaces the reader's
   `ending_at(width)` lookup.
+- *Implemented (S2, §11):* `Debug` is a supertrait (`ToToken` requires
+  it), `parents` returns an `impl Iterator` instead of a named associated
+  type, and `is_parent_at` keeps the `BTreeMap` lookup of the committed
+  store in the validation link check. The committed vertex object is
+  `PositionedVertexRef<'a, G>` (graph and vertex reference); stored data is
+  reached through `PositionedGraph::vertex_data` / `PositionedVertexRef::data`.
+  Hot recursions dispatch through `node().composite()` / `node().atom()`
+  rather than a `match` on `NodeRef` (the match made the composition
+  address depend on the node tag; content reads were about 40 % slower).
 - **`string_repr(v: impl VertexRead)`** (free function, legacy
   `HasVertexStringRepr`): the vertex's string, computed by expanding the
   composition down to atoms. Works for staged vertices and in release
@@ -395,20 +405,29 @@ pub trait Navigate<'a>: VertexRead<'a> {
 impl<'a, V: VertexRead<'a>> Navigate<'a> for V {}
 ```
 
+*Implemented (S2, §11):* positions are `impl Into<AtomPosition>` as
+today; `interval(range)`, `read_interval(range)` (debug and `test-api`) and
+`contains_path(steps)` (`test-api`; each step is looked up in its own
+parent, reached from `self`) are vertex methods; `IntervalView<I>` carries
+the store's index. `Located<I> = (Token<I>, Vec<OccurrenceLocation<I>>)`
+names the `start_at`/`end_at` result.
+
 ### 3.5 `GraphWrite` (sealed) and the generic `GraphEdit` (context-trace)
 
 ```rust
 pub trait GraphWrite: GraphRead + raw::Write {}
 impl<T: raw::Write> GraphWrite for T {}
 
-mod raw {   // private module: not nameable, importable or implementable outside context-trace
+pub(crate) mod raw {   // not nameable, importable or implementable outside context-trace
+    pub struct Seal(pub(crate) ());   // constructible only inside context-trace
     pub trait Write: super::GraphRead {
         type VertexMut<'a>: VertexWrite<Kind = Self::Kind, Index = Self::Index> where Self: 'a;
-        fn vertex_mut(&mut self, i: Self::Index) -> Option<Self::VertexMut<'_>>;
-        fn push(&mut self, node: VertexNode<AtomOf<Self::Kind>, Self::Index>, width: TokenWidth)
+        fn vertex_mut(&mut self, _: Seal, i: Self::Index) -> Option<Self::VertexMut<'_>>;
+        fn next_index(&self, _: Seal) -> Self::Index;  // index of the next push (G1 error)
+        fn push(&mut self, _: Seal, node: VertexNode<AtomOf<Self::Kind>, Self::Index>, width: TokenWidth)
             -> Self::Index;                          // Staged inside a stage
-        fn register_atom(&mut self, value: AtomOf<Self::Kind>, i: Self::Index);
-        fn bump_generation(&mut self);
+        fn register_atom(&mut self, _: Seal, value: AtomOf<Self::Kind>, i: Self::Index);
+        fn bump_generation(&mut self, _: Seal);
     }
     pub trait VertexWrite {
         type Kind: GraphKind;
@@ -424,13 +443,15 @@ mod raw {   // private module: not nameable, importable or implementable outside
 ```
 
 - Sealing alone would only prevent other crates from *implementing* the
-  trait; putting the primitives into an unnameable supertrait also prevents
-  them from *calling* them. D8 holds: only `GraphEdit` mutates.
+  trait. An unnameable supertrait does not prevent *calling* it: methods of
+  supertraits are callable through a `S: GraphWrite` bound without naming
+  them (verified, S2). Every primitive therefore takes a `Seal` that only
+  `context-trace` can construct. D8 holds: only `GraphEdit` mutates.
 - `GraphEdit` accesses one vertex at a time (set the host's node, drop the
   handle, then link each child).
 
 ```rust
-pub struct GraphEdit<'g, S: GraphWrite + ?Sized> {
+pub struct GraphEdit<'g, S: GraphWrite + ?Sized> {   // opened by GraphEdit::new(&mut S) or PositionedGraph::edit()
     graph: &'g mut S,
     created: Vec<Token<S::Index>>,
     edits: BTreeMap<S::Index, VertexEdit<S::Index>>,
@@ -451,9 +472,10 @@ impl<'g, S: GraphWrite + ?Sized> GraphEdit<'g, S> {
         -> Result<Token<S::Index>, PositionedError>;
     pub fn finish(self) -> Publication<S::Index>;
 }
-// new PositionedError variants: NotStaged,
+// PositionedError<I = CommittedIndex> carries the store's indices.
+// new PositionedError variants: NotStaged (S3),
 // Atom (composite-only operation on an atom; replaces today's
-// `Composition { error: TooFew }` from `GraphEdit::composite`)
+// `Composition { error: TooFew }` from `GraphEdit::composite`; S2)
 ```
 
 `extend` and `add_occurrences` match `NodeRef::Composite` and return
@@ -509,6 +531,8 @@ pub type GraphAtom<G> = AtomOf<KindOf<G>>;               // legacy TravAtom
 ///   `GuardMut<'a> = &'a mut Self`;
 /// handles (`PositionedGraphRef`, `OverlayHandle`, `TaggedHandle`): guards are
 ///   lock views taken per call, as `PositionedGraphRef` locks per step today.
+/// `&PositionedGraphRef` is also `HasGraphMut` (it locks for writing, as
+///   legacy `HypergraphRef` has interior mutability).
 
 pub trait Stage: GraphWrite<Index = StageIndex> {
     fn staged(&self) -> impl Iterator<Item = StagedIndex> + '_;
@@ -549,10 +573,17 @@ pub enum CommitError {
 ```rust
 // context-search: one trait for views and handles, as legacy `Find: HasGraph`
 pub trait Find: HasGraph {
-    fn find_ancestor(&self, q: impl Searchable<Self::Kind, AncestorSearchTraversal>)
+    fn find_ancestor(&self, q: impl Searchable<Self::Kind, Self::Index, AncestorSearchTraversal>)
         -> SearchResult<Self::Index> { q.search(&self.graph()) }
 }
 impl<G: HasGraph + ?Sized> Find for G {}
+
+// a query of a search on a store of kind K with indices I (Vec<Token<I>>,
+// atoms, continuation cursors, responses)
+pub trait Searchable<K: GraphKind, I: VertexId = CommittedIndex, SK: SearchKind = AncestorSearchTraversal> {
+    fn start_search<S: GraphRead<Kind = K, Index = I> + ?Sized>(self, graph: &S)
+        -> Result<SearchState<'_, S, SK>, SearchError<I>>;
+}
 ```
 
 A single blanket impl over `HasGraph` replaces the planned `Find` /
@@ -562,10 +593,13 @@ take `G: HasGraph` as legacy `TraceCtx<G: HasGraph>`.
 
 ```rust
 // context-insert
-pub fn insert_match<G: HasGraphMut>(graph: &mut G, response: Response<G::Index>)
-    -> Result<InsertResult<G::Index>, InsertError>;
-pub fn insert_next_match<G: HasGraphMut>(graph: &mut G, query: …) -> …;
-// SplitGraph::build<V: GraphRead>, join<S: GraphWrite>(edit: &mut GraphEdit<'_, S>, …)
+// by value: `&mut view`, `&PositionedGraphRef` and handles are HasGraphMut
+pub fn insert_match<G: HasGraphMut>(graph: G, response: Response<G::Index>)
+    -> Result<InsertOutcome<G::Index>, InsertError<G::Index>>;
+pub fn insert_next_match<G: HasGraphMut>(graph: G, query: impl Searchable<KindOf<G>, G::Index>)
+    -> Result<InsertOutcome<G::Index>, InsertError<G::Index>>;
+// SplitGraph<I>::from_response<G: GraphRead<Index = I>>,
+// join<S: GraphWrite>(edit: &mut GraphEdit<'_, S>, split: &SplitGraph<S::Index>)
 
 // context-read
 pub trait StagingStrategy {
@@ -930,3 +964,127 @@ Benchmarks (`--baseline pre-staging`, medians):
   the differences come from code placement: generic functions such as
   `Composition::covering` are now instantiated in the calling crates.
   Verdict: within noise of S0.
+
+### S2 — store traits (2026-11-24)
+
+New modules in `context-trace/src/positioned`: `access.rs` (`GraphRead`,
+`VertexRead`, `CompositionRead`, `NodeRef`, `VertexState`, `Generation`,
+sealed `raw::Write`/`raw::VertexWrite`, `GraphWrite`), `navigate.rs`
+(`Navigate`, `string_repr`, replacing the inherent navigation and
+`read.rs`), `has_graph.rs` (`HasGraph`, `HasGraphMut`, `KindOf`, `IndexOf`,
+`GraphAtom`, `impl_has_graph!`/`impl_has_graph_mut!`), `committed.rs`
+(`PositionedVertexRef` and the impls for `PositionedGraph`, its
+`RwLock` guards and `PositionedGraphRef`), `check.rs` (store-generic
+validation shared by `validate` and `GraphEdit`). `GraphEdit<'g, S:
+GraphWrite + ?Sized>` is written once over the traits. Search, tracing,
+paths, insertion and the split graph are generic over the store and its
+index (`G: GraphRead` / `G: HasGraph(Mut)`, data types with
+`I: VertexId = CommittedIndex`): `RolePath` (index from `PathRoot::Index`;
+aliases `StartPath<I>`, `EndPath<I>`, `QueryPath<I>`), `QueryRoot<I>`,
+`ParentState<I>`, `ChildState<I>`, `ParentBatch<I>`, the trace commands,
+`TraceCtx<'g, G>`, `EditKind<I>`, `NewTraceEdge<D, I>` (`TraceDirection::Key<I>`
+is a GAT), the search cursors, compare states, queue, `MatchResult<I>`,
+`PathCoverage<I>`, `Response<I>`, `SearchError<I>`, `SplitGraph<I>`,
+`Publication<I>`, `PositionedError<I>`, `InsertOutcome<I>`, `InsertError<I>`.
+The reader changed at call sites only; its `expand::postfixes` is
+`Navigate::postfixes`, and its fixture test moved to
+`context-trace/src/positioned/tests/navigation.rs`.
+
+Deviations from §3 (the §3 text is updated where the design changed):
+
+- **`VertexRead`**: `Debug` supertrait (required by `ToToken`); `parents`
+  returns `impl Iterator` (no named `Parents` type); added the provided
+  `is_parent_at(parent, offset)` so validation keeps the committed store's
+  `BTreeMap` lookup (the linear default would change the cost of the
+  `test-api` link checks).
+- **`GraphRead`** is implemented for `&T` *and* `&mut T` (the write guard
+  of `PositionedGraph` as `HasGraphMut` is `&mut Self`).
+- **Sealing**: a supertrait in a private module is still *callable*
+  through a `S: GraphWrite` bound from other crates (checked with a
+  two-crate example), so every `raw::Write` method takes a `raw::Seal`
+  that only `context-trace` can construct.
+- **`raw::Write::next_index`** added: `create` reports `DuplicateContent {
+  second }` with the index the vertex would get before pushing it.
+  `push` takes no label; `GraphEdit` sets it with `VertexWrite::set_label`.
+- **Opening an edit**: `GraphEdit::new(&mut S)` (hidden, `edit` feature as
+  `PositionedGraph::edit`), used by `insert_match` on its write guard.
+  `GraphEdit::validate_touched` no longer checks `index == slot` (not
+  expressible for generic indices; `PositionedGraph::validate` still does).
+- **`Generation`** replaces the `u64` generation everywhere
+  (`GraphRead::generation`, `Response::generation`); the inherent
+  `PositionedGraph::generation` is gone.
+- **Inherent API removed** from `PositionedGraph`: `vertex`, `vertices`,
+  `token`, `start_at`, `end_at`, `prefix_child`, `parent_occurrences`,
+  `atom_token`, `advance_end_path`, `interval`, `contains_path`,
+  `read_interval`. Storage access is `vertex_data(i) -> &PositionedVertex`
+  (and `PositionedVertexRef::data`); tests use it for `parents()` maps.
+- **`impl_has_graph!`** is crate-internal (`pub(crate) use`) and takes
+  `Kind = …, Index = …`: legacy `#[macro_export]`s a macro of the same
+  name at the crate root, and all implementers live in `context-trace`.
+- **`&PositionedGraphRef` is `HasGraphMut`** (write lock per call, as
+  legacy `HypergraphRef`), and `insert_match`, `insert_next_match`,
+  `insert` take the handle **by value** (`G: HasGraphMut`) instead of
+  `&mut G`: `&mut view`, `&PositionedGraphRef` and later handles all
+  qualify, and call sites need no `&mut &graph`.
+- **`Searchable<K, I = CommittedIndex, SK = AncestorSearchTraversal>`**:
+  the index is a trait parameter (atom queries are generic over it), and
+  `start_search<S: GraphRead<Kind = K, Index = I> + ?Sized>`.
+- `CompareState<Q, C, X>`: the store index is the third parameter (`I`
+  was already the child cursor state). The `test-api` tie order of the
+  search queue compares `(index, offset)` keys through an enum instead of
+  `usize::MAX − …` (same order).
+- `NotStaged` is not added yet (unreachable without stages; S3 adds it with
+  the staged precondition). `extend` accepts exactly what it accepted
+  before; on an atom it now returns `PositionedError::Atom` instead of
+  `Composition { error: TooFew }` (also for `add_occurrences`).
+- `QueryPath::new(Vec::new())` needs a type annotation now (alias defaults
+  do not apply in expression position).
+
+Performance: the first S2 build was 30 % slower on `read/periodic`. With
+`test-api`, `GraphEdit`'s content checks dominate the periodic reads
+(`check_agrees` and the G1 scan; without them a read of `abc^256 x` takes
+2.5 ms in both builds), and the generic `read_into` matched on `NodeRef`,
+which made the composition address depend on the node tag. Dispatching
+through `node().composite()` / `node().atom()` and a `while` loop gives the
+same code as before (isolated `read_interval` probe: 87.7 ms vs 86.7 ms).
+The periodic graphs are identical in both builds (interchange hash,
+`n` = 8, 64, 256).
+
+Gate (`passed / failed / ignored`, before → after S2):
+
+| Command | Before (S1) | After (S2) |
+|---|---|---|
+| `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api` | ok | ok |
+| `cargo test -p context-read --no-default-features --features test-api` | 111 / 0 / 9 | 110 / 0 / 9 (`postfixes_are_all_postfix_tokens` moved to context-trace) |
+| `cargo test -p context-trace -p context-search -p context-insert --no-default-features --features test-api` | 88 / 0 / 12 | 89 / 0 / 12 (+1 moved test) |
+| `cargo test --release -p context-insert --no-default-features --features test-api insert_gate` | 1 / 0 / 0 | 1 / 0 / 0 |
+| `cargo test -p context-read --features legacy-tests` | 194 / 0 / 18 | 193 / 0 / 18 (moved test) |
+| `cargo test -p context-trace -p context-search -p context-insert --features legacy-tests` | 310 / 0 / 47 | 311 / 0 / 47 (moved test) |
+| `cargo build --workspace --all-targets --exclude context-editor-kernel --exclude sandbox-app` | ok | ok |
+
+New assertions inside existing tests: `PositionedError::Atom` for
+`add_occurrences`/`extend` on an atom (`tests/edit.rs`), located
+`prefixes` chain (`tests/navigation.rs`).
+
+Benchmarks (`--baseline pre-staging`, medians; the S1 column is the S1
+build benched right after the S2 run on the same machine, for drift):
+
+| Benchmark | S0 | S2 | Change (criterion) | S1 rerun |
+|---|---|---|---|---|
+| `read/corpus/all` | 1.316 ms | 1.366 ms | +2.5 % | 1.382 ms (+4.4 %) |
+| `read/periodic/abc^n_x/64` | 828 µs | 861 µs | +1.8 %, within noise threshold | 861 µs (+1.9 %) |
+| `read/periodic/abc^n_x/256` | 36.4 ms | 36.4 ms | −0.8 %, no change (p = 0.33) | 36.0 ms (−2.4 %) |
+| `read/periodic/abc^n_x/512` | 333 ms | 334 ms | +0.5 %, no change (p = 0.52) | 331 ms (−0.6 %) |
+| `find_ancestor/corpus_inputs` | 869 µs | 905 µs | +2.8 % | 912 µs (+3.4 %) |
+
+- An earlier S2 run of the final code gave +1.8 % / −1.3 % for
+  `read/corpus` / `find_ancestor`; the S1 build drifted by the same
+  amount in the back-to-back run. Verdict: within noise of S0 (and of S1).
+
+Open for S3:
+
+- Search, insertion and `GraphEdit` are only instantiated with
+  `CommittedIndex` so far; the first `StageIndex` store (overlay view)
+  will show whether bounds are missing.
+- `StageHandle`, `Translation`, `Stage`, `Lifted` and the overlay are not
+  started; `NotStaged` and the staged `extend` precondition come with them.
