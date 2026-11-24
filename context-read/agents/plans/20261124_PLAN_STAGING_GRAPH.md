@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-trace` `#context-insert` `#context-search` `#positioned-composition` `#reader` `#staging`
 summary: Staging graph for the positioned reader, behavior-neutral infrastructure. Tokens created during a read are staged (content may change through the owned-root `extend`); everything else is committed (content immutable forever, only composition shape may change). The read commits its stage at input end. Replaces the root manager's implicit ownership flag by an explicit vertex state. The stores are abstracted by traits with typed vertex indices (CommittedIndex, StagedIndex, StageIndex) and vertex objects (GraphRead hands out VertexRead objects; Navigate on vertices; sealed GraphWrite/VertexWrite behind a generic GraphEdit; Stage; legacy-style HasGraph/HasGraphMut access traits whose guards are GraphRead/GraphWrite views; StageHandle with commit and Translation; StagingStrategy; shared HasVertexIndex/Wide/ToToken accessors), so search, insertion and the reader are written once. Two implementations are built side by side and benchmarked: (a) a physical overlay graph next to the committed graph; (b) a stage tag on vertices of the one graph. The reader's output does not change; dissolution of provisional tokens is the follow-up plan 20261124_PLAN_DISSOLUTION.
-status: 📋 draft revision 5 — behavior-neutral (dissolution moved to 20261124_PLAN_DISSOLUTION); typed indices and vertex-object traits (§3); legacy trait patterns adopted (§3.10: HasGraph/HasGraphMut replace GraphHandle/FindLocked, index-like lookup, Wide/ToToken supertraits, located prefix/postfix chains); (a) overlay is the default and is implemented first (D-S1), (b) tag follows for comparison
+status: ✅ implemented (S0–S6, 2026-11-24) — revision 5; (a) overlay is the default (D-S1), (b) tag implemented behind the same traits and benchmarked (§11 S5/S6: tagged is faster on the corpus and equal on periodic reads; recommendation for a later D-S1 revision in §11 S6); dissolution follows in 20261124_PLAN_DISSOLUTION
 date: 2026-11-24
 parent: 20261122_PLAN_POSITIONED_READER.md (phase R4)
 depends_on: 20261122_PLAN_POSITIONED_READER.md (R1–R3 implemented), 20261122_PLAN_POSITIONED_INSERT.md (revision 3, GraphEdit D8)
@@ -581,6 +581,11 @@ pub enum CommitError {
   once (the base generation stays as opened); `commit` adds the stage
   counter to the base generation, so the committed generation after a read
   equals the one of applying the edits directly.
+- *Implemented (S5, §11):* `Translation` has two forms: a table by staged
+  slot (overlay, vertices are moved) and "clear the bit" (tag, staged slot
+  = committed slot; `len` counts the formerly staged vertices). The tagged
+  `commit` never fails (it writes the committed graph directly); dropping
+  an uncommitted `TaggedHandle` commits it (no rollback, D10).
 
 ### 3.7 Search, insertion and reader (context-search, context-insert, context-read)
 
@@ -643,7 +648,7 @@ pub fn read(graph: &PositionedGraphRef, input: impl IntoIterator<Item = char>)
 | `StagingGraph<G>` | context-trace | storage only | — | — |
 | `OverlayView<'a, G>` (a) | context-trace | `GraphRead`, `GraphWrite`, `Stage`, `HasGraph(Mut)` (guard `&Self`) | `StageIndex` | `OverlayVertex { view: &OverlayView, index }` (two words; stored vertex and delta looked up per access, S3) |
 | `OverlayHandle<'g, G>` (a) | context-trace | `HasGraph`, `HasGraphMut`, `StageHandle` | `StageIndex` | — |
-| `TaggedView<'a, G>` (b) | context-trace | `GraphRead`, `GraphWrite`, `Stage`, `HasGraph(Mut)` (guard `&Self`) | `StageIndex` | `&PositionedVertex` + graph reference |
+| `TaggedView<'a, G>` (b) | context-trace | `GraphRead`, `GraphWrite`, `Stage`, `HasGraph(Mut)` (guard `&Self`) | `StageIndex` | `TaggedVertex { graph, vertex }` (`&PositionedVertex` + graph reference; compositions as two-word `TaggedComposition`, S5) |
 | `TaggedHandle<'g, G>` (b) | context-trace | `HasGraph`, `HasGraphMut`, `StageHandle` | `StageIndex` | — |
 | vertex objects of all stores | context-trace | `VertexRead`, `Navigate`, `HasVertexIndex`, `Wide`, `ToToken` | the store's | — |
 | `OverlayStaging`, `TaggedStaging` | context-read | `StagingStrategy` | — | — |
@@ -785,6 +790,33 @@ translates the only token it holds, the root.
 - Other readers would see staged vertices and shape changes of committed
   hosts (fine with one read at a time).
 
+*Implemented (S5, §11):* `context-trace/src/positioned/tagged.rs`.
+
+- `PositionedVertex::state` (`VertexState`, `Committed` outside a stage)
+  and `PositionedGraph::stage: Option<StageId>`; `StageId` is the open
+  stage's first slot and the graph generation at open.
+- The store keeps plain slots (compositions and parent maps of
+  `CommittedIndex`); the tag bit is derived on reading. While a stage is
+  open only its views write, so every composite at or after the first slot
+  is staged and every vertex there of width 1 is an atom (committed): a
+  child's bit follows from its slot and width without a lookup
+  (`TaggedComposition { composition, first }`, two words, as `Lifted`).
+  Parents carry the bit of the parent's state (the parent vertex is loaded
+  for its width anyway). Writes clear the bit (`Composition::into_slots`).
+- `GraphRead::vertex` checks only the slot; that the bit agrees with the
+  state is a debug assertion (as a filter it delayed every lookup on the
+  state load and cost 15 % on `abc^256 x`).
+- Atoms are committed at once (`push` of an atom); new composites are
+  `Staged`. Vertices committed before the stage opened keep width and
+  label (asserted, as in the overlay).
+- `commit` flips the tags of `vertices[first..]`, clears `stage` and
+  returns `Translation::untag`; generation edits bump the graph
+  generation directly, the view reports `Generation { base: opened,
+  stage: now − opened }`.
+- One open stage per graph: `TaggedHandle::open` and `OverlayHandle::open`
+  panic on an open tagged stage; committed pushes debug-assert that none is
+  open.
+
 ## 6. Reader integration
 
 - `RootManager { root, owned }` becomes `ReadStage<'g, S: StagingStrategy>
@@ -837,6 +869,11 @@ the comparison with `settle` (its §6).
 - `find_ancestor` on committed graphs through `PositionedGraph` and through
   an empty `OverlayView` (cost of the indirection alone).
 - Commit cost relative to read cost; peak memory.
+- *Implemented (S6, §11):* `benches/staging.rs` (throughput and
+  `find_ancestor`; `_tagged` ids for (b)), `benches/staging_commit.rs`
+  (commit cost, no pre-staging counterpart) and `benches/staging_memory.rs`
+  (peak and retained heap with a counting global allocator, kept out of
+  the timed benches).
 
 ### 7.2 Tests for both
 
@@ -867,15 +904,15 @@ and the proofs belong to the dissolution plan.
 
 ## 9. Tasks
 
-| Task | Content | Exit |
-|---|---|---|
-| S0 | Benchmark baseline of the current reader (§7.1), saved as `pre-staging` | numbers recorded here |
-| S1 | Typed indices (§3.2): `VertexId`, `CommittedIndex`, `StagedIndex`, `StageIndex`; `Token<I>`, `Occurrence<I>`, `Composition<I>`, `VertexNode<A, I>`, `OccurrenceLocation<I>`, `Response<I>`, `TraceCache<I>` with `CommittedIndex` default; `HasVertexIndex::Index` associated, `ToToken` returns `Token<Self::Index>`, `Wide` for the index-generic types; no behavior change | all gates green (incl. `--features legacy-tests`); benchmarks within noise of S0 |
-| S2 | Traits (§3.3–§3.7, §3.10): `GraphRead` (index-like lookup) / `VertexRead: HasVertexIndex + Wide` with `NodeRef`, `CompositionRead: Wide` (incl. `postfix`, `crossing`) and `Composition::postfix`, `Navigate` on vertex objects (incl. `postfix_child`, located `prefixes`/`postfixes`; the reader's `expand::postfixes` and its fixture test move here), `string_repr`, `PositionedError::Atom`, sealed `raw::Write`/`VertexWrite`, generic `GraphEdit<S>`, `HasGraph`/`HasGraphMut` with `KindOf`/`IndexOf` and `impl_has_graph!`, `Find: HasGraph`; `PositionedGraph`, its guards and `PositionedGraphRef` implement them; search, tracing, paths and insertion take `G: HasGraph(Mut)` | all gates green; benchmarks within noise of S0 |
-| S3 | (a): `StagingGraph`, `OverlayHandle`/`OverlayView`, `Lifted`, `Stage`, `StageHandle`, commit with `Translation`; `extend` precondition `NotStaged` | unit tests (§7.2) |
-| S4 | Reader: `ReadStage`, `read_with`, `read` on `OverlayStaging` | gate (§10) for (a) |
-| S5 | (b): state tag, `TaggedHandle`/`TaggedView`; `TaggedStaging` | unit tests; differential tests against (a) on `GraphEdit` sequences; gate (§10) for (b) |
-| S6 | Benchmarks per strategy (§7.1) | numbers recorded here (input for a later revision of D-S1) |
+| Task | Content | Exit | Status |
+|---|---|---|---|
+| S0 | Benchmark baseline of the current reader (§7.1), saved as `pre-staging` | numbers recorded here | ✅ met (§11 S0) |
+| S1 | Typed indices (§3.2): `VertexId`, `CommittedIndex`, `StagedIndex`, `StageIndex`; `Token<I>`, `Occurrence<I>`, `Composition<I>`, `VertexNode<A, I>`, `OccurrenceLocation<I>`, `Response<I>`, `TraceCache<I>` with `CommittedIndex` default; `HasVertexIndex::Index` associated, `ToToken` returns `Token<Self::Index>`, `Wide` for the index-generic types; no behavior change | all gates green (incl. `--features legacy-tests`); benchmarks within noise of S0 | ✅ met (§11 S1) |
+| S2 | Traits (§3.3–§3.7, §3.10): `GraphRead` (index-like lookup) / `VertexRead: HasVertexIndex + Wide` with `NodeRef`, `CompositionRead: Wide` (incl. `postfix`, `crossing`) and `Composition::postfix`, `Navigate` on vertex objects (incl. `postfix_child`, located `prefixes`/`postfixes`; the reader's `expand::postfixes` and its fixture test move here), `string_repr`, `PositionedError::Atom`, sealed `raw::Write`/`VertexWrite`, generic `GraphEdit<S>`, `HasGraph`/`HasGraphMut` with `KindOf`/`IndexOf` and `impl_has_graph!`, `Find: HasGraph`; `PositionedGraph`, its guards and `PositionedGraphRef` implement them; search, tracing, paths and insertion take `G: HasGraph(Mut)` | all gates green; benchmarks within noise of S0 | ✅ met (§11 S2) |
+| S3 | (a): `StagingGraph`, `OverlayHandle`/`OverlayView`, `Lifted`, `Stage`, `StageHandle`, commit with `Translation`; `extend` precondition `NotStaged` | unit tests (§7.2) | ✅ met (§11 S3) |
+| S4 | Reader: `ReadStage`, `read_with`, `read` on `OverlayStaging` | gate (§10) for (a) | ✅ met (§11 S4) |
+| S5 | (b): state tag, `TaggedHandle`/`TaggedView`; `TaggedStaging` | unit tests; differential tests against (a) on `GraphEdit` sequences; gate (§10) for (b) | ✅ met (§11 S5) |
+| S6 | Benchmarks per strategy (§7.1) | numbers recorded here (input for a later revision of D-S1) | ✅ met (§11 S6) |
 
 ## 10. Gate
 
@@ -887,6 +924,10 @@ cargo test --release -p context-insert --no-default-features --features test-api
 cargo test -p context-read --features legacy-tests
 cargo bench -p context-read
 ```
+
+From S6 the strategy benchmarks run as
+`cargo bench -p context-read --bench staging --no-default-features --features test-api -- --baseline pre-staging`
+(plus `--bench staging_commit` and `--bench staging_memory`, §11 S6).
 
 - Every test that passes today passes for both strategies; the same tests
   are ignored and `READ_DEVIATIONS` is unchanged.
@@ -1278,3 +1319,217 @@ Open:
   parent iteration.
 - `OverlayHandle` is not `Sync` (`RefCell`); concurrent reads (§4.4) need
   a different stage cell.
+
+### S5 — tagged stage (2026-11-24)
+
+`context-trace/src/positioned/tagged.rs`: `StageId`, `TaggedHandle`,
+`TaggedView`, `TaggedVertex`, `TaggedComposition`, `TaggedLabels`;
+`PositionedVertex::state`, `PositionedGraph::stage`;
+`context-read/src/staging.rs`: `TaggedStaging`. Design as implemented in
+§5 ("Implemented (S5)"); `TaggedView` implements `GraphRead`, the sealed
+`raw::Write`, `Stage` and `HasGraph(Mut)` (guards `&Self` / `&mut Self`),
+`TaggedHandle` implements `HasGraph(Mut)` (a view per call) and
+`StageHandle`.
+
+Deviations (the §3/§5 text is updated):
+
+- **Tag bit derived, not stored.** The graph keeps `CommittedIndex` slots
+  in compositions and parent maps, so the committed store's data is valid
+  at all times and `commit` only flips states (no rewrite of compositions
+  or parent maps). A child's bit is `slot ≥ first ∧ width > 1` (only the
+  stage writes while it is open); `TaggedComposition` applies it per
+  returned occurrence.
+- **`StageId`** is the first slot of the stage and the generation at open,
+  not an opaque counter (both are needed by every view).
+- **Tag/state agreement of a looked-up index is a debug assertion**, not a
+  filter (−15 % on `abc^256 x`; the vertex object derives its index from
+  the state).
+- **`TaggedComposition` is two words** (`&Composition`, `first`): a
+  three-word slice form returned `NodeRef` through memory (S3 §11
+  experience); −2 % on `abc^256 x`.
+- **`Translation`** has a table form (overlay) and an untag form (tag).
+- **Dropping an uncommitted `TaggedHandle` commits it** (D10: no rollback;
+  the vertices are in the committed graph already). The tagged `commit`
+  never returns `CommitError`.
+- **Views write-lock the graph also for reads** (`HasGraph::graph`): a
+  stage writes into the base, and the reader never nests views (the
+  overlay's `RefCell` would panic as well).
+- `PositionedVertexRef::state` returns the stored state (`Committed`
+  outside a tagged stage, so the committed store behaves as before; during
+  one, other readers see `Staged`). `OverlayHandle::open` and
+  `TaggedHandle::open` panic on an open tagged stage; committed pushes
+  debug-assert that none is open.
+- The field allowlist of the binding-rule guard test
+  (`tests/guard.rs`) gains `PositionedVertex::state` and
+  `PositionedGraph::stage` (structural, no content).
+- `PositionedVertex` grows from 80 to 88 bytes (release; `VertexKey` is a
+  byte-aligned `Uuid`, so the state byte needs a new word). A dummy byte on
+  the S4 build measured no effect (corpus +1 %, `find_ancestor` ±2 %).
+
+**Atoms and indices in the differential tests.** In (a) a new atom is
+staged and translated at commit; in (b) it is committed at once. Both
+assign committed indices in creation order (the overlay pushes staged
+vertices in `StagedIndex` order, the tag stage pushes into the committed
+vector directly), so the final indices coincide and the graphs are
+compared exactly, without any allowance. The only observable difference
+is the staged count (and `Translation::len`): (b) stages the new
+composites only, (a) also the new atoms; the tests assert exactly that
+difference. Before commit the index *order* of a new atom relative to
+staged composites differs ((a): by creation; (b): every committed index
+sorts before every staged one); no read depends on it (dumps below).
+
+New tests:
+
+- `positioned/tests/tagged.rs` (6): `tagged_commit_equals_overlay_and_direct_edits`
+  (the two `GraphEdit` sequences of S3 applied directly, on an overlay and
+  on a tagged stage; committed graphs compared exactly: indices, widths,
+  states, compositions, parent links, labels, atom index, generation, no
+  open stage), `tagged_extend_preconditions` (`NotStaged` on committed
+  vertices with and without parents, `Atom` on committed and new atoms,
+  `OutsideVertex`, growth, `HasParents`, `NotStaged` after the commit in a
+  new stage), `tag_bits_mirror_vertex_states` (indices, states, parents and
+  composition bits, `staged`, generation, labels, translation),
+  `dropping_a_tagged_handle_commits`, `one_open_stage_per_graph`,
+  `a_tag_bit_disagreeing_with_the_state_is_rejected` (debug builds).
+  `assert_identical` (S3) also compares states and the open stage.
+- `tests/reader_behavior.rs`: `strategies!(…, tagged: TaggedStaging)`
+  (every scenario and the read gate; same 9 ignored scenarios, same
+  `READ_DEVIATIONS`), and `strategies_commit_identical_graphs`: all 94
+  corpus scenarios (dump after every read), all 140 read-lane cases and
+  `abc^64 x`, read through both strategies, exact dumps (generation, index,
+  width, state, composition, parents, label, root) equal.
+
+**Behavior neutrality.** The temporary dump test of S4 (not committed)
+rerun on the final S5 code: 237 dumps (94 corpus scenarios with a dump
+after every read, 140 read-lane cases, `abc^n x` for n = 8, 64, 256) per
+strategy, debug build with labels, compared with the dumps of 14209da
+(S2, before any stage): byte-identical for overlay and for tagged,
+including generations and indices. A release-build rerun gives identical
+overlay and tagged dumps as well.
+
+Gate (`passed / failed / ignored`, before (S4) → after S5+S6):
+
+| Command | Before | After |
+|---|---|---|
+| `cargo check … --no-default-features --features test-api` | ok | ok |
+| `cargo test -p context-read --no-default-features --features test-api` | 111 / 0 / 9 | 198 / 0 / 18 (+86 tagged scenarios and read gate, +9 tagged ignored, +1 `strategies_commit_identical_graphs`) |
+| `cargo test -p context-trace -p context-search -p context-insert --no-default-features --features test-api` | 95 / 0 / 12 | 101 / 0 / 12 (+6 tagged) |
+| `cargo test --release -p context-insert --no-default-features --features test-api insert_gate` | 1 / 0 / 0 | 1 / 0 / 0 |
+| `cargo test -p context-read --features legacy-tests` | 194 / 0 / 18 | 281 / 0 / 27 |
+| `cargo test -p context-trace -p context-search -p context-insert --features legacy-tests` | 317 / 0 / 47 | 323 / 0 / 47 |
+| `cargo build --workspace --all-targets --exclude context-editor-kernel --exclude sandbox-app` | ok | ok (no new warnings) |
+| `cargo bench -p context-read --bench staging --no-default-features --features test-api -- --baseline pre-staging` | — | ok (S6) |
+
+### S6 — benchmarks per strategy (2026-11-24)
+
+Benches (§7.1 "Implemented (S6)"): `staging` (`read/corpus/all`,
+`read/periodic/abc^n_x/n` and `find_ancestor/corpus_inputs_overlay` for
+(a), `…_tagged` for (b), `find_ancestor/corpus_inputs` on the committed
+store), `staging_commit` (`commit/overlay/abc^n_x/n`,
+`commit/tagged/abc^n_x/n`) and `staging_memory`.
+
+- **Baseline for strategy ids.** `--baseline pre-staging` panics for ids
+  without that baseline, and the pre-staging reader has no strategies. The
+  `pre-staging` data of `read/corpus/all_tagged`,
+  `read/periodic/abc^n_x_tagged/n` and `find_ancestor/corpus_inputs_{overlay,tagged}`
+  is a copy of the S0 measurement of the same workload (the id without
+  suffix; `target/criterion/<id>/pre-staging`, `benchmark.json` ids
+  adjusted). The S4 run of `corpus_inputs_overlay` had no `pre-staging`
+  data.
+- **Commit benches moved** to `staging_commit`: a commit has no
+  pre-staging counterpart. (b)'s replayed stage commits its atoms at once,
+  so its commit flips only the composites' tags.
+- **Peak memory** in a separate bench binary with a counting global
+  allocator, so `staging` keeps the allocator of the S0 baseline.
+
+Throughput (criterion point estimates, one run of the gate command;
+`(b) vs (a)` from the same binary):
+
+| Benchmark | S0 | S4 (overlay) | (a) overlay | vs S0 | (b) tagged | vs S0 | (b) vs (a) |
+|---|---|---|---|---|---|---|---|
+| `read/corpus/all` (1171 atoms) | 1.316 ms | 1.839 ms | 1.793 ms | +36 % | 1.605 ms | +22 % | −10.5 % |
+| `read/periodic/abc^n_x/64` | 828 µs | 1.031 ms | 1.001 ms | +21 % | 980 µs | +18 % | −2.1 % |
+| `read/periodic/abc^n_x/256` | 36.4 ms | 41.2 ms | 39.6 ms | +9 % | 39.9 ms | +10 % | +0.8 % |
+| `read/periodic/abc^n_x/512` | 333 ms | 380 ms | 361 ms | +8 % | 357 ms | +7 % | −0.9 % |
+| `find_ancestor/corpus_inputs` (committed) | 869 µs | 896 µs | 902 µs | +4 % | — | — | — |
+| `find_ancestor` through an empty stage view | (869 µs) | 869 µs | 882 µs | +1 % | 893 µs | +3 % | +1.3 % |
+| `commit/…/abc^n_x/64` (68 vertices) | — | 5.5 µs | 5.1 µs | 0.5 % of the read | 126 ns | 0.01 % | ÷40 |
+| `commit/…/abc^n_x/256` (260 vertices) | — | 18.6 µs | 17.8 µs | 0.04 % | 259 ns | 0.0006 % | ÷69 |
+| `commit/…/abc^n_x/512` (516 vertices) | — | 41.8 µs | 35.0 µs | 0.01 % | 390 ns | 0.0001 % | ÷90 |
+
+Single-strategy binaries, alternated three times (code placement: a
+binary instantiating both strategies runs the overlay corpus 3–5 % and
+the committed search 1–3 % slower than one with a single strategy; the
+S5 code built with the S4 bench source equals S4 within 1 % on
+`read/corpus/all` and `find_ancestor/corpus_inputs`, so S5 does not
+regress the committed store or the overlay):
+
+| Binary | `read/corpus/all` | `abc^256 x` | `find_ancestor/corpus_inputs` |
+|---|---|---|---|
+| S4 (overlay only) | 1.769 ms (+34 % vs S0) | 40.8 ms (+12 %) | 902 µs |
+| S5, tagged only | 1.547 ms (+18 %) | 39.6 ms (+9 %) | 889 µs |
+| S6 bench (both): overlay / tagged | 1.771 / 1.606 ms | 39.5 / 39.8 ms | 911 µs |
+
+Heap (`staging_memory`; KiB; corpus: maximum peak over the scenarios and
+total retained; reference: the reader of 14209da (S2, no stage; S0–S2
+change types only, the stored data is the same)):
+
+| Input | reference peak / retained | (a) overlay | (b) tagged |
+|---|---|---|---|
+| corpus | 40.5 / 462.0 | 53.9 / 460.3 | 41.1 / 472.2 |
+| `abc^64 x` | 59.8 / 44.2 | 56.8 / 40.1 | 60.8 / 45.2 |
+| `abc^256 x` | 224.8 / 171.7 | 212.8 / 154.1 | 228.8 / 175.7 |
+| `abc^512 x` | 444.8 / 341.7 | 420.8 / 306.1 | 452.8 / 349.7 |
+
+- The committed graphs are identical (S5 dumps); retained heap differs by
+  allocation slack and the state word: (b) = reference + 8 B per vertex
+  slot of the vertex vector (capacity 1024 for `abc^512 x`: +8 KiB); (a)
+  retains *less* than the reference because its commit reserves the
+  vertex vector exactly and rebuilds parent maps from sorted iterators
+  (compact B-tree nodes).
+- Peak: (a) needs the stage next to the growing base during the commit
+  (corpus, many small reads: +33 % peak); on long reads its compact
+  commit outweighs that. (b) has no transient structure.
+
+**Evaluation for a later revision of D-S1** (D-S1 itself unchanged):
+
+- Throughput: (b) is 10 % faster on many small reads (corpus) and equal
+  (±2 %) on long periodic reads; neither strategy costs anything
+  measurable for search through an empty stage. Commit: (b) is 40–90×
+  cheaper, but even (a)'s commit is below 1 % of a read.
+- Of the corpus overhead over S0, about half is common to both strategies
+  (tagged only +18 %): stage plumbing per read (open, a lock per view,
+  commit), `StageIndex` search instantiations and the reader's
+  editability checks through the stage; the other half is the overlay's
+  lookups and commit (S4 §11).
+- Memory: (b) +8 B per vertex permanently, no transient stage; (a) a
+  transient stage, a more compact committed graph.
+- Structure: (a) keeps the base read-only during a read (other readers
+  are unaffected, several overlays are possible, §4.4) and its stage is a
+  separate store, which suits the dissolution plan's removal of staged
+  vertices (a slab in the stage; in (b) removing staged vertices leaves
+  holes in the dense committed vector, so its commit would need a table
+  translation as (a)). (b) write-locks the graph for every view, so a
+  read blocks all other readers, and allows one open stage per graph.
+
+**Recommendation:** keep (a) overlay as the default through the
+dissolution plan, and keep (b) behind `TaggedStaging` for its comparison
+rerun (dissolution plan §6). The performance difference alone (−10 % on
+small reads, nothing on long ones) does not outweigh isolation and the
+simpler removal. Revisit D-S1 in favor of (b) only if, with `settle`, (b)
+keeps a corpus advantage of ≥ 10 % without a table translation at commit
+and concurrent reads stay out of scope; otherwise drop (b) after that
+rerun to halve the strategy instantiations (and their code-placement
+cost).
+
+Open:
+
+- The common per-read cost (+18 % corpus for (b) vs S0) is not
+  attributed further (no profiler available on this machine:
+  `perf_event_paranoid = 2`); candidates: one lock per view, the
+  editability check, `StageIndex` packing in search keys.
+- (b) is not safe against edits of the committed graph while a stage is
+  open (only pushes are debug-asserted); a stage generation check as (a)'s
+  `BaseChanged` would need a separate committed-edit counter.
+- The S0 baseline for the strategy ids is aliased (above); a later
+  baseline should be saved with `--save-baseline` from a single run.
