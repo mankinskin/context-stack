@@ -226,7 +226,7 @@ impl<G: GraphKind> StagingGraph<G> {
         base: &mut PositionedGraph<G>,
     ) -> Translation {
         let first = base.vertices.len();
-        let translation = Translation(
+        let translation = Translation::table(
             (first..first + self.vertices.len())
                 .map(VertexIndex)
                 .collect(),
@@ -238,7 +238,7 @@ impl<G: GraphKind> StagingGraph<G> {
                 .collect()
         };
         base.vertices.reserve(self.vertices.len());
-        for (vertex, &index) in self.vertices.into_iter().zip(&translation.0) {
+        for (vertex, &index) in self.vertices.into_iter().zip(translation.slots()) {
             let node = match vertex.node {
                 VertexNode::Atom(atom) => {
                     base.atoms.insert(atom, index);
@@ -252,6 +252,7 @@ impl<G: GraphKind> StagingGraph<G> {
                 index,
                 key: VertexKey::default(),
                 width: vertex.width,
+                state: VertexState::Committed,
                 node,
                 parents: links(vertex.parents),
                 #[cfg(debug_assertions)]
@@ -876,7 +877,11 @@ pub struct OverlayHandle<'g, G: GraphKind = BaseGraphKind> {
 impl<'g, G: GraphKind> OverlayHandle<'g, G> {
     /// Open an empty stage over `base`.
     pub fn open(base: &'g PositionedGraphRef<G>) -> Self {
-        let generation = base.read().generation;
+        let generation = {
+            let base = base.read();
+            assert!(base.stage.is_none(), "a tagged stage is open");
+            base.generation
+        };
         Self {
             base,
             stage: RefCell::new(StagingGraph::new(generation)),

@@ -34,29 +34,29 @@ use crate::{
     },
 };
 
-fn occ<I: VertexId>(
+pub(super) fn occ<I: VertexId>(
     offset: usize,
     token: Token<I>,
 ) -> Occurrence<I> {
     Occurrence::new(offset, token)
 }
 
-fn lift<I: VertexId + From<CommittedIndex>>(token: Token) -> Token<I> {
+pub(super) fn lift<I: VertexId + From<CommittedIndex>>(token: Token) -> Token<I> {
     Token::new(I::from(token.index), token.width)
 }
 
 /// The committed tokens of [`base`].
 #[derive(Clone, Copy)]
-struct Names {
-    a: Token,
-    b: Token,
-    ab: Token,
-    abab: Token,
-    ababab: Token,
+pub(super) struct Names {
+    pub(super) a: Token,
+    pub(super) b: Token,
+    pub(super) ab: Token,
+    pub(super) abab: Token,
+    pub(super) ababab: Token,
 }
 
 /// `ab = a@0, b@1`, `abab = ab@0, ab@2`, `ababab = abab@0, abab@2`.
-fn base() -> (PositionedGraph, Names) {
+pub(super) fn base() -> (PositionedGraph, Names) {
     let mut graph = PositionedGraph::default();
     let mut edit = graph.edit();
     let a = edit.atom('a');
@@ -77,9 +77,10 @@ fn base() -> (PositionedGraph, Names) {
     )
 }
 
-/// Exact equality: indices, widths, compositions, parent links, labels,
-/// atom index and generation (not the random vertex keys).
-fn assert_identical(
+/// Exact equality: indices, widths, states, compositions, parent links,
+/// labels, atom index, generation and no open stage (not the random vertex
+/// keys).
+pub(super) fn assert_identical(
     left: &PositionedGraph,
     right: &PositionedGraph,
 ) {
@@ -87,17 +88,18 @@ fn assert_identical(
         graph
             .vertices
             .iter()
-            .map(|v| format!("{} {:?} {:?}", v, v.node, v.parents))
+            .map(|v| format!("{} {:?} {:?} {:?}", v, v.state, v.node, v.parents))
             .collect::<Vec<_>>()
     };
     assert_eq!(strip(left), strip(right));
     assert_eq!(left.atoms, right.atoms);
     assert_eq!(left.generation, right.generation);
+    assert_eq!((left.stage, right.stage), (None, None));
 }
 
 /// Insertion of `baba` into `ababab` (insert plan §9.3) by hand, in two
 /// edits: new vertices in committed hosts, base links removed.
-fn insert_baba<S: GraphWrite<Kind = BaseGraphKind>>(
+pub(super) fn insert_baba<S: GraphWrite<Kind = BaseGraphKind>>(
     graph: &mut S,
     n: Names,
 ) -> Token<S::Index>
@@ -128,7 +130,7 @@ where
 
 /// New atom, new composites over committed children, and a staged host
 /// dropping a link it added to a committed child (`a@0` replaced by `ab@0`).
-fn new_atom_and_recompose<S: GraphWrite<Kind = BaseGraphKind>>(
+pub(super) fn new_atom_and_recompose<S: GraphWrite<Kind = BaseGraphKind>>(
     graph: &mut S,
     n: Names,
 ) -> Token<S::Index>

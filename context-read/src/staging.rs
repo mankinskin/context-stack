@@ -5,6 +5,7 @@ use context_trace::{
         OverlayHandle,
         PositionedGraphRef,
         StageHandle,
+        TaggedHandle,
     },
     BaseGraphKind,
 };
@@ -24,6 +25,18 @@ impl StagingStrategy for OverlayStaging {
     type Handle<'g> = OverlayHandle<'g>;
     fn open(graph: &PositionedGraphRef) -> OverlayHandle<'_> {
         OverlayHandle::open(graph)
+    }
+}
+
+/// (b): a stage tag on the vertices of the committed graph (staging plan
+/// §5).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TaggedStaging;
+
+impl StagingStrategy for TaggedStaging {
+    type Handle<'g> = TaggedHandle<'g>;
+    fn open(graph: &PositionedGraphRef) -> TaggedHandle<'_> {
+        TaggedHandle::open(graph)
     }
 }
 

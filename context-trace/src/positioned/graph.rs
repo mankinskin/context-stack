@@ -24,7 +24,11 @@ use super::{
     navigate::Navigate,
 };
 use super::{
-    access::GraphRead,
+    access::{
+        GraphRead,
+        VertexState,
+    },
+    tagged::StageId,
     check::validate_vertex,
     composition::{
         Composition,
@@ -66,6 +70,8 @@ pub struct PositionedVertex<G: GraphKind = BaseGraphKind> {
     pub(crate) index: VertexIndex,
     pub(crate) key: VertexKey,
     pub(crate) width: TokenWidth,
+    /// `Staged` only while a tagged stage is open (staging plan §5).
+    pub(crate) state: VertexState,
     pub(crate) node: VertexNode<AtomOf<G>>,
     /// Parent vertex → offsets at which this vertex occurs in it.
     pub(crate) parents: BTreeMap<VertexIndex, BTreeSet<AtomPosition>>,
@@ -86,6 +92,9 @@ impl<G: GraphKind> PositionedVertex<G> {
     }
     pub fn token(&self) -> Token {
         Token::new(self.index, self.width)
+    }
+    pub fn state(&self) -> VertexState {
+        self.state
     }
     pub fn node(&self) -> &VertexNode<AtomOf<G>> {
         &self.node
@@ -299,6 +308,8 @@ pub struct PositionedGraph<G: GraphKind = BaseGraphKind> {
     pub(crate) atoms: HashMap<AtomOf<G>, VertexIndex>,
     /// Bumped by the first mutation of every edit.
     pub(crate) generation: u64,
+    /// The open tagged stage, if any (staging plan §5).
+    pub(crate) stage: Option<StageId>,
 }
 
 impl<G: GraphKind> Default for PositionedGraph<G> {
@@ -307,6 +318,7 @@ impl<G: GraphKind> Default for PositionedGraph<G> {
             vertices: Vec::new(),
             atoms: HashMap::new(),
             generation: 0,
+            stage: None,
         }
     }
 }

@@ -11,6 +11,7 @@ use crate::{
         CommittedIndex,
         StageIndex,
         VertexId,
+        VertexIndex,
         has_vertex_index::HasVertexIndex,
         wide::Wide,
     },
@@ -222,6 +223,23 @@ impl Composition<CommittedIndex> {
         // (`StageIndex::from` asserts it), so each lifted index addresses
         // the same committed vertex.
         unsafe { std::slice::from_raw_parts(self.0.as_ptr().cast(), self.0.len()) }
+    }
+}
+
+impl Composition<StageIndex> {
+    /// The stored form in a tag stage: every child index as its slot.
+    pub(crate) fn into_slots(self) -> Composition<CommittedIndex> {
+        Composition(
+            self.0
+                .into_iter()
+                .map(|o| {
+                    Occurrence::new(
+                        o.offset,
+                        Token::new(VertexIndex(o.child.index.slot()), o.child.width),
+                    )
+                })
+                .collect(),
+        )
     }
 }
 

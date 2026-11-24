@@ -16,6 +16,7 @@ use crate::{
         CommittedIndex,
         StageIndex,
         StagedIndex,
+        VertexIndex,
     },
 };
 
@@ -26,21 +27,51 @@ pub trait Stage: GraphWrite<Index = StageIndex> {
     fn staged(&self) -> impl Iterator<Item = StagedIndex> + '_;
 }
 
-/// Staged → committed, indexed by [`StagedIndex`]; committed indices are
-/// unchanged.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Translation(pub(crate) Vec<CommittedIndex>);
+/// Staged → committed; committed indices are unchanged.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Translation(Map);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Map {
+    /// Committed index by [`StagedIndex`] slot (overlay: vertices moved).
+    Table(Vec<CommittedIndex>),
+    /// A staged slot is its committed slot (tag: only the tag bit is
+    /// cleared); the number of formerly staged vertices.
+    Untag(usize),
+}
+
+impl Default for Translation {
+    fn default() -> Self {
+        Self(Map::Table(Vec::new()))
+    }
+}
 
 impl Translation {
+    pub(crate) fn table(committed: Vec<CommittedIndex>) -> Self {
+        Self(Map::Table(committed))
+    }
+    pub(crate) fn untag(staged: usize) -> Self {
+        Self(Map::Untag(staged))
+    }
+    /// The committed indices of a table, by staged slot.
+    pub(crate) fn slots(&self) -> &[CommittedIndex] {
+        match &self.0 {
+            Map::Table(committed) => committed,
+            Map::Untag(_) => &[],
+        }
+    }
     /// # Panics
-    /// If `index` is staged but not part of the committed stage.
+    /// If `index` is staged but not part of the committed stage (overlay).
     pub fn index(
         &self,
         index: StageIndex,
     ) -> CommittedIndex {
-        match index.split() {
-            Either::Left(committed) => committed,
-            Either::Right(staged) => self.0[staged.slot()],
+        match (index.split(), &self.0) {
+            (Either::Left(committed), _) => committed,
+            (Either::Right(staged), Map::Table(committed)) =>
+                committed[staged.slot()],
+            (Either::Right(staged), Map::Untag(_)) =>
+                VertexIndex(staged.slot()),
         }
     }
     pub fn token(
@@ -51,10 +82,13 @@ impl Translation {
     }
     /// Number of translated (formerly staged) vertices.
     pub fn len(&self) -> usize {
-        self.0.len()
+        match &self.0 {
+            Map::Table(committed) => committed.len(),
+            &Map::Untag(staged) => staged,
+        }
     }
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.len() == 0
     }
 }
 

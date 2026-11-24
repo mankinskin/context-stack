@@ -6,4 +6,5 @@ mod interchange;
 mod model;
 mod navigation;
 mod overlay;
+mod tagged;
 mod trace;

@@ -15,11 +15,14 @@
 #[allow(dead_code)]
 mod support;
 
-use context_read::{Commit, StagingStrategy, Step, StepKind};
-use context_trace::positioned::{
-    diff,
-    fixtures::{read_cases, ReadCase},
-    PositionedGraph, PositionedGraphRef,
+use context_read::{Commit, OverlayStaging, StagingStrategy, Step, StepKind, TaggedStaging};
+use context_trace::{
+    positioned::{
+        diff,
+        fixtures::{read_cases, ReadCase},
+        GraphRead, PositionedGraph, PositionedGraphRef,
+    },
+    Token,
 };
 use support::positioned::load_positioned;
 
@@ -188,7 +191,69 @@ macro_rules! strategies {
     )*};
 }
 
-strategies!(overlay: context_read::OverlayStaging);
+strategies!(
+    overlay: context_read::OverlayStaging,
+    tagged: context_read::TaggedStaging,
+);
+
+/// The exact committed graph (generation, every vertex with index, width,
+/// state, composition, parent links and label) and the returned root.
+fn dump(graph: &PositionedGraphRef, root: Option<Token>) -> String {
+    let graph = graph.read();
+    let mut out = format!("{root:?} {:?}\n", graph.generation());
+    for vertex in graph.vertices() {
+        let data = vertex.data();
+        #[cfg(debug_assertions)]
+        let label = data.label();
+        #[cfg(not(debug_assertions))]
+        let label = "";
+        out += &format!(
+            "{} {:?} {:?} {:?} {:?} {label:?}\n",
+            data.index(),
+            data.width(),
+            data.state(),
+            data.node(),
+            data.parents()
+        );
+    }
+    out
+}
+
+/// Differential test of the strategies (staging plan §7.2): reads through
+/// (a) and (b) commit exactly the same graph after every read, including
+/// indices (both commit in creation order; (b) commits new atoms at once),
+/// for the corpus, the read lane and a long periodic input.
+#[test]
+fn strategies_commit_identical_graphs() {
+    fn reads<S: StagingStrategy>(base: &PositionedGraph, inputs: &[String]) -> Vec<String> {
+        let graph = PositionedGraphRef::new(base.clone());
+        inputs
+            .iter()
+            .map(|input| dump(&graph, context_read::read_with::<S>(&graph, input.chars())))
+            .collect()
+    }
+    let mut cases: Vec<(String, PositionedGraph, Vec<String>)> = support::positioned::scenarios()
+        .into_iter()
+        .map(|scenario| (scenario.name, PositionedGraph::default(), scenario.inputs))
+        .collect();
+    for case in read_cases() {
+        let base = case
+            .base
+            .as_ref()
+            .map_or_else(PositionedGraph::default, |base| {
+                PositionedGraph::from_interchange(&base.graph).unwrap()
+            });
+        cases.push((case.name, base, vec![case.input]));
+    }
+    cases.push(("abc^64 x".into(), PositionedGraph::default(), vec![format!("{}x", "abc".repeat(64))]));
+    for (name, base, inputs) in &cases {
+        assert_eq!(
+            reads::<OverlayStaging>(base, inputs),
+            reads::<TaggedStaging>(base, inputs),
+            "{name}"
+        );
+    }
+}
 
 /// Every positioned manifest entry has exactly one scenario test above.
 #[test]

@@ -146,7 +146,7 @@ impl<'a, G: GraphKind> VertexRead<'a> for PositionedVertexRef<'a, G> {
             .is_some_and(|offsets| offsets.contains(&offset))
     }
     fn state(self) -> VertexState {
-        VertexState::Committed
+        self.vertex.state
     }
     fn resolve(
         self,
@@ -223,11 +223,16 @@ impl<G: GraphKind> raw::Write for PositionedGraph<G> {
         node: VertexNode<AtomOf<G>>,
         width: TokenWidth,
     ) -> CommittedIndex {
+        debug_assert!(
+            self.stage.is_none(),
+            "committed edit while a tagged stage is open"
+        );
         let index = VertexIndex(self.vertices.len());
         self.vertices.push(PositionedVertex {
             index,
             key: VertexKey::default(),
             width,
+            state: VertexState::Committed,
             #[cfg(debug_assertions)]
             label: String::new(),
             node,

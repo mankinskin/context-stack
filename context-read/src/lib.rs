@@ -18,6 +18,7 @@ pub use staging::{
     DefaultStaging,
     OverlayStaging,
     StagingStrategy,
+    TaggedStaging,
 };
 
 /// Row-model reader, fenced off from the model-agnostic root.

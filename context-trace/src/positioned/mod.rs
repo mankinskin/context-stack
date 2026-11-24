@@ -13,7 +13,9 @@
 //! [`PositionedGraphRef`]) implements them (`committed.rs`). A read edits a
 //! stage ([`Stage`], [`StageHandle`], `stage.rs`); the overlay stage
 //! ([`OverlayHandle`], [`OverlayView`], `overlay.rs`) keeps its vertices
-//! next to the read-only committed graph until the commit.
+//! next to the read-only committed graph until the commit; the tagged stage
+//! ([`TaggedHandle`], [`TaggedView`], `tagged.rs`) writes into the committed
+//! graph and marks its vertices [`VertexState::Staged`] until the commit.
 //!
 //! Read-only navigation (reader plan Phase 2) is split into separate APIs:
 //! - content reading (debug and `test-api` builds):
@@ -45,6 +47,7 @@ mod navigate;
 mod overlay;
 pub mod path;
 mod stage;
+mod tagged;
 pub mod trace;
 
 #[cfg(feature = "edit")]
@@ -54,6 +57,7 @@ pub use self::edit::GraphEdit;
 pub use self::{
     graph::PositionedLabels,
     overlay::OverlayLabels,
+    tagged::TaggedLabels,
 };
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
 pub use self::location::IntervalView;
@@ -80,6 +84,13 @@ pub use self::{
         OverlayView,
         StagedVertex,
         StagingGraph,
+    },
+    tagged::{
+        StageId,
+        TaggedComposition,
+        TaggedHandle,
+        TaggedVertex,
+        TaggedView,
     },
     stage::{
         CommitError,
