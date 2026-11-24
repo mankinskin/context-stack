@@ -3,12 +3,12 @@
 
 use context_trace::{
     positioned::{
-        PositionedGraph,
+        GraphRead,
         TraceCache,
         TraceCtx,
     },
-    GraphKind,
     Token,
+    VertexId,
 };
 
 use crate::{
@@ -24,25 +24,25 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub(crate) enum BfsStepResult {
+pub(crate) enum BfsStepResult<I: VertexId> {
     Expanded,
-    FoundMatch(MatchedCompareState),
+    FoundMatch(MatchedCompareState<I>),
     Skipped,
     Empty,
 }
 
 #[derive(Debug)]
-pub(crate) struct SearchIterator<'g, G: GraphKind, K: SearchKind> {
+pub(crate) struct SearchIterator<'g, G: GraphRead + ?Sized, K: SearchKind> {
     pub(crate) trace_ctx: TraceCtx<'g, G>,
-    pub(crate) queue: SearchQueue,
+    pub(crate) queue: SearchQueue<G::Index>,
     _kind: std::marker::PhantomData<K>,
 }
 
-impl<'g, G: GraphKind, K: SearchKind> SearchIterator<'g, G, K> {
+impl<'g, G: GraphRead + ?Sized, K: SearchKind> SearchIterator<'g, G, K> {
     pub(crate) fn new(
-        graph: &'g PositionedGraph<G>,
-        start_index: Token,
-        batch: CompareParentBatch,
+        graph: &'g G,
+        start_index: Token<G::Index>,
+        batch: CompareParentBatch<G::Index>,
     ) -> Self {
         let mut queue = SearchQueue::new();
         queue.extend(
@@ -57,11 +57,11 @@ impl<'g, G: GraphKind, K: SearchKind> SearchIterator<'g, G, K> {
             _kind: std::marker::PhantomData,
         }
     }
-    pub(crate) fn graph(&self) -> &'g PositionedGraph<G> {
+    pub(crate) fn graph(&self) -> &'g G {
         self.trace_ctx.graph
     }
 
-    pub(crate) fn pop_and_process_one(&mut self) -> BfsStepResult {
+    pub(crate) fn pop_and_process_one(&mut self) -> BfsStepResult<G::Index> {
         let Some(node) = self.queue.pop() else {
             return BfsStepResult::Empty;
         };
@@ -111,7 +111,7 @@ impl<'g, G: GraphKind, K: SearchKind> SearchIterator<'g, G, K> {
     }
 
     /// Pop nodes until a root matches; `None` if the queue runs empty.
-    pub(crate) fn find_next_root_match(&mut self) -> Option<MatchedCompareState> {
+    pub(crate) fn find_next_root_match(&mut self) -> Option<MatchedCompareState<G::Index>> {
         loop {
             match self.pop_and_process_one() {
                 BfsStepResult::Expanded | BfsStepResult::Skipped => continue,

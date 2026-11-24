@@ -6,8 +6,12 @@
 //! same input is *known* (legacy `NewAtomIndex::{New, Known}`).
 
 use context_trace::{
+    ToToken,
     Token,
-    positioned::PositionedGraphRef,
+    positioned::{
+        GraphRead,
+        PositionedGraphRef,
+    },
 };
 
 /// One run of unknown atoms followed by one run of known atoms (legacy
@@ -29,7 +33,7 @@ pub(crate) fn segments(
     let mut edit = graph.edit();
     let mut segments: Vec<Segment> = Vec::new();
     for c in chars {
-        let known = edit.graph().atom_token(&c);
+        let known = edit.graph().atom(&c).map(|atom| atom.to_token());
         let token = known.unwrap_or_else(|| edit.atom(c));
         match (known.is_some(), segments.last_mut()) {
             (true, Some(segment)) => segment.known.push(token),
@@ -60,7 +64,7 @@ mod tests {
         let (graph, _) = fixture("linear_abc");
         let generation = graph.read().generation();
         let segments = segments(&graph, "xabyyc".chars());
-        let atom = |c| graph.read().atom_token(&c).unwrap();
+        let atom = |c| graph.read().atom(&c).unwrap().to_token();
         assert_eq!(
             segments,
             vec![
@@ -74,7 +78,7 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(graph.read().generation(), generation + 1);
+        assert_eq!(graph.read().generation().base, generation.base + 1);
         graph.read().validate().unwrap();
     }
 
@@ -93,7 +97,7 @@ mod tests {
     fn repeat_inside_one_input_is_known() {
         let graph = PositionedGraphRef::default();
         let segments = segments(&graph, "aab".chars());
-        let atom = |c| graph.read().atom_token(&c).unwrap();
+        let atom = |c| graph.read().atom(&c).unwrap().to_token();
         assert_eq!(
             segments,
             vec![

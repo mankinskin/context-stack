@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::{
+    graph::vertex::id::Plain,
     AtomPosition,
     Token,
     TokenWidth,
@@ -71,7 +72,7 @@ pub enum CompositionError<I: VertexId = CommittedIndex> {
     Gap(AtomPosition),
 }
 
-impl fmt::Display for CompositionError {
+impl<I: VertexId> fmt::Display for CompositionError<I> {
     fn fmt(
         &self,
         f: &mut fmt::Formatter<'_>,
@@ -79,19 +80,22 @@ impl fmt::Display for CompositionError {
         match self {
             Self::TooFew => f.write_str("a composition needs at least two occurrences"),
             Self::Duplicate(o) => {
-                write!(f, "duplicate occurrence {}@{}", o.child.index.0, o.offset)
+                write!(f, "duplicate occurrence {}@{}", Plain(o.child.index), o.offset)
             },
             Self::Contained { inner, outer } => write!(
                 f,
                 "occurrence {}@{} is contained in {}@{}",
-                inner.child.index.0, inner.offset, outer.child.index.0, outer.offset
+                Plain(inner.child.index),
+                inner.offset,
+                Plain(outer.child.index),
+                outer.offset
             ),
             Self::Gap(position) => write!(f, "position {position} is not covered"),
         }
     }
 }
 
-impl std::error::Error for CompositionError {}
+impl<I: VertexId> std::error::Error for CompositionError<I> {}
 
 /// Complete composition of a non-atom vertex: occurrences sorted by
 /// `(offset, width)`, without duplicates or wholly contained intervals,
@@ -192,6 +196,11 @@ impl<I: VertexId> Composition<I> {
     /// The unique occurrence at offset 0.
     pub fn prefix(&self) -> &Occurrence<I> {
         &self.0[0]
+    }
+    /// The unique occurrence ending at the width: ends increase strictly
+    /// with offsets, so it is the last one.
+    pub fn postfix(&self) -> &Occurrence<I> {
+        self.0.last().expect("a composition has at least two occurrences")
     }
 }
 

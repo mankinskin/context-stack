@@ -53,6 +53,8 @@ pub(crate) fn find_complete(
 
 #[cfg(test)]
 mod tests {
+    use context_trace::positioned::GraphRead;
+
     use super::*;
     use crate::tests::fixture;
 

@@ -6,10 +6,10 @@ use std::ops::ControlFlow;
 
 use context_trace::{
     positioned::{
-        PositionedGraph,
+        GraphRead,
         StateAdvance,
     },
-    GraphKind,
+    VertexId,
 };
 
 use super::core::{
@@ -26,9 +26,9 @@ use crate::cursor::{
     Mismatched,
 };
 
-impl MarkMatchState for CompareState<Candidate, Candidate> {
-    type Matched = CompareState<Matched, Matched>;
-    type Mismatched = CompareState<Mismatched, Mismatched>;
+impl<X: VertexId> MarkMatchState for CompareState<Candidate, Candidate, X> {
+    type Matched = CompareState<Matched, Matched, X>;
+    type Mismatched = CompareState<Mismatched, Mismatched, X>;
 
     /// Both leaves matched: the query checkpoint moves to the query leaf,
     /// the child span extends over the graph leaf.
@@ -51,13 +51,13 @@ impl MarkMatchState for CompareState<Candidate, Candidate> {
     }
 }
 
-impl CompareState<Matched, Matched> {
+impl<X: VertexId> CompareState<Matched, Matched, X> {
     /// Advance the query candidate to the next query token.
     /// `Exhausted` (unchanged) at the query end.
-    pub(crate) fn advance_query_cursor<G: GraphKind>(
+    pub(crate) fn advance_query_cursor<G: GraphRead<Index = X> + ?Sized>(
         mut self,
-        graph: &PositionedGraph<G>,
-    ) -> QueryAdvanceResult {
+        graph: &G,
+    ) -> QueryAdvanceResult<X> {
         match self.query.candidate_mut().advance(graph) {
             ControlFlow::Continue(()) => {
                 let candidate = self.query.candidate().clone().with_state::<Candidate>();
@@ -73,13 +73,13 @@ impl CompareState<Matched, Matched> {
     }
 }
 
-impl CompareState<Candidate, Matched> {
+impl<X: VertexId> CompareState<Candidate, Matched, X> {
     /// Advance the child candidate to the graph token at the matched end
     /// (corrected pop rule). `Exhausted` (unchanged) at the root end.
-    pub(crate) fn advance_index_cursor<G: GraphKind>(
+    pub(crate) fn advance_index_cursor<G: GraphRead<Index = X> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> IndexAdvanceResult {
+        graph: &G,
+    ) -> IndexAdvanceResult<X> {
         match self
             .child
             .candidate()

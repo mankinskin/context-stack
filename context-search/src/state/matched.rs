@@ -19,7 +19,8 @@ use context_trace::{
         ChildState,
         End,
         EndPath,
-        PositionedGraph,
+        GraphRead,
+        Navigate,
         PostfixCommand,
         PrefixCommand,
         QueryAnchor,
@@ -31,11 +32,12 @@ use context_trace::{
         Traceable,
     },
     AtomPosition,
+    CommittedIndex,
     DownKey,
     DownPosition,
-    GraphKind,
     Token,
     UpPosition,
+    VertexId,
 };
 
 use crate::cursor::{
@@ -49,21 +51,21 @@ use crate::cursor::{
 /// The query cursor of a result: the checkpoint (last matched query leaf)
 /// and, after an inconclusive root, the candidate advanced past it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CheckpointedCursor {
-    AtCheckpoint(Checkpointed<QueryCursor<Matched>, AtCheckpoint>),
-    HasCandidate(Checkpointed<QueryCursor<Matched>, HasCandidate>),
+pub enum CheckpointedCursor<I: VertexId = CommittedIndex> {
+    AtCheckpoint(Checkpointed<QueryCursor<Matched, I>, AtCheckpoint>),
+    HasCandidate(Checkpointed<QueryCursor<Matched, I>, HasCandidate>),
 }
 
-impl CheckpointedCursor {
+impl<I: VertexId> CheckpointedCursor<I> {
     /// The last matched query leaf; `atom_position` is the match end.
-    pub fn checkpoint(&self) -> &QueryCursor<Matched> {
+    pub fn checkpoint(&self) -> &QueryCursor<Matched, I> {
         match self {
             Self::AtCheckpoint(c) => c.checkpoint(),
             Self::HasCandidate(c) => c.checkpoint(),
         }
     }
     /// The candidate if present, else the checkpoint (legacy `cursor()`).
-    pub fn cursor(&self) -> &QueryCursor<Matched> {
+    pub fn cursor(&self) -> &QueryCursor<Matched, I> {
         match self {
             Self::AtCheckpoint(c) => c.checkpoint(),
             Self::HasCandidate(c) => c.candidate(),
@@ -80,15 +82,15 @@ impl CheckpointedCursor {
 /// - `target`: down key of the end leaf;
 /// - `end_pos`: query position at the match end.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MatchedRange {
-    pub path: RangePath,
+pub struct MatchedRange<I: VertexId = CommittedIndex> {
+    pub path: RangePath<Token<I>>,
     pub entry_pos: UpPosition,
     pub exit_pos: DownPosition,
-    pub target: DownKey,
+    pub target: DownKey<I>,
     pub end_pos: AtomPosition,
 }
 
-impl MatchedRange {
+impl<I: VertexId> MatchedRange<I> {
     /// Query position of the match start (`span.start`).
     pub fn query_start(&self) -> AtomPosition {
         AtomPosition::from(*self.end_pos - (*self.path.span.end - *self.path.span.start))
@@ -106,30 +108,30 @@ impl MatchedRange {
 /// query token matched and that token is an atom (legacy `EntireRoot` of
 /// `q0`); an unmatched composite `q0` carries its canonical paths.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EntireRootEnd {
-    pub root: Token,
+pub struct EntireRootEnd<I: VertexId = CommittedIndex> {
+    pub root: Token<I>,
     pub query_start: AtomPosition,
-    pub path: Option<MatchedRange>,
+    pub path: Option<MatchedRange<I>>,
 }
 
 /// How the match covers its root (legacy `PathCoverage`), classified by
 /// [`SpanCoverage`] from the span.
 #[derive(Clone, Debug, PartialEq, Eq, strum::AsRefStr)]
-pub enum PathCoverage {
-    Range(MatchedRange),
-    Postfix(MatchedRange),
-    Prefix(MatchedRange),
-    EntireRoot(EntireRootEnd),
+pub enum PathCoverage<I: VertexId = CommittedIndex> {
+    Range(MatchedRange<I>),
+    Postfix(MatchedRange<I>),
+    Prefix(MatchedRange<I>),
+    EntireRoot(EntireRootEnd<I>),
 }
 
-impl PathCoverage {
+impl<I: VertexId> PathCoverage<I> {
     /// Classify the matched child state. The end path is replaced by the
     /// canonical one (2.4: descent to the largest token ending at the span
     /// end), so it depends only on root and span, not on the leaves the
     /// comparison went through; the start path is the climbed chain.
-    pub(crate) fn from_child_state<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        mut state: ChildState,
+    pub(crate) fn from_child_state<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        mut state: ChildState<I>,
         end_pos: AtomPosition,
     ) -> Self {
         let anchor = state.anchor();
@@ -170,12 +172,12 @@ impl PathCoverage {
     /// prefix child, i.e. `start_at(token, 0)`, and `end_at(token, width)`),
     /// as the equivalent atom query matching the whole token returns them;
     /// both are functions of root and span, no content is read.
-    pub(crate) fn entire_token<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        token: Token,
+    pub(crate) fn entire_token<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        token: Token<I>,
         query_start: AtomPosition,
     ) -> Self {
-        let Some(prefix) = graph.prefix_child(token) else {
+        let Some(prefix) = graph.vertex(token).and_then(|v| v.prefix_child()) else {
             return Self::EntireRoot(EntireRootEnd {
                 root: token,
                 query_start,
@@ -196,14 +198,14 @@ impl PathCoverage {
         debug_assert!(matches!(path, Self::EntireRoot(_)));
         path
     }
-    pub fn root(&self) -> Token {
+    pub fn root(&self) -> Token<I> {
         match self {
             Self::EntireRoot(end) => end.root,
             Self::Range(r) | Self::Postfix(r) | Self::Prefix(r) => r.path.root(),
         }
     }
     /// The matched range with paths; `None` for an unmatched first token.
-    pub fn range(&self) -> Option<&MatchedRange> {
+    pub fn range(&self) -> Option<&MatchedRange<I>> {
         match self {
             Self::EntireRoot(end) => end.path.as_ref(),
             Self::Range(r) | Self::Postfix(r) | Self::Prefix(r) => Some(r),
@@ -238,19 +240,20 @@ impl PathCoverage {
             Self::EntireRoot(_) => SpanCoverage::EntireRoot,
         }
     }
-    pub fn start_path(&self) -> Option<&StartPath> {
+    pub fn start_path(&self) -> Option<&StartPath<I>> {
         self.range().map(|r| &r.path.start)
     }
-    pub fn end_path(&self) -> Option<&EndPath> {
+    pub fn end_path(&self) -> Option<&EndPath<I>> {
         self.range().map(|r| &r.path.end)
     }
 }
 
-impl Traceable for &PathCoverage {
+impl<I: VertexId> Traceable for &PathCoverage<I> {
+    type Index = I;
     /// As legacy: up edges along the start path for `Postfix`, down edges
     /// along the end path for `Prefix`, both for `Range`, nothing for
     /// `EntireRoot`.
-    fn trace<G: GraphKind>(
+    fn trace<G: GraphRead<Index = I> + ?Sized>(
         self,
         ctx: &mut TraceCtx<'_, G>,
     ) {
@@ -277,15 +280,15 @@ impl Traceable for &PathCoverage {
 
 /// A match in one root: the classified path and the query cursor.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MatchResult {
-    pub path: PathCoverage,
-    pub cursor: CheckpointedCursor,
+pub struct MatchResult<I: VertexId = CommittedIndex> {
+    pub path: PathCoverage<I>,
+    pub cursor: CheckpointedCursor<I>,
 }
 
-impl MatchResult {
+impl<I: VertexId> MatchResult<I> {
     pub(crate) fn new(
-        path: PathCoverage,
-        cursor: CheckpointedCursor,
+        path: PathCoverage<I>,
+        cursor: CheckpointedCursor<I>,
     ) -> Self {
         let result = Self { path, cursor };
         debug_assert_eq!(
@@ -298,17 +301,17 @@ impl MatchResult {
         );
         result
     }
-    pub fn path(&self) -> &PathCoverage {
+    pub fn path(&self) -> &PathCoverage<I> {
         &self.path
     }
-    pub fn root_parent(&self) -> Token {
+    pub fn root_parent(&self) -> Token<I> {
         self.path.root()
     }
     /// The candidate if present, else the checkpoint (legacy `cursor()`).
-    pub fn cursor(&self) -> &QueryCursor<Matched> {
+    pub fn cursor(&self) -> &QueryCursor<Matched, I> {
         self.cursor.cursor()
     }
-    pub fn checkpoint(&self) -> &QueryCursor<Matched> {
+    pub fn checkpoint(&self) -> &QueryCursor<Matched, I> {
         self.cursor.checkpoint()
     }
     /// The whole query matched.
@@ -320,8 +323,9 @@ impl MatchResult {
     }
 }
 
-impl Traceable for &MatchResult {
-    fn trace<G: GraphKind>(
+impl<I: VertexId> Traceable for &MatchResult<I> {
+    type Index = I;
+    fn trace<G: GraphRead<Index = I> + ?Sized>(
         self,
         ctx: &mut TraceCtx<'_, G>,
     ) {

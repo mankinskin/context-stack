@@ -6,6 +6,7 @@ use crate::{
     Token,
     graph::vertex::VertexIndex,
     positioned::{
+        GraphRead,
         Occurrence,
         PositionedError,
         PositionedGraph,
@@ -29,7 +30,7 @@ fn links(
     child: Token,
 ) -> Vec<(VertexIndex, usize)> {
     graph
-        .vertex(child.index)
+        .vertex_data(child.index)
         .unwrap()
         .parents()
         .iter()
@@ -132,7 +133,7 @@ fn create_and_add_occurrences_keep_the_graph_valid_and_maintain_links() {
     assert_eq!(links(&graph, bab), [(abab.index, 1), (baba.index, 0)]);
     assert_eq!(links(&graph, baba), [(ababab.index, 1)]);
     #[cfg(debug_assertions)]
-    assert_eq!(graph.vertex(baba.index).unwrap().label(), "baba");
+    assert_eq!(graph.vertex_data(baba.index).unwrap().label(), "baba");
 }
 
 #[test]
@@ -166,9 +167,9 @@ fn extend_grows_a_parentless_vertex() {
     );
     assert_eq!(links(&graph, ab), [(root.index, 0), (root.index, 3)]);
     assert_eq!(links(&graph, bc), [(root.index, 4)]);
-    assert_eq!(graph.vertex(root.index).unwrap().token(), abcabc);
+    assert_eq!(graph.vertex_data(root.index).unwrap().token(), abcabc);
     #[cfg(debug_assertions)]
-    assert_eq!(graph.vertex(root.index).unwrap().label(), "abcabc");
+    assert_eq!(graph.vertex_data(root.index).unwrap().label(), "abcabc");
 }
 
 #[test]
@@ -211,6 +212,14 @@ fn add_occurrences_and_extend_reject_inputs_outside_their_preconditions() {
             vertex: ababab.index,
             occurrence: occ(4, ab),
         })
+    );
+    assert_eq!(
+        edit.add_occurrences(a.index, vec![occ(0, a)]),
+        Err(PositionedError::Atom(a.index))
+    );
+    assert_eq!(
+        edit.extend(a.index, occ(1, a)),
+        Err(PositionedError::Atom(a.index))
     );
     assert_eq!(edit.finish(), Publication::default());
     assert!(
@@ -287,7 +296,7 @@ fn generation_bumps_once_per_mutating_edit() {
         ab,
         ..
     } = ababab();
-    let start = graph.generation();
+    let start = graph.generation().base;
     assert!(start > 0, "building the graph was an edit");
 
     let mut edit = graph.edit();
@@ -295,19 +304,27 @@ fn generation_bumps_once_per_mutating_edit() {
     assert_eq!(edit.atom('b'), b);
     assert!(edit.create(vec![occ(0, ab)]).is_err());
     assert_eq!(edit.finish(), Publication::default());
-    assert_eq!(graph.generation(), start, "existing atoms and rejections");
+    assert_eq!(
+        graph.generation().base,
+        start,
+        "existing atoms and rejections"
+    );
 
     let mut edit = graph.edit();
     let c = edit.atom('c');
     edit.create(vec![occ(0, ab), occ(2, c)]).unwrap();
     edit.finish();
-    assert_eq!(graph.generation(), start + 1, "once per edit");
+    assert_eq!(graph.generation().base, start + 1, "once per edit");
 
     {
         let mut edit = graph.edit();
         edit.create(vec![occ(0, b), occ(1, a)]).unwrap();
     }
-    assert_eq!(graph.generation(), start + 2, "also for a dropped edit");
+    assert_eq!(
+        graph.generation().base,
+        start + 2,
+        "also for a dropped edit"
+    );
 }
 
 #[test]
@@ -344,7 +361,7 @@ fn maximal_drops_duplicates_and_contained_occurrences() {
 #[test]
 fn crossing_equals_the_brute_force_filter_on_every_fixture_composition() {
     for fixture in fixture_graphs() {
-        for vertex in fixture.graph.vertices() {
+        for vertex in fixture.graph.vertices.iter() {
             let Some(composition) = vertex.composition() else {
                 continue;
             };

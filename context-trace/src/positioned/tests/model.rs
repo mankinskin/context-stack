@@ -9,6 +9,8 @@ use crate::{
     positioned::{
         Composition,
         CompositionError,
+        GraphRead,
+        Navigate,
         Occurrence,
         OccurrenceLocation,
         PositionedError,
@@ -47,7 +49,7 @@ fn create_links_parents_and_rejects_incomplete_compositions() {
     assert_eq!(ababa.width.0, 5);
     let offsets: Vec<_> = edit
         .graph()
-        .vertex(aba.index).unwrap().parents()[&ababa.index]
+        .vertex_data(aba.index).unwrap().parents()[&ababa.index]
         .iter()
         .map(|offset| offset.0)
         .collect();
@@ -119,12 +121,12 @@ fn occurrence_paths_and_intervals_are_checked_against_the_graph() {
         offset: offset.into(),
         child: child.index,
     };
-    assert!(graph.contains_path(&[step(ababa, 2, aba), step(aba, 1, b)]));
-    assert!(!graph.contains_path(&[step(ababa, 1, aba)]));
+    assert!(graph.vertex(ababa).unwrap().contains_path(&[step(ababa, 2, aba), step(aba, 1, b)]));
+    assert!(!graph.vertex(ababa).unwrap().contains_path(&[step(ababa, 1, aba)]));
 
     let range = |start: usize, end: usize| AtomPosition::from(start)..AtomPosition::from(end);
-    assert!(graph.interval(ababa.index, range(1, 4)).is_some());
-    assert!(graph.interval(ababa.index, range(3, 6)).is_none());
+    assert!(graph.vertex(ababa.index).and_then(|v| v.interval(range(1, 4))).is_some());
+    assert!(graph.vertex(ababa.index).and_then(|v| v.interval(range(3, 6))).is_none());
 }
 
 /// A second `ab` is rejected by `create`; added by field access, it is

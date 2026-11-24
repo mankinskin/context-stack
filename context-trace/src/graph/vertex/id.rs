@@ -91,6 +91,22 @@ impl fmt::Debug for StagedIndex {
     }
 }
 
+/// Displays an index without name resolution: the plain slot for committed
+/// indices (as `VertexIndex::0`), else the index's own display (`s<slot>`).
+pub(crate) struct Plain<I>(pub I);
+
+impl<I: VertexId> fmt::Display for Plain<I> {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        match self.0.committed() {
+            Some(committed) => write!(f, "{}", committed.0),
+            None => fmt::Display::fmt(&self.0, f),
+        }
+    }
+}
+
 const STAGED_BIT: usize = 1 << (usize::BITS - 1);
 
 /// Index space of a stage: a committed or a staged index, packed into one

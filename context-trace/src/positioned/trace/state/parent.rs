@@ -14,13 +14,16 @@ use derive_more::{
 use crate::{
     AtomPosition,
     DirectedKey,
-    GraphKind,
     Token,
     UpKey,
     UpPosition,
-    graph::vertex::wide::Wide,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+        wide::Wide,
+    },
     positioned::{
-        graph::PositionedGraph,
+        access::GraphRead,
         path::{
             EndPath,
             RangePath,
@@ -41,9 +44,17 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Deref, DerefMut, Default)]
-pub struct ParentBatch {
-    pub parents: VecDeque<ParentState>,
+#[derive(Debug, Clone, Deref, DerefMut)]
+pub struct ParentBatch<I: VertexId = CommittedIndex> {
+    pub parents: VecDeque<ParentState<I>>,
+}
+
+impl<I: VertexId> Default for ParentBatch<I> {
+    fn default() -> Self {
+        Self {
+            parents: VecDeque::new(),
+        }
+    }
 }
 
 /// A match that ends at the end of the root's entry child: the start path
@@ -55,19 +66,19 @@ pub struct ParentBatch {
 /// - `prev_pos`: `root_pos` before the last raise; equals `root_pos` for
 ///   seeds.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParentState {
+pub struct ParentState<I: VertexId = CommittedIndex> {
     pub prev_pos: UpPosition,
     pub root_pos: UpPosition,
     pub span: Range<AtomPosition>,
-    pub path: StartPath,
+    pub path: StartPath<I>,
 }
 
-impl ParentState {
+impl<I: VertexId> ParentState<I> {
     /// Seed: `start`, at query position `query_pos`, occurs in `parent` at
     /// `offset`.
     pub fn new(
-        start: Token,
-        parent: Token,
+        start: Token<I>,
+        parent: Token<I>,
         offset: impl Into<AtomPosition>,
         query_pos: impl Into<AtomPosition>,
     ) -> Self {
@@ -80,7 +91,7 @@ impl ParentState {
             path: StartPath::new(parent, offset, start),
         }
     }
-    pub fn root(&self) -> Token {
+    pub fn root(&self) -> Token<I> {
         self.path.root()
     }
     /// Root offsets ↔ query positions of this match.
@@ -102,7 +113,7 @@ impl ParentState {
     /// the step is prepended.
     pub fn path_raise(
         &mut self,
-        parent: Token,
+        parent: Token<I>,
         offset: impl Into<AtomPosition>,
     ) {
         let offset = offset.into();
@@ -114,13 +125,14 @@ impl ParentState {
     }
 }
 
-impl StateAdvance for ParentState {
-    type Next = RootChildState;
-    /// The next graph token: [`PositionedGraph::start_at`]`(root,
+impl<I: VertexId> StateAdvance for ParentState<I> {
+    type Index = I;
+    type Next = RootChildState<I>;
+    /// The next graph token: [`Navigate::start_at`](crate::positioned::Navigate::start_at)`(root,
     /// span.end)`. `Err(self)` at the root end (then the state is raised).
-    fn advance_state<G: GraphKind>(
+    fn advance_state<G: GraphRead<Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) -> Result<Self::Next, Self> {
         let Some(end) = EndPath::start_at(graph, self.root(), self.span.end) else {
             return Err(self);
@@ -140,19 +152,19 @@ impl StateAdvance for ParentState {
     }
 }
 
-impl RootKey for ParentState {
-    fn root_key(&self) -> UpKey {
+impl<I: VertexId> RootKey<I> for ParentState<I> {
+    fn root_key(&self) -> UpKey<I> {
         UpKey::new(self.root(), self.root_pos)
     }
 }
 
-impl TargetKey for ParentState {
-    fn target_key(&self) -> DirectedKey {
+impl<I: VertexId> TargetKey<I> for ParentState<I> {
+    fn target_key(&self) -> DirectedKey<I> {
         self.root_key().into()
     }
 }
 
-impl Ord for ParentState {
+impl<I: VertexId> Ord for ParentState<I> {
     fn cmp(
         &self,
         other: &Self,
@@ -161,7 +173,7 @@ impl Ord for ParentState {
     }
 }
 
-impl PartialOrd for ParentState {
+impl<I: VertexId> PartialOrd for ParentState<I> {
     fn partial_cmp(
         &self,
         other: &Self,

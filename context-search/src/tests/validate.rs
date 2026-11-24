@@ -2,6 +2,13 @@
 //! brute-force expectation derived only from the fixture strings (through
 //! the name map), never from search output.
 
+use context_trace::{
+    positioned::{
+        GraphRead,
+        Navigate,
+    },
+    ToToken,
+};
 use std::collections::{BTreeSet, HashMap};
 
 use context_trace::{
@@ -141,9 +148,9 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
     };
     assert_eq!(response.path().coverage(), coverage, "{context}: coverage");
     // Diagnostic read (tests only).
-    let view = graph.interval(root.index, span(o, o + k)).unwrap();
+    let view = graph.vertex(root.index).and_then(|v| v.interval(span(o, o + k))).unwrap();
     assert_eq!(
-        graph.read_interval(&view).unwrap(),
+        graph.vertex(view.owner).and_then(|v| v.read_interval(view.range.clone())).unwrap(),
         q[..k],
         "{context}: read_interval"
     );
@@ -166,7 +173,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
     // Start path: canonical and maximally trimmed.
     let start = absolute(path.start.top_down());
     assert!(
-        graph.contains_path(path.start.top_down()),
+        graph.vertex(root).unwrap().contains_path(path.start.top_down()),
         "{context}: start path"
     );
     assert_eq!(start[0].0.parent, root.index, "{context}");
@@ -194,7 +201,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
         );
     }
     let mut v = path.start.leaf();
-    while let Some(prefix) = graph.prefix_child(v) {
+    while let Some(prefix) = graph.vertex(v).and_then(|v| v.prefix_child()) {
         assert!(
             r[o..].starts_with(oracle.key(prefix.child.index)),
             "{context}"
@@ -206,7 +213,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
     // End path: largest token ending at o + k (2.4 deviation), trimmed.
     let end = absolute(path.end.steps());
     assert!(
-        graph.contains_path(path.end.top_down()),
+        graph.vertex(root).unwrap().contains_path(path.end.top_down()),
         "{context}: end path"
     );
     assert_eq!(end[0].0.parent, root.index, "{context}");
@@ -248,7 +255,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
     // Trace cache, per coverage as legacy: up edges along the start path
     // (`Postfix`, `Range`), down edges along the end path (`Prefix`,
     // `Range`), nothing for `EntireRoot`.
-    let token = |v: VertexIndex| graph.token(v).unwrap();
+    let token = |v: VertexIndex| graph.vertex(v).map(|v| v.to_token()).unwrap();
     let (trace_start, trace_end) = match coverage {
         SpanCoverage::Range => (true, true),
         SpanCoverage::Postfix => (true, false),
@@ -305,7 +312,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
         match parent.pos {
             context_trace::DirectedPosition::BottomUp(_) => assert!(
                 graph
-                    .vertex(child.index.index)
+                    .vertex_data(child.index.index)
                     .unwrap()
                     .parents()
                     .get(&parent.index.index)

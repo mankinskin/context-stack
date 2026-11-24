@@ -3,8 +3,10 @@
 
 use context_trace::{
     positioned::trace::child::iterator::ChildQueue,
+    CommittedIndex,
     DownKey,
     DownPosition,
+    VertexId,
 };
 
 use crate::cursor::{
@@ -17,14 +19,14 @@ use crate::cursor::{
     QueryCursor,
 };
 
-pub(crate) enum QueryAdvanceResult {
-    Advanced(CompareState<Candidate, Matched>),
+pub(crate) enum QueryAdvanceResult<X: VertexId> {
+    Advanced(CompareState<Candidate, Matched, X>),
     Exhausted,
 }
 
-pub(crate) enum IndexAdvanceResult {
-    Advanced(CompareState<Candidate, Candidate>),
-    Exhausted(CompareState<Candidate, Matched>),
+pub(crate) enum IndexAdvanceResult<X: VertexId> {
+    Advanced(CompareState<Candidate, Candidate, X>),
+    Exhausted(CompareState<Candidate, Matched, X>),
 }
 
 /// Which side the last decomposition split (Decision 1 b: equal widths
@@ -51,19 +53,25 @@ impl std::fmt::Display for PathPairMode {
 ///   leaf is the graph token to compare;
 /// - `target`: down key of the graph leaf at the query position of the
 ///   query leaf.
+///
+/// `X` is the index type of the searched store.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CompareState<Q: CursorState = Candidate, I: CursorState = Candidate> {
-    pub(crate) query: Checkpointed<QueryCursor<Q>, HasCandidate>,
-    pub(crate) child: Checkpointed<ChildCursor<I>, HasCandidate>,
-    pub(crate) target: DownKey,
+pub struct CompareState<
+    Q: CursorState = Candidate,
+    I: CursorState = Candidate,
+    X: VertexId = CommittedIndex,
+> {
+    pub(crate) query: Checkpointed<QueryCursor<Q, X>, HasCandidate>,
+    pub(crate) child: Checkpointed<ChildCursor<I, X>, HasCandidate>,
+    pub(crate) target: DownKey<X>,
     pub(crate) mode: PathPairMode,
 }
 
-pub(crate) type MatchedCompareState = CompareState<Matched, Matched>;
+pub(crate) type MatchedCompareState<X = CommittedIndex> = CompareState<Matched, Matched, X>;
 
-impl<Q: CursorState, I: CursorState> CompareState<Q, I> {
+impl<Q: CursorState, I: CursorState, X: VertexId> CompareState<Q, I, X> {
     /// Target key of the current graph and query leaves.
-    pub(crate) fn current_target(&self) -> DownKey {
+    pub(crate) fn current_target(&self) -> DownKey<X> {
         DownKey::new(
             self.child.current().child_state.path.end.leaf(),
             DownPosition(self.query.current().path.leaf_offset()),
@@ -71,7 +79,7 @@ impl<Q: CursorState, I: CursorState> CompareState<Q, I> {
     }
 }
 
-impl CompareState<Matched, Matched> {
+impl<X: VertexId> CompareState<Matched, Matched, X> {
     /// Make the current positions the checkpoints.
     pub(crate) fn update_checkpoint(&mut self) {
         self.query.checkpoint = self.query.candidate().clone();
@@ -80,19 +88,21 @@ impl CompareState<Matched, Matched> {
 }
 
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum CompareLeafResult {
-    Finished(CompareEndResult),
-    Prefixes(ChildQueue<CompareState<Candidate, Candidate>>),
+pub(crate) enum CompareLeafResult<X: VertexId> {
+    Finished(CompareEndResult<X>),
+    Prefixes(ChildQueue<CompareState<Candidate, Candidate, X>>),
 }
 
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum CompareEndResult {
-    FoundMatch(CompareState<Matched, Matched>),
+pub(crate) enum CompareEndResult<X: VertexId> {
+    FoundMatch(CompareState<Matched, Matched, X>),
     Mismatch,
 }
 
-impl From<CompareState<Candidate, Candidate>> for ChildQueue<CompareState<Candidate, Candidate>> {
-    fn from(state: CompareState<Candidate, Candidate>) -> Self {
+impl<X: VertexId> From<CompareState<Candidate, Candidate, X>>
+    for ChildQueue<CompareState<Candidate, Candidate, X>>
+{
+    fn from(state: CompareState<Candidate, Candidate, X>) -> Self {
         ChildQueue::from_iter([state])
     }
 }

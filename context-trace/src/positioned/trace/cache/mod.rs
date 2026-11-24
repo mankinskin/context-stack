@@ -117,14 +117,14 @@ impl<I: VertexId> TraceCache<I> {
     }
 }
 
-impl TraceCache {
+impl<I: VertexId> TraceCache<I> {
     /// Add the target key of `edit` and record its edge at the parent.
     /// Returns the target key and whether it was new. Unlike legacy, the
     /// edge is recorded even if the target key existed.
-    pub fn add_state<E: Into<EditKind>>(
+    pub fn add_state<E: Into<EditKind<I>>>(
         &mut self,
         edit: E,
-    ) -> (DirectedKey, bool) {
+    ) -> (DirectedKey<I>, bool) {
         let edit = edit.into();
         let key = edit.target_key();
         let was_new = !self.exists(&key);

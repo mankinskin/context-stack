@@ -14,7 +14,33 @@ use std::collections::{
     BTreeSet,
 };
 
+#[cfg(debug_assertions)]
+use super::check::composed_label;
+#[cfg(any(debug_assertions, feature = "test-api"))]
 use super::{
+    access::NodeRef,
+    check::{
+        check_overlap_closure,
+        validate_vertex,
+    },
+    navigate::Navigate,
+};
+use super::{
+    access::{
+        CompositionRead,
+        GraphRead,
+        GraphWrite,
+        VertexRead,
+        raw::{
+            SEAL,
+            VertexWrite,
+            Write as _,
+        },
+    },
+    check::{
+        check_child,
+        expect_vertex,
+    },
     composition::{
         Composition,
         Occurrence,
@@ -23,66 +49,89 @@ use super::{
     graph::{
         PositionedError,
         PositionedGraph,
-        PositionedVertex,
         VertexNode,
     },
 };
+#[cfg(any(debug_assertions, feature = "test-api"))]
+use crate::graph::vertex::has_vertex_index::HasVertexIndex;
 use crate::{
     AtomOf,
     GraphKind,
     Token,
     TokenWidth,
-    VertexKey,
-    graph::vertex::VertexIndex,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+        has_vertex_index::ToToken,
+        wide::Wide,
+    },
 };
 
 /// Record of one edit: created tokens and changed existing vertices.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Publication {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Publication<I: VertexId = CommittedIndex> {
     /// Created tokens in creation order.
-    pub created: Vec<Token>,
+    pub created: Vec<Token<I>>,
     /// One entry per changed vertex that existed before the edit.
-    pub edits: Vec<VertexEdit>,
+    pub edits: Vec<VertexEdit<I>>,
+}
+
+impl<I: VertexId> Default for Publication<I> {
+    fn default() -> Self {
+        Self {
+            created: Vec::new(),
+            edits: Vec::new(),
+        }
+    }
 }
 
 /// Occurrences added to and removed from the composition of `vertex`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VertexEdit {
-    pub vertex: VertexIndex,
-    pub added: Vec<Occurrence>,
-    pub removed: Vec<Occurrence>,
+pub struct VertexEdit<I: VertexId = CommittedIndex> {
+    pub vertex: I,
+    pub added: Vec<Occurrence<I>>,
+    pub removed: Vec<Occurrence<I>>,
 }
 
 impl<G: GraphKind> PositionedGraph<G> {
     /// Open an edit (see [`GraphEdit`]).
     #[cfg(feature = "edit")]
     #[doc(hidden)]
-    pub fn edit(&mut self) -> GraphEdit<'_, G> {
+    pub fn edit(&mut self) -> GraphEdit<'_, Self> {
         GraphEdit::new(self)
     }
     /// Open an edit (see [`GraphEdit`]).
     #[cfg(not(feature = "edit"))]
-    pub(crate) fn edit(&mut self) -> GraphEdit<'_, G> {
+    pub(crate) fn edit(&mut self) -> GraphEdit<'_, Self> {
         GraphEdit::new(self)
-    }
-    /// Bumped once by the first mutation of every edit, so a stale search
-    /// result can be detected.
-    pub fn generation(&self) -> u64 {
-        self.generation
     }
 }
 
-/// Vertex-local, checked mutations of a [`PositionedGraph`].
-pub struct GraphEdit<'g, G: GraphKind> {
-    graph: &'g mut PositionedGraph<G>,
-    created: Vec<Token>,
-    edits: BTreeMap<VertexIndex, VertexEdit>,
-    touched: BTreeSet<VertexIndex>,
+/// Vertex-local, checked mutations of a store, written once for every
+/// [`GraphWrite`] store.
+pub struct GraphEdit<'g, S: GraphWrite + ?Sized> {
+    graph: &'g mut S,
+    created: Vec<Token<S::Index>>,
+    edits: BTreeMap<S::Index, VertexEdit<S::Index>>,
+    touched: BTreeSet<S::Index>,
     bumped: bool,
 }
 
-impl<'g, G: GraphKind> GraphEdit<'g, G> {
-    fn new(graph: &'g mut PositionedGraph<G>) -> Self {
+type Error<S> = PositionedError<<S as GraphRead>::Index>;
+
+impl<'g, S: GraphWrite + ?Sized> GraphEdit<'g, S> {
+    /// Open an edit on `graph`.
+    #[cfg(feature = "edit")]
+    #[doc(hidden)]
+    pub fn new(graph: &'g mut S) -> Self {
+        Self::open(graph)
+    }
+    /// Open an edit on `graph`.
+    #[cfg(not(feature = "edit"))]
+    pub(crate) fn new(graph: &'g mut S) -> Self {
+        Self::open(graph)
+    }
+    fn open(graph: &'g mut S) -> Self {
         Self {
             graph,
             created: Vec::new(),
@@ -93,37 +142,39 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     }
 
     /// Read access while edits are applied.
-    pub fn graph(&self) -> &PositionedGraph<G> {
+    pub fn graph(&self) -> &S {
         self.graph
     }
 
     fn mutate(&mut self) {
         if !self.bumped {
-            self.graph.generation += 1;
+            self.graph.bump_generation(SEAL);
             self.bumped = true;
         }
+    }
+
+    fn vertex_mut(
+        &mut self,
+        index: S::Index,
+    ) -> S::VertexMut<'_> {
+        self.graph.vertex_mut(SEAL, index).expect("checked vertex")
     }
 
     /// The existing atom vertex for `value`, or a new one (a mutation).
     pub fn atom(
         &mut self,
-        value: AtomOf<G>,
-    ) -> Token {
-        if let Some(&index) = self.graph.atoms.get(&value) {
-            return Token::new(index, 1);
+        value: AtomOf<S::Kind>,
+    ) -> Token<S::Index> {
+        if let Some(atom) = self.graph.atom(&value) {
+            return atom.to_token();
         }
         self.mutate();
-        let index = VertexIndex(self.graph.vertices.len());
-        self.graph.vertices.push(PositionedVertex {
-            index,
-            key: VertexKey::default(),
-            width: TokenWidth(1),
-            #[cfg(debug_assertions)]
-            label: value.to_string(),
-            node: VertexNode::Atom(value),
-            parents: BTreeMap::new(),
-        });
-        self.graph.atoms.insert(value, index);
+        let index =
+            self.graph
+                .push(SEAL, VertexNode::Atom(value), TokenWidth(1));
+        #[cfg(debug_assertions)]
+        self.vertex_mut(index).set_label(value.to_string());
+        self.graph.register_atom(SEAL, value, index);
         let token = Token::new(index, 1);
         self.created.push(token);
         self.touched.insert(index);
@@ -139,34 +190,34 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     /// vertices (G4).
     pub fn create(
         &mut self,
-        occurrences: Vec<Occurrence>,
-    ) -> Result<Token, PositionedError> {
+        occurrences: Vec<Occurrence<S::Index>>,
+    ) -> Result<Token<S::Index>, Error<S>> {
         let composition = Composition::new(occurrences).map_err(|error| {
             PositionedError::Composition { owner: None, error }
         })?;
         for occurrence in composition.occurrences() {
-            self.graph.check_child(occurrence)?;
+            check_child(&*self.graph, occurrence)?;
         }
-        let index = VertexIndex(self.graph.vertices.len());
+        let index = self.graph.next_index(SEAL);
         #[cfg(any(debug_assertions, feature = "test-api"))]
         self.check_new_content(index, &composition)?;
 
         self.mutate();
         let width = composition.width();
         #[cfg(debug_assertions)]
-        let label = self.graph.composed_label(&composition);
+        let label = composed_label(
+            &*self.graph,
+            composition.occurrences().iter().copied(),
+        );
         for occurrence in composition.occurrences() {
             self.link(index, occurrence);
         }
-        self.graph.vertices.push(PositionedVertex {
-            index,
-            key: VertexKey::default(),
-            width,
-            #[cfg(debug_assertions)]
-            label,
-            node: VertexNode::Composite(composition),
-            parents: BTreeMap::new(),
-        });
+        let pushed =
+            self.graph
+                .push(SEAL, VertexNode::Composite(composition), width);
+        debug_assert_eq!(pushed, index);
+        #[cfg(debug_assertions)]
+        self.vertex_mut(index).set_label(label);
         let token = Token::new(index, width);
         self.created.push(token);
         self.touched.insert(index);
@@ -180,11 +231,12 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     /// and end within it (`WidthChange`). Debug and `test-api` builds also
     /// check that each added token equals `vertex` at its offset
     /// (`OverlapMismatch` against the whole vertex) and G4 for the result.
+    /// `Atom` if `vertex` is an atom.
     pub fn add_occurrences(
         &mut self,
-        vertex: VertexIndex,
-        added: Vec<Occurrence>,
-    ) -> Result<(), PositionedError> {
+        vertex: S::Index,
+        added: Vec<Occurrence<S::Index>>,
+    ) -> Result<(), Error<S>> {
         let (width, old) = self.composite(vertex)?;
         for occurrence in &added {
             if occurrence.offset.0 >= width.0 {
@@ -196,7 +248,7 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
             if occurrence.end().0 > width.0 {
                 return Err(PositionedError::WidthChange { vertex });
             }
-            self.graph.check_child(occurrence)?;
+            check_child(&*self.graph, occurrence)?;
         }
         let mut union = old.clone();
         union.extend(added.iter().copied());
@@ -213,8 +265,11 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
             for occurrence in &added {
                 self.check_agrees(vertex, whole, *occurrence)?;
             }
-            self.graph
-                .check_overlap_closure(vertex, composition.occurrences())?;
+            check_overlap_closure(
+                &*self.graph,
+                vertex,
+                composition.occurrences().iter().copied(),
+            )?;
         }
         self.recompose(vertex, &old, composition);
         Ok(())
@@ -227,20 +282,20 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     /// must start at or before the end of `vertex` and reach beyond it
     /// (`OutsideVertex`). Debug and `test-api` builds also check that the
     /// occurrence agrees with `vertex` on their overlap (`OverlapMismatch`)
-    /// and G4 for the result.
+    /// and G4 for the result. `Atom` if `vertex` is an atom.
     pub fn extend(
         &mut self,
-        vertex: VertexIndex,
-        occurrence: Occurrence,
-    ) -> Result<Token, PositionedError> {
+        vertex: S::Index,
+        occurrence: Occurrence<S::Index>,
+    ) -> Result<Token<S::Index>, Error<S>> {
         let (width, old) = self.composite(vertex)?;
-        if !self.graph.vertices[vertex.0].parents.is_empty() {
+        if expect_vertex(&*self.graph, vertex)?.parents().next().is_some() {
             return Err(PositionedError::HasParents(vertex));
         }
         if occurrence.offset.0 > width.0 || occurrence.end().0 <= width.0 {
             return Err(PositionedError::OutsideVertex { vertex, occurrence });
         }
-        self.graph.check_child(&occurrence)?;
+        check_child(&*self.graph, &occurrence)?;
         let mut union = old.clone();
         union.push(occurrence);
         let composition =
@@ -254,27 +309,29 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
         {
             let whole = Occurrence::new(0, Token::new(vertex, width));
             self.check_agrees(vertex, whole, occurrence)?;
-            self.graph
-                .check_overlap_closure(vertex, composition.occurrences())?;
+            check_overlap_closure(
+                &*self.graph,
+                vertex,
+                composition.occurrences().iter().copied(),
+            )?;
         }
         let new_width = composition.width();
-        self.recompose(vertex, &old, composition);
-        self.graph.vertices[vertex.0].width = new_width;
         #[cfg(debug_assertions)]
-        {
-            let label = match &self.graph.vertices[vertex.0].node {
-                VertexNode::Composite(composition) =>
-                    self.graph.composed_label(composition),
-                VertexNode::Atom(_) => unreachable!("checked composite"),
-            };
-            self.graph.vertices[vertex.0].label = label;
-        }
+        let label = composed_label(
+            &*self.graph,
+            composition.occurrences().iter().copied(),
+        );
+        self.recompose(vertex, &old, composition);
+        let mut handle = self.vertex_mut(vertex);
+        handle.set_width(new_width);
+        #[cfg(debug_assertions)]
+        handle.set_label(label);
         Ok(Token::new(vertex, new_width))
     }
 
     /// Validate the touched vertices (debug and `test-api` builds; panics on
     /// a violation, which is a bug) and return the record.
-    pub fn finish(self) -> Publication {
+    pub fn finish(self) -> Publication<S::Index> {
         #[cfg(any(debug_assertions, feature = "test-api"))]
         if let Err(error) = self.validate_touched() {
             panic!("GraphEdit::finish: {error}");
@@ -291,46 +348,36 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
         }
     }
 
-    /// Width and occurrences of a composite `vertex`.
+    /// Width and occurrences of a composite `vertex`; `Atom` for an atom.
     fn composite(
         &self,
-        vertex: VertexIndex,
-    ) -> Result<(TokenWidth, Vec<Occurrence>), PositionedError> {
-        let node = self.graph.expect(vertex)?;
-        let composition =
-            node.composition().ok_or(PositionedError::Composition {
-                owner: Some(vertex),
-                error: super::CompositionError::TooFew,
-            })?;
-        Ok((node.width, composition.occurrences().to_vec()))
+        vertex: S::Index,
+    ) -> Result<(TokenWidth, Vec<Occurrence<S::Index>>), Error<S>> {
+        let node = expect_vertex(&*self.graph, vertex)?;
+        let composition = node
+            .node()
+            .composite()
+            .ok_or(PositionedError::Atom(vertex))?;
+        Ok((node.width(), composition.occurrences().collect()))
     }
 
     fn link(
         &mut self,
-        parent: VertexIndex,
-        occurrence: &Occurrence,
+        parent: S::Index,
+        occurrence: &Occurrence<S::Index>,
     ) {
-        self.graph.vertices[occurrence.child.index.0]
-            .parents
-            .entry(parent)
-            .or_default()
-            .insert(occurrence.offset);
+        self.vertex_mut(occurrence.child.index)
+            .link_parent(parent, occurrence.offset);
         self.touched.insert(occurrence.child.index);
     }
 
     fn unlink(
         &mut self,
-        parent: VertexIndex,
-        occurrence: &Occurrence,
+        parent: S::Index,
+        occurrence: &Occurrence<S::Index>,
     ) {
-        let parents =
-            &mut self.graph.vertices[occurrence.child.index.0].parents;
-        if let Some(offsets) = parents.get_mut(&parent) {
-            offsets.remove(&occurrence.offset);
-            if offsets.is_empty() {
-                parents.remove(&parent);
-            }
-        }
+        self.vertex_mut(occurrence.child.index)
+            .unlink_parent(parent, occurrence.offset);
         self.touched.insert(occurrence.child.index);
     }
 
@@ -338,14 +385,14 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     /// added and removed children and record the change.
     fn recompose(
         &mut self,
-        vertex: VertexIndex,
-        old: &[Occurrence],
-        composition: Composition,
+        vertex: S::Index,
+        old: &[Occurrence<S::Index>],
+        composition: Composition<S::Index>,
     ) {
         let new = composition.occurrences();
-        let removed: Vec<Occurrence> =
+        let removed: Vec<Occurrence<S::Index>> =
             old.iter().filter(|o| !new.contains(o)).copied().collect();
-        let added: Vec<Occurrence> =
+        let added: Vec<Occurrence<S::Index>> =
             new.iter().filter(|o| !old.contains(o)).copied().collect();
         if added.is_empty() && removed.is_empty() {
             return;
@@ -357,7 +404,8 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
         for occurrence in &added {
             self.link(vertex, occurrence);
         }
-        self.graph.vertices[vertex.0].node = VertexNode::Composite(composition);
+        self.vertex_mut(vertex)
+            .set_node(VertexNode::Composite(composition));
         self.touched.insert(vertex);
         if self.created.iter().any(|token| token.index == vertex) {
             return;
@@ -388,15 +436,12 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     #[cfg(any(debug_assertions, feature = "test-api"))]
     fn content(
         &self,
-        vertex: VertexIndex,
+        vertex: S::Index,
         range: std::ops::Range<usize>,
-    ) -> Vec<AtomOf<G>> {
-        let view = super::IntervalView {
-            owner: vertex,
-            range: range.start.into()..range.end.into(),
-        };
+    ) -> Vec<AtomOf<S::Kind>> {
         self.graph
-            .read_interval(&view)
+            .vertex(vertex)
+            .and_then(|v| v.read_interval(range.start.into()..range.end.into()))
             .expect("structurally valid interval")
     }
 
@@ -404,10 +449,10 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     #[cfg(any(debug_assertions, feature = "test-api"))]
     fn check_agrees(
         &self,
-        owner: VertexIndex,
-        left: Occurrence,
-        right: Occurrence,
-    ) -> Result<(), PositionedError> {
+        owner: S::Index,
+        left: Occurrence<S::Index>,
+        right: Occurrence<S::Index>,
+    ) -> Result<(), Error<S>> {
         let start = left.offset.0.max(right.offset.0);
         let end = left.end().0.min(right.end().0);
         if start < end
@@ -433,14 +478,18 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     #[cfg(any(debug_assertions, feature = "test-api"))]
     fn check_new_content(
         &self,
-        index: VertexIndex,
-        composition: &Composition,
-    ) -> Result<(), PositionedError> {
+        index: S::Index,
+        composition: &Composition<S::Index>,
+    ) -> Result<(), Error<S>> {
         let occurrences = composition.occurrences();
         for pair in occurrences.windows(2) {
             self.check_agrees(index, pair[0], pair[1])?;
         }
-        self.graph.check_overlap_closure(index, occurrences)?;
+        check_overlap_closure(
+            &*self.graph,
+            index,
+            occurrences.iter().copied(),
+        )?;
         let mut content = Vec::with_capacity(composition.width().0);
         for occurrence in occurrences {
             let from = content.len() - occurrence.offset.0;
@@ -450,10 +499,10 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
             ));
         }
         let width = composition.width();
-        for vertex in self.graph.vertices.iter().filter(|v| v.width == width) {
-            if self.content(vertex.index, 0..width.0) == content {
+        for vertex in self.graph.vertices().filter(|v| v.width() == width) {
+            if self.content(vertex.vertex_index(), 0..width.0) == content {
                 return Err(PositionedError::DuplicateContent {
-                    first: vertex.index,
+                    first: vertex.vertex_index(),
                     second: index,
                 });
             }
@@ -464,23 +513,27 @@ impl<'g, G: GraphKind> GraphEdit<'g, G> {
     /// Structure and links of every touched vertex and its children, and G4
     /// for touched compositions.
     #[cfg(any(debug_assertions, feature = "test-api"))]
-    fn validate_touched(&self) -> Result<(), PositionedError> {
+    fn validate_touched(&self) -> Result<(), Error<S>> {
         let mut vertices = self.touched.clone();
         for &vertex in &self.touched {
             if let Some(composition) =
-                self.graph.vertex(vertex).and_then(|v| v.composition())
+                self.graph.vertex(vertex).and_then(|v| v.node().composite())
             {
-                vertices.extend(composition.children());
+                vertices
+                    .extend(composition.occurrences().map(|o| o.child.index));
             }
         }
         for vertex in vertices {
-            let node = self.graph.expect(vertex)?;
-            self.graph.validate_vertex(vertex.0, node)?;
-            if let (true, Some(composition)) =
-                (self.touched.contains(&vertex), node.composition())
+            let node = expect_vertex(&*self.graph, vertex)?;
+            validate_vertex(node)?;
+            if let (true, NodeRef::Composite(composition)) =
+                (self.touched.contains(&vertex), node.node())
             {
-                self.graph
-                    .check_overlap_closure(vertex, composition.occurrences())?;
+                check_overlap_closure(
+                    &*self.graph,
+                    vertex,
+                    composition.occurrences(),
+                )?;
             }
         }
         Ok(())

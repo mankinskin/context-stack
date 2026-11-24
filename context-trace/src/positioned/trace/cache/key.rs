@@ -2,14 +2,16 @@
 //! themselves are the model-agnostic [`crate::key`] types.
 
 use crate::{
+    CommittedIndex,
     DirectedKey,
     UpKey,
+    VertexId,
 };
 
-pub trait RootKey {
-    fn root_key(&self) -> UpKey;
+pub trait RootKey<I: VertexId = CommittedIndex> {
+    fn root_key(&self) -> UpKey<I>;
 }
 
-pub trait TargetKey {
-    fn target_key(&self) -> DirectedKey;
+pub trait TargetKey<I: VertexId = CommittedIndex> {
+    fn target_key(&self) -> DirectedKey<I>;
 }

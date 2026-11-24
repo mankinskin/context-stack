@@ -10,8 +10,6 @@ use crate::{
         VertexId,
     },
 };
-#[cfg(any(debug_assertions, test, feature = "test-api"))]
-use crate::graph::vertex::VertexIndex;
 
 /// One retained occurrence: `child` at `offset` inside `parent`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -25,7 +23,7 @@ pub struct OccurrenceLocation<I: VertexId = CommittedIndex> {
 /// vertex identity and is never stored in the graph.
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct IntervalView {
-    pub owner: VertexIndex,
+pub struct IntervalView<I: VertexId = CommittedIndex> {
+    pub owner: I,
     pub range: Range<AtomPosition>,
 }

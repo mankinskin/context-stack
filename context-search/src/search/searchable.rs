@@ -7,11 +7,14 @@
 
 use context_trace::{
     positioned::{
-        PositionedGraph,
+        GraphRead,
         QueryPath,
     },
+    CommittedIndex,
     GraphKind,
+    ToToken,
     Token,
+    VertexId,
 };
 
 use crate::{
@@ -36,16 +39,22 @@ use crate::{
     SearchError,
 };
 
-pub trait Searchable<G: GraphKind, K: SearchKind = AncestorSearchTraversal>: Sized {
-    fn start_search(
+/// A query of a search on a store of kind `G` with indices `I`.
+pub trait Searchable<
+    G: GraphKind,
+    I: VertexId = CommittedIndex,
+    K: SearchKind = AncestorSearchTraversal,
+>: Sized
+{
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError>;
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>>;
 
-    fn search(
+    fn search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<Response, SearchError> {
+        graph: &S,
+    ) -> Result<Response<I>, SearchError<I>> {
         stats::reset();
         Ok(self.start_search(graph)?.search())
     }
@@ -53,42 +62,51 @@ pub trait Searchable<G: GraphKind, K: SearchKind = AncestorSearchTraversal>: Siz
 
 /// Atoms through the atom index; an atom without a vertex is
 /// `UnknownAtom`, an empty query `EmptyPatterns`.
-impl<G: GraphKind<Atom = char>, K: SearchKind> Searchable<G, K> for std::str::Chars<'_> {
-    fn start_search(
+impl<G: GraphKind<Atom = char>, I: VertexId, K: SearchKind> Searchable<G, I, K>
+    for std::str::Chars<'_>
+{
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         let pattern = self
-            .map(|atom| graph.atom_token(&atom).ok_or(SearchError::UnknownAtom))
-            .collect::<Result<Vec<Token>, _>>()?;
+            .map(|atom| {
+                graph
+                    .atom(&atom)
+                    .map(|vertex| vertex.to_token())
+                    .ok_or(SearchError::UnknownAtom)
+            })
+            .collect::<Result<Vec<Token<I>>, _>>()?;
         pattern.start_search(graph)
     }
 }
 
-impl<G: GraphKind, K: SearchKind> Searchable<G, K> for Vec<Token> {
-    fn start_search(
+impl<G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K> for Vec<Token<I>> {
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         let path = QueryPath::new(self).ok_or(SearchError::EmptyPatterns)?;
         StartCtx::new(graph, QueryCursor::at(path)).into_search()
     }
 }
 
-impl<G: GraphKind, K: SearchKind> Searchable<G, K> for &[Token] {
-    fn start_search(
+impl<G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K> for &[Token<I>] {
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         self.to_vec().start_search(graph)
     }
 }
 
-impl<const N: usize, G: GraphKind, K: SearchKind> Searchable<G, K> for [Token; N] {
-    fn start_search(
+impl<const N: usize, G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K>
+    for [Token<I>; N]
+{
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         self.to_vec().start_search(graph)
     }
 }
@@ -97,11 +115,11 @@ impl<const N: usize, G: GraphKind, K: SearchKind> Searchable<G, K> for [Token; N
 /// a composite query token if the checkpoint ends inside one) becomes the
 /// first query token. `EmptyPatterns` if the checkpoint is at the query
 /// end.
-impl<G: GraphKind, K: SearchKind> Searchable<G, K> for QueryCursor<Matched> {
-    fn start_search(
+impl<G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K> for QueryCursor<Matched, I> {
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         mut self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         if self.advance(graph).is_break() {
             return Err(SearchError::EmptyPatterns);
         }
@@ -109,39 +127,41 @@ impl<G: GraphKind, K: SearchKind> Searchable<G, K> for QueryCursor<Matched> {
     }
 }
 
-impl<G: GraphKind, K: SearchKind> Searchable<G, K> for &QueryCursor<Matched> {
-    fn start_search(
+impl<G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K>
+    for &QueryCursor<Matched, I>
+{
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         self.clone().start_search(graph)
     }
 }
 
 /// Continues at the checkpoint (the candidate is not needed).
-impl<G: GraphKind, K: SearchKind> Searchable<G, K> for &CheckpointedCursor {
-    fn start_search(
+impl<G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K> for &CheckpointedCursor<I> {
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         self.checkpoint().start_search(graph)
     }
 }
 
-impl<G: GraphKind, K: SearchKind> Searchable<G, K> for &MatchResult {
-    fn start_search(
+impl<G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K> for &MatchResult<I> {
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         self.checkpoint().start_search(graph)
     }
 }
 
-impl<G: GraphKind, K: SearchKind> Searchable<G, K> for &Response {
-    fn start_search(
+impl<G: GraphKind, I: VertexId, K: SearchKind> Searchable<G, I, K> for &Response<I> {
+    fn start_search<S: GraphRead<Kind = G, Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<SearchState<'_, G, K>, SearchError> {
+        graph: &S,
+    ) -> Result<SearchState<'_, S, K>, SearchError<I>> {
         self.query_cursor().start_search(graph)
     }
 }

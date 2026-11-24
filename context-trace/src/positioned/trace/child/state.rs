@@ -12,12 +12,15 @@ use crate::{
     AtomPosition,
     DirectedKey,
     DownPosition,
-    GraphKind,
     Token,
     UpKey,
     UpPosition,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+    },
     positioned::{
-        graph::PositionedGraph,
+        access::GraphRead,
         path::RangePath,
         trace::{
             QueryAnchor,
@@ -35,11 +38,11 @@ use crate::{
 
 /// A child state together with the parent state it was entered from.
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub struct RootChildState {
+pub struct RootChildState<I: VertexId = CommittedIndex> {
     #[deref]
     #[deref_mut]
-    pub child_state: ChildState,
-    pub root_parent: ParentState,
+    pub child_state: ChildState<I>,
+    pub root_parent: ParentState<I>,
 }
 
 /// A match inside `path.root`: `path.span` is matched, the end path points
@@ -51,17 +54,17 @@ pub struct RootChildState {
 ///   position at its start, clamped to the match start).
 /// - `start_pos`: `prev_pos` of the parent state (legacy, for tracing).
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub struct ChildState {
+pub struct ChildState<I: VertexId = CommittedIndex> {
     pub entry_pos: UpPosition,
     pub exit_pos: DownPosition,
     pub start_pos: AtomPosition,
     #[deref]
     #[deref_mut]
-    pub path: RangePath,
+    pub path: RangePath<Token<I>>,
 }
 
-impl ChildState {
-    pub fn root(&self) -> Token {
+impl<I: VertexId> ChildState<I> {
+    pub fn root(&self) -> Token<I> {
         self.path.root()
     }
     /// Root offsets ↔ query positions of this match.
@@ -75,7 +78,7 @@ impl ChildState {
     /// The start path as a parent state (legacy: start path and entry
     /// position; the end is dropped). Raising it adds the matched rest of
     /// the root.
-    pub fn parent_state(&self) -> ParentState {
+    pub fn parent_state(&self) -> ParentState<I> {
         ParentState {
             path: self.path.start.clone(),
             span: self.path.span.start..self.path.start.root_child_end(),
@@ -85,14 +88,15 @@ impl ChildState {
     }
 }
 
-impl StateAdvance for ChildState {
+impl<I: VertexId> StateAdvance for ChildState<I> {
+    type Index = I;
     type Next = Self;
     /// Move the end path to the token starting at `span.end` (corrected pop
     /// rule, equal to `start_at(root, span.end)`). `Err(self)` at the root
     /// end.
-    fn advance_state<G: GraphKind>(
+    fn advance_state<G: GraphRead<Index = I> + ?Sized>(
         mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) -> Result<Self, Self> {
         let end = self.path.span.end;
         if self.path.end.advance(graph, end).is_continue() {
@@ -104,19 +108,19 @@ impl StateAdvance for ChildState {
     }
 }
 
-impl RootKey for ChildState {
-    fn root_key(&self) -> UpKey {
+impl<I: VertexId> RootKey<I> for ChildState<I> {
+    fn root_key(&self) -> UpKey<I> {
         UpKey::new(self.root(), self.entry_pos)
     }
 }
 
-impl TargetKey for ChildState {
-    fn target_key(&self) -> DirectedKey {
+impl<I: VertexId> TargetKey<I> for ChildState<I> {
+    fn target_key(&self) -> DirectedKey<I> {
         self.root_key().into()
     }
 }
 
-impl Ord for ChildState {
+impl<I: VertexId> Ord for ChildState<I> {
     fn cmp(
         &self,
         other: &Self,
@@ -125,7 +129,7 @@ impl Ord for ChildState {
     }
 }
 
-impl PartialOrd for ChildState {
+impl<I: VertexId> PartialOrd for ChildState<I> {
     fn partial_cmp(
         &self,
         other: &Self,

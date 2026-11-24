@@ -4,7 +4,8 @@ use context_insert::insert_next_match;
 use context_trace::{
     Token,
     positioned::{
-        PositionedGraph,
+        GraphRead,
+        Navigate,
         PositionedGraphRef,
     },
 };
@@ -13,28 +14,6 @@ use crate::{
     forward::find_complete,
     root::Span,
 };
-
-/// The postfix tokens of `vertex`, largest first: the chain of last
-/// children down to an atom. With positioned compositions this is every
-/// postfix token of `vertex` (§3.2); `vertex` itself is not yielded.
-pub(crate) fn postfixes(
-    graph: &PositionedGraph,
-    vertex: Token,
-) -> Vec<Token> {
-    let mut chain = Vec::new();
-    let mut current = vertex;
-    while let Some(composition) =
-        graph.vertex(current.index).and_then(|v| v.composition())
-    {
-        let width = graph.vertex(current.index).map_or(0, |v| v.width().0);
-        current = composition
-            .ending_at(width)
-            .expect("a composition reaches its width")
-            .child;
-        chain.push(current);
-    }
-    chain
-}
 
 /// An accepted probe and the span committing it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,7 +41,13 @@ pub(crate) fn expand(
     if cursor == 0 || rest.is_empty() {
         return None;
     }
-    let chain = postfixes(&graph.read(), root);
+    // Every postfix token of the root, largest first (§3.2).
+    let chain: Vec<Token> = graph
+        .read()
+        .vertex(root)
+        .into_iter()
+        .flat_map(|vertex| vertex.postfixes().map(|(_, postfix)| postfix))
+        .collect();
     for postfix in chain {
         let mut query = Vec::with_capacity(rest.len() + 1);
         query.push(postfix);
@@ -96,38 +81,8 @@ pub(crate) fn expand(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use super::*;
     use crate::tests::fixture;
-    use context_trace::positioned::fixtures::fixture_graphs;
-
-    /// On every fixture graph, `postfixes(v)` is every vertex whose string
-    /// is a proper suffix of `v`'s, largest first.
-    #[test]
-    fn postfixes_are_all_postfix_tokens() {
-        for fixture in fixture_graphs() {
-            let keys: BTreeMap<_, _> = fixture
-                .names
-                .iter()
-                .map(|(key, token)| (token.index, key.as_str()))
-                .collect();
-            for (key, token) in &fixture.names {
-                let mut expected: Vec<&str> = fixture
-                    .names
-                    .keys()
-                    .filter(|other| other.len() < key.len() && key.ends_with(other.as_str()))
-                    .map(String::as_str)
-                    .collect();
-                expected.sort_by_key(|other| std::cmp::Reverse(other.len()));
-                let found: Vec<&str> = postfixes(&fixture.graph, *token)
-                    .into_iter()
-                    .map(|postfix| keys[&postfix.index])
-                    .collect();
-                assert_eq!(found, expected, "{}: postfixes of {}", fixture.name, key);
-            }
-        }
-    }
 
     /// A rejected probe leaves the graph unchanged.
     #[test]

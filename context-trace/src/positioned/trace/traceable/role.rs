@@ -5,9 +5,11 @@
 
 use crate::{
     AtomPosition,
-    GraphKind,
+    Token,
     graph::vertex::wide::Wide,
     positioned::{
+        access::GraphRead,
+        check::expect_token,
         path::{
             PathRole,
             RolePath,
@@ -32,18 +34,18 @@ use crate::{
 /// token start clamped to the match start). The root key takes the
 /// position of the root child's key. Edges are labelled by the child
 /// offset in its parent.
-pub(crate) fn trace_role_path<R: PathRole, G: GraphKind>(
+pub(crate) fn trace_role_path<R: PathRole, G: GraphRead + ?Sized>(
     ctx: &mut TraceCtx<'_, G>,
-    path: &RolePath<R>,
+    path: &RolePath<R, Token<G::Index>>,
     anchor: QueryAnchor,
 ) where
-    NewTraceEdge<R::Direction>: Into<EditKind>,
+    NewTraceEdge<R::Direction, G::Index>: Into<EditKind<G::Index>>,
 {
     let mut edges = Vec::with_capacity(path.len());
     let mut parent = (path.root(), None);
     let mut start = AtomPosition::default();
     for step in path.top_down() {
-        let child = ctx.graph.expect_token(step.child);
+        let child = expect_token(ctx.graph, step.child);
         start += step.offset.0;
         let pos = R::trace_pos(&anchor, start, child.width());
         let (parent_token, parent_pos) = parent;

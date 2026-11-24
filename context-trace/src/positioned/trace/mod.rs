@@ -21,17 +21,17 @@ pub mod traceable;
 
 use std::fmt::Debug;
 
-use super::graph::PositionedGraph;
+use super::access::GraphRead;
 use crate::{
     AtomPosition,
     DirectedKey,
     DownKey,
     DownPosition,
-    GraphKind,
     HasAtomPosition,
     Token,
     UpKey,
     UpPosition,
+    graph::vertex::VertexId,
 };
 use cache::{
     TraceCache,
@@ -42,32 +42,47 @@ use traceable::{
     Traceable,
 };
 
-#[derive(Debug)]
-pub struct TraceCtx<'g, G: GraphKind> {
-    pub graph: &'g PositionedGraph<G>,
-    pub cache: TraceCache,
+/// The graph traced and the cache traced into (legacy `TraceCtx<G:
+/// HasGraph>`; here borrowed from one guard for the whole search).
+pub struct TraceCtx<'g, G: GraphRead + ?Sized> {
+    pub graph: &'g G,
+    pub cache: TraceCache<G::Index>,
 }
 
-impl<'g, G: GraphKind> TraceCtx<'g, G> {
+impl<G: GraphRead + ?Sized> Debug for TraceCtx<'_, G> {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        f.debug_struct("TraceCtx")
+            .field("cache", &self.cache)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'g, G: GraphRead + ?Sized> TraceCtx<'g, G> {
     pub fn new(
-        graph: &'g PositionedGraph<G>,
-        cache: TraceCache,
+        graph: &'g G,
+        cache: TraceCache<G::Index>,
     ) -> Self {
         Self { graph, cache }
     }
     pub fn trace_command(
         &mut self,
-        command: TraceCommand,
+        command: TraceCommand<G::Index>,
     ) {
         command.trace(self)
     }
 }
 
-pub trait TraceKey:
-    HasAtomPosition + Debug + Clone + Copy + Into<DirectedKey>
+pub trait TraceKey<I: VertexId>:
+    HasAtomPosition + Debug + Clone + Copy + Into<DirectedKey<I>>
 {
 }
-impl<T: HasAtomPosition + Debug + Clone + Copy + Into<DirectedKey>> TraceKey for T {}
+impl<I: VertexId, T: HasAtomPosition + Debug + Clone + Copy + Into<DirectedKey<I>>> TraceKey<I>
+    for T
+{
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BottomUp;
@@ -79,17 +94,17 @@ pub struct TopDown;
 /// role ([`PathRole::Direction`](super::path::PathRole::Direction)).
 pub trait TraceDirection: Sized {
     type Pos: Copy;
-    type Key: TraceKey;
-    fn key(
-        token: Token,
+    type Key<I: VertexId>: TraceKey<I>;
+    fn key<I: VertexId>(
+        token: Token<I>,
         pos: Self::Pos,
-    ) -> Self::Key;
+    ) -> Self::Key<I>;
     /// The edge between `parent` and its `child` at `offset`.
-    fn edge(
-        parent: Self::Key,
-        child: Self::Key,
+    fn edge<I: VertexId>(
+        parent: Self::Key<I>,
+        child: Self::Key<I>,
         offset: AtomPosition,
-    ) -> NewTraceEdge<Self>;
+    ) -> NewTraceEdge<Self, I>;
     /// Reorder edges collected top-down into trace order.
     fn trace_order<T>(top_down: &mut [T]);
 }
@@ -97,18 +112,18 @@ pub trait TraceDirection: Sized {
 /// leaf upwards.
 impl TraceDirection for BottomUp {
     type Pos = UpPosition;
-    type Key = UpKey;
-    fn key(
-        token: Token,
+    type Key<I: VertexId> = UpKey<I>;
+    fn key<I: VertexId>(
+        token: Token<I>,
         pos: UpPosition,
-    ) -> UpKey {
+    ) -> UpKey<I> {
         UpKey::new(token, pos)
     }
-    fn edge(
-        parent: UpKey,
-        child: UpKey,
+    fn edge<I: VertexId>(
+        parent: UpKey<I>,
+        child: UpKey<I>,
         offset: AtomPosition,
-    ) -> NewTraceEdge<Self> {
+    ) -> NewTraceEdge<Self, I> {
         NewTraceEdge::new(child, parent, offset)
     }
     fn trace_order<T>(top_down: &mut [T]) {
@@ -119,18 +134,18 @@ impl TraceDirection for BottomUp {
 /// root downwards.
 impl TraceDirection for TopDown {
     type Pos = DownPosition;
-    type Key = DownKey;
-    fn key(
-        token: Token,
+    type Key<I: VertexId> = DownKey<I>;
+    fn key<I: VertexId>(
+        token: Token<I>,
         pos: DownPosition,
-    ) -> DownKey {
+    ) -> DownKey<I> {
         DownKey::new(token, pos)
     }
-    fn edge(
-        parent: DownKey,
-        child: DownKey,
+    fn edge<I: VertexId>(
+        parent: DownKey<I>,
+        child: DownKey<I>,
         offset: AtomPosition,
-    ) -> NewTraceEdge<Self> {
+    ) -> NewTraceEdge<Self, I> {
         NewTraceEdge::new(parent, child, offset)
     }
     fn trace_order<T>(_top_down: &mut [T]) {}

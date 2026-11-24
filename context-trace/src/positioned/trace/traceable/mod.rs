@@ -5,9 +5,13 @@ pub mod role;
 use crate::{
     AtomPosition,
     DownPosition,
-    GraphKind,
     UpPosition,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+    },
     positioned::{
+        access::GraphRead,
         path::{
             End,
             EndPath,
@@ -26,16 +30,16 @@ use crate::{
 use role::trace_role_path;
 
 #[derive(Debug, Clone)]
-pub enum TraceCommand {
-    Postfix(PostfixCommand),
-    Prefix(PrefixCommand),
-    Range(RangeCommand),
+pub enum TraceCommand<I: VertexId = CommittedIndex> {
+    Postfix(PostfixCommand<I>),
+    Prefix(PrefixCommand<I>),
+    Range(RangeCommand<I>),
 }
 
 /// Anchor of a start path whose root entry child ends at query position
 /// `entry_pos`.
-fn start_anchor(
-    path: &StartPath,
+fn start_anchor<I: VertexId>(
+    path: &StartPath<I>,
     entry_pos: UpPosition,
 ) -> QueryAnchor {
     let start = path.leaf_offset();
@@ -47,30 +51,30 @@ fn start_anchor(
 
 /// Up edges along a start path (match ending at the root end).
 #[derive(Debug, Clone)]
-pub struct PostfixCommand {
-    pub path: StartPath,
+pub struct PostfixCommand<I: VertexId = CommittedIndex> {
+    pub path: StartPath<I>,
     /// Query position at the end of the root entry child.
     pub entry_pos: UpPosition,
 }
 
 /// Down edges along an end path (match starting at the root start).
 #[derive(Debug, Clone)]
-pub struct PrefixCommand {
-    pub path: EndPath,
+pub struct PrefixCommand<I: VertexId = CommittedIndex> {
+    pub path: EndPath<I>,
     /// Query position at the start of the root exit child.
     pub exit_pos: DownPosition,
 }
 
 /// Up edges along the start path and down edges along the end path.
 #[derive(Debug, Clone)]
-pub struct RangeCommand {
-    pub path: RangePath,
+pub struct RangeCommand<I: VertexId = CommittedIndex> {
+    pub path: RangePath<crate::Token<I>>,
     /// Query position at the end of the root entry child.
     pub entry_pos: UpPosition,
 }
 
-impl From<ChildState> for RangeCommand {
-    fn from(state: ChildState) -> Self {
+impl<I: VertexId> From<ChildState<I>> for RangeCommand<I> {
+    fn from(state: ChildState<I>) -> Self {
         Self {
             path: state.path,
             entry_pos: state.entry_pos,
@@ -79,14 +83,17 @@ impl From<ChildState> for RangeCommand {
 }
 
 pub trait Traceable {
-    fn trace<G: GraphKind>(
+    /// Index type of the store the traced paths live in.
+    type Index: VertexId;
+    fn trace<G: GraphRead<Index = Self::Index> + ?Sized>(
         self,
         ctx: &mut TraceCtx<'_, G>,
     );
 }
 
-impl Traceable for PostfixCommand {
-    fn trace<G: GraphKind>(
+impl<I: VertexId> Traceable for PostfixCommand<I> {
+    type Index = I;
+    fn trace<G: GraphRead<Index = I> + ?Sized>(
         self,
         ctx: &mut TraceCtx<'_, G>,
     ) {
@@ -95,8 +102,9 @@ impl Traceable for PostfixCommand {
     }
 }
 
-impl Traceable for PrefixCommand {
-    fn trace<G: GraphKind>(
+impl<I: VertexId> Traceable for PrefixCommand<I> {
+    type Index = I;
+    fn trace<G: GraphRead<Index = I> + ?Sized>(
         self,
         ctx: &mut TraceCtx<'_, G>,
     ) {
@@ -108,8 +116,9 @@ impl Traceable for PrefixCommand {
     }
 }
 
-impl Traceable for RangeCommand {
-    fn trace<G: GraphKind>(
+impl<I: VertexId> Traceable for RangeCommand<I> {
+    type Index = I;
+    fn trace<G: GraphRead<Index = I> + ?Sized>(
         self,
         ctx: &mut TraceCtx<'_, G>,
     ) {
@@ -120,8 +129,9 @@ impl Traceable for RangeCommand {
     }
 }
 
-impl Traceable for TraceCommand {
-    fn trace<G: GraphKind>(
+impl<I: VertexId> Traceable for TraceCommand<I> {
+    type Index = I;
+    fn trace<G: GraphRead<Index = I> + ?Sized>(
         self,
         ctx: &mut TraceCtx<'_, G>,
     ) {

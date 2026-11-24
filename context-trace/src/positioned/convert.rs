@@ -4,8 +4,10 @@
 use std::collections::BTreeMap;
 
 use super::{
+    GraphRead,
     Occurrence,
     PositionedGraph,
+    string_repr,
     VertexNode,
     interchange::{
         PositionedCover,
@@ -13,7 +15,6 @@ use super::{
     },
 };
 use crate::{
-    AtomPosition,
     GraphKind,
     Token,
     graph::vertex::VertexIndex,
@@ -80,17 +81,11 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
     /// read by traversal here and never stored in the graph.
     pub fn to_interchange(&self) -> PositionedGraphData {
         let name = |index: VertexIndex| -> String {
-            let width = self.vertex(index).expect("vertex of this graph").width();
-            let view = self
-                .interval(index, AtomPosition::default()..width.into())
-                .expect("whole vertex is a valid interval");
-            self.read_interval(&view)
-                .expect("vertex of this graph")
-                .into_iter()
-                .collect()
+            string_repr(self.vertex(index).expect("vertex of this graph"))
         };
         let vertices = self
-            .vertices()
+            .vertices
+            .iter()
             .map(|vertex| {
                 let cover = match vertex.node() {
                     VertexNode::Atom(_) => Vec::new(),

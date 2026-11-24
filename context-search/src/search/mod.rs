@@ -12,13 +12,13 @@ pub mod stats;
 use context::AncestorSearchTraversal;
 use context_trace::{
     positioned::{
-        PositionedGraph,
-        PositionedGraphRef,
+        GraphRead,
+        HasGraph,
         TraceCache,
         TraceCtx,
         Traceable,
     },
-    GraphKind,
+    CommittedIndex,
 };
 use searchable::Searchable;
 
@@ -51,61 +51,46 @@ use crate::{
     SearchError,
 };
 
-pub type SearchResult = Result<Response, SearchError>;
+pub type SearchResult<I = CommittedIndex> = Result<Response<I>, SearchError<I>>;
 
-pub trait Find {
-    type Kind: GraphKind;
+/// Ancestor search on views and handles alike (legacy `Find: HasGraph`):
+/// one guard for the whole search.
+pub trait Find: HasGraph {
     /// Search the smallest ancestor containing the longest prefix of the
-    /// query (legacy `find_ancestor`). One read guard for the whole search.
+    /// query (legacy `find_ancestor`).
     fn find_ancestor(
         &self,
-        searchable: impl Searchable<Self::Kind, AncestorSearchTraversal>,
-    ) -> SearchResult;
-}
-
-impl<G: GraphKind> Find for PositionedGraph<G> {
-    type Kind = G;
-    fn find_ancestor(
-        &self,
-        searchable: impl Searchable<G, AncestorSearchTraversal>,
-    ) -> SearchResult {
-        searchable.search(self)
-    }
-}
-
-impl<G: GraphKind> Find for PositionedGraphRef<G> {
-    type Kind = G;
-    fn find_ancestor(
-        &self,
-        searchable: impl Searchable<G, AncestorSearchTraversal>,
-    ) -> SearchResult {
-        let graph = self.read();
+        searchable: impl Searchable<Self::Kind, Self::Index, AncestorSearchTraversal>,
+    ) -> SearchResult<Self::Index> {
+        let graph = self.graph();
         searchable.search(&graph)
     }
 }
 
+impl<G: HasGraph + ?Sized> Find for G {}
+
 /// Outer search loop: yields one [`MatchResult`] per matched root; the last
 /// one is the result.
 #[derive(Debug)]
-pub struct SearchState<'g, G: GraphKind, K: SearchKind> {
+pub struct SearchState<'g, G: GraphRead + ?Sized, K: SearchKind> {
     pub(crate) matches: SearchIterator<'g, G, K>,
     /// The query cursor at the first query token.
-    pub(crate) query: QueryCursor<Matched>,
+    pub(crate) query: QueryCursor<Matched, G::Index>,
 }
 
-impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
+impl<'g, G: GraphRead + ?Sized, K: SearchKind> SearchState<'g, G, K> {
     pub(crate) fn new(
         matches: SearchIterator<'g, G, K>,
-        query: QueryCursor<Matched>,
+        query: QueryCursor<Matched, G::Index>,
     ) -> Self {
         Self { matches, query }
     }
-    fn graph(&self) -> &'g PositionedGraph<G> {
+    fn graph(&self) -> &'g G {
         self.matches.graph()
     }
 
     /// Run to the end and trace the final match into the cache.
-    pub fn search(mut self) -> Response {
+    pub fn search(mut self) -> Response<G::Index> {
         let mut best_match = None;
         for item in self.by_ref() {
             best_match = Some(item);
@@ -140,8 +125,8 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
     /// advanced.
     fn finish_root_cursor(
         &mut self,
-        init_state: MatchedCompareState,
-    ) -> MatchResult {
+        init_state: MatchedCompareState<G::Index>,
+    ) -> MatchResult<G::Index> {
         let graph = self.graph();
         let mut last_match = init_state;
         loop {
@@ -173,8 +158,8 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
     /// The checkpoint of a matched state as a result.
     pub(crate) fn create_result_from_state(
         &self,
-        state: MatchedCompareState,
-    ) -> MatchResult {
+        state: MatchedCompareState<G::Index>,
+    ) -> MatchResult<G::Index> {
         let checkpoint = state.query.checkpoint().clone();
         let end_pos = checkpoint.atom_position();
         MatchResult::new(
@@ -188,8 +173,8 @@ impl<'g, G: GraphKind, K: SearchKind> SearchState<'g, G, K> {
     }
 }
 
-impl<G: GraphKind, K: SearchKind> Iterator for SearchState<'_, G, K> {
-    type Item = MatchResult;
+impl<G: GraphRead + ?Sized, K: SearchKind> Iterator for SearchState<'_, G, K> {
+    type Item = MatchResult<G::Index>;
     /// The next matched root: the first node to match clears the queue
     /// (first match wins), then the root cursor runs.
     fn next(&mut self) -> Option<Self::Item> {

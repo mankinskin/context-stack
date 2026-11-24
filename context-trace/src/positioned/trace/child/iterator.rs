@@ -10,6 +10,7 @@ use derive_more::{
 };
 
 use super::state::ChildState;
+use crate::graph::vertex::VertexId;
 
 #[derive(Debug, Clone, Default, Deref, DerefMut, IntoIterator, From)]
 pub struct ChildQueue<S> {
@@ -24,8 +25,8 @@ impl<S> FromIterator<S> for ChildQueue<S> {
     }
 }
 
-impl From<ChildState> for ChildQueue<ChildState> {
-    fn from(state: ChildState) -> Self {
+impl<I: VertexId> From<ChildState<I>> for ChildQueue<ChildState<I>> {
+    fn from(state: ChildState<I>) -> Self {
         FromIterator::from_iter([state])
     }
 }

@@ -2,6 +2,7 @@
 //! §9 tables, unchanged graphs for `EntireRoot` responses and stale
 //! responses.
 
+use context_trace::positioned::GraphRead;
 use std::{
     collections::BTreeSet,
     panic::{
@@ -109,7 +110,7 @@ fn occurrences_of(
     names: &std::collections::BTreeMap<String, context_trace::Token>,
 ) -> Vec<(String, usize)> {
     let g = graph.read();
-    let composition = g.vertex(names[key].index).unwrap().composition().unwrap().clone();
+    let composition = g.vertex_data(names[key].index).unwrap().composition().unwrap().clone();
     named(&g, composition.occurrences())
 }
 
@@ -164,7 +165,7 @@ fn insert_small_periodic() {
         .iter()
         .map(|edit| {
             (
-                content(&g, g.vertex(edit.vertex).unwrap().token()),
+                content(&g, g.vertex_data(edit.vertex).unwrap().token()),
                 named(&g, &edit.added),
                 named(&g, &edit.removed),
             )
@@ -195,7 +196,7 @@ fn insert_shared_vertex() {
     let g = graph.read();
     let composition = |s: &str| {
         let token = publication.created[created.iter().position(|c| c == s).unwrap()];
-        named(&g, g.vertex(token.index).unwrap().composition().unwrap().occurrences())
+        named(&g, g.vertex_data(token.index).unwrap().composition().unwrap().occurrences())
     };
     assert_eq!(composition("ca"), occ(&[("c", 0), ("a", 1)]));
     assert_eq!(composition("ab"), occ(&[("a", 0), ("b", 1)]));
@@ -233,7 +234,7 @@ fn insert_off_path_position() {
     let g = graph.read();
     let n = *publication.created.last().unwrap();
     assert_eq!(
-        named(&g, g.vertex(n.index).unwrap().composition().unwrap().occurrences()),
+        named(&g, g.vertex_data(n.index).unwrap().composition().unwrap().occurrences()),
         occ(&[("abab", 0), ("abab", 2), ("abc", 4)])
     );
 }

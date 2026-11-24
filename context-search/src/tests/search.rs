@@ -2,6 +2,7 @@
 //! `legacy/tests/search/ancestor.rs`), errors and continuation.
 //! Expectations come from the fixture strings via the name map.
 
+use context_trace::positioned::GraphRead;
 use context_trace::{
     positioned::{fixtures::FixtureGraph, SpanCoverage},
     AtomPosition, DirectedKey, DirectedPosition, DownPosition, HasAtomPosition, Token, UpPosition,

@@ -5,6 +5,10 @@
 mod insert;
 mod split;
 
+use context_trace::positioned::{
+        GraphRead,
+        Navigate,
+    };
 use std::{
     collections::{
         BTreeMap,
@@ -59,10 +63,15 @@ pub(crate) fn content(
     graph: &PositionedGraph<BaseGraphKind>,
     token: Token,
 ) -> String {
-    let view = graph
-        .interval(token.index, pos(0)..AtomPosition::from(token.width))
+    let vertex = graph.vertex(token).expect("vertex of the graph");
+    let view = vertex
+        .interval(pos(0)..AtomPosition::from(token.width))
         .expect("token of this graph");
-    graph.read_interval(&view).expect("valid interval").into_iter().collect()
+    vertex
+        .read_interval(view.range)
+        .expect("valid interval")
+        .into_iter()
+        .collect()
 }
 
 /// `(string, offset)` of occurrences, sorted by offset.

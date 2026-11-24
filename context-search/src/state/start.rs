@@ -5,10 +5,9 @@ use std::marker::PhantomData;
 
 use context_trace::{
     positioned::{
+        GraphRead,
         ParentState,
-        PositionedGraph,
     },
-    GraphKind,
     Token,
 };
 
@@ -33,18 +32,17 @@ use crate::{
 
 /// A query cursor at its first token `start_token` (the cursor's leaf, at
 /// query position `cursor.path.leaf_offset()`).
-#[derive(Debug)]
-pub(crate) struct StartCtx<'g, G: GraphKind, K: SearchKind> {
-    pub(crate) graph: &'g PositionedGraph<G>,
-    pub(crate) start_token: Token,
-    pub(crate) cursor: QueryCursor<Matched>,
+pub(crate) struct StartCtx<'g, G: GraphRead + ?Sized, K: SearchKind> {
+    pub(crate) graph: &'g G,
+    pub(crate) start_token: Token<G::Index>,
+    pub(crate) cursor: QueryCursor<Matched, G::Index>,
     pub(crate) _kind: PhantomData<K>,
 }
 
-impl<'g, G: GraphKind, K: SearchKind> StartCtx<'g, G, K> {
+impl<'g, G: GraphRead + ?Sized, K: SearchKind> StartCtx<'g, G, K> {
     pub(crate) fn new(
-        graph: &'g PositionedGraph<G>,
-        cursor: QueryCursor<Matched>,
+        graph: &'g G,
+        cursor: QueryCursor<Matched, G::Index>,
     ) -> Self {
         Self {
             graph,
@@ -53,7 +51,7 @@ impl<'g, G: GraphKind, K: SearchKind> StartCtx<'g, G, K> {
             _kind: PhantomData,
         }
     }
-    pub(crate) fn into_search(self) -> Result<SearchState<'g, G, K>, SearchError> {
+    pub(crate) fn into_search(self) -> Result<SearchState<'g, G, K>, SearchError<G::Index>> {
         let batch = self.get_parent_batch()?;
         Ok(SearchState::new(
             SearchIterator::new(self.graph, self.start_token, batch),
@@ -63,7 +61,9 @@ impl<'g, G: GraphKind, K: SearchKind> StartCtx<'g, G, K> {
     /// Advance the query past the start token (`SingleIndex` if it is the
     /// last one) and build one parent state per occurrence of the start
     /// token, at the start token's query position.
-    pub(crate) fn get_parent_batch(&self) -> Result<CompareParentBatch, SearchError> {
+    pub(crate) fn get_parent_batch(
+        &self
+    ) -> Result<CompareParentBatch<G::Index>, SearchError<G::Index>> {
         let checkpoint = self.cursor.clone();
         let mut candidate = self.cursor.clone();
         if candidate.advance(self.graph).is_break() {

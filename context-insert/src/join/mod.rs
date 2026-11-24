@@ -14,13 +14,15 @@ use std::{
 
 use context_trace::{
     AtomPosition,
-    GraphKind,
     Token,
-    graph::vertex::VertexIndex,
+    VertexId,
     positioned::{
+        CompositionRead,
         GraphEdit,
+        GraphWrite,
         Occurrence,
         PositionedError,
+        VertexRead,
         maximal,
     },
 };
@@ -28,26 +30,26 @@ use context_trace::{
 use crate::split::SplitGraph;
 
 /// Resolved intervals of this insertion: `(vertex, start, end) → token`.
-type Resolved = BTreeMap<(VertexIndex, AtomPosition, AtomPosition), Token>;
+type Resolved<I> = BTreeMap<(I, AtomPosition, AtomPosition), Token<I>>;
 
 /// Create every required token of `split` through `edit` and add the new
 /// tokens to their split nodes. Returns the target token `N` (created last).
-pub fn join<G: GraphKind>(
-    edit: &mut GraphEdit<'_, G>,
-    split: &SplitGraph,
-) -> Result<Token, PositionedError> {
+pub fn join<S: GraphWrite + ?Sized>(
+    edit: &mut GraphEdit<'_, S>,
+    split: &SplitGraph<S::Index>,
+) -> Result<Token<S::Index>, PositionedError<S::Index>> {
     let mut resolved = Resolved::new();
     #[cfg(debug_assertions)]
-    let mut composed: Vec<Vec<Occurrence>> = Vec::new();
+    let mut composed: Vec<Vec<Occurrence<S::Index>>> = Vec::new();
     for (vertex, _) in split.bottom_up() {
-        let occurrences = edit
+        let occurrences: Vec<Occurrence<S::Index>> = edit
             .graph()
             .vertex(vertex)
-            .and_then(|v| v.composition())
+            .and_then(|v| v.node().composite())
             .expect("split node is composite")
             .occurrences()
-            .to_vec();
-        let mut own: Vec<Occurrence> = Vec::new();
+            .collect();
+        let mut own: Vec<Occurrence<S::Index>> = Vec::new();
         for interval in split.intervals(vertex) {
             let token = match inside_child(&occurrences, &interval) {
                 Some(child) => resolve_in_child(&resolved, child, &interval),
@@ -83,10 +85,10 @@ pub fn join<G: GraphKind>(
 
 /// The occurrence containing `interval`, if any (§5.2 step 1). J1: an
 /// interval in no child is not a vertex, so only those are composed.
-fn inside_child<'o>(
-    occurrences: &'o [Occurrence],
+fn inside_child<'o, I: VertexId>(
+    occurrences: &'o [Occurrence<I>],
     interval: &Range<AtomPosition>,
-) -> Option<&'o Occurrence> {
+) -> Option<&'o Occurrence<I>> {
     occurrences
         .iter()
         .find(|o| o.offset <= interval.start && interval.end <= o.end())
@@ -94,11 +96,11 @@ fn inside_child<'o>(
 
 /// The token of the part `range` (relative to `child`) of an original
 /// child: the child itself or its resolved interval token.
-fn child_part(
-    resolved: &Resolved,
-    child: Token,
+fn child_part<I: VertexId>(
+    resolved: &Resolved<I>,
+    child: Token<I>,
     range: Range<AtomPosition>,
-) -> Token {
+) -> Token<I> {
     if *range.start == 0 && *range.end == child.width.0 {
         return child;
     }
@@ -109,11 +111,11 @@ fn child_part(
         })
 }
 
-fn resolve_in_child(
-    resolved: &Resolved,
-    child: &Occurrence,
+fn resolve_in_child<I: VertexId>(
+    resolved: &Resolved<I>,
+    child: &Occurrence<I>,
     interval: &Range<AtomPosition>,
-) -> Token {
+) -> Token<I> {
     let a = *child.offset;
     child_part(resolved, child.child, interval.start - a..interval.end - a)
 }
@@ -121,12 +123,12 @@ fn resolve_in_child(
 /// Pieces of `interval`, relative to its start (§5.2 step 2): children
 /// inside it, the resolved parts of children crossing its borders and the
 /// vertex's own new tokens inside it.
-fn pieces(
-    resolved: &Resolved,
-    occurrences: &[Occurrence],
-    own: &[Occurrence],
+fn pieces<I: VertexId>(
+    resolved: &Resolved<I>,
+    occurrences: &[Occurrence<I>],
+    own: &[Occurrence<I>],
     interval: &Range<AtomPosition>,
-) -> Vec<Occurrence> {
+) -> Vec<Occurrence<I>> {
     let (x, y) = (interval.start, interval.end);
     let mut pieces = Vec::new();
     for occurrence in occurrences {

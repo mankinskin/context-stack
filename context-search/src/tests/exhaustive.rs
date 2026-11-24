@@ -5,6 +5,10 @@
 //! [`validate`]. Suite-level depth floors ([`Depth`]) make sure the deep
 //! fixtures keep exercising long paths, raises and decompositions.
 
+use context_trace::positioned::{
+        GraphRead,
+        Navigate,
+    };
 use std::collections::{BTreeMap, BTreeSet};
 
 use context_trace::{
@@ -67,11 +71,9 @@ fn deep_spans(f: &FixtureGraph) -> Vec<Vec<char>> {
         let key = chars(key);
         for s in 0..key.len() {
             for e in s + 2..=key.len() {
-                let start = f
-                    .graph
-                    .start_at(root, s)
-                    .map_or(0, |(_, steps)| steps.len());
-                let end = f.graph.end_at(root, e).map_or(0, |(_, steps)| steps.len());
+                let vertex = f.graph.vertex(root).unwrap();
+                let start = vertex.start_at(s).map_or(0, |(_, steps)| steps.len());
+                let end = vertex.end_at(e).map_or(0, |(_, steps)| steps.len());
                 let depth = spans.entry(key[s..e].to_vec()).or_insert(0);
                 *depth = (*depth).max(start + end);
             }

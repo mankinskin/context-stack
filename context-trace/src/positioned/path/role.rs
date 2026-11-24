@@ -27,13 +27,17 @@ use std::{
 
 use crate::{
     AtomPosition,
-    GraphKind,
     Token,
     TokenWidth,
+    graph::vertex::VertexId,
     positioned::{
+        access::GraphRead,
         composition::Occurrence,
-        graph::PositionedGraph,
         location::OccurrenceLocation,
+        navigate::{
+            Located,
+            Navigate,
+        },
         trace::{
             BottomUp,
             QueryAnchor,
@@ -45,7 +49,9 @@ use crate::{
 
 /// Sum of the step offsets: the offset of the last child in the first
 /// parent.
-pub fn offset_sum<'a>(steps: impl IntoIterator<Item = &'a OccurrenceLocation>) -> AtomPosition {
+pub fn offset_sum<'a, I: VertexId + 'a>(
+    steps: impl IntoIterator<Item = &'a OccurrenceLocation<I>>
+) -> AtomPosition {
     steps
         .into_iter()
         .fold(AtomPosition::default(), |sum, step| sum + step.offset.0)
@@ -64,28 +70,28 @@ pub trait PathRole: 'static + Debug + Clone + Copy + Default + PartialEq + Eq + 
     type Direction: TraceDirection;
 
     /// Stored steps from the root child down to the leaf.
-    fn top_down(
-        steps: &[OccurrenceLocation]
-    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation> + ExactSizeIterator;
+    fn top_down<I: VertexId>(
+        steps: &[OccurrenceLocation<I>]
+    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation<I>> + ExactSizeIterator;
     /// Stored steps from the leaf up to the root child.
-    fn bottom_up(
-        steps: &[OccurrenceLocation]
-    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation> + ExactSizeIterator {
+    fn bottom_up<I: VertexId>(
+        steps: &[OccurrenceLocation<I>]
+    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation<I>> + ExactSizeIterator {
         Self::top_down(steps).rev()
     }
     /// Top-down steps in storage order.
-    fn from_top_down(steps: Vec<OccurrenceLocation>) -> Vec<OccurrenceLocation>;
+    fn from_top_down<I: VertexId>(steps: Vec<OccurrenceLocation<I>>) -> Vec<OccurrenceLocation<I>>;
     /// The step in the root (its child is the root child).
-    fn root_step(steps: &[OccurrenceLocation]) -> Option<&OccurrenceLocation>;
+    fn root_step<I: VertexId>(steps: &[OccurrenceLocation<I>]) -> Option<&OccurrenceLocation<I>>;
     /// Add a step above the current root step.
-    fn push_root(
-        steps: &mut Vec<OccurrenceLocation>,
-        step: OccurrenceLocation,
+    fn push_root<I: VertexId>(
+        steps: &mut Vec<OccurrenceLocation<I>>,
+        step: OccurrenceLocation<I>,
     );
     /// Add a step below the current leaf.
-    fn push_leaf(
-        steps: &mut Vec<OccurrenceLocation>,
-        step: OccurrenceLocation,
+    fn push_leaf<I: VertexId>(
+        steps: &mut Vec<OccurrenceLocation<I>>,
+        step: OccurrenceLocation<I>,
     );
 
     /// The boundary of `span` this role addresses.
@@ -105,13 +111,13 @@ pub trait PathRole: 'static + Debug + Clone + Copy + Default + PartialEq + Eq + 
         Self::at_border(AtomPosition::default(), width, Self::boundary(span))
     }
     /// The largest proper descendant of `root` with its border at `p` and
-    /// the top-down steps to it ([`PositionedGraph::start_at`] for
-    /// [`Start`], [`PositionedGraph::end_at`] for [`End`]).
-    fn locate<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
+    /// the top-down steps to it ([`Navigate::start_at`] for
+    /// [`Start`], [`Navigate::end_at`] for [`End`]).
+    fn locate<G: GraphRead + ?Sized>(
+        graph: &G,
+        root: Token<G::Index>,
         p: AtomPosition,
-    ) -> Option<(Token, Vec<OccurrenceLocation>)>;
+    ) -> Option<Located<G::Index>>;
 
     /// Position of the trace key of a token of `width` at root offset
     /// `offset`.
@@ -125,10 +131,10 @@ pub trait PathRole: 'static + Debug + Clone + Copy + Default + PartialEq + Eq + 
 /// Roles whose paths descend into the child at their border.
 pub trait BorderChild: PathRole {
     /// The child of `token` at its role border; `None` for atoms.
-    fn border_child<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        token: Token,
-    ) -> Option<Occurrence>;
+    fn border_child<G: GraphRead + ?Sized>(
+        graph: &G,
+        token: Token<G::Index>,
+    ) -> Option<Occurrence<G::Index>>;
 }
 
 /// Path to the token at the span start, stored bottom-up.
@@ -142,27 +148,29 @@ pub struct End;
 impl PathRole for Start {
     type Direction = BottomUp;
 
-    fn top_down(
-        steps: &[OccurrenceLocation]
-    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation> + ExactSizeIterator {
+    fn top_down<I: VertexId>(
+        steps: &[OccurrenceLocation<I>]
+    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation<I>> + ExactSizeIterator {
         steps.iter().rev()
     }
-    fn from_top_down(mut steps: Vec<OccurrenceLocation>) -> Vec<OccurrenceLocation> {
+    fn from_top_down<I: VertexId>(
+        mut steps: Vec<OccurrenceLocation<I>>
+    ) -> Vec<OccurrenceLocation<I>> {
         steps.reverse();
         steps
     }
-    fn root_step(steps: &[OccurrenceLocation]) -> Option<&OccurrenceLocation> {
+    fn root_step<I: VertexId>(steps: &[OccurrenceLocation<I>]) -> Option<&OccurrenceLocation<I>> {
         steps.last()
     }
-    fn push_root(
-        steps: &mut Vec<OccurrenceLocation>,
-        step: OccurrenceLocation,
+    fn push_root<I: VertexId>(
+        steps: &mut Vec<OccurrenceLocation<I>>,
+        step: OccurrenceLocation<I>,
     ) {
         steps.push(step);
     }
-    fn push_leaf(
-        steps: &mut Vec<OccurrenceLocation>,
-        step: OccurrenceLocation,
+    fn push_leaf<I: VertexId>(
+        steps: &mut Vec<OccurrenceLocation<I>>,
+        step: OccurrenceLocation<I>,
     ) {
         steps.insert(0, step);
     }
@@ -176,12 +184,12 @@ impl PathRole for Start {
     ) -> bool {
         offset == boundary
     }
-    fn locate<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
+    fn locate<G: GraphRead + ?Sized>(
+        graph: &G,
+        root: Token<G::Index>,
         p: AtomPosition,
-    ) -> Option<(Token, Vec<OccurrenceLocation>)> {
-        graph.start_at(root, p)
+    ) -> Option<Located<G::Index>> {
+        graph.vertex(root)?.start_at(p)
     }
     /// Up keys: the query position at the token end.
     fn trace_pos(
@@ -196,26 +204,28 @@ impl PathRole for Start {
 impl PathRole for End {
     type Direction = TopDown;
 
-    fn top_down(
-        steps: &[OccurrenceLocation]
-    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation> + ExactSizeIterator {
+    fn top_down<I: VertexId>(
+        steps: &[OccurrenceLocation<I>]
+    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation<I>> + ExactSizeIterator {
         steps.iter()
     }
-    fn from_top_down(steps: Vec<OccurrenceLocation>) -> Vec<OccurrenceLocation> {
+    fn from_top_down<I: VertexId>(
+        steps: Vec<OccurrenceLocation<I>>
+    ) -> Vec<OccurrenceLocation<I>> {
         steps
     }
-    fn root_step(steps: &[OccurrenceLocation]) -> Option<&OccurrenceLocation> {
+    fn root_step<I: VertexId>(steps: &[OccurrenceLocation<I>]) -> Option<&OccurrenceLocation<I>> {
         steps.first()
     }
-    fn push_root(
-        steps: &mut Vec<OccurrenceLocation>,
-        step: OccurrenceLocation,
+    fn push_root<I: VertexId>(
+        steps: &mut Vec<OccurrenceLocation<I>>,
+        step: OccurrenceLocation<I>,
     ) {
         steps.insert(0, step);
     }
-    fn push_leaf(
-        steps: &mut Vec<OccurrenceLocation>,
-        step: OccurrenceLocation,
+    fn push_leaf<I: VertexId>(
+        steps: &mut Vec<OccurrenceLocation<I>>,
+        step: OccurrenceLocation<I>,
     ) {
         steps.push(step);
     }
@@ -229,12 +239,12 @@ impl PathRole for End {
     ) -> bool {
         token_end(offset, width) == boundary
     }
-    fn locate<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
+    fn locate<G: GraphRead + ?Sized>(
+        graph: &G,
+        root: Token<G::Index>,
         p: AtomPosition,
-    ) -> Option<(Token, Vec<OccurrenceLocation>)> {
-        graph.end_at(root, p)
+    ) -> Option<Located<G::Index>> {
+        graph.vertex(root)?.end_at(p)
     }
     /// Down keys: the query position at the token start, clamped to the
     /// match start.
@@ -250,10 +260,10 @@ impl PathRole for End {
 /// An end path continues at the next token starting at the match end, so
 /// it descends into prefix children.
 impl BorderChild for End {
-    fn border_child<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        token: Token,
-    ) -> Option<Occurrence> {
-        graph.prefix_child(token)
+    fn border_child<G: GraphRead + ?Sized>(
+        graph: &G,
+        token: Token<G::Index>,
+    ) -> Option<Occurrence<G::Index>> {
+        graph.vertex(token)?.prefix_child()
     }
 }

@@ -6,18 +6,26 @@
 //! Independent of the row model in `crate::legacy`; shares only the ID and
 //! atom types ([`crate::VertexIndex`], [`crate::Token`], [`crate::GraphKind`]).
 //!
+//! Stores are abstracted by traits (staging plan §3): [`GraphRead`] hands
+//! out [`VertexRead`] vertex objects (`access.rs`), [`HasGraph`] /
+//! [`HasGraphMut`] abstract how a store is reached (`has_graph.rs`), and the
+//! committed store ([`PositionedGraph`], its lock guards and
+//! [`PositionedGraphRef`]) implements them (`committed.rs`).
+//!
 //! Read-only navigation (reader plan Phase 2) is split into separate APIs:
 //! - content reading (debug and `test-api` builds):
-//!   [`PositionedGraph::read_interval`] (`read.rs`);
-//! - local navigation for search: [`PositionedGraph::start_at`],
-//!   [`PositionedGraph::end_at`], [`PositionedGraph::prefix_child`],
-//!   [`PositionedGraph::parent_occurrences`],
-//!   [`PositionedGraph::atom_token`], [`PositionedGraph::advance_end_path`]
-//!   (`navigate.rs`);
+//!   [`Navigate::read_interval`];
+//! - local navigation for search, on vertex objects ([`Navigate`],
+//!   `navigate.rs`): `start_at`, `end_at`, `prefix_child`,
+//!   `postfix_child`, `prefixes`, `postfixes`, `parent_occurrences`,
+//!   `advance_end_path`; atoms through [`GraphRead::atom`];
 //! - search paths (role-generic [`RolePath`] with aliases [`StartPath`],
 //!   [`EndPath`], [`QueryPath`]; [`RangePath`], `path/`) and trace states / trace cache ([`ParentState`],
 //!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2.
 
+mod access;
+mod check;
+mod committed;
 pub mod composition;
 #[cfg(any(test, feature = "test-api"))]
 mod convert;
@@ -27,12 +35,11 @@ mod edit;
 #[cfg(any(test, feature = "test-api"))]
 pub mod fixtures;
 pub mod graph;
+mod has_graph;
 pub mod interchange;
 pub mod location;
 mod navigate;
 pub mod path;
-#[cfg(any(debug_assertions, test, feature = "test-api"))]
-mod read;
 pub mod trace;
 
 #[cfg(feature = "edit")]
@@ -48,6 +55,28 @@ pub use self::diff::{
     diff,
 };
 pub use self::{
+    access::{
+        CompositionRead,
+        Generation,
+        GraphRead,
+        GraphWrite,
+        NodeRef,
+        VertexRead,
+        VertexState,
+    },
+    committed::PositionedVertexRef,
+    has_graph::{
+        GraphAtom,
+        HasGraph,
+        HasGraphMut,
+        IndexOf,
+        KindOf,
+    },
+    navigate::{
+        Located,
+        Navigate,
+        string_repr,
+    },
     composition::{
         Composition,
         CompositionError,

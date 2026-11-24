@@ -11,10 +11,11 @@ use std::{
 
 use context_trace::{
     positioned::{
-        PositionedGraph,
+        GraphRead,
         QueryPath,
     },
-    GraphKind,
+    CommittedIndex,
+    VertexId,
 };
 
 use super::{
@@ -24,11 +25,11 @@ use super::{
 };
 
 /// Positioned query cursor (legacy `PatternCursor`).
-pub type QueryCursor<State = Matched> = PathCursor<QueryPath, State>;
+pub type QueryCursor<State = Matched, I = CommittedIndex> = PathCursor<QueryPath<I>, State>;
 
-impl<S: CursorState> PathCursor<QueryPath, S> {
+impl<S: CursorState, I: VertexId> PathCursor<QueryPath<I>, S> {
     /// Cursor at the leaf of `path`.
-    pub fn at(path: QueryPath) -> Self {
+    pub fn at(path: QueryPath<I>) -> Self {
         Self {
             atom_position: path.leaf_end(),
             path,
@@ -42,25 +43,25 @@ impl<S: CursorState> PathCursor<QueryPath, S> {
     /// Move to the largest query token starting at the leaf end
     /// ([`RolePath::advance_leaf`](context_trace::positioned::RolePath::advance_leaf)).
     /// `Break` (unchanged) at the query end.
-    pub fn advance<G: GraphKind>(
+    pub fn advance<G: GraphRead<Index = I> + ?Sized>(
         &mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) -> ControlFlow<()> {
         let flow = self.path.advance_leaf(graph);
         self.atom_position = self.path.leaf_end();
         flow
     }
     /// Split the leaf into its prefix child (query-side decomposition).
-    pub fn push_border_child<G: GraphKind>(
+    pub fn push_border_child<G: GraphRead<Index = I> + ?Sized>(
         &mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) -> bool {
         let split = self.path.push_border_child(graph);
         self.atom_position = self.path.leaf_end();
         split
     }
     /// The same position in another state.
-    pub(crate) fn with_state<T: CursorState>(self) -> PathCursor<QueryPath, T> {
+    pub(crate) fn with_state<T: CursorState>(self) -> PathCursor<QueryPath<I>, T> {
         PathCursor {
             path: self.path,
             atom_position: self.atom_position,

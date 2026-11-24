@@ -1,7 +1,7 @@
 //! Lock-step advance inside one root (legacy
 //! `match/root_cursor/advance.rs`).
 
-use context_trace::GraphKind;
+use context_trace::positioned::GraphRead;
 
 use super::core::{
     ConclusiveEnd,
@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-impl<'g, G: GraphKind, K: SearchKind> RootCursor<'g, G, K, Matched, Matched> {
+impl<'g, G: GraphRead + ?Sized, K: SearchKind> RootCursor<'g, G, K, Matched, Matched> {
     /// Advance the query, then the graph, then compare. Ends:
     /// query exhausted → `Conclusive(Exhausted)`; mismatch →
     /// `Conclusive(Mismatch)`; root exhausted → `Inconclusive`.
@@ -65,10 +65,10 @@ impl<'g, G: GraphKind, K: SearchKind> RootCursor<'g, G, K, Matched, Matched> {
     }
 }
 
-impl<G: GraphKind, K: SearchKind> RootCursor<'_, G, K, Candidate, Matched> {
+impl<G: GraphRead + ?Sized, K: SearchKind> RootCursor<'_, G, K, Candidate, Matched> {
     /// The match up to the root end, with the query cursor advanced past
     /// the checkpoint (legacy: result of an inconclusive root).
-    pub(crate) fn create_parent_exploration_state(&self) -> MatchResult {
+    pub(crate) fn create_parent_exploration_state(&self) -> MatchResult<G::Index> {
         let checkpoint = self.state.query.checkpoint().clone();
         let candidate = self.state.query.candidate().clone().to_matched();
         let end_pos = checkpoint.atom_position;

@@ -1,5 +1,6 @@
 //! Split graph (task 3.2) on every insert case and on the §9 tables.
 
+use context_trace::positioned::GraphRead;
 use std::collections::BTreeSet;
 
 use context_trace::positioned::{

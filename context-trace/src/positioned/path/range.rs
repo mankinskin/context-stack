@@ -13,10 +13,10 @@ use super::{
 };
 use crate::{
     AtomPosition,
-    GraphKind,
     Token,
     TokenWidth,
-    positioned::graph::PositionedGraph,
+    graph::vertex::VertexId,
+    positioned::access::GraphRead,
 };
 
 /// How a matched span covers its root (legacy `PathCoverage`, classified
@@ -122,8 +122,8 @@ impl<Root: PathRoot> RangePath<Root> {
     }
 }
 
-impl RangePath<Token> {
-    pub fn root(&self) -> Token {
+impl<I: VertexId> RangePath<Token<I>> {
+    pub fn root(&self) -> Token<I> {
         self.start.root()
     }
     /// Canonical path of role `R` (2.4): the descent to the largest token
@@ -134,13 +134,14 @@ impl RangePath<Token> {
     ///
     /// Search results canonicalise the end path only; the start path keeps
     /// the climbed chain, trimmed by the raise rule ([`RolePath::raise`]).
-    pub fn canonicalize<R: PathRole, G: GraphKind>(
+    pub fn canonicalize<R: PathRole, G: GraphRead<Index = I> + ?Sized>(
         &mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) where
-        Self: HasRolePath<R, Root = Token>,
+        Self: HasRolePath<R, Root = Token<I>>,
     {
-        if let Some(path) = RolePath::<R>::locate(graph, self.root(), self.boundary::<R>()) {
+        let path = RolePath::<R, Token<I>>::locate(graph, self.root(), self.boundary::<R>());
+        if let Some(path) = path {
             *<Self as HasRolePath<R>>::role_path_mut(self) = path;
         }
     }

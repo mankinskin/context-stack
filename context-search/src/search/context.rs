@@ -1,10 +1,7 @@
 //! Search kinds and the search context (legacy `search/context.rs`).
 //! Only the ancestor search exists (Decision 7.2).
 
-use context_trace::{
-    positioned::PositionedGraph,
-    GraphKind,
-};
+use context_trace::positioned::GraphRead;
 
 use crate::policy::{
     DirectedTraversalPolicy,
@@ -20,22 +17,22 @@ impl DirectedTraversalPolicy for AncestorPolicy {}
 /// The graph a search reads, borrowed from one read guard for the whole
 /// search.
 #[derive(Debug)]
-pub struct SearchCtx<'g, G: GraphKind> {
-    pub(crate) graph: &'g PositionedGraph<G>,
+pub struct SearchCtx<'g, G: GraphRead + ?Sized> {
+    pub(crate) graph: &'g G,
 }
 
-impl<G: GraphKind> Clone for SearchCtx<'_, G> {
+impl<G: GraphRead + ?Sized> Clone for SearchCtx<'_, G> {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<G: GraphKind> Copy for SearchCtx<'_, G> {}
+impl<G: GraphRead + ?Sized> Copy for SearchCtx<'_, G> {}
 
-impl<'g, G: GraphKind> SearchCtx<'g, G> {
-    pub fn new(graph: &'g PositionedGraph<G>) -> Self {
+impl<'g, G: GraphRead + ?Sized> SearchCtx<'g, G> {
+    pub fn new(graph: &'g G) -> Self {
         Self { graph }
     }
-    pub fn graph(&self) -> &'g PositionedGraph<G> {
+    pub fn graph(&self) -> &'g G {
         self.graph
     }
 }

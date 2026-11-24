@@ -32,7 +32,7 @@ fn name_map_addresses_every_fixture_vertex() {
         for (key, token) in &fixture.names {
             assert_eq!(token.width.0, key.chars().count(), "{name}: {key}");
             assert_eq!(
-                fixture.graph.vertex(token.index).map(|v| v.token()),
+                fixture.graph.vertex_data(token.index).map(|v| v.token()),
                 Some(*token),
                 "{name}: {key}"
             );
@@ -53,7 +53,7 @@ fn debug_labels_equal_fixture_keys_and_resolve_names() {
     for fixture in super::super::fixtures::fixture_graphs() {
         fixture.graph.register_name_resolver();
         for (key, token) in &fixture.names {
-            let vertex = fixture.graph.vertex(token.index).unwrap();
+            let vertex = fixture.graph.vertex_data(token.index).unwrap();
             assert_eq!(vertex.label(), key, "{}", fixture.name);
             assert_eq!(resolve_token_name(token.index.0).as_deref(), Some(key.as_str()));
             assert_eq!(
@@ -70,7 +70,7 @@ fn debug_labels_equal_fixture_keys_and_resolve_names() {
 fn release_display_shows_index_and_width_only() {
     for fixture in super::super::fixtures::fixture_graphs() {
         for token in fixture.names.values() {
-            let vertex = fixture.graph.vertex(token.index).unwrap();
+            let vertex = fixture.graph.vertex_data(token.index).unwrap();
             assert_eq!(vertex.to_string(), format!("#{}(w{})", token.index.0, token.width.0));
         }
     }

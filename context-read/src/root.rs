@@ -9,8 +9,10 @@
 use context_trace::{
     Token,
     positioned::{
+        GraphRead,
         Occurrence,
         PositionedGraphRef,
+        VertexRead,
         maximal,
     },
 };
@@ -80,8 +82,8 @@ impl RootManager {
         self.owned
             && graph
                 .read()
-                .vertex(root.index)
-                .is_some_and(|vertex| vertex.parents().is_empty())
+                .vertex(root)
+                .is_some_and(|vertex| vertex.parents().next().is_none())
     }
 
     /// Apply `span` (table of §3.4) through one `GraphEdit`.
@@ -166,7 +168,7 @@ mod tests {
     ) -> Vec<Occurrence> {
         graph
             .read()
-            .vertex(token.index)
+            .vertex(token)
             .and_then(|vertex| vertex.composition())
             .map(|composition| composition.occurrences().to_vec())
             .unwrap_or_default()

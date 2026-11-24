@@ -8,12 +8,16 @@ use std::{
 
 use crate::{
     AtomPosition,
-    GraphKind,
     Token,
     TokenWidth,
-    graph::vertex::wide::Wide,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+        wide::Wide,
+    },
     positioned::{
-        graph::PositionedGraph,
+        access::GraphRead,
+        check::expect_token,
         location::OccurrenceLocation,
     },
 };
@@ -25,34 +29,37 @@ use crate::{
 /// for a [`QueryRoot`] it is the current pattern token (the root child), so
 /// the steps may be empty.
 pub trait PathRoot: Clone + Debug + PartialEq + Eq + Hash {
+    /// Index type of the store the path lives in.
+    type Index: VertexId;
     /// The token the stored steps descend from.
-    fn steps_root(&self) -> Token;
+    fn steps_root(&self) -> Token<Self::Index>;
     /// Offset of [`Self::steps_root`] in root coordinates.
     fn steps_root_offset(&self) -> AtomPosition;
     /// Total width of the root.
     fn root_width(&self) -> TokenWidth;
     /// The root child of a path with root step `root_step` (top-down first
     /// stored step) and leaf `leaf`.
-    fn root_child<G: GraphKind>(
+    fn root_child<G: GraphRead<Index = Self::Index> + ?Sized>(
         &self,
-        graph: &PositionedGraph<G>,
-        root_step: Option<&OccurrenceLocation>,
-        leaf: Token,
-    ) -> Token;
+        graph: &G,
+        root_step: Option<&OccurrenceLocation<Self::Index>>,
+        leaf: Token<Self::Index>,
+    ) -> Token<Self::Index>;
     /// Offset of the root child in root coordinates.
     fn root_child_offset(
         &self,
-        root_step: Option<&OccurrenceLocation>,
+        root_step: Option<&OccurrenceLocation<Self::Index>>,
     ) -> AtomPosition;
     /// Move to the root child after [`Self::steps_root`] and return it;
     /// `None` (unchanged) if there is none.
-    fn next_root_child(&mut self) -> Option<Token>;
+    fn next_root_child(&mut self) -> Option<Token<Self::Index>>;
 }
 
 /// A graph root: steps start with the occurrence of the root child in it;
 /// there is no next root child.
-impl PathRoot for Token {
-    fn steps_root(&self) -> Token {
+impl<I: VertexId> PathRoot for Token<I> {
+    type Index = I;
+    fn steps_root(&self) -> Token<I> {
         *self
     }
     fn steps_root_offset(&self) -> AtomPosition {
@@ -61,26 +68,26 @@ impl PathRoot for Token {
     fn root_width(&self) -> TokenWidth {
         Wide::width(self)
     }
-    fn root_child<G: GraphKind>(
+    fn root_child<G: GraphRead<Index = I> + ?Sized>(
         &self,
-        graph: &PositionedGraph<G>,
-        root_step: Option<&OccurrenceLocation>,
-        leaf: Token,
-    ) -> Token {
+        graph: &G,
+        root_step: Option<&OccurrenceLocation<I>>,
+        leaf: Token<I>,
+    ) -> Token<I> {
         let step = root_step.expect("graph-rooted path has a root step");
         if step.child == leaf.index {
             leaf
         } else {
-            graph.expect_token(step.child)
+            expect_token(graph, step.child)
         }
     }
     fn root_child_offset(
         &self,
-        root_step: Option<&OccurrenceLocation>,
+        root_step: Option<&OccurrenceLocation<I>>,
     ) -> AtomPosition {
         root_step.expect("graph-rooted path has a root step").offset
     }
-    fn next_root_child(&mut self) -> Option<Token> {
+    fn next_root_child(&mut self) -> Option<Token<I>> {
         None
     }
 }
@@ -89,22 +96,22 @@ impl PathRoot for Token {
 /// children are the pattern tokens, `pattern[entry]` at query position
 /// `entry_position`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct QueryRoot {
-    pub(crate) pattern: Vec<Token>,
+pub struct QueryRoot<I: VertexId = CommittedIndex> {
+    pub(crate) pattern: Vec<Token<I>>,
     pub(crate) entry: usize,
     pub(crate) entry_position: AtomPosition,
 }
 
-impl QueryRoot {
+impl<I: VertexId> QueryRoot<I> {
     /// At the first query token; `None` for an empty pattern.
-    pub fn new(pattern: Vec<Token>) -> Option<Self> {
+    pub fn new(pattern: Vec<Token<I>>) -> Option<Self> {
         (!pattern.is_empty()).then_some(Self {
             pattern,
             entry: 0,
             entry_position: AtomPosition::default(),
         })
     }
-    pub fn pattern(&self) -> &[Token] {
+    pub fn pattern(&self) -> &[Token<I>] {
         &self.pattern
     }
     /// Index of the current query token.
@@ -117,8 +124,9 @@ impl QueryRoot {
     }
 }
 
-impl PathRoot for QueryRoot {
-    fn steps_root(&self) -> Token {
+impl<I: VertexId> PathRoot for QueryRoot<I> {
+    type Index = I;
+    fn steps_root(&self) -> Token<I> {
         self.pattern[self.entry]
     }
     fn steps_root_offset(&self) -> AtomPosition {
@@ -127,21 +135,21 @@ impl PathRoot for QueryRoot {
     fn root_width(&self) -> TokenWidth {
         TokenWidth(self.pattern.iter().map(|t| t.width().0).sum())
     }
-    fn root_child<G: GraphKind>(
+    fn root_child<G: GraphRead<Index = I> + ?Sized>(
         &self,
-        _graph: &PositionedGraph<G>,
-        _root_step: Option<&OccurrenceLocation>,
-        _leaf: Token,
-    ) -> Token {
+        _graph: &G,
+        _root_step: Option<&OccurrenceLocation<I>>,
+        _leaf: Token<I>,
+    ) -> Token<I> {
         self.steps_root()
     }
     fn root_child_offset(
         &self,
-        _root_step: Option<&OccurrenceLocation>,
+        _root_step: Option<&OccurrenceLocation<I>>,
     ) -> AtomPosition {
         self.entry_position
     }
-    fn next_root_child(&mut self) -> Option<Token> {
+    fn next_root_child(&mut self) -> Option<Token<I>> {
         let next = *self.pattern.get(self.entry + 1)?;
         self.entry_position += self.pattern[self.entry].width().0;
         self.entry += 1;

@@ -4,36 +4,38 @@ pub mod parent;
 
 use crate::{
     AtomPosition,
-    GraphKind,
     Token,
-    positioned::graph::PositionedGraph,
+    graph::vertex::VertexId,
+    positioned::access::GraphRead,
 };
 use parent::ParentState;
 
 pub trait StateAdvance: Sized + Clone {
+    /// Index type of the store the state lives in.
+    type Index: VertexId;
     type Next;
-    fn advance_state<G: GraphKind>(
+    fn advance_state<G: GraphRead<Index = Self::Index> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) -> Result<Self::Next, Self>;
 }
 
-pub trait IntoParentState: Sized {
+pub trait IntoParentState<I: VertexId>: Sized {
     /// Seed state: `self` (the first query token, at query position 0)
     /// occurs in `parent` at `offset`.
     fn into_parent_state(
         self,
-        parent: Token,
+        parent: Token<I>,
         offset: AtomPosition,
-    ) -> ParentState;
+    ) -> ParentState<I>;
 }
 
-impl IntoParentState for Token {
+impl<I: VertexId> IntoParentState<I> for Token<I> {
     fn into_parent_state(
         self,
-        parent: Token,
+        parent: Token<I>,
         offset: AtomPosition,
-    ) -> ParentState {
+    ) -> ParentState<I> {
         ParentState::new(self, parent, offset, AtomPosition::default())
     }
 }

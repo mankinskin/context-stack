@@ -2,17 +2,18 @@
 //! `compare/state/decomposition.rs`, Decision 1 b).
 //!
 //! A decomposition replaces the wider leaf by its prefix child
-//! ([`PositionedGraph::prefix_child`]); equal widths replace both leaves in
-//! one step (`BothMajor`). Each decomposition yields exactly one state.
+//! ([`Navigate::prefix_child`](context_trace::positioned::Navigate::prefix_child));
+//! equal widths replace both leaves in one step (`BothMajor`). Each
+//! decomposition yields exactly one state.
 
 use std::cmp::Ordering;
 
 use context_trace::{
     positioned::{
         trace::child::iterator::ChildQueue,
-        PositionedGraph,
+        GraphRead,
     },
-    GraphKind,
+    VertexId,
 };
 
 use super::core::{
@@ -29,14 +30,14 @@ use crate::{
     search::stats,
 };
 
-impl CompareState<Candidate, Candidate> {
+impl<X: VertexId> CompareState<Candidate, Candidate, X> {
     /// Compare the graph leaf `g` with the query leaf `q`: equal → match;
     /// two different atoms → mismatch; otherwise decompose the wider side
     /// (both on equal width).
-    pub(crate) fn compare_leaf_tokens<G: GraphKind>(
+    pub(crate) fn compare_leaf_tokens<G: GraphRead<Index = X> + ?Sized>(
         mut self,
-        graph: &PositionedGraph<G>,
-    ) -> CompareLeafResult {
+        graph: &G,
+    ) -> CompareLeafResult<X> {
         let g = self.child.current().child_state.path.end.leaf();
         let q = self.query.current().path.leaf();
         stats::record_compare(self.query.current().path.leaf_offset());
@@ -58,9 +59,9 @@ impl CompareState<Candidate, Candidate> {
 
     /// Replace the leaf of the side(s) selected by `mode` by its prefix
     /// child.
-    pub(crate) fn expand_to_prefix_comparisons<G: GraphKind>(
+    pub(crate) fn expand_to_prefix_comparisons<G: GraphRead<Index = X> + ?Sized>(
         &mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) {
         if matches!(
             self.mode,

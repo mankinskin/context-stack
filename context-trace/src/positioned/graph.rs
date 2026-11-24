@@ -15,17 +15,22 @@ use std::{
     },
 };
 
-#[cfg(any(debug_assertions, test, feature = "test-api"))]
+#[cfg(any(debug_assertions, feature = "test-api"))]
 use std::ops::Range;
 
-#[cfg(any(debug_assertions, test, feature = "test-api"))]
-use super::location::IntervalView;
-#[cfg(any(test, feature = "test-api"))]
-use super::location::OccurrenceLocation;
-use super::composition::{
-    Composition,
-    CompositionError,
-    Occurrence,
+#[cfg(any(debug_assertions, feature = "test-api"))]
+use super::{
+    check::check_overlap_closure,
+    navigate::Navigate,
+};
+use super::{
+    access::GraphRead,
+    check::validate_vertex,
+    composition::{
+        Composition,
+        CompositionError,
+        Occurrence,
+    },
 };
 use crate::{
     AtomOf,
@@ -39,6 +44,8 @@ use crate::{
         CommittedIndex,
         VertexId,
         VertexIndex,
+        has_vertex_index::HasVertexIndex,
+        id::Plain,
     },
 };
 #[cfg(debug_assertions)]
@@ -128,77 +135,80 @@ impl TokenNameResolver for PositionedLabels {
     }
 }
 
-/// Edit or validation failure.
+/// Edit or validation failure, with the indices of the store `I`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PositionedError {
+pub enum PositionedError<I: VertexId = CommittedIndex> {
     Composition {
-        owner: Option<VertexIndex>,
-        error: CompositionError,
+        owner: Option<I>,
+        error: CompositionError<I>,
     },
-    UnknownVertex(VertexIndex),
+    UnknownVertex(I),
+    /// A composite-only operation on an atom.
+    Atom(I),
     /// Stored or referenced width disagrees with the vertex.
     Width {
-        vertex: VertexIndex,
+        vertex: I,
         expected: TokenWidth,
         found: TokenWidth,
     },
     /// Occurrence `child@offset` in `parent` lacks its reciprocal link (or
     /// the link has no occurrence).
     ParentLink {
-        parent: VertexIndex,
-        child: VertexIndex,
+        parent: I,
+        child: I,
         offset: AtomPosition,
     },
     /// Vertex stored at the wrong slot.
     Index {
         slot: usize,
-        vertex: VertexIndex,
+        vertex: I,
     },
     /// `first` and `second` denote the same content.
     #[cfg(any(debug_assertions, feature = "test-api"))]
     DuplicateContent {
-        first: VertexIndex,
-        second: VertexIndex,
+        first: I,
+        second: I,
     },
     /// Adjacent occurrences in `owner` denote different atoms on their overlap.
     #[cfg(any(debug_assertions, feature = "test-api"))]
     OverlapMismatch {
-        owner: VertexIndex,
-        left: Occurrence,
-        right: Occurrence,
+        owner: I,
+        left: Occurrence<I>,
+        right: Occurrence<I>,
     },
     /// Adjacent occurrences in `owner` overlap, but their overlap is not a
     /// vertex (G4).
     #[cfg(any(debug_assertions, feature = "test-api"))]
     OverlapNotVertex {
-        owner: VertexIndex,
-        left: Occurrence,
-        right: Occurrence,
+        owner: I,
+        left: Occurrence<I>,
+        right: Occurrence<I>,
     },
     /// The vertex has parents, so its width must not change.
-    HasParents(VertexIndex),
+    HasParents(I),
     /// `occurrence` does not lie where the edit of `vertex` requires it.
     OutsideVertex {
-        vertex: VertexIndex,
-        occurrence: Occurrence,
+        vertex: I,
+        occurrence: Occurrence<I>,
     },
     /// The edit would change the width of `vertex`.
-    WidthChange { vertex: VertexIndex },
+    WidthChange { vertex: I },
 }
 
-impl fmt::Display for PositionedError {
+impl<I: VertexId> fmt::Display for PositionedError<I> {
     fn fmt(
         &self,
         f: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
-        let owner = |owner: &Option<VertexIndex>| {
-            owner.map_or("new vertex".to_string(), |o| format!("vertex {}", o.0))
+        let owner = |owner: &Option<I>| {
+            owner.map_or("new vertex".to_string(), |o| format!("vertex {}", Plain(o)))
         };
         match self {
             Self::Composition { owner: o, error } => {
                 write!(f, "{}: {error}", owner(o))
             },
-            Self::UnknownVertex(v) => write!(f, "unknown vertex {}", v.0),
+            Self::UnknownVertex(v) => write!(f, "unknown vertex {}", Plain(*v)),
+            Self::Atom(v) => write!(f, "vertex {} is an atom", Plain(*v)),
             Self::Width {
                 vertex,
                 expected,
@@ -206,7 +216,9 @@ impl fmt::Display for PositionedError {
             } => write!(
                 f,
                 "vertex {}: width {} expected, found {}",
-                vertex.0, expected.0, found.0
+                Plain(*vertex),
+                expected.0,
+                found.0
             ),
             Self::ParentLink {
                 parent,
@@ -215,43 +227,55 @@ impl fmt::Display for PositionedError {
             } => write!(
                 f,
                 "occurrence {}@{offset} in vertex {} has no reciprocal link",
-                child.0, parent.0
+                Plain(*child),
+                Plain(*parent)
             ),
             Self::Index { slot, vertex } => {
-                write!(f, "vertex {} stored at slot {slot}", vertex.0)
+                write!(f, "vertex {} stored at slot {slot}", Plain(*vertex))
             },
             #[cfg(any(debug_assertions, feature = "test-api"))]
             Self::DuplicateContent { first, second } => write!(
                 f,
                 "vertices {} and {} have the same content",
-                first.0, second.0
+                Plain(*first),
+                Plain(*second)
             ),
             #[cfg(any(debug_assertions, feature = "test-api"))]
             Self::OverlapMismatch { owner, left, right } => write!(
                 f,
                 "vertex {}: occurrences {}@{} and {}@{} disagree on their overlap",
-                owner.0, left.child.index.0, left.offset, right.child.index.0, right.offset
+                Plain(*owner),
+                Plain(left.child.index),
+                left.offset,
+                Plain(right.child.index),
+                right.offset
             ),
             #[cfg(any(debug_assertions, feature = "test-api"))]
             Self::OverlapNotVertex { owner, left, right } => write!(
                 f,
                 "vertex {}: the overlap of {}@{} and {}@{} is not a vertex",
-                owner.0, left.child.index.0, left.offset, right.child.index.0, right.offset
+                Plain(*owner),
+                Plain(left.child.index),
+                left.offset,
+                Plain(right.child.index),
+                right.offset
             ),
-            Self::HasParents(vertex) => write!(f, "vertex {} has parents", vertex.0),
+            Self::HasParents(vertex) => write!(f, "vertex {} has parents", Plain(*vertex)),
             Self::OutsideVertex { vertex, occurrence } => write!(
                 f,
                 "occurrence {}@{} lies outside the editable range of vertex {}",
-                occurrence.child.index.0, occurrence.offset, vertex.0
+                Plain(occurrence.child.index),
+                occurrence.offset,
+                Plain(*vertex)
             ),
             Self::WidthChange { vertex } => {
-                write!(f, "edit would change the width of vertex {}", vertex.0)
+                write!(f, "edit would change the width of vertex {}", Plain(*vertex))
             },
         }
     }
 }
 
-impl std::error::Error for PositionedError {}
+impl<I: VertexId> std::error::Error for PositionedError<I> {}
 
 /// Positioned composition graph with its own storage.
 ///
@@ -288,53 +312,13 @@ impl<G: GraphKind> PositionedGraph<G> {
     pub fn vertex_count(&self) -> usize {
         self.vertices.len()
     }
-    pub fn vertices(&self) -> impl Iterator<Item = &PositionedVertex<G>> {
-        self.vertices.iter()
-    }
-    pub fn vertex(
+    /// The stored vertex data at `index` (storage access; algorithms use
+    /// the vertex objects of [`GraphRead::vertex`]).
+    pub fn vertex_data(
         &self,
-        index: VertexIndex,
+        index: impl HasVertexIndex<Index = CommittedIndex>,
     ) -> Option<&PositionedVertex<G>> {
-        self.vertices.get(index.0)
-    }
-    pub(crate) fn expect(
-        &self,
-        index: VertexIndex,
-    ) -> Result<&PositionedVertex<G>, PositionedError> {
-        self.vertex(index).ok_or(PositionedError::UnknownVertex(index))
-    }
-    /// The child of `occurrence` exists and has the recorded width.
-    pub(crate) fn check_child(
-        &self,
-        occurrence: &Occurrence,
-    ) -> Result<(), PositionedError> {
-        let child = self.expect(occurrence.child.index)?;
-        if child.width != occurrence.child.width {
-            return Err(PositionedError::Width {
-                vertex: child.index,
-                expected: child.width,
-                found: occurrence.child.width,
-            });
-        }
-        Ok(())
-    }
-    /// Children's labels joined in order, each from the first position not
-    /// covered by the previous occurrences. Assumes one `char` per atom
-    /// label (true for `char` atoms).
-    #[cfg(debug_assertions)]
-    pub(crate) fn composed_label(
-        &self,
-        composition: &Composition,
-    ) -> String {
-        let mut label = String::new();
-        let mut end: usize = 0;
-        for occurrence in composition.occurrences() {
-            let child = &self.vertices[occurrence.child.index.0].label;
-            let skip = end.saturating_sub(occurrence.offset.0);
-            label.extend(child.chars().skip(skip));
-            end = end.max(occurrence.end().0);
-        }
-        label
+        self.vertices.get(index.vertex_index().0)
     }
 
     /// Snapshot of all debug labels as a [`TokenNameResolver`].
@@ -350,110 +334,6 @@ impl<G: GraphKind> PositionedGraph<G> {
         set_token_name_resolver(Box::new(self.name_resolver()));
     }
 
-    /// `range` of `owner` as a view, if it lies within the owner.
-    #[cfg(any(debug_assertions, test, feature = "test-api"))]
-    pub fn interval(
-        &self,
-        owner: VertexIndex,
-        range: Range<AtomPosition>,
-    ) -> Option<IntervalView> {
-        let width = self.vertex(owner)?.width.0;
-        (range.start <= range.end && range.end.0 <= width)
-            .then_some(IntervalView { owner, range })
-    }
-
-    /// Whether every step is a stored occurrence.
-    #[cfg(any(test, feature = "test-api"))]
-    pub fn contains_path<'a>(
-        &self,
-        steps: impl IntoIterator<Item = &'a OccurrenceLocation>,
-    ) -> bool {
-        steps.into_iter().all(|step| {
-            self.vertex(step.parent)
-                .and_then(PositionedVertex::composition)
-                .is_some_and(|composition| {
-                    composition.occurrences().iter().any(|o| {
-                        o.offset == step.offset && o.child.index == step.child
-                    })
-                })
-        })
-    }
-
-    /// Structure, width and reciprocal links of the vertex stored at `slot`.
-    pub(crate) fn validate_vertex(
-        &self,
-        slot: usize,
-        vertex: &PositionedVertex<G>,
-    ) -> Result<(), PositionedError> {
-        let index = vertex.index;
-        if index.0 != slot {
-            return Err(PositionedError::Index {
-                slot,
-                vertex: index,
-            });
-        }
-        match &vertex.node {
-            VertexNode::Atom(_) => {
-                if vertex.width.0 != 1 {
-                    return Err(PositionedError::Width {
-                        vertex: index,
-                        expected: TokenWidth(1),
-                        found: vertex.width,
-                    });
-                }
-            },
-            VertexNode::Composite(composition) => {
-                let error = |error| PositionedError::Composition {
-                    owner: Some(index),
-                    error,
-                };
-                // Order is guaranteed by construction; re-check the rest.
-                Composition::new(composition.occurrences().to_vec())
-                    .map_err(error)?;
-                if composition.width() != vertex.width {
-                    return Err(PositionedError::Width {
-                        vertex: index,
-                        expected: composition.width(),
-                        found: vertex.width,
-                    });
-                }
-                for occurrence in composition.occurrences() {
-                    self.check_child(occurrence)?;
-                    let linked = self
-                        .expect(occurrence.child.index)?
-                        .parents
-                        .get(&index)
-                        .is_some_and(|offsets| offsets.contains(&occurrence.offset));
-                    if !linked {
-                        return Err(PositionedError::ParentLink {
-                            parent: index,
-                            child: occurrence.child.index,
-                            offset: occurrence.offset,
-                        });
-                    }
-                }
-            },
-        }
-        for (&parent, offsets) in &vertex.parents {
-            let composition = self.expect(parent)?.composition();
-            for &offset in offsets {
-                let present = composition.is_some_and(|c| {
-                    c.occurrences()
-                        .iter()
-                        .any(|o| o.offset == offset && o.child.index == index)
-                });
-                if !present {
-                    return Err(PositionedError::ParentLink {
-                        parent,
-                        child: index,
-                        offset,
-                    });
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Check the structural composition rules, recorded widths and reciprocal
     /// parent links.
     ///
@@ -461,36 +341,18 @@ impl<G: GraphKind> PositionedGraph<G> {
     /// and overlap closure (G4) (see [`Self::validate_content`]); release
     /// builds never expand content.
     pub fn validate(&self) -> Result<(), PositionedError> {
-        for (slot, vertex) in self.vertices.iter().enumerate() {
-            self.validate_vertex(slot, vertex)?;
+        for (slot, vertex) in self.vertices().enumerate() {
+            let index = vertex.vertex_index();
+            if index.0 != slot {
+                return Err(PositionedError::Index {
+                    slot,
+                    vertex: index,
+                });
+            }
+            validate_vertex(vertex)?;
         }
         #[cfg(any(debug_assertions, feature = "test-api"))]
         self.validate_content()?;
-        Ok(())
-    }
-
-    /// G4, structurally: for adjacent overlapping `L@l`, `R@r`, the largest
-    /// token starting at `r − l` in `L` ends at `|L|`, i.e. the overlap is a
-    /// vertex. Non-adjacent pairs are not checked.
-    #[cfg(any(debug_assertions, feature = "test-api"))]
-    pub(crate) fn check_overlap_closure(
-        &self,
-        owner: VertexIndex,
-        occurrences: &[Occurrence],
-    ) -> Result<(), PositionedError> {
-        for pair in occurrences.windows(2) {
-            let (left, right) = (pair[0], pair[1]);
-            if right.offset >= left.end() {
-                continue;
-            }
-            let start = right.offset.0 - left.offset.0;
-            let closed = self
-                .start_at(left.child.index, start)
-                .is_some_and(|(token, _)| start + token.width.0 == left.child.width.0);
-            if !closed {
-                return Err(PositionedError::OverlapNotVertex { owner, left, right });
-            }
-        }
         Ok(())
     }
 
@@ -501,11 +363,9 @@ impl<G: GraphKind> PositionedGraph<G> {
     #[cfg(any(debug_assertions, feature = "test-api"))]
     fn validate_content(&self) -> Result<(), PositionedError> {
         let read = |owner: VertexIndex, range: Range<usize>| {
-            let view = IntervalView {
-                owner,
-                range: range.start.into()..range.end.into(),
-            };
-            self.read_interval(&view).expect("structurally valid interval")
+            self.vertex(owner)
+                .and_then(|v| v.read_interval(range.start.into()..range.end.into()))
+                .expect("structurally valid interval")
         };
         let mut seen: HashMap<Vec<AtomOf<G>>, VertexIndex> = HashMap::new();
         for vertex in &self.vertices {
@@ -529,7 +389,11 @@ impl<G: GraphKind> PositionedGraph<G> {
                         });
                     }
                 }
-                self.check_overlap_closure(vertex.index, composition.occurrences())?;
+                check_overlap_closure(
+                    self,
+                    vertex.index,
+                    composition.occurrences().iter().copied(),
+                )?;
             }
             let content = read(vertex.index, 0..vertex.width.0);
             if content.len() != vertex.width.0 {

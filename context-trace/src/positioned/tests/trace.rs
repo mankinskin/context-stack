@@ -10,6 +10,13 @@ use std::{
 use pretty_assertions::assert_eq;
 
 use crate::{
+    ToToken,
+    positioned::{
+        GraphRead,
+        Navigate,
+    },
+};
+use crate::{
     AtomPosition,
     DirectedKey,
     DownKey,
@@ -314,7 +321,7 @@ impl Walk<'_> {
         assert_eq!(state.anchor().query, pos(0), "{context}");
         assert_eq!(state.path.leaf_offset(), state.span.start, "{context}");
         assert_eq!(state.path.root_child_end(), state.span.end, "{context}");
-        assert!(graph.contains_path(state.path.top_down()), "{context}");
+        assert!(graph.vertex(root).unwrap().contains_path(state.path.top_down()), "{context}");
         // Canonical start path: it stops at the largest climbed token
         // starting at the match start, and no intermediate token starts there.
         let expected_start = climbed
@@ -358,7 +365,7 @@ impl Walk<'_> {
             },
         };
         let matched: String = self.substr(root, s..root.width.0);
-        for (parent, o) in graph.parent_occurrences(root) {
+        for (parent, o) in graph.vertex(root).into_iter().flat_map(|v| v.parent_occurrences()) {
             let mut raised = exhausted.clone();
             raised.path_raise(parent, o);
             let o = o.0;
@@ -382,7 +389,7 @@ impl Walk<'_> {
         loop {
             let p = state.path.span.end;
             let context = format!("{context} @ {p}");
-            let (leaf, steps) = graph.start_at(root, p).unwrap();
+            let (leaf, steps) = graph.vertex(root).and_then(|v| v.start_at(p)).unwrap();
             assert_eq!(state.path.end.leaf(), leaf, "{context}");
             assert_eq!(state.path.end.steps(), &steps[..], "{context}");
             assert_eq!(state.path.end.leaf_offset(), p, "{context}");
@@ -399,11 +406,11 @@ impl Walk<'_> {
             let mut canonical = state.path.clone();
             canonical.canonicalize::<End, _>(graph);
             let end = &canonical.end;
-            assert!(graph.contains_path(end.top_down()), "{context}");
+            assert!(graph.vertex(root).unwrap().contains_path(end.top_down()), "{context}");
             assert_eq!(end.leaf_end(), canonical.span.end, "{context}");
             for (i, step) in end.steps().iter().enumerate().take(end.steps().len() - 1) {
                 let at: usize = end.steps()[..=i].iter().map(|s| s.offset.0).sum();
-                let width = graph.token(step.child).unwrap().width.0;
+                let width = graph.vertex(step.child).map(|v| v.to_token()).unwrap().width.0;
                 assert_ne!(at + width, canonical.span.end.0, "{context}: not maximal");
             }
             let cache = trace(graph, &state);
@@ -432,8 +439,7 @@ impl Walk<'_> {
         let graph = &self.fixture.graph;
         for (parent, child, offset) in cache.edges() {
             assert!(
-                graph
-                    .parent_occurrences(child.index)
+                graph.vertex(child.index).into_iter().flat_map(|v| v.parent_occurrences())
                     .any(|(p, o)| p.index == parent.index.index && o == offset),
                 "{context}: edge {parent:?} -> {child:?} @ {offset}"
             );
@@ -459,7 +465,7 @@ fn trace_states_on_every_fixture() {
             edges: 0,
         };
         for token in fixture.names.values() {
-            for (parent, offset) in fixture.graph.parent_occurrences(*token) {
+            for (parent, offset) in fixture.graph.vertex(*token).unwrap().parent_occurrences() {
                 let state = token.into_parent_state(parent, offset);
                 let matched = walk.key(*token).to_string();
                 walk.parent_state(state, &matched, &[(*token, offset.0)]);
@@ -479,7 +485,7 @@ fn child_advance_state_equals_start_at() {
     for fixture in fixture_graphs() {
         let graph = &fixture.graph;
         for token in fixture.names.values() {
-            for (parent, offset) in graph.parent_occurrences(*token) {
+            for (parent, offset) in graph.vertex(*token).unwrap().parent_occurrences() {
                 let Ok(mut state) = token.into_parent_state(parent, offset).advance_state(graph)
                 else {
                     continue;
@@ -545,7 +551,7 @@ fn walk_query(
         if !path.steps().is_empty() {
             let steps = path.steps();
             assert_eq!(steps[0].parent, token.index, "{context}");
-            assert!(graph.contains_path(steps), "{context}");
+            assert!(graph.vertex(token).unwrap().contains_path(steps), "{context}");
             let offset: usize = steps.iter().map(|s| s.offset.0).sum();
             assert_eq!(entry_start + offset, p, "{context}");
         }
@@ -556,7 +562,7 @@ fn walk_query(
                 assert_eq!(path.leaf_offset(), end, "{context}");
                 let local = end.0 - entry_start;
                 if path.entry() == entry {
-                    let (expected, _) = graph.start_at(token, local).unwrap();
+                    let (expected, _) = graph.vertex(token).unwrap().start_at(local).unwrap();
                     assert_eq!(path.leaf(), expected, "{context} @ {end}");
                 } else {
                     assert_eq!(local, token.width.0, "{context}");
@@ -607,5 +613,5 @@ fn query_path_atoms_of_composite() {
         }
     }
     assert_eq!(atoms, "abcdexbcdy");
-    assert!(QueryPath::new(Vec::new()).is_none());
+    assert!(QueryPath::new(Vec::<Token>::new()).is_none());
 }

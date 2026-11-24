@@ -16,14 +16,17 @@ use std::{
 use context_search::Response;
 use context_trace::{
     AtomPosition,
-    GraphKind,
+    CommittedIndex,
+    DirectedKey,
     Token,
     TokenWidth,
-    graph::vertex::VertexIndex,
-    DirectedKey,
+    VertexId,
+    Wide,
     positioned::{
-        PositionedGraph,
+        CompositionRead,
+        GraphRead,
         TraceCache,
+        VertexRead,
     },
 };
 
@@ -132,10 +135,10 @@ impl SplitVertex {
 
 /// Split graph of one response: split positions per vertex (§4.1).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SplitGraph {
-    root: Token,
+pub struct SplitGraph<I: VertexId = CommittedIndex> {
+    root: Token<I>,
     span: Range<AtomPosition>,
-    nodes: BTreeMap<VertexIndex, SplitVertex>,
+    nodes: BTreeMap<I, SplitVertex>,
     #[cfg(any(test, feature = "test-api"))]
     stats: SplitStats,
 }
@@ -159,15 +162,15 @@ impl SplitStats {
 }
 
 /// `(child, position, role)` given by the edges of the trace cache.
-pub(crate) type PathPosition = (VertexIndex, AtomPosition, Roles);
+pub(crate) type PathPosition<I> = (I, AtomPosition, Roles);
 
-impl SplitGraph {
+impl<I: VertexId> SplitGraph<I> {
     /// Split graph of a response (legacy `InitInterval::from(Response)`):
     /// [`Self::from_trace`] with the response's root, span and trace cache.
     /// `None` for an `EntireRoot` response, which has no split graph.
-    pub fn from_response<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        response: &Response,
+    pub fn from_response<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        response: &Response<I>,
     ) -> Option<Self> {
         if response.is_entire_root() {
             return None;
@@ -183,11 +186,11 @@ impl SplitGraph {
     /// traced edges below the root and propagate (§4.2). `cache` is the
     /// subgraph traced by the search: the edges of its start path (up
     /// entries) and end path (down entries).
-    pub fn from_trace<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
+    pub fn from_trace<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        root: Token<I>,
         span: Range<AtomPosition>,
-        cache: &TraceCache,
+        cache: &TraceCache<I>,
     ) -> Self {
         debug_assert!(*span.start > 0 || *span.end < root.width.0, "EntireRoot has no split graph");
         let on_paths = traced_positions(cache, root, span.clone());
@@ -201,10 +204,10 @@ impl SplitGraph {
             root_node.add(span.end, Roles::END);
         }
         nodes.insert(root.index, root_node);
-        let width = |vertex: VertexIndex| {
+        let width = |vertex: I| {
             graph.vertex(vertex).expect("vertex of the response").width()
         };
-        let mut queue: BTreeSet<(TokenWidth, VertexIndex)> = BTreeSet::new();
+        let mut queue: BTreeSet<(TokenWidth, I)> = BTreeSet::new();
         queue.insert((root.width, root.index));
         for &(child, position, roles) in &on_paths {
             nodes
@@ -215,13 +218,13 @@ impl SplitGraph {
         }
 
         #[cfg(debug_assertions)]
-        let mut pushed: BTreeSet<(VertexIndex, AtomPosition, bool)> = BTreeSet::new();
+        let mut pushed: BTreeSet<(I, AtomPosition, bool)> = BTreeSet::new();
         // Children are narrower than their parents, so every vertex is
         // processed after all its parents among the split nodes.
         while let Some((_, vertex)) = queue.pop_last() {
             let composition = graph
                 .vertex(vertex)
-                .and_then(|v| v.composition())
+                .and_then(|v| v.node().composite())
                 .expect("a split node with positions is composite");
             let positions: Vec<_> = nodes[&vertex]
                 .positions
@@ -276,23 +279,23 @@ impl SplitGraph {
             nodes,
         }
     }
-    pub fn root(&self) -> Token {
+    pub fn root(&self) -> Token<I> {
         self.root
     }
     pub fn span(&self) -> Range<AtomPosition> {
         self.span.clone()
     }
-    pub fn nodes(&self) -> &BTreeMap<VertexIndex, SplitVertex> {
+    pub fn nodes(&self) -> &BTreeMap<I, SplitVertex> {
         &self.nodes
     }
     pub fn node(
         &self,
-        vertex: VertexIndex,
+        vertex: I,
     ) -> Option<&SplitVertex> {
         self.nodes.get(&vertex)
     }
     /// Split nodes in join order: increasing `(width, index)`.
-    pub fn bottom_up(&self) -> Vec<(VertexIndex, &SplitVertex)> {
+    pub fn bottom_up(&self) -> Vec<(I, &SplitVertex)> {
         let mut nodes: Vec<_> = self.nodes.iter().map(|(&v, node)| (v, node)).collect();
         nodes.sort_by_key(|(v, node)| (node.width, *v));
         nodes
@@ -300,7 +303,7 @@ impl SplitGraph {
     /// Required intervals of `vertex` ([`SplitVertex::intervals`]).
     pub fn intervals(
         &self,
-        vertex: VertexIndex,
+        vertex: I,
     ) -> Vec<Range<AtomPosition>> {
         self.nodes
             .get(&vertex)
@@ -319,17 +322,17 @@ impl SplitGraph {
 /// edge offset; the key positions only identify entries (down keys are
 /// clamped to the match start and do not give offsets). The walk stops at
 /// the leaf, which has the border on its own border.
-pub(crate) fn traced_positions(
-    cache: &TraceCache,
-    root: Token,
+pub(crate) fn traced_positions<I: VertexId>(
+    cache: &TraceCache<I>,
+    root: Token<I>,
     span: Range<AtomPosition>,
-) -> Vec<PathPosition> {
-    fn walk(
-        cache: &TraceCache,
-        key: &DirectedKey,
+) -> Vec<PathPosition<I>> {
+    fn walk<I: VertexId>(
+        cache: &TraceCache<I>,
+        key: &DirectedKey<I>,
         position: AtomPosition,
         roles: Roles,
-        out: &mut Vec<PathPosition>,
+        out: &mut Vec<PathPosition<I>>,
     ) {
         let Some(entry) = cache.get(key) else {
             return;
@@ -350,7 +353,7 @@ pub(crate) fn traced_positions(
     let Some(entry) = cache.get_vertex(root) else {
         return out;
     };
-    let mut entries: Vec<(DirectedKey, AtomPosition, Roles)> = Vec::new();
+    let mut entries: Vec<(DirectedKey<I>, AtomPosition, Roles)> = Vec::new();
     entries.extend(
         entry
             .bottom_up

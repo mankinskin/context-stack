@@ -21,13 +21,20 @@ use super::{
 };
 use crate::{
     AtomPosition,
-    GraphKind,
     Token,
     TokenWidth,
-    graph::vertex::wide::Wide,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+        wide::Wide,
+    },
     positioned::{
-        graph::PositionedGraph,
+        access::GraphRead,
         location::OccurrenceLocation,
+        navigate::{
+            Located,
+            Navigate,
+        },
     },
 };
 
@@ -52,33 +59,33 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RolePath<R: PathRole, Root: PathRoot = Token> {
     root: Root,
-    root_child: Token,
-    leaf: Token,
-    steps: Vec<OccurrenceLocation>,
+    root_child: Token<Root::Index>,
+    leaf: Token<Root::Index>,
+    steps: Vec<OccurrenceLocation<Root::Index>>,
     _role: PhantomData<R>,
 }
 
 /// Path from a graph root to the token at the match start.
-pub type StartPath = RolePath<super::role::Start>;
+pub type StartPath<I = CommittedIndex> = RolePath<super::role::Start, Token<I>>;
 /// Path from a graph root to a leaf at the match end.
-pub type EndPath = RolePath<End>;
+pub type EndPath<I = CommittedIndex> = RolePath<End, Token<I>>;
 /// Position in a token-sequence query: an end path rooted at the query.
-pub type QueryPath = RolePath<End, QueryRoot>;
+pub type QueryPath<I = CommittedIndex> = RolePath<End, QueryRoot<I>>;
 
 impl<R: PathRole, Root: PathRoot> RolePath<R, Root> {
     pub fn path_root(&self) -> &Root {
         &self.root
     }
     /// The root child the path passes through.
-    pub fn root_child(&self) -> Token {
+    pub fn root_child(&self) -> Token<Root::Index> {
         self.root_child
     }
-    pub fn leaf(&self) -> Token {
+    pub fn leaf(&self) -> Token<Root::Index> {
         self.leaf
     }
     /// Steps in storage order (bottom-up for start, top-down for end
     /// paths).
-    pub fn steps(&self) -> &[OccurrenceLocation] {
+    pub fn steps(&self) -> &[OccurrenceLocation<Root::Index>] {
         &self.steps
     }
     pub fn len(&self) -> usize {
@@ -87,10 +94,14 @@ impl<R: PathRole, Root: PathRoot> RolePath<R, Root> {
     pub fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }
-    pub fn top_down(&self) -> impl DoubleEndedIterator<Item = &OccurrenceLocation> + ExactSizeIterator {
+    pub fn top_down(
+        &self
+    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation<Root::Index>> + ExactSizeIterator {
         R::top_down(&self.steps)
     }
-    pub fn bottom_up(&self) -> impl DoubleEndedIterator<Item = &OccurrenceLocation> + ExactSizeIterator {
+    pub fn bottom_up(
+        &self
+    ) -> impl DoubleEndedIterator<Item = &OccurrenceLocation<Root::Index>> + ExactSizeIterator {
         R::bottom_up(&self.steps)
     }
     /// Offset of the root child in root coordinates.
@@ -120,9 +131,9 @@ impl<R: PathRole, Root: PathRoot> RolePath<R, Root> {
     /// Descend into the border child of the leaf ([`BorderChild`]; the
     /// prefix child for end paths). `false` (path unchanged) for an atom
     /// leaf.
-    pub fn push_border_child<G: GraphKind>(
+    pub fn push_border_child<G: GraphRead<Index = Root::Index> + ?Sized>(
         &mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) -> bool
     where
         R: BorderChild,
@@ -141,12 +152,12 @@ impl<R: PathRole, Root: PathRoot> RolePath<R, Root> {
     }
 }
 
-impl<R: PathRole> RolePath<R, Token> {
+impl<R: PathRole, I: VertexId> RolePath<R, Token<I>> {
     /// One step: `leaf` at `offset` inside `root`.
     pub fn new(
-        root: Token,
+        root: Token<I>,
         offset: impl Into<AtomPosition>,
-        leaf: Token,
+        leaf: Token<I>,
     ) -> Self {
         Self {
             root,
@@ -162,10 +173,10 @@ impl<R: PathRole> RolePath<R, Token> {
     }
     /// `steps` must be a connected chain from `root` ending at `leaf`,
     /// top-down.
-    fn from_top_down<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
-        (leaf, steps): (Token, Vec<OccurrenceLocation>),
+    fn from_top_down<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        root: Token<I>,
+        (leaf, steps): Located<I>,
     ) -> Self {
         debug_assert!(steps.first().is_some_and(|s| s.parent == root.index));
         debug_assert!(steps.last().is_some_and(|s| s.child == leaf.index));
@@ -179,41 +190,43 @@ impl<R: PathRole> RolePath<R, Token> {
             _role: PhantomData,
         }
     }
-    /// [`PositionedGraph::start_at`] as a path of this role.
-    pub fn start_at<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
+    /// [`Navigate::start_at`] as a path of this role.
+    pub fn start_at<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        root: Token<I>,
         p: impl Into<AtomPosition>,
     ) -> Option<Self> {
         graph
-            .start_at(root, p)
+            .vertex(root)?
+            .start_at(p)
             .map(|found| Self::from_top_down(graph, root, found))
     }
-    /// [`PositionedGraph::end_at`] as a path of this role: the descent to
+    /// [`Navigate::end_at`] as a path of this role: the descent to
     /// the largest token ending at `e`.
-    pub fn end_at<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
+    pub fn end_at<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        root: Token<I>,
         e: impl Into<AtomPosition>,
     ) -> Option<Self> {
         graph
-            .end_at(root, e)
+            .vertex(root)?
+            .end_at(e)
             .map(|found| Self::from_top_down(graph, root, found))
     }
     /// The canonical path of this role to boundary `p` ([`PathRole::locate`]):
     /// the descent to the largest token with its role border at `p`.
-    pub fn locate<G: GraphKind>(
-        graph: &PositionedGraph<G>,
-        root: Token,
+    pub fn locate<G: GraphRead<Index = I> + ?Sized>(
+        graph: &G,
+        root: Token<I>,
         p: impl Into<AtomPosition>,
     ) -> Option<Self> {
         R::locate(graph, root, p.into()).map(|found| Self::from_top_down(graph, root, found))
     }
-    pub fn root(&self) -> Token {
+    pub fn root(&self) -> Token<I> {
         self.root
     }
     /// The occurrence of the root child in the root.
-    pub fn root_child_location(&self) -> &OccurrenceLocation {
+    pub fn root_child_location(&self) -> &OccurrenceLocation<I> {
         R::root_step(&self.steps).expect("graph-rooted path has a step")
     }
     /// Raise to `parent`, where the root occurs at `offset`; `span` is the
@@ -226,7 +239,7 @@ impl<R: PathRole> RolePath<R, Token> {
     /// root)]`; otherwise the step is added above the root.
     pub fn raise(
         &mut self,
-        parent: Token,
+        parent: Token<I>,
         offset: impl Into<AtomPosition>,
         span: &std::ops::Range<AtomPosition>,
     ) {
@@ -248,13 +261,13 @@ impl<R: PathRole> RolePath<R, Token> {
 impl<Root: PathRoot> RolePath<End, Root> {
     /// Move to the largest token starting at `p` (root coordinates): inside
     /// the current root child via the corrected pop rule
-    /// ([`PositionedGraph::advance_end_path`], equal to `start_at`), else at
+    /// ([`Navigate::advance_end_path`], equal to `start_at`), else at
     /// the next root child ([`PathRoot::next_root_child`]). `Break` (path
     /// unchanged) if there is none (`p ≥ width(root)` for a graph root, the
     /// query end for a query root).
-    pub fn advance<G: GraphKind>(
+    pub fn advance<G: GraphRead<Index = Root::Index> + ?Sized>(
         &mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
         p: impl Into<AtomPosition>,
     ) -> ControlFlow<()> {
         let p = p.into();
@@ -262,11 +275,13 @@ impl<Root: PathRoot> RolePath<End, Root> {
         let base = self.root.steps_root_offset();
         if p.0 < token_end(base, token.width()).0 {
             let (leaf, steps) = graph
-                .advance_end_path(
-                    token,
-                    std::mem::take(&mut self.steps),
-                    AtomPosition(p.0 - base.0),
-                )
+                .vertex(token)
+                .and_then(|root| {
+                    root.advance_end_path(
+                        std::mem::take(&mut self.steps),
+                        AtomPosition(p.0 - base.0),
+                    )
+                })
                 .expect("p is inside the root child");
             self.leaf = leaf;
             self.steps = steps;
@@ -282,17 +297,17 @@ impl<Root: PathRoot> RolePath<End, Root> {
     }
     /// [`Self::advance`] to the leaf end: the largest token starting right
     /// after the leaf.
-    pub fn advance_leaf<G: GraphKind>(
+    pub fn advance_leaf<G: GraphRead<Index = Root::Index> + ?Sized>(
         &mut self,
-        graph: &PositionedGraph<G>,
+        graph: &G,
     ) -> ControlFlow<()> {
         self.advance(graph, self.leaf_end())
     }
 }
 
-impl QueryPath {
+impl<I: VertexId> QueryPath<I> {
     /// At the first query token; `None` for an empty pattern.
-    pub fn new(pattern: Vec<Token>) -> Option<Self> {
+    pub fn new(pattern: Vec<Token<I>>) -> Option<Self> {
         let root = QueryRoot::new(pattern)?;
         let leaf = root.steps_root();
         Some(Self {
@@ -303,7 +318,7 @@ impl QueryPath {
             _role: PhantomData,
         })
     }
-    pub fn pattern(&self) -> &[Token] {
+    pub fn pattern(&self) -> &[Token<I>] {
         self.root.pattern()
     }
     /// Index of the query token containing the leaf.

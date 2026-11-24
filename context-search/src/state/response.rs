@@ -7,6 +7,7 @@ use std::ops::Range;
 use context_trace::positioned::OccurrenceLocation;
 use context_trace::{
     positioned::{
+        Generation,
         QueryAnchor,
         TraceCache,
     },
@@ -37,26 +38,25 @@ use crate::{
 /// [`Self::generation`] is the graph generation the search ran under (insert
 /// plan rev 3, R6/D9); insertion rejects a response of another generation.
 ///
-/// `I` is the index type of the searched store (staging plan §3.2); the
-/// match itself is still committed until search becomes store-generic (S2).
+/// `I` is the index type of the searched store (staging plan §3.2).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Response<I: VertexId = CommittedIndex> {
     pub cache: TraceCache<I>,
-    pub end: MatchResult,
-    pub(crate) generation: u64,
+    pub end: MatchResult<I>,
+    pub(crate) generation: Generation,
 }
 
 impl<I: VertexId> Response<I> {
     /// Graph generation under which the search ran
-    /// ([`PositionedGraph::generation`](context_trace::positioned::PositionedGraph::generation)).
-    pub fn generation(&self) -> u64 {
+    /// ([`GraphRead::generation`](context_trace::positioned::GraphRead::generation)).
+    pub fn generation(&self) -> Generation {
         self.generation
     }
     /// Root of the final match.
-    pub fn root_token(&self) -> Token {
+    pub fn root_token(&self) -> Token<I> {
         self.end.root_parent()
     }
-    pub fn path(&self) -> &PathCoverage {
+    pub fn path(&self) -> &PathCoverage<I> {
         &self.end.path
     }
     /// The whole query matched.
@@ -70,7 +70,7 @@ impl<I: VertexId> Response<I> {
     /// ([`Searchable`](crate::search::searchable::Searchable)) starts right
     /// after it. (Legacy returned the advanced candidate; it is
     /// `end.cursor()` here.)
-    pub fn query_cursor(&self) -> &QueryCursor<Matched> {
+    pub fn query_cursor(&self) -> &QueryCursor<Matched, I> {
         self.end.checkpoint()
     }
     /// Query position of the candidate if present, else of the checkpoint.
@@ -97,7 +97,7 @@ impl<I: VertexId> Response<I> {
     /// first); empty if only an atom first query token matched (the root is
     /// that atom). `None` for other coverages.
     #[cfg(any(test, feature = "test-api"))]
-    pub fn entire_root_start_path(&self) -> Option<Vec<OccurrenceLocation>> {
+    pub fn entire_root_start_path(&self) -> Option<Vec<OccurrenceLocation<I>>> {
         match &self.end.path {
             PathCoverage::EntireRoot(end) => Some(
                 end.path

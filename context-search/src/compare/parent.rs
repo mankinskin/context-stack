@@ -3,13 +3,14 @@
 
 use context_trace::{
     positioned::{
+        GraphRead,
         ParentState,
-        PositionedGraph,
         StateAdvance,
     },
+    CommittedIndex,
     DownKey,
     DownPosition,
-    GraphKind,
+    VertexId,
 };
 use derive_more::{
     Deref,
@@ -32,30 +33,30 @@ use crate::{
 
 /// The first compare state in a root and the parent state it came from.
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
-pub(crate) struct CompareRootState {
+pub(crate) struct CompareRootState<I: VertexId = CommittedIndex> {
     #[deref]
     #[deref_mut]
-    pub(crate) candidate: CompareState<Candidate, Candidate>,
-    pub(crate) root_parent: ParentState,
+    pub(crate) candidate: CompareState<Candidate, Candidate, I>,
+    pub(crate) root_parent: ParentState<I>,
 }
 
 /// A parent state with the query cursor: checkpoint at the last matched
 /// query leaf, candidate at the next query token.
 #[derive(Clone, Debug, Deref, DerefMut)]
-pub(crate) struct ParentCompareState {
+pub(crate) struct ParentCompareState<I: VertexId = CommittedIndex> {
     #[deref]
     #[deref_mut]
-    pub(crate) parent_state: ParentState,
-    pub(crate) cursor: Checkpointed<QueryCursor<Candidate>, HasCandidate>,
+    pub(crate) parent_state: ParentState<I>,
+    pub(crate) cursor: Checkpointed<QueryCursor<Candidate, I>, HasCandidate>,
 }
 
-impl ParentCompareState {
+impl<I: VertexId> ParentCompareState<I> {
     /// Enter the root at the graph token starting at the matched end
     /// ([`ParentState::advance_state`]); `Err(self)` at the root end.
-    pub(crate) fn advance_state<G: GraphKind>(
+    pub(crate) fn advance_state<G: GraphRead<Index = I> + ?Sized>(
         self,
-        graph: &PositionedGraph<G>,
-    ) -> Result<CompareRootState, Self> {
+        graph: &G,
+    ) -> Result<CompareRootState<I>, Self> {
         match self.parent_state.advance_state(graph) {
             Ok(next) => {
                 let child_state = next.child_state;

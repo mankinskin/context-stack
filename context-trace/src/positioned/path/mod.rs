@@ -6,8 +6,8 @@
 //!
 //! - [`PathRole`] ([`Start`], [`End`], `role.rs`): storage order, span
 //!   boundary, border predicate of the canonical rules, location from a
-//!   root ([`PositionedGraph::start_at`](super::PositionedGraph::start_at) /
-//!   [`PositionedGraph::end_at`](super::PositionedGraph::end_at)), trace
+//!   root ([`Navigate::start_at`](super::Navigate::start_at) /
+//!   [`Navigate::end_at`](super::Navigate::end_at)), trace
 //!   direction and trace key positions;
 //! - [`PathRoot`] (`root.rs`): a graph [`Token`](crate::Token) or a
 //!   [`QueryRoot`] (token-sequence query; its next root child is the next
