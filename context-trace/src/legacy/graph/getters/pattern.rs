@@ -1,3 +1,4 @@
+use crate::VertexIndex;
 use crate::legacy::{
     HasPatternId,
     graph::{
@@ -58,7 +59,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
     pub(crate) fn get_pattern_of(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
         pid: PatternId,
     ) -> Result<Pattern, ErrorReason> {
         self.with_vertex(index.vertex_index(), |vertex| {

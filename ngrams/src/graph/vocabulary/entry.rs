@@ -132,7 +132,7 @@ pub(crate) trait HasVertexEntries<K: ?Sized + Debug> {
     }
 }
 /// Marker for index-like vocabulary handles; currently has no implementations here.
-pub(crate) trait VocabIndex: HasVertexIndex {}
+pub(crate) trait VocabIndex: HasVertexIndex<Index = VertexIndex> {}
 //impl VocabIndex for VertexIndex {}
 //impl VocabIndex for NGramId {}
 /// Implement metadata lookup after converting an index-like handle to a key.

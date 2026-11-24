@@ -14,7 +14,10 @@ use crate::{
     AtomPosition,
     TokenWidth,
     graph::vertex::{
-        VertexIndex,
+        id::{
+            CommittedIndex,
+            VertexId,
+        },
         has_vertex_index::HasVertexIndex,
         token::Token,
         wide::Wide,
@@ -89,28 +92,29 @@ impl AddAssign<usize> for DirectedPosition {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct DirectedKey {
-    pub index: Token,
+pub struct DirectedKey<I: VertexId = CommittedIndex> {
+    pub index: Token<I>,
     pub pos: DirectedPosition,
 }
-impl Wide for DirectedKey {
+impl<I: VertexId> Wide for DirectedKey<I> {
     fn width(&self) -> TokenWidth {
         self.index.width()
     }
 }
-impl HasVertexIndex for DirectedKey {
-    fn vertex_index(&self) -> VertexIndex {
+impl<I: VertexId> HasVertexIndex for DirectedKey<I> {
+    type Index = I;
+    fn vertex_index(&self) -> I {
         self.index.vertex_index()
     }
 }
-impl HasAtomPosition for DirectedKey {
+impl<I: VertexId> HasAtomPosition for DirectedKey<I> {
     fn pos(&self) -> &AtomPosition {
         self.pos.pos()
     }
 }
-impl DirectedKey {
+impl<I: VertexId> DirectedKey<I> {
     pub fn new(
-        index: Token,
+        index: Token<I>,
         pos: impl Into<DirectedPosition>,
     ) -> Self {
         Self {
@@ -119,7 +123,7 @@ impl DirectedKey {
         }
     }
     pub fn up(
-        index: Token,
+        index: Token<I>,
         pos: impl Into<UpPosition>,
     ) -> Self {
         Self {
@@ -128,7 +132,7 @@ impl DirectedKey {
         }
     }
     pub fn down(
-        index: Token,
+        index: Token<I>,
         pos: impl Into<DownPosition>,
     ) -> Self {
         Self {
@@ -144,8 +148,8 @@ impl DirectedKey {
     }
 }
 
-impl From<Token> for DirectedKey {
-    fn from(index: Token) -> Self {
+impl<I: VertexId> From<Token<I>> for DirectedKey<I> {
+    fn from(index: Token<I>) -> Self {
         Self {
             pos: DirectedPosition::BottomUp(index.width().0.into()),
             index,
@@ -153,8 +157,8 @@ impl From<Token> for DirectedKey {
     }
 }
 
-impl From<UpKey> for DirectedKey {
-    fn from(key: UpKey) -> Self {
+impl<I: VertexId> From<UpKey<I>> for DirectedKey<I> {
+    fn from(key: UpKey<I>) -> Self {
         Self {
             index: key.index,
             pos: DirectedPosition::BottomUp(key.pos),
@@ -162,8 +166,8 @@ impl From<UpKey> for DirectedKey {
     }
 }
 
-impl From<DownKey> for DirectedKey {
-    fn from(key: DownKey) -> Self {
+impl<I: VertexId> From<DownKey<I>> for DirectedKey<I> {
+    fn from(key: DownKey<I>) -> Self {
         Self {
             index: key.index,
             pos: DirectedPosition::TopDown(key.pos),

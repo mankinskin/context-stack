@@ -35,7 +35,11 @@ use crate::{
     Token,
     TokenWidth,
     VertexKey,
-    graph::vertex::VertexIndex,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+        VertexIndex,
+    },
 };
 #[cfg(debug_assertions)]
 use crate::graph::vertex::name_resolver::TokenNameResolver;
@@ -44,9 +48,9 @@ use crate::graph::vertex::name_resolver::set_token_name_resolver;
 
 /// What a vertex consists of.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum VertexNode<A> {
+pub enum VertexNode<A, I: VertexId = CommittedIndex> {
     Atom(A),
-    Composite(Composition),
+    Composite(Composition<I>),
 }
 
 /// A retained vertex with its composition and reciprocal parent links.

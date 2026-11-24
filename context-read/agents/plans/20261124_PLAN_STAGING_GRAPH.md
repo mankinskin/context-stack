@@ -244,6 +244,10 @@ impl<T: HasVertexIndex + Wide> ToToken for T {}
 The legacy row model keeps its own untyped `VertexIndex` impls (behind the
 `legacy` feature); only the positioned types use the associated index.
 
+*Implemented (S1, §11):* `CommittedIndex` is a type alias of the shared
+`VertexIndex` rather than a newtype, because `Token` is shared with the
+row model; legacy bounds read `HasVertexIndex<Index = VertexIndex>`.
+
 ### 3.3 `GraphRead`, `VertexRead`, `CompositionRead` (context-trace)
 
 ```rust
@@ -851,3 +855,78 @@ cargo bench -p context-read --no-default-features --features test-api --bench st
   for 256 → 512); `n = 1024` takes 2.76 s per read and was dropped from the
   bench to keep its runtime short.
 - Run-to-run noise on this machine (two consecutive runs): below 1 %.
+
+### S1 — typed indices (2026-11-24)
+
+Implemented in `context-trace/src/graph/vertex/id.rs` (sealed `VertexId`,
+`CommittedIndex`, `StagedIndex`, packed `StageIndex` with `is_staged`,
+`split`, `From`/`TryFrom` both ways). Index-generic with the committed
+default: `Token<I>`, `Occurrence<I>`, `Composition<I>` (and
+`CompositionError<I>`, `maximal`), `VertexNode<A, I>`,
+`OccurrenceLocation<I>`, `TraceCache<I>` (with `VertexCache<I>`,
+`DirectedPositions<I>`, `PositionCache<I>` and the shared keys
+`DirectedKey<I>`, `UpKey<I>`, `DownKey<I>`), `Response<I>`.
+
+Decisions:
+
+- **`CommittedIndex = VertexIndex` (type alias).** `Token`, `VertexIndex`,
+  `HasVertexIndex`, `ToToken`, `Wide` and the trace keys live in the shared
+  root (`graph/vertex`, `key`) and are used by `legacy` throughout. A
+  `CommittedIndex` newtype as the default of `Token<I>` would make legacy's
+  `Token` a `Token<CommittedIndex>` while legacy code stores and compares
+  `VertexIndex` everywhere. With the alias, legacy `Token` is unchanged
+  (`Token = Token<VertexIndex>`), and the compile-time boundary that the
+  plan needs, committed vs. staged (`StagedIndex`, `StageIndex`), holds.
+- **`HasVertexIndex::Index`** is associated (`VertexId:
+  HasVertexIndex<Index = Self>`, so every index type is index-like).
+  Legacy and `ngrams` generic bounds were constrained mechanically to
+  `HasVertexIndex<Index = VertexIndex>` / `ToToken<Index = VertexIndex>`
+  (and `ChildLocation`, `VertexData`, `NewAtomIndex` impls got `type Index
+  = VertexIndex`); no other legacy change. Positioned navigation
+  (`navigate.rs`) stays committed in S1 (`Index = CommittedIndex`); it
+  becomes store-generic with the vertex objects in S2.
+- `ToToken` keeps its `Debug` supertrait (no widening of the blanket impl);
+  `Occurrence<I>` gained `HasVertexIndex` (the child's index) and `Wide`,
+  `Composition<I>` gained `Wide`.
+- Committed-only (unchanged) where generic impls would overlap with std
+  impls or change output: `PartialEq<VertexIndex> for Token`,
+  `From<Result<_, _>>`, `From<&T>`, `From<NewAtomIndex>`, the legacy helper
+  methods on `Token`, `Display` of `CompositionError`, and
+  `TraceCache::add_state` (its `EditKind`/`NewTraceEdge` follow the
+  committed `TraceDirection::Key`).
+- `Response<I>` makes only the trace cache generic; `MatchResult` and the
+  search paths are committed until search becomes store-generic (S2).
+- `Token::get_string_repr` resolves names only for committed indices
+  (`VertexId::committed`); `StagedIndex` displays as `s<slot>`.
+- `StagedIndex::new` is public for now (S3 may restrict it to stages).
+
+Gate (test counts `passed / failed / ignored`, before → after S1):
+
+| Command | Before | After |
+|---|---|---|
+| `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api` | ok | ok |
+| `cargo test -p context-read --no-default-features --features test-api` | 111 / 0 / 9 | 111 / 0 / 9 |
+| `cargo test -p context-trace -p context-search -p context-insert --no-default-features --features test-api` | 87 / 0 / 12 | 88 / 0 / 12 (+1: `stage_index_round_trips`) |
+| `cargo test --release -p context-insert --no-default-features --features test-api insert_gate` | 1 / 0 / 0 | 1 / 0 / 0 |
+| `cargo test -p context-read --features legacy-tests` | 194 / 0 / 18 | 194 / 0 / 18 |
+| `cargo build --workspace --all-targets --exclude context-editor-kernel --exclude sandbox-app` | ok | ok |
+| (extra) `cargo test -p context-trace -p context-search -p context-insert --features legacy-tests,test-api` | 309 / 0 / 47 | 310 / 0 / 47 |
+
+Benchmarks (`--baseline pre-staging`, medians):
+
+| Benchmark | S0 | S1 | Change (criterion) |
+|---|---|---|---|
+| `read/corpus/all` | 1.316 ms | 1.340 ms | +1.3 %, within noise threshold |
+| `read/periodic/abc^n_x/64` | 828 µs | 853 µs | +1.5 %, no change (p = 0.08) |
+| `read/periodic/abc^n_x/256` | 36.4 ms | 36.1 ms | −1.6 %, within noise threshold |
+| `read/periodic/abc^n_x/512` | 333 ms | 326 ms | −2.1 %, within noise threshold |
+| `find_ancestor/corpus_inputs` | 869 µs | 895 µs | +2.6 % (reruns: +1.6 %, +0.7 %) |
+
+- Repeated A/B runs (pre-S1 and S1 builds alternated on the same machine)
+  scatter by ±2–6 % on `read/corpus/all` and `find_ancestor`, in both
+  directions. With `codegen-units = 1` the S1 build is 3.3 % (`read/corpus`)
+  and 3.5 % (`find_ancestor`) *faster* than the pre-S1 build. The change is
+  type-level only (the alias makes the committed instantiations identical);
+  the differences come from code placement: generic functions such as
+  `Composition::covering` are now instantiated in the calling crates.
+  Verdict: within noise of S0.

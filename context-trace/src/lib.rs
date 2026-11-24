@@ -67,6 +67,10 @@ pub use crate::{
             GraphKind,
         },
         vertex::{
+            CommittedIndex,
+            StageIndex,
+            StagedIndex,
+            VertexId,
             VertexIndex,
             atom::{
                 AsAtom,

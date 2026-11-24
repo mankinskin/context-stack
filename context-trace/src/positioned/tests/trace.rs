@@ -282,7 +282,7 @@ struct Walk<'f> {
 impl Walk<'_> {
     fn key(
         &self,
-        token: impl crate::HasVertexIndex,
+        token: impl crate::HasVertexIndex<Index = crate::CommittedIndex>,
     ) -> &str {
         &self.keys[&token.vertex_index()]
     }

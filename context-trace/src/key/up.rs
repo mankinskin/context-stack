@@ -9,6 +9,10 @@ use derive_new::new;
 use crate::{
     AtomPosition,
     graph::vertex::{
+        id::{
+            CommittedIndex,
+            VertexId,
+        },
         token::Token,
         wide::Wide,
     },
@@ -91,18 +95,18 @@ impl CompactFormat for UpPosition {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy, new)]
-pub struct UpKey {
-    pub index: Token,
+pub struct UpKey<I: VertexId = CommittedIndex> {
+    pub index: Token<I>,
     pub pos: UpPosition,
 }
 
-impl HasAtomPosition for UpKey {
+impl<I: VertexId> HasAtomPosition for UpKey<I> {
     fn pos(&self) -> &AtomPosition {
         &self.pos.0
     }
 }
 
-impl Wide for UpKey {
+impl<I: VertexId> Wide for UpKey<I> {
     fn width(&self) -> TokenWidth {
         self.index.width()
     }

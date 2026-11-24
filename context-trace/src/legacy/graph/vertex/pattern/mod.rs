@@ -1,3 +1,4 @@
+use crate::VertexIndex;
 use std::{
     borrow::{
         Borrow,
@@ -274,14 +275,14 @@ pub(crate) fn pattern_pre<T: Borrow<Token>>(
     pattern_pre_ctx(pat, sub_index + 1)
 }
 
-pub(crate) fn prefix<T: ToToken + Clone>(
+pub(crate) fn prefix<T: ToToken<Index = VertexIndex> + Clone>(
     pattern: &'_ [T],
     index: usize,
 ) -> Vec<T> {
     pattern.get(0..index).unwrap_or(pattern).to_vec()
 }
 
-pub(crate) fn postfix<T: ToToken + Clone>(
+pub(crate) fn postfix<T: ToToken<Index = VertexIndex> + Clone>(
     pattern: &'_ [T],
     index: usize,
 ) -> Vec<T> {
@@ -302,7 +303,7 @@ pub(crate) fn replace_in_pattern(
 }
 
 #[allow(dead_code)]
-pub(crate) fn infix<T: ToToken + Clone>(
+pub(crate) fn infix<T: ToToken<Index = VertexIndex> + Clone>(
     pattern: &'_ [T],
     start: usize,
     end: usize,
@@ -330,7 +331,7 @@ pub(crate) fn single_child_pattern(half: Pattern) -> Result<Token, Pattern> {
 
 #[allow(dead_code)]
 /// Split a pattern before the specified index
-pub(crate) fn split_pattern_at_index<T: ToToken + Clone>(
+pub(crate) fn split_pattern_at_index<T: ToToken<Index = VertexIndex> + Clone>(
     pattern: &'_ [T],
     index: usize,
 ) -> (Vec<T>, Vec<T>) {
@@ -338,7 +339,7 @@ pub(crate) fn split_pattern_at_index<T: ToToken + Clone>(
 }
 
 #[allow(dead_code)]
-pub(crate) fn split_context<T: ToToken + Clone>(
+pub(crate) fn split_context<T: ToToken<Index = VertexIndex> + Clone>(
     pattern: &'_ [T],
     index: usize,
 ) -> (Vec<T>, Vec<T>) {

@@ -9,24 +9,36 @@ use derive_more::derive::{
 use crate::{
     AtomPosition,
     HashMap,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+    },
     positioned::trace::cache::position::PositionCache,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Default, IntoIterator, Deref, DerefMut)]
-pub struct DirectedPositions {
-    entries: HashMap<AtomPosition, PositionCache>,
+#[derive(Clone, Debug, PartialEq, Eq, IntoIterator, Deref, DerefMut)]
+pub struct DirectedPositions<I: VertexId = CommittedIndex> {
+    entries: HashMap<AtomPosition, PositionCache<I>>,
 }
 
-impl FromIterator<(AtomPosition, PositionCache)> for DirectedPositions {
-    fn from_iter<T: IntoIterator<Item = (AtomPosition, PositionCache)>>(iter: T) -> Self {
+impl<I: VertexId> Default for DirectedPositions<I> {
+    fn default() -> Self {
+        Self {
+            entries: HashMap::default(),
+        }
+    }
+}
+
+impl<I: VertexId> FromIterator<(AtomPosition, PositionCache<I>)> for DirectedPositions<I> {
+    fn from_iter<T: IntoIterator<Item = (AtomPosition, PositionCache<I>)>>(iter: T) -> Self {
         Self {
             entries: FromIterator::from_iter(iter),
         }
     }
 }
 
-impl Extend<(AtomPosition, PositionCache)> for DirectedPositions {
-    fn extend<T: IntoIterator<Item = (AtomPosition, PositionCache)>>(
+impl<I: VertexId> Extend<(AtomPosition, PositionCache<I>)> for DirectedPositions<I> {
+    fn extend<T: IntoIterator<Item = (AtomPosition, PositionCache<I>)>>(
         &mut self,
         iter: T,
     ) {

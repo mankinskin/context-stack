@@ -338,7 +338,7 @@ fn maximal_drops_duplicates_and_contained_occurrences() {
         [occ(0, ab), occ(1, bc), occ(2, bc)],
         "partial overlaps are kept"
     );
-    assert_eq!(maximal(vec![]), []);
+    assert_eq!(maximal(Vec::<Occurrence>::new()), []);
 }
 
 #[test]

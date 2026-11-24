@@ -72,7 +72,7 @@ pub enum ErrorReason {
 impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn expect_index_width(
         &self,
-        index: &impl HasVertexIndex,
+        index: &impl HasVertexIndex<Index = VertexIndex>,
     ) -> usize {
         self.expect_vertex_data(index.vertex_index()).width().0
     }

@@ -1,3 +1,4 @@
+use crate::VertexIndex;
 use crate::legacy::graph::{
     Hypergraph,
     getters::{
@@ -48,7 +49,7 @@ impl<G: GraphKind> Hypergraph<G> {
     }
     pub(crate) fn to_token(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Token {
         Token::new(index.vertex_index(), self.expect_index_width(&index))
     }
@@ -64,14 +65,14 @@ impl<G: GraphKind> Hypergraph<G> {
     #[allow(dead_code)]
     pub(crate) fn expect_child(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Token {
         self.to_token(index)
     }
     #[allow(dead_code)]
     pub(crate) fn to_children(
         &self,
-        indices: impl IntoIterator<Item = impl HasVertexIndex>,
+        indices: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
     ) -> Pattern {
         indices.into_iter().map(|i| self.to_token(i)).collect()
     }

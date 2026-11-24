@@ -1,3 +1,4 @@
+use crate::VertexIndex;
 use crate::legacy::graph::{
     Hypergraph,
     getters::{
@@ -22,8 +23,8 @@ use std::ops::Range;
 impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn get_common_pattern_in_parent(
         &self,
-        pattern: impl IntoIterator<Item = impl HasVertexIndex>,
-        parent: impl HasVertexIndex,
+        pattern: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
+        parent: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Result<PatternIndex, ErrorReason> {
         let mut parents = self
             .get_pattern_parents(pattern, parent)?
@@ -50,8 +51,8 @@ impl<G: GraphKind> Hypergraph<G> {
     #[track_caller]
     pub(crate) fn expect_common_pattern_in_parent(
         &self,
-        pattern: impl IntoIterator<Item = impl HasVertexIndex>,
-        parent: impl HasVertexIndex,
+        pattern: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
+        parent: impl HasVertexIndex<Index = VertexIndex>,
     ) -> PatternIndex {
         self.get_common_pattern_in_parent(pattern, parent)
             .expect("No common pattern in parent for tokens.")

@@ -18,6 +18,7 @@ use crate::{
     GraphKind,
     Token,
     graph::vertex::{
+        CommittedIndex,
         VertexIndex,
         has_vertex_index::HasVertexIndex,
     },
@@ -34,14 +35,14 @@ impl<G: GraphKind> PositionedGraph<G> {
     /// The token (index and width) of a known vertex.
     pub fn token(
         &self,
-        vertex: impl HasVertexIndex,
+        vertex: impl HasVertexIndex<Index = CommittedIndex>,
     ) -> Option<Token> {
         self.vertex(vertex.vertex_index()).map(|v| v.token())
     }
 
     pub(crate) fn expect_token(
         &self,
-        vertex: impl HasVertexIndex,
+        vertex: impl HasVertexIndex<Index = CommittedIndex>,
     ) -> Token {
         let vertex = vertex.vertex_index();
         self.token(vertex)
@@ -57,7 +58,7 @@ impl<G: GraphKind> PositionedGraph<G> {
     /// atom (it has no proper descendants) or unknown.
     pub fn start_at(
         &self,
-        root: impl HasVertexIndex,
+        root: impl HasVertexIndex<Index = CommittedIndex>,
         p: impl Into<AtomPosition>,
     ) -> Option<(Token, Vec<OccurrenceLocation>)> {
         self.descend(root.vertex_index(), p.into(), Vec::new())
@@ -96,7 +97,7 @@ impl<G: GraphKind> PositionedGraph<G> {
     /// `e > width(root)`, `root` is an atom or unknown.
     pub fn end_at(
         &self,
-        root: impl HasVertexIndex,
+        root: impl HasVertexIndex<Index = CommittedIndex>,
         e: impl Into<AtomPosition>,
     ) -> Option<(Token, Vec<OccurrenceLocation>)> {
         let mut parent = root.vertex_index();
@@ -122,7 +123,7 @@ impl<G: GraphKind> PositionedGraph<G> {
     /// chain `prefix_child(v)`, `prefix_child(prefix_child(v))`, ….
     pub fn prefix_child(
         &self,
-        vertex: impl HasVertexIndex,
+        vertex: impl HasVertexIndex<Index = CommittedIndex>,
     ) -> Option<Occurrence> {
         Some(*self.composition_of(vertex.vertex_index())?.prefix())
     }
@@ -131,7 +132,7 @@ impl<G: GraphKind> PositionedGraph<G> {
     /// by parent width, parent index, offset. Empty for unknown vertices.
     pub fn parent_occurrences(
         &self,
-        vertex: impl HasVertexIndex,
+        vertex: impl HasVertexIndex<Index = CommittedIndex>,
     ) -> impl Iterator<Item = (Token, AtomPosition)> {
         let mut occurrences: Vec<(Token, AtomPosition)> = self
             .vertex(vertex.vertex_index())
@@ -166,7 +167,7 @@ impl<G: GraphKind> PositionedGraph<G> {
     /// descent continues from the last child.
     pub fn advance_end_path(
         &self,
-        root: impl HasVertexIndex,
+        root: impl HasVertexIndex<Index = CommittedIndex>,
         mut steps: Vec<OccurrenceLocation>,
         p: impl Into<AtomPosition>,
     ) -> Option<(Token, Vec<OccurrenceLocation>)> {

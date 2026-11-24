@@ -11,7 +11,9 @@ use context_trace::{
         TraceCache,
     },
     AtomPosition,
+    CommittedIndex,
     Token,
+    VertexId,
 };
 
 use crate::{
@@ -34,14 +36,17 @@ use crate::{
 ///
 /// [`Self::generation`] is the graph generation the search ran under (insert
 /// plan rev 3, R6/D9); insertion rejects a response of another generation.
+///
+/// `I` is the index type of the searched store (staging plan §3.2); the
+/// match itself is still committed until search becomes store-generic (S2).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Response {
-    pub cache: TraceCache,
+pub struct Response<I: VertexId = CommittedIndex> {
+    pub cache: TraceCache<I>,
     pub end: MatchResult,
     pub(crate) generation: u64,
 }
 
-impl Response {
+impl<I: VertexId> Response<I> {
     /// Graph generation under which the search ran
     /// ([`PositionedGraph::generation`](context_trace::positioned::PositionedGraph::generation)).
     pub fn generation(&self) -> u64 {

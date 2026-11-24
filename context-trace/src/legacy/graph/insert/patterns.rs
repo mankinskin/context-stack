@@ -1,4 +1,5 @@
 //! Multiple pattern insertion and management operations
+use crate::VertexIndex;
 
 use itertools::Itertools;
 
@@ -23,7 +24,7 @@ impl<G: GraphKind> Hypergraph<G> {
     /// Add pattern to existing node
     pub fn add_pattern_with_update(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
         pattern: Pattern,
     ) -> PatternId {
         let indices = pattern.into_pattern();
@@ -44,7 +45,7 @@ impl<G: GraphKind> Hypergraph<G> {
     /// Add patterns to existing node
     pub fn add_patterns_with_update(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
         patterns: impl IntoIterator<Item = Pattern>,
     ) -> Vec<PatternId> {
         let index = index.vertex_index();

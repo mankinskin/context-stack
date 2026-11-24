@@ -289,7 +289,7 @@ impl<G: GraphKind> Hypergraph<G> {
     /// Get the key for an index by looking up in index_to_key map.
     pub(crate) fn get_key_for_index(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Result<VertexKey, ErrorReason> {
         self.index_to_key
             .get(&index.vertex_index())
@@ -300,7 +300,7 @@ impl<G: GraphKind> Hypergraph<G> {
     #[track_caller]
     pub fn expect_key_for_index(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> VertexKey {
         self.get_key_for_index(index).expect("Key does not exist")
     }
@@ -323,7 +323,7 @@ impl<G: GraphKind> Hypergraph<G> {
     /// - A write lock is currently held on the vertex
     pub fn try_get_vertex_data(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Option<VertexData> {
         let key = self.get_key_for_index(index).ok()?;
         self.graph

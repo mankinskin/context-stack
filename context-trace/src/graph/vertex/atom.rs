@@ -105,6 +105,7 @@ impl Wide for NewAtomIndex {
 }
 
 impl crate::graph::vertex::has_vertex_index::HasVertexIndex for NewAtomIndex {
+    type Index = crate::graph::vertex::VertexIndex;
     fn vertex_index(&self) -> crate::graph::vertex::VertexIndex {
         match self {
             Self::New(i) => *i,

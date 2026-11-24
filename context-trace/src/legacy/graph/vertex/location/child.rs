@@ -1,3 +1,4 @@
+use crate::VertexIndex;
 use std::ops::ControlFlow;
 
 use crate::legacy::{
@@ -237,6 +238,7 @@ impl IntoPatternLocation for ChildLocation {
 }
 
 impl HasVertexIndex for ChildLocation {
+    type Index = VertexIndex;
     fn vertex_index(&self) -> crate::legacy::graph::vertex::VertexIndex {
         self.parent.index
     }

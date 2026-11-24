@@ -220,7 +220,7 @@ where
 
 // ── HasTokenRoleIters trait ───────────────────────────────────────────────────
 
-pub trait HasTokenRoleIters: ToToken {
+pub trait HasTokenRoleIters: ToToken<Index = VertexIndex> {
     /// Follow the widest terminal child at each level, stopping at an atom.
     ///
     /// The root itself is not yielded. Accumulate the returned child locations
@@ -270,4 +270,4 @@ pub trait HasTokenRoleIters: ToToken {
     }
 }
 
-impl<T: ToToken> HasTokenRoleIters for T {}
+impl<T: ToToken<Index = VertexIndex>> HasTokenRoleIters for T {}

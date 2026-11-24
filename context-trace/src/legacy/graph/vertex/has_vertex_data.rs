@@ -1,3 +1,4 @@
+use crate::VertexIndex;
 use std::ops::Deref;
 
 use crate::legacy::graph::{
@@ -32,7 +33,7 @@ use crate::legacy::graph::{
 ///     println!("Token string: {}", s);
 /// }
 /// ```
-pub trait HasVertexStringRepr: HasVertexIndex {
+pub trait HasVertexStringRepr: HasVertexIndex<Index = VertexIndex> {
     /// Get the string representation of this vertex from the given graph
     fn vertex_string_repr<G: GraphKind, R: Deref<Target = Hypergraph<G>>>(
         &self,
@@ -44,7 +45,7 @@ pub trait HasVertexStringRepr: HasVertexIndex {
     }
 }
 
-impl<T: HasVertexIndex> HasVertexStringRepr for T {}
+impl<T: HasVertexIndex<Index = VertexIndex>> HasVertexStringRepr for T {}
 
 /// Trait for types that can get vertex data from a graph.
 ///

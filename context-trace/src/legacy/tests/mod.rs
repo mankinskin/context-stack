@@ -39,8 +39,8 @@ pub mod test_env1_string_repr;
 
 pub fn assert_parents(
     graph: &Hypergraph,
-    token: impl ToToken,
-    parent: impl ToToken,
+    token: impl ToToken<Index = VertexIndex>,
+    parent: impl ToToken<Index = VertexIndex>,
     pattern_indices: impl IntoIterator<Item = PatternIndex>,
 ) {
     assert_eq!(

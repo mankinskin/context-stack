@@ -71,7 +71,7 @@ impl<G: GraphKind> Hypergraph<G> {
 impl<G: GraphKind> Hypergraph<G> {
     pub(crate) fn validate_vertex(
         &self,
-        index: impl crate::legacy::graph::vertex::has_vertex_index::HasVertexIndex,
+        index: impl crate::legacy::graph::vertex::has_vertex_index::HasVertexIndex<Index = VertexIndex>,
     ) {
         self.expect_vertex_data(index.vertex_index()).validate()
     }

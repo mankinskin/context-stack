@@ -25,6 +25,10 @@ use serde::{
 use crate::graph::vertex::{
     VertexIndex,
     atom::NewAtomIndex,
+    id::{
+        CommittedIndex,
+        VertexId,
+    },
     has_vertex_index::HasVertexIndex,
     wide::{
         Wide,
@@ -158,7 +162,7 @@ impl std::ops::SubAssign<usize> for TokenWidth {
     }
 }
 
-impl Borrow<TokenWidth> for Token {
+impl<I> Borrow<TokenWidth> for Token<I> {
     fn borrow(&self) -> &TokenWidth {
         &self.width
     }
@@ -208,13 +212,15 @@ impl HasSubLocation for SubToken {
     }
 }
 
-#[derive(Eq, Clone, Copy, Serialize, Deserialize)]
-pub struct Token {
-    pub index: VertexIndex, // the token index
-    pub width: TokenWidth,  // the atom width
+/// A vertex index with the vertex width. `I` is the index type of the store
+/// the token belongs to (staging plan §3.2).
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub struct Token<I = CommittedIndex> {
+    pub index: I,          // the token index
+    pub width: TokenWidth, // the atom width
 }
 
-impl Debug for Token {
+impl<I: VertexId> Debug for Token<I> {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
@@ -224,9 +230,9 @@ impl Debug for Token {
     }
 }
 
-impl Token {
+impl<I: VertexId> Token<I> {
     pub fn new(
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = I>,
         width: impl Into<TokenWidth>,
     ) -> Self {
         Self {
@@ -235,10 +241,16 @@ impl Token {
         }
     }
 
+    /// Resolved name of a committed token; `None` for staged ones.
     #[cfg(any(test, feature = "test-api"))]
     pub fn get_string_repr(&self) -> Option<String> {
-        crate::graph::vertex::name_resolver::resolve_token_name(*self.index)
+        self.index
+            .committed()
+            .and_then(|index| crate::graph::vertex::name_resolver::resolve_token_name(*index))
     }
+}
+
+impl Token {
     #[cfg(feature = "legacy")]
     pub fn to_pattern_location(
         self,
@@ -255,10 +267,14 @@ impl Token {
     }
 }
 #[allow(dead_code)]
-impl Token {
+impl<I> Token<I> {
     pub(crate) fn get_width(&self) -> usize {
         self.width.0
     }
+}
+
+#[allow(dead_code)]
+impl Token {
     #[cfg(feature = "legacy")]
     pub(crate) fn down_key(
         self,
@@ -275,7 +291,7 @@ impl Token {
     }
 }
 
-impl Ord for Token {
+impl<I: VertexId> Ord for Token<I> {
     fn cmp(
         &self,
         other: &Self,
@@ -284,7 +300,7 @@ impl Ord for Token {
     }
 }
 
-impl PartialOrd for Token {
+impl<I: VertexId> PartialOrd for Token<I> {
     fn partial_cmp(
         &self,
         other: &Self,
@@ -302,7 +318,7 @@ impl<A: Borrow<Token>, B: Borrow<Token>> From<Result<A, B>> for Token {
     }
 }
 
-impl std::hash::Hash for Token {
+impl<I: VertexId> std::hash::Hash for Token<I> {
     fn hash<H: std::hash::Hasher>(
         &self,
         h: &mut H,
@@ -319,7 +335,9 @@ impl std::hash::Hash for Token {
 //        self.index.cmp(&other.index)
 //    }
 //}
-impl PartialEq for Token {
+impl<I: VertexId> Eq for Token<I> {}
+
+impl<I: VertexId> PartialEq for Token<I> {
     fn eq(
         &self,
         other: &Self,
@@ -367,9 +385,9 @@ impl From<NewAtomIndex> for Token {
     }
 }
 
-impl IntoIterator for Token {
+impl<I> IntoIterator for Token<I> {
     type Item = Self;
-    type IntoIter = std::iter::Once<Token>;
+    type IntoIter = std::iter::Once<Self>;
     fn into_iter(self) -> Self::IntoIter {
         std::iter::once(self)
     }
@@ -381,30 +399,30 @@ impl IntoIterator for Token {
 //    }
 //}
 
-impl Wide for Token {
+impl<I> Wide for Token<I> {
     fn width(&self) -> TokenWidth {
         self.width
     }
 }
 
-impl WideMut for Token {
+impl<I> WideMut for Token<I> {
     fn width_mut(&mut self) -> &mut TokenWidth {
         &mut self.width
     }
 }
 
-impl Borrow<[Token]> for Token {
-    fn borrow(&self) -> &[Token] {
+impl<I> Borrow<[Token<I>]> for Token<I> {
+    fn borrow(&self) -> &[Token<I>] {
         std::slice::from_ref(self)
     }
 }
 
-impl AsRef<[Token]> for Token {
-    fn as_ref(&self) -> &[Token] {
+impl<I> AsRef<[Token<I>]> for Token<I> {
+    fn as_ref(&self) -> &[Token<I>] {
         self.borrow()
     }
 }
-impl Display for Token {
+impl<I: VertexId> Display for Token<I> {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
@@ -420,7 +438,7 @@ impl Display for Token {
     }
 }
 
-impl crate::logging::compact_format::CompactFormat for Token {
+impl<I: VertexId> crate::logging::compact_format::CompactFormat for Token<I> {
     fn fmt_compact(
         &self,
         f: &mut std::fmt::Formatter,

@@ -206,7 +206,7 @@ impl<G: GraphKind> Hypergraph<G> {
     /// span the vertex width, and not share inner boundaries with the others.
     pub fn validate_expansion(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) {
         self.expect_vertex_data(index.vertex_index()).validate();
     }
@@ -288,7 +288,7 @@ where
 
     pub(crate) fn pattern_string_with_separator(
         &'a self,
-        pattern: impl IntoIterator<Item = impl HasVertexIndex>,
+        pattern: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
         separator: &'static str,
     ) -> String {
         pattern
@@ -299,13 +299,13 @@ where
     #[allow(dead_code)]
     pub(crate) fn separated_pattern_string(
         &'a self,
-        pattern: impl IntoIterator<Item = impl HasVertexIndex>,
+        pattern: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
     ) -> String {
         self.pattern_string_with_separator(pattern, "_")
     }
     pub(crate) fn pattern_string(
         &'a self,
-        pattern: impl IntoIterator<Item = impl HasVertexIndex>,
+        pattern: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
     ) -> String {
         self.pattern_string_with_separator(pattern, "")
     }
@@ -313,7 +313,7 @@ where
     pub(crate) fn pattern_strings(
         &'a self,
         patterns: impl IntoIterator<
-            Item = impl IntoIterator<Item = impl HasVertexIndex>,
+            Item = impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
         >,
     ) -> Vec<String> {
         patterns
@@ -355,7 +355,7 @@ where
     }
     pub fn index_string(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> String {
         let data = self.expect_vertex_data(index.vertex_index());
         self.vertex_data_string(data)

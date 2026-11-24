@@ -1,3 +1,4 @@
+use crate::VertexIndex;
 use crate::legacy::graph::{
     Hypergraph,
     getters::{
@@ -17,7 +18,7 @@ impl<G: GraphKind> Hypergraph<G> {
     #[track_caller]
     pub(crate) fn expect_parents(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> VertexParents {
         self.expect_vertex_data(index.vertex_index())
             .parents()
@@ -26,8 +27,8 @@ impl<G: GraphKind> Hypergraph<G> {
     #[track_caller]
     pub(crate) fn expect_parent(
         &self,
-        index: impl HasVertexIndex,
-        parent: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
+        parent: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Parent {
         self.expect_vertex_data(index.vertex_index())
             .expect_parent(parent)
@@ -35,8 +36,8 @@ impl<G: GraphKind> Hypergraph<G> {
     }
     pub(crate) fn get_pattern_parents(
         &self,
-        pattern: impl IntoIterator<Item = impl HasVertexIndex>,
-        parent: impl HasVertexIndex,
+        pattern: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
+        parent: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Result<Vec<Parent>, ErrorReason> {
         pattern
             .into_iter()

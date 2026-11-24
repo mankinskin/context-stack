@@ -16,7 +16,7 @@ pub(crate) fn clone_child_patterns(
 
 /// Helper function to create localized child iterator
 pub(crate) fn localized_children_iter_for_index(
-    parent: impl ToToken,
+    parent: impl ToToken<Index = VertexIndex>,
     tokens: &ChildPatterns,
 ) -> impl IntoIterator<Item = (ChildLocation, &Token)> {
     let parent = parent.to_token();

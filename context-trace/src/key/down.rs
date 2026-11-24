@@ -10,6 +10,10 @@ use crate::{
     AtomPosition,
     TokenWidth,
     graph::vertex::{
+        id::{
+            CommittedIndex,
+            VertexId,
+        },
         token::Token,
         wide::Wide,
     },
@@ -90,18 +94,18 @@ impl CompactFormat for DownPosition {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy, new)]
-pub struct DownKey {
-    pub index: Token,
+pub struct DownKey<I: VertexId = CommittedIndex> {
+    pub index: Token<I>,
     pub pos: DownPosition,
 }
 
-impl HasAtomPosition for DownKey {
+impl<I: VertexId> HasAtomPosition for DownKey<I> {
     fn pos(&self) -> &AtomPosition {
         &self.pos.0
     }
 }
 
-impl Wide for DownKey {
+impl<I: VertexId> Wide for DownKey<I> {
     fn width(&self) -> TokenWidth {
         self.index.width()
     }

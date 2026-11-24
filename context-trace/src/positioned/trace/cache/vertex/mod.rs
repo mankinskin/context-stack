@@ -8,24 +8,28 @@ use crate::{
     DirectedPosition,
     HasAtomPosition,
     Token,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+    },
     positioned::trace::cache::position::PositionCache,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VertexCache {
-    pub bottom_up: DirectedPositions,
-    pub top_down: DirectedPositions,
-    pub index: Token,
+pub struct VertexCache<I: VertexId = CommittedIndex> {
+    pub bottom_up: DirectedPositions<I>,
+    pub top_down: DirectedPositions<I>,
+    pub index: Token<I>,
 }
 
-impl VertexCache {
-    pub fn start(index: Token) -> Self {
+impl<I: VertexId> VertexCache<I> {
+    pub fn start(index: Token<I>) -> Self {
         Self::from(index)
     }
     pub fn dir(
         &self,
         pos: &DirectedPosition,
-    ) -> &DirectedPositions {
+    ) -> &DirectedPositions<I> {
         match pos {
             DirectedPosition::BottomUp(_) => &self.bottom_up,
             DirectedPosition::TopDown(_) => &self.top_down,
@@ -34,7 +38,7 @@ impl VertexCache {
     pub fn dir_mut(
         &mut self,
         pos: &DirectedPosition,
-    ) -> &mut DirectedPositions {
+    ) -> &mut DirectedPositions<I> {
         match pos {
             DirectedPosition::BottomUp(_) => &mut self.bottom_up,
             DirectedPosition::TopDown(_) => &mut self.top_down,
@@ -43,26 +47,26 @@ impl VertexCache {
     pub fn get(
         &self,
         pos: &DirectedPosition,
-    ) -> Option<&PositionCache> {
+    ) -> Option<&PositionCache<I>> {
         self.dir(pos).get(pos.pos())
     }
     pub fn get_mut(
         &mut self,
         pos: &DirectedPosition,
-    ) -> Option<&mut PositionCache> {
+    ) -> Option<&mut PositionCache<I>> {
         self.dir_mut(pos).get_mut(pos.pos())
     }
     pub fn insert(
         &mut self,
         pos: &DirectedPosition,
-        cache: PositionCache,
+        cache: PositionCache<I>,
     ) {
         self.dir_mut(pos).insert(*pos.pos(), cache);
     }
 }
 
-impl From<Token> for VertexCache {
-    fn from(index: Token) -> Self {
+impl<I: VertexId> From<Token<I>> for VertexCache<I> {
+    fn from(index: Token<I>) -> Self {
         Self {
             index,
             bottom_up: Default::default(),

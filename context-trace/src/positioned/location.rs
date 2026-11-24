@@ -5,15 +5,20 @@ use std::ops::Range;
 
 use crate::{
     AtomPosition,
-    graph::vertex::VertexIndex,
+    graph::vertex::{
+        CommittedIndex,
+        VertexId,
+    },
 };
+#[cfg(any(debug_assertions, test, feature = "test-api"))]
+use crate::graph::vertex::VertexIndex;
 
 /// One retained occurrence: `child` at `offset` inside `parent`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct OccurrenceLocation {
-    pub parent: VertexIndex,
+pub struct OccurrenceLocation<I: VertexId = CommittedIndex> {
+    pub parent: I,
     pub offset: AtomPosition,
-    pub child: VertexIndex,
+    pub child: I,
 }
 
 /// Atom range of an owner vertex. A view, explicitly not a token: it has no

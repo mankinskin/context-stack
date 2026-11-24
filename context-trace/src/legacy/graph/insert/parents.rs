@@ -1,4 +1,5 @@
 //! Parent management operations
+use crate::VertexIndex;
 
 use crate::legacy::{
     graph::{
@@ -116,7 +117,7 @@ impl<G: GraphKind> Hypergraph<G> {
     /// Utility: builds total width, indices and tokens for pattern
     pub(super) fn to_width_indices_children(
         &self,
-        indices: impl IntoIterator<Item = impl HasVertexIndex>,
+        indices: impl IntoIterator<Item = impl HasVertexIndex<Index = VertexIndex>>,
     ) -> (usize, Vec<crate::legacy::graph::vertex::VertexIndex>, Vec<Token>) {
         let mut width = 0;
         let (a, b) = indices
@@ -133,7 +134,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     /// Adds a parent to all nodes in a pattern
     #[track_caller]
-    pub fn add_parents_to_pattern_nodes<I: HasVertexIndex, P: ToToken>(
+    pub fn add_parents_to_pattern_nodes<I: HasVertexIndex<Index = VertexIndex>, P: ToToken<Index = VertexIndex>>(
         &self,
         pattern: Vec<I>,
         parent: P,
@@ -153,7 +154,7 @@ impl<G: GraphKind> Hypergraph<G> {
 
     pub(crate) fn add_pattern_parent(
         &self,
-        parent: impl ToToken,
+        parent: impl ToToken<Index = VertexIndex>,
         pattern: impl IntoPattern,
         pattern_id: PatternId,
         start: usize,
@@ -185,9 +186,9 @@ impl<G: GraphKind> Hypergraph<G> {
     #[allow(deprecated)]
     pub fn append_to_pattern(
         &self,
-        parent: impl ToToken,
+        parent: impl ToToken<Index = VertexIndex>,
         pattern_id: PatternId,
-        new: impl IntoIterator<Item = impl ToToken>,
+        new: impl IntoIterator<Item = impl ToToken<Index = VertexIndex>>,
     ) -> Token {
         let new: Vec<_> = new.into_iter().map(|c| c.to_token()).collect();
         if new.is_empty() {
@@ -238,9 +239,9 @@ impl<G: GraphKind> Hypergraph<G> {
     /// any root references to point to this new token.
     pub fn extend_root_pattern(
         &self,
-        parent: impl ToToken,
+        parent: impl ToToken<Index = VertexIndex>,
         pattern_id: PatternId,
-        new: impl IntoIterator<Item = impl ToToken>,
+        new: impl IntoIterator<Item = impl ToToken<Index = VertexIndex>>,
     ) -> Token {
         let new: Vec<_> = new.into_iter().map(|c| c.to_token()).collect();
         if new.is_empty() {
@@ -280,9 +281,9 @@ impl<G: GraphKind> Hypergraph<G> {
     /// Prefer [`extend_root_pattern`] for safety.
     pub fn append_to_owned_pattern(
         &self,
-        parent: impl ToToken,
+        parent: impl ToToken<Index = VertexIndex>,
         pattern_id: PatternId,
-        new: impl IntoIterator<Item = impl ToToken>,
+        new: impl IntoIterator<Item = impl ToToken<Index = VertexIndex>>,
     ) -> Token {
         let new: Vec<_> = new.into_iter().map(|c| c.to_token()).collect();
         if new.is_empty() {

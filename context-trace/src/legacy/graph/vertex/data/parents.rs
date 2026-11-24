@@ -26,7 +26,7 @@ impl VertexData {
     /// Get parent relationship by vertex index
     pub(crate) fn get_parent(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Result<&Parent, ErrorReason> {
         let index = index.vertex_index();
         self.parents
@@ -37,7 +37,7 @@ impl VertexData {
     /// Get mutable parent relationship by vertex index
     pub(crate) fn get_parent_mut(
         &mut self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Result<&mut Parent, ErrorReason> {
         let index = index.vertex_index();
         self.parents
@@ -49,7 +49,7 @@ impl VertexData {
     #[track_caller]
     pub(crate) fn expect_parent(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> &Parent {
         self.get_parent(index).unwrap()
     }
@@ -58,7 +58,7 @@ impl VertexData {
     #[track_caller]
     pub(crate) fn expect_parent_mut(
         &mut self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> &mut Parent {
         self.get_parent_mut(index).unwrap()
     }
@@ -82,7 +82,7 @@ impl VertexData {
     /// Remove all relationships to a parent vertex
     pub(crate) fn remove_parent(
         &mut self,
-        vertex: impl HasVertexIndex,
+        vertex: impl HasVertexIndex<Index = VertexIndex>,
     ) {
         self.parents.remove(&vertex.vertex_index());
         // not while indexing
@@ -92,7 +92,7 @@ impl VertexData {
     /// Remove a specific parent pattern index
     pub(crate) fn remove_parent_index(
         &mut self,
-        vertex: impl HasVertexIndex,
+        vertex: impl HasVertexIndex<Index = VertexIndex>,
         pattern: PatternId,
         index: usize,
     ) {
@@ -128,7 +128,7 @@ impl VertexData {
     /// Get parent pattern index starting at specified offset
     pub(crate) fn get_parent_to_starting_at(
         &self,
-        parent_index: impl HasVertexIndex,
+        parent_index: impl HasVertexIndex<Index = VertexIndex>,
         index_offset: usize,
     ) -> Result<PatternIndex, ErrorReason> {
         let index = parent_index.vertex_index();
@@ -141,7 +141,7 @@ impl VertexData {
     /// Get parent pattern index at prefix (offset 0)
     pub(crate) fn get_parent_at_prefix_of(
         &self,
-        index: impl HasVertexIndex,
+        index: impl HasVertexIndex<Index = VertexIndex>,
     ) -> Result<PatternIndex, ErrorReason> {
         self.get_parent_to_starting_at(index, 0)
     }
@@ -193,7 +193,7 @@ impl VertexData {
 
     pub(crate) fn filter_parent_to(
         &self,
-        parent: impl HasVertexIndex,
+        parent: impl HasVertexIndex<Index = VertexIndex>,
         cond: impl Fn(&&Parent) -> bool,
     ) -> Result<&'_ Parent, ErrorReason> {
         let index = parent.vertex_index();
