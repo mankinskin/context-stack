@@ -1,0 +1,51 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "abcdabcda",
+    "bcda"
+  ],
+  "vertices": {
+    "a": [],
+    "abcda": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "bcda"
+      ]
+    ],
+    "abcdabcda": [
+      [
+        0,
+        "abcda"
+      ],
+      [
+        4,
+        "abcda"
+      ]
+    ],
+    "b": [],
+    "bcda": [
+      [
+        0,
+        "b"
+      ],
+      [
+        1,
+        "c"
+      ],
+      [
+        2,
+        "d"
+      ],
+      [
+        3,
+        "a"
+      ]
+    ],
+    "c": [],
+    "d": []
+  }
+}

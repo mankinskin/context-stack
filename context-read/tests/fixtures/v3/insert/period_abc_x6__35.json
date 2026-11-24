@@ -1,0 +1,210 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "abcabcabcabcabcabc",
+    "cabcabcabcabca"
+  ],
+  "vertices": {
+    "a": [],
+    "abc": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "b"
+      ],
+      [
+        2,
+        "c"
+      ]
+    ],
+    "abca": [
+      [
+        0,
+        "abc"
+      ],
+      [
+        2,
+        "ca"
+      ]
+    ],
+    "abcabc": [
+      [
+        0,
+        "abca"
+      ],
+      [
+        2,
+        "cabc"
+      ]
+    ],
+    "abcabca": [
+      [
+        0,
+        "abcabc"
+      ],
+      [
+        2,
+        "cabca"
+      ]
+    ],
+    "abcabcabc": [
+      [
+        0,
+        "abcabca"
+      ],
+      [
+        2,
+        "cabcabc"
+      ]
+    ],
+    "abcabcabca": [
+      [
+        0,
+        "abcabcabc"
+      ],
+      [
+        2,
+        "cabcabca"
+      ]
+    ],
+    "abcabcabcabc": [
+      [
+        0,
+        "abcabcabca"
+      ],
+      [
+        2,
+        "cabcabcabc"
+      ]
+    ],
+    "abcabcabcabca": [
+      [
+        0,
+        "abcabcabcabc"
+      ],
+      [
+        2,
+        "cabcabcabca"
+      ]
+    ],
+    "abcabcabcabcabc": [
+      [
+        0,
+        "abcabcabcabca"
+      ],
+      [
+        2,
+        "cabcabcabcabc"
+      ]
+    ],
+    "abcabcabcabcabcabc": [
+      [
+        0,
+        "abcabcabcabcabc"
+      ],
+      [
+        2,
+        "cabcabcabcabca"
+      ],
+      [
+        3,
+        "abcabcabcabcabc"
+      ]
+    ],
+    "b": [],
+    "c": [],
+    "ca": [
+      [
+        0,
+        "c"
+      ],
+      [
+        1,
+        "a"
+      ]
+    ],
+    "cabc": [
+      [
+        0,
+        "ca"
+      ],
+      [
+        1,
+        "abc"
+      ]
+    ],
+    "cabca": [
+      [
+        0,
+        "cabc"
+      ],
+      [
+        1,
+        "abca"
+      ]
+    ],
+    "cabcabc": [
+      [
+        0,
+        "cabca"
+      ],
+      [
+        1,
+        "abcabc"
+      ]
+    ],
+    "cabcabca": [
+      [
+        0,
+        "cabcabc"
+      ],
+      [
+        1,
+        "abcabca"
+      ]
+    ],
+    "cabcabcabc": [
+      [
+        0,
+        "cabcabca"
+      ],
+      [
+        1,
+        "abcabcabc"
+      ]
+    ],
+    "cabcabcabca": [
+      [
+        0,
+        "cabcabcabc"
+      ],
+      [
+        1,
+        "abcabcabca"
+      ]
+    ],
+    "cabcabcabcabc": [
+      [
+        0,
+        "cabcabcabca"
+      ],
+      [
+        1,
+        "abcabcabcabc"
+      ]
+    ],
+    "cabcabcabcabca": [
+      [
+        0,
+        "cabcabcabcabc"
+      ],
+      [
+        1,
+        "abcabcabcabca"
+      ]
+    ]
+  }
+}

@@ -126,6 +126,35 @@ scenarios!(
     insert_periodic,
     insert_deep_borders,
     seam_overlap_append,
+    period_a_x5,
+    period_a_x6,
+    period_a_x7,
+    period_a_x8,
+    period_ab_x4,
+    period_ab_x5,
+    period_ab_x6,
+    period_abc_x4,
+    period_abc_x5,
+    period_abc_x6,
+    period_abcd_x2,
+    period_abcd_x3,
+    period_abcd_x4,
+    period_abcd_x5,
+    period_abcdef_x2,
+    period_abcdef_x3,
+    period_abcdef_x4,
+    #[ignore = "provisional retention (reader plan §5)"]
+    period_ab_x3_a,
+    #[ignore = "provisional retention (reader plan §5)"]
+    period_abc_x3_a,
+    #[ignore = "provisional retention (reader plan §5)"]
+    period_abc_x3_ab,
+    #[ignore = "provisional retention (reader plan §5)"]
+    period_abcd_x2_a,
+    #[ignore = "provisional retention (reader plan §5)"]
+    period_abcd_x3_ab,
+    #[ignore = "provisional retention (reader plan §5)"]
+    period_abcd_x2_abc,
 );
 
 /// Every positioned manifest entry has exactly one scenario test above.

@@ -1,0 +1,157 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "abcdefabcdefabcdefabcdef",
+    "defabcdefabcdefabc"
+  ],
+  "vertices": {
+    "a": [],
+    "abc": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "b"
+      ],
+      [
+        2,
+        "c"
+      ]
+    ],
+    "abcdef": [
+      [
+        0,
+        "abc"
+      ],
+      [
+        3,
+        "def"
+      ]
+    ],
+    "abcdefabc": [
+      [
+        0,
+        "abcdef"
+      ],
+      [
+        3,
+        "defabc"
+      ]
+    ],
+    "abcdefabcdef": [
+      [
+        0,
+        "abcdefabc"
+      ],
+      [
+        3,
+        "defabcdef"
+      ]
+    ],
+    "abcdefabcdefabc": [
+      [
+        0,
+        "abcdefabcdef"
+      ],
+      [
+        3,
+        "defabcdefabc"
+      ]
+    ],
+    "abcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdefabc"
+      ],
+      [
+        3,
+        "defabcdefabcdef"
+      ]
+    ],
+    "abcdefabcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdefabcdef"
+      ],
+      [
+        3,
+        "defabcdefabcdefabc"
+      ],
+      [
+        6,
+        "abcdefabcdefabcdef"
+      ]
+    ],
+    "b": [],
+    "c": [],
+    "d": [],
+    "def": [
+      [
+        0,
+        "d"
+      ],
+      [
+        1,
+        "e"
+      ],
+      [
+        2,
+        "f"
+      ]
+    ],
+    "defabc": [
+      [
+        0,
+        "def"
+      ],
+      [
+        3,
+        "abc"
+      ]
+    ],
+    "defabcdef": [
+      [
+        0,
+        "defabc"
+      ],
+      [
+        3,
+        "abcdef"
+      ]
+    ],
+    "defabcdefabc": [
+      [
+        0,
+        "defabcdef"
+      ],
+      [
+        3,
+        "abcdefabc"
+      ]
+    ],
+    "defabcdefabcdef": [
+      [
+        0,
+        "defabcdefabc"
+      ],
+      [
+        3,
+        "abcdefabcdef"
+      ]
+    ],
+    "defabcdefabcdefabc": [
+      [
+        0,
+        "defabcdefabcdef"
+      ],
+      [
+        3,
+        "abcdefabcdefabc"
+      ]
+    ],
+    "e": [],
+    "f": []
+  }
+}

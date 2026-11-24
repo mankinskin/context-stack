@@ -1,0 +1,121 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "abcdefabcdefabcdefabcdef",
+    "fabcdefabcde"
+  ],
+  "vertices": {
+    "a": [],
+    "abcde": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "b"
+      ],
+      [
+        2,
+        "c"
+      ],
+      [
+        3,
+        "d"
+      ],
+      [
+        4,
+        "e"
+      ]
+    ],
+    "abcdef": [
+      [
+        0,
+        "abcde"
+      ],
+      [
+        5,
+        "f"
+      ]
+    ],
+    "abcdefabcde": [
+      [
+        0,
+        "abcdef"
+      ],
+      [
+        5,
+        "fabcde"
+      ]
+    ],
+    "abcdefabcdef": [
+      [
+        0,
+        "abcdefabcde"
+      ],
+      [
+        5,
+        "fabcdef"
+      ]
+    ],
+    "abcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdef"
+      ],
+      [
+        5,
+        "fabcdefabcde"
+      ],
+      [
+        6,
+        "abcdefabcdef"
+      ]
+    ],
+    "abcdefabcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdefabcdef"
+      ],
+      [
+        6,
+        "abcdefabcdefabcdef"
+      ]
+    ],
+    "b": [],
+    "c": [],
+    "d": [],
+    "e": [],
+    "f": [],
+    "fabcde": [
+      [
+        0,
+        "f"
+      ],
+      [
+        1,
+        "abcde"
+      ]
+    ],
+    "fabcdef": [
+      [
+        0,
+        "fabcde"
+      ],
+      [
+        1,
+        "abcdef"
+      ]
+    ],
+    "fabcdefabcde": [
+      [
+        0,
+        "fabcdef"
+      ],
+      [
+        1,
+        "abcdefabcde"
+      ]
+    ]
+  }
+}

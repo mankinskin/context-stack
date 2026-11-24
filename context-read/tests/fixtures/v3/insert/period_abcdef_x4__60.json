@@ -1,0 +1,121 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "abcdefabcdefabcdefabcdef",
+    "bcdefabcdefa"
+  ],
+  "vertices": {
+    "a": [],
+    "abcdef": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "bcdef"
+      ]
+    ],
+    "abcdefa": [
+      [
+        0,
+        "abcdef"
+      ],
+      [
+        1,
+        "bcdefa"
+      ]
+    ],
+    "abcdefabcdef": [
+      [
+        0,
+        "abcdefa"
+      ],
+      [
+        1,
+        "bcdefabcdef"
+      ]
+    ],
+    "abcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdef"
+      ],
+      [
+        1,
+        "bcdefabcdefa"
+      ],
+      [
+        6,
+        "abcdefabcdef"
+      ]
+    ],
+    "abcdefabcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdefabcdef"
+      ],
+      [
+        6,
+        "abcdefabcdefabcdef"
+      ]
+    ],
+    "b": [],
+    "bcdef": [
+      [
+        0,
+        "b"
+      ],
+      [
+        1,
+        "c"
+      ],
+      [
+        2,
+        "d"
+      ],
+      [
+        3,
+        "e"
+      ],
+      [
+        4,
+        "f"
+      ]
+    ],
+    "bcdefa": [
+      [
+        0,
+        "bcdef"
+      ],
+      [
+        5,
+        "a"
+      ]
+    ],
+    "bcdefabcdef": [
+      [
+        0,
+        "bcdefa"
+      ],
+      [
+        5,
+        "abcdef"
+      ]
+    ],
+    "bcdefabcdefa": [
+      [
+        0,
+        "bcdefabcdef"
+      ],
+      [
+        5,
+        "abcdefa"
+      ]
+    ],
+    "c": [],
+    "d": [],
+    "e": [],
+    "f": []
+  }
+}

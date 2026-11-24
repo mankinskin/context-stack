@@ -1,0 +1,161 @@
+{
+  "format_version": 3,
+  "corpus": [
+    "abcdefabcdefabcdefabcdef",
+    "cdefabcdefabcdefabc"
+  ],
+  "vertices": {
+    "a": [],
+    "abc": [
+      [
+        0,
+        "a"
+      ],
+      [
+        1,
+        "b"
+      ],
+      [
+        2,
+        "c"
+      ]
+    ],
+    "abcdef": [
+      [
+        0,
+        "abc"
+      ],
+      [
+        2,
+        "cdef"
+      ]
+    ],
+    "abcdefabc": [
+      [
+        0,
+        "abcdef"
+      ],
+      [
+        2,
+        "cdefabc"
+      ]
+    ],
+    "abcdefabcdef": [
+      [
+        0,
+        "abcdefabc"
+      ],
+      [
+        2,
+        "cdefabcdef"
+      ]
+    ],
+    "abcdefabcdefabc": [
+      [
+        0,
+        "abcdefabcdef"
+      ],
+      [
+        2,
+        "cdefabcdefabc"
+      ]
+    ],
+    "abcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdefabc"
+      ],
+      [
+        2,
+        "cdefabcdefabcdef"
+      ]
+    ],
+    "abcdefabcdefabcdefabcdef": [
+      [
+        0,
+        "abcdefabcdefabcdef"
+      ],
+      [
+        2,
+        "cdefabcdefabcdefabc"
+      ],
+      [
+        6,
+        "abcdefabcdefabcdef"
+      ]
+    ],
+    "b": [],
+    "c": [],
+    "cdef": [
+      [
+        0,
+        "c"
+      ],
+      [
+        1,
+        "d"
+      ],
+      [
+        2,
+        "e"
+      ],
+      [
+        3,
+        "f"
+      ]
+    ],
+    "cdefabc": [
+      [
+        0,
+        "cdef"
+      ],
+      [
+        4,
+        "abc"
+      ]
+    ],
+    "cdefabcdef": [
+      [
+        0,
+        "cdefabc"
+      ],
+      [
+        4,
+        "abcdef"
+      ]
+    ],
+    "cdefabcdefabc": [
+      [
+        0,
+        "cdefabcdef"
+      ],
+      [
+        4,
+        "abcdefabc"
+      ]
+    ],
+    "cdefabcdefabcdef": [
+      [
+        0,
+        "cdefabcdefabc"
+      ],
+      [
+        4,
+        "abcdefabcdef"
+      ]
+    ],
+    "cdefabcdefabcdefabc": [
+      [
+        0,
+        "cdefabcdefabcdef"
+      ],
+      [
+        4,
+        "abcdefabcdefabc"
+      ]
+    ],
+    "d": [],
+    "e": [],
+    "f": []
+  }
+}
