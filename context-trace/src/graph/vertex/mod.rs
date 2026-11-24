@@ -5,7 +5,6 @@ pub mod id;
 pub mod key;
 pub mod name_resolver;
 pub mod token;
-pub mod vertex_index;
 pub mod wide;
 
 pub use id::{
@@ -13,5 +12,5 @@ pub use id::{
     StageIndex,
     StagedIndex,
     VertexId,
+    VertexIndex,
 };
-pub use vertex_index::VertexIndex;

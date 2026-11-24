@@ -33,18 +33,22 @@ the pending positioned reader lane and slow sweeps. The two running legacy
 doctests (`legacy::graph::test_graph`, `HasVertexStringRepr`) switch their
 fence to `rust,ignore` via `cfg_attr(not(feature = "legacy-tests"), doc = …)`.
 
-**Positioned model** (`src/positioned/`, root, no legacy dependency):
-`interchange.rs` (v3 `PositionedGraphData`/`PositionedGraphSnapshot` and the
-structural validator, re-exported by `ngrams::output`), `composition.rs`
-(`Occurrence`, `Composition`), `location.rs` (`OccurrenceLocation`,
-`IntervalView`), `graph.rs` (`PositionedGraph`,
-`PositionedVertex`, `PositionedGraphRef = Arc<RwLock<_>>`), `convert.rs`
+**Positioned model** (`src/positioned/`, root, no legacy dependency; layout:
+`model/` data types, `store/` store traits, `committed/` the committed
+store, `edit/` the `GraphEdit` mutation layer, `stage/` the overlay and
+tagged stages, `interchange/` snapshots and test data, `path/`, `trace/`):
+`interchange/` (v3 `PositionedGraphData`/`PositionedGraphSnapshot` and the
+structural validator, re-exported by `ngrams::output`), `model/composition.rs`
+(`Occurrence`, `Composition`), `model/location.rs` (`OccurrenceLocation`,
+`IntervalView`), `committed/graph.rs` (`PositionedGraph`,
+`PositionedGraphRef = Arc<RwLock<_>>`), `model/vertex.rs`
+(`PositionedVertex`), `interchange/convert.rs`
 (`test-api`: `from_interchange`/`to_interchange`; `from_interchange_named`
-also returns the fixture key → token name map), `diff.rs` (`test-api`:
-`diff` → `GraphDiff`), content reading `read.rs` (debug and `test-api`
+also returns the fixture key → token name map), `interchange/diff.rs` (`test-api`:
+`diff` → `GraphDiff`), content reading `store/navigate.rs` (debug and `test-api`
 builds: `PositionedGraph::read_interval`, content of an `IntervalView`, each
 position once), search navigation
-`navigate.rs` (`start_at`, `prefix_child`, `parent_occurrences`,
+`store/navigate.rs` (`start_at`, `prefix_child`, `parent_occurrences`,
 `atom_token`, `advance_end_path`, `token`; `Composition::covering`/`prefix`),
 search paths `path/` (role-generic `RolePath<R: PathRole, Root: PathRoot>`
 mirroring legacy `RolePath`/`RootedRolePath`: roles `Start`/`End` carry
@@ -56,13 +60,13 @@ absolute `span` and `HasRolePath<Start/End>`; `SpanCoverage`; position
 arithmetic confined to `path/role.rs` for later multi-dimensional inputs),
 trace states and cache `trace/` (mirrors `legacy/trace`: `ParentState`,
 `ChildState`/`RootChildState`, `TraceCache` with offset-labelled edges and
-query-position keys, `Traceable` commands; search plan 2.2), `fixtures.rs` (`test-api`:
+query-position keys, `Traceable` commands; search plan 2.2), `interchange/fixtures.rs` (`test-api`:
 `fixture_snapshots` and `fixture_graphs` → `FixtureGraph { name, corpus, graph, names }`,
 shared with context-search). Tests round-trip and validate every v3 fixture
 of `context-read/tests/fixtures/v3` and check `read_interval` and the
 search navigation primitives on every fixture vertex and position
 (`tests/navigation.rs`), and paths, trace states and trace cache on every
-fixture (`tests/trace.rs`). Trace-cache keys (`DirectedKey`, `UpKey`,
+fixture (`tests/trace/`). Trace-cache keys (`DirectedKey`, `UpKey`,
 `DownKey`, `UpPosition`, `DownPosition`) live in the root module `key.rs`,
 re-exported from `legacy::trace::cache::key::directed`.
 
@@ -72,7 +76,7 @@ re-exported from `legacy::trace::cache::key::directed`.
   atom vertex (`PositionedGraph::atoms`); composites are reached
   structurally, by search through parent links and compositions. Enforced by
   `tests/guard.rs`: the fields of `PositionedGraph` and `PositionedVertex`
-  (read from `graph.rs` source) must equal a structural allowlist, and only
+  (read from the `committed/graph.rs` and `model/vertex.rs` sources) must equal a structural allowlist, and only
   `#[cfg(debug_assertions)]` fields may hold content. A new field fails the
   test and must be reviewed against these rules.
 - **Expanded content is debug-only.** `PositionedVertex::label` (built from

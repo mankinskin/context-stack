@@ -3,7 +3,10 @@
 //! structural fields. Adding a field fails this test, forcing a review
 //! against the rule; only `#[cfg(debug_assertions)]` fields may hold content.
 
-const SOURCE: &str = include_str!("../graph.rs");
+const SOURCE: &str = concat!(
+    include_str!("../committed/graph.rs"),
+    include_str!("../model/vertex.rs"),
+);
 
 /// `(name, type, debug_only)` of every field of `struct name` in `SOURCE`.
 fn fields(name: &str) -> Vec<(String, String, bool)> {

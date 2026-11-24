@@ -6,128 +6,132 @@
 //! Independent of the row model in `crate::legacy`; shares only the ID and
 //! atom types ([`crate::VertexIndex`], [`crate::Token`], [`crate::GraphKind`]).
 //!
-//! Stores are abstracted by traits (staging plan §3): [`GraphRead`] hands
-//! out [`VertexRead`] vertex objects (`access.rs`), [`HasGraph`] /
-//! [`HasGraphMut`] abstract how a store is reached (`has_graph.rs`), and the
-//! committed store ([`PositionedGraph`], its lock guards and
-//! [`PositionedGraphRef`]) implements them (`committed.rs`). A read edits a
-//! stage ([`Stage`], [`StageHandle`], `stage.rs`); the overlay stage
-//! ([`OverlayHandle`], [`OverlayView`], `overlay.rs`) keeps its vertices
-//! next to the read-only committed graph until the commit; the tagged stage
-//! ([`TaggedHandle`], [`TaggedView`], `tagged.rs`) writes into the committed
-//! graph and marks its vertices [`VertexState::Staged`] until the commit.
+//! Layout:
+//! - `model/`: data types of the cover model (`Occurrence`,
+//!   `Composition`, `OccurrenceLocation`, `VertexNode`,
+//!   `PositionedVertex`, `PositionedError`);
+//! - `store/`: store abstraction traits (staging plan §3): [`GraphRead`]
+//!   hands out [`VertexRead`] vertex objects (`store/read.rs`),
+//!   `CompositionRead` (`store/composition.rs`), the sealed writes behind
+//!   `GraphWrite` (`store/write.rs`), [`HasGraph`] / [`HasGraphMut`]
+//!   abstract how a store is reached (`store/has_graph.rs`), `Navigate`
+//!   (`store/navigate.rs`);
+//! - `committed/`: the committed store ([`PositionedGraph`], its lock guards
+//!   and [`PositionedGraphRef`]) implements them (`committed/access.rs`);
+//! - `edit/`: `GraphEdit`, the only mutation layer, with its
+//!   `Publication` record and the store-generic checks;
+//! - `stage/`: a read edits a stage ([`Stage`], [`StageHandle`],
+//!   `stage/mod.rs`); the overlay stage ([`OverlayHandle`], [`OverlayView`],
+//!   `stage/overlay/`) keeps its vertices next to the read-only committed
+//!   graph until the commit; the tagged stage ([`TaggedHandle`],
+//!   [`TaggedView`], `stage/tagged/`) writes into the committed graph and
+//!   marks its vertices [`VertexState::Staged`] until the commit;
+//! - `interchange`: content-keyed snapshots, with conversion, `diff`
+//!   and `fixtures` in `test-api` builds;
+//! - `path` and `trace`: search paths and trace states (below).
 //!
 //! Read-only navigation (reader plan Phase 2) is split into separate APIs:
 //! - content reading (debug and `test-api` builds):
 //!   [`Navigate::read_interval`];
 //! - local navigation for search, on vertex objects ([`Navigate`],
-//!   `navigate.rs`): `start_at`, `end_at`, `prefix_child`,
+//!   `store/navigate.rs`): `start_at`, `end_at`, `prefix_child`,
 //!   `postfix_child`, `prefixes`, `postfixes`, `parent_occurrences`,
 //!   `advance_end_path`; atoms through [`GraphRead::atom`];
 //! - search paths (role-generic [`RolePath`] with aliases [`StartPath`],
 //!   [`EndPath`], [`QueryPath`]; [`RangePath`], `path/`) and trace states / trace cache ([`ParentState`],
 //!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2.
 
-mod access;
-mod check;
 mod committed;
-pub mod composition;
-#[cfg(any(test, feature = "test-api"))]
-mod convert;
-#[cfg(any(test, feature = "test-api"))]
-pub mod diff;
 mod edit;
-#[cfg(any(test, feature = "test-api"))]
-pub mod fixtures;
-pub mod graph;
-mod has_graph;
 pub mod interchange;
-pub mod location;
-mod navigate;
-mod overlay;
+mod model;
 pub mod path;
 mod stage;
-mod tagged;
+mod store;
 pub mod trace;
+
+#[cfg(any(test, feature = "test-api"))]
+pub use self::interchange::{
+    diff,
+    fixtures,
+};
 
 #[cfg(feature = "edit")]
 #[doc(hidden)]
 pub use self::edit::GraphEdit;
 #[cfg(debug_assertions)]
 pub use self::{
-    graph::PositionedLabels,
-    overlay::OverlayLabels,
-    tagged::TaggedLabels,
+    model::PositionedLabels,
+    stage::{
+        overlay::OverlayLabels,
+        tagged::TaggedLabels,
+    },
 };
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
-pub use self::location::IntervalView;
+pub use self::model::IntervalView;
 #[cfg(any(test, feature = "test-api"))]
-pub use self::diff::{
+pub use self::interchange::diff::{
     GraphDiff,
     diff,
 };
 pub use self::{
-    access::{
-        CompositionRead,
-        Generation,
-        GraphRead,
-        GraphWrite,
-        NodeRef,
-        VertexRead,
-        VertexState,
+    committed::{
+        PositionedGraph,
+        PositionedGraphRef,
+        PositionedVertexRef,
     },
-    committed::PositionedVertexRef,
-    overlay::{
-        Lifted,
-        OverlayHandle,
-        OverlayVertex,
-        OverlayView,
-        StagedVertex,
-        StagingGraph,
+    edit::{
+        Publication,
+        VertexEdit,
     },
-    tagged::{
-        StageId,
-        TaggedComposition,
-        TaggedHandle,
-        TaggedVertex,
-        TaggedView,
+    model::{
+        Composition,
+        CompositionError,
+        Occurrence,
+        OccurrenceLocation,
+        PositionedError,
+        PositionedVertex,
+        VertexNode,
+        maximal,
     },
     stage::{
         CommitError,
         Stage,
         StageHandle,
         Translation,
+        overlay::{
+            Lifted,
+            OverlayHandle,
+            OverlayVertex,
+            OverlayView,
+            StagedVertex,
+            StagingGraph,
+        },
+        tagged::{
+            StageId,
+            TaggedComposition,
+            TaggedHandle,
+            TaggedVertex,
+            TaggedView,
+        },
     },
-    has_graph::{
+    store::{
+        CompositionRead,
+        Generation,
         GraphAtom,
+        GraphRead,
+        GraphWrite,
         HasGraph,
         HasGraphMut,
         IndexOf,
         KindOf,
-    },
-    navigate::{
         Located,
         Navigate,
+        NodeRef,
+        VertexRead,
+        VertexState,
         string_repr,
     },
-    composition::{
-        Composition,
-        CompositionError,
-        Occurrence,
-        maximal,
-    },
-    edit::{
-        Publication,
-        VertexEdit,
-    },
-    graph::{
-        PositionedError,
-        PositionedGraph,
-        PositionedGraphRef,
-        PositionedVertex,
-        VertexNode,
-    },
-    location::OccurrenceLocation,
     path::{
         End,
         EndPath,
@@ -150,7 +154,7 @@ pub use self::{
             position::PositionCache,
             vertex::VertexCache,
         },
-        child::state::{
+        child::{
             ChildState,
             RootChildState,
         },

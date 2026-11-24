@@ -31,10 +31,12 @@ use crate::{
     TokenWidth,
     graph::vertex::VertexId,
     positioned::{
-        access::GraphRead,
-        composition::Occurrence,
-        location::OccurrenceLocation,
-        navigate::{
+        model::{
+            Occurrence,
+            OccurrenceLocation,
+        },
+        store::{
+            GraphRead,
             Located,
             Navigate,
         },

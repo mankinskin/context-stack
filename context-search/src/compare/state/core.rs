@@ -2,7 +2,7 @@
 //! child cursor inside one root, each with a checkpoint.
 
 use context_trace::{
-    positioned::trace::child::iterator::ChildQueue,
+    positioned::trace::child::ChildQueue,
     CommittedIndex,
     DownKey,
     DownPosition,

@@ -16,9 +16,9 @@ use crate::{
         wide::Wide,
     },
     positioned::{
-        access::GraphRead,
-        check::expect_token,
-        location::OccurrenceLocation,
+        edit::check::expect_token,
+        model::OccurrenceLocation,
+        store::GraphRead,
     },
 };
 

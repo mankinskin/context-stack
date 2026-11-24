@@ -8,17 +8,17 @@ use crate::{
     Token,
     graph::vertex::wide::Wide,
     positioned::{
-        access::GraphRead,
-        check::expect_token,
+        edit::check::expect_token,
         path::{
             PathRole,
             RolePath,
         },
+        store::GraphRead,
         trace::{
             QueryAnchor,
             TraceCtx,
             TraceDirection,
-            cache::new::{
+            cache::{
                 EditKind,
                 NewTraceEdge,
             },

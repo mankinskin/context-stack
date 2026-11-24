@@ -1,18 +1,75 @@
 //! Typed vertex indices (staging plan §3.2): every store has its own index
 //! type, so a committed index cannot address a stage's own vertices and a
-//! staged index cannot address the committed graph.
+//! staged index cannot address the committed graph. [`VertexIndex`] is the
+//! untyped slot index underneath.
 
 use std::{
     fmt,
     hash::Hash,
+    ops::Deref,
 };
 
 use either::Either;
-
-use crate::graph::vertex::{
-    VertexIndex,
-    has_vertex_index::HasVertexIndex,
+use serde::{
+    Deserialize,
+    Serialize,
 };
+
+use crate::graph::vertex::has_vertex_index::HasVertexIndex;
+
+/// Newtype for vertex indices that provides Display with string representation
+#[repr(transparent)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct VertexIndex(pub usize);
+
+impl From<usize> for VertexIndex {
+    fn from(index: usize) -> Self {
+        Self(index)
+    }
+}
+
+impl From<VertexIndex> for usize {
+    fn from(index: VertexIndex) -> Self {
+        index.0
+    }
+}
+
+impl Deref for VertexIndex {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl fmt::Display for VertexIndex {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        #[cfg(any(test, feature = "test-api"))]
+        {
+            use crate::graph::vertex::name_resolver;
+            if let Some(s) = name_resolver::resolve_token_name(self.0) {
+                return write!(f, "\"{}\"({})", s, self.0);
+            }
+        }
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl fmt::Debug for VertexIndex {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        // Use Display formatting for Debug as well, so string representations
+        // show up in assert_eq and other debug contexts
+        fmt::Display::fmt(self, f)
+    }
+}
 
 mod sealed {
     pub trait Id {}

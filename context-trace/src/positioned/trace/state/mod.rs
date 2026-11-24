@@ -6,7 +6,7 @@ use crate::{
     AtomPosition,
     Token,
     graph::vertex::VertexId,
-    positioned::access::GraphRead,
+    positioned::store::GraphRead,
 };
 use parent::ParentState;
 

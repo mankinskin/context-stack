@@ -29,9 +29,9 @@ use crate::{
         wide::Wide,
     },
     positioned::{
-        access::GraphRead,
-        location::OccurrenceLocation,
-        navigate::{
+        model::OccurrenceLocation,
+        store::{
+            GraphRead,
             Located,
             Navigate,
         },

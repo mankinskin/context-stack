@@ -21,7 +21,7 @@ pub mod traceable;
 
 use std::fmt::Debug;
 
-use super::access::GraphRead;
+use crate::positioned::store::GraphRead;
 use crate::{
     AtomPosition,
     DirectedKey,
@@ -34,8 +34,8 @@ use crate::{
     graph::vertex::VertexId,
 };
 use cache::{
+    NewTraceEdge,
     TraceCache,
-    new::NewTraceEdge,
 };
 use traceable::{
     TraceCommand,

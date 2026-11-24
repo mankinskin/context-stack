@@ -6,27 +6,39 @@
 //! labelled by the child's offset in the parent, so consumers read offsets
 //! without a composition lookup. The root offset of the match is not stored
 //! here but once in [`RangePath::span`](crate::positioned::path::RangePath).
+//!
+//! Also holds the key accessors of trace states ([`RootKey`],
+//! [`TargetKey`]; legacy `cache::key::props`, the keys themselves are the
+//! model-agnostic [`crate::key`] types) and the new trace edges
+//! ([`EditKind`], [`NewTraceEdge`]; legacy `cache::new`), labelled by the
+//! child's offset in its parent instead of a row location.
 
-pub mod key;
-pub mod new;
 pub mod position;
 pub mod vertex;
 
-use derive_more::derive::IntoIterator;
+use derive_more::{
+    From,
+    derive::IntoIterator,
+};
+use derive_new::new;
 
 use crate::{
     AtomPosition,
     DirectedKey,
     HashMap,
     Token,
+    UpKey,
     graph::vertex::{
         CommittedIndex,
         VertexId,
         has_vertex_index::HasVertexIndex,
     },
+    positioned::trace::{
+        BottomUp,
+        TopDown,
+        TraceDirection,
+    },
 };
-use key::TargetKey;
-use new::EditKind;
 use position::PositionCache;
 use vertex::VertexCache;
 
@@ -148,6 +160,51 @@ impl<I: VertexId> Extend<(I, VertexCache<I>)> for TraceCache<I> {
             } else {
                 self.entries.insert(k, v);
             }
+        }
+    }
+}
+
+pub trait RootKey<I: VertexId = CommittedIndex> {
+    fn root_key(&self) -> UpKey<I>;
+}
+
+pub trait TargetKey<I: VertexId = CommittedIndex> {
+    fn target_key(&self) -> DirectedKey<I>;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, From)]
+pub enum EditKind<I: VertexId = CommittedIndex> {
+    Parent(NewTraceEdge<BottomUp, I>),
+    Child(NewTraceEdge<TopDown, I>),
+}
+
+impl<I: VertexId> TargetKey<I> for EditKind<I> {
+    fn target_key(&self) -> DirectedKey<I> {
+        match self {
+            Self::Parent(edge) => edge.target.into(),
+            Self::Child(edge) => edge.target.into(),
+        }
+    }
+}
+
+/// Edge between `prev` and `target` in trace direction `D`: bottom-up
+/// `prev` is the child and `target` the parent, top-down the reverse.
+/// `offset` is the child's offset in the parent.
+#[derive(Clone, Debug, PartialEq, Eq, new)]
+pub struct NewTraceEdge<D: TraceDirection, I: VertexId = CommittedIndex> {
+    pub prev: D::Key<I>,
+    pub target: D::Key<I>,
+    pub offset: AtomPosition,
+}
+
+impl<I: VertexId> EditKind<I> {
+    /// `(parent key, child key, child offset)`.
+    pub(crate) fn edge(
+        &self
+    ) -> (DirectedKey<I>, DirectedKey<I>, AtomPosition) {
+        match self {
+            Self::Parent(e) => (e.target.into(), e.prev.into(), e.offset),
+            Self::Child(e) => (e.prev.into(), e.target.into(), e.offset),
         }
     }
 }

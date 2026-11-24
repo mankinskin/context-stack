@@ -23,19 +23,19 @@ use crate::{
         wide::Wide,
     },
     positioned::{
-        access::GraphRead,
         path::{
             EndPath,
             RangePath,
             StartPath,
         },
+        store::GraphRead,
         trace::{
             QueryAnchor,
-            cache::key::{
+            cache::{
                 RootKey,
                 TargetKey,
             },
-            child::state::{
+            child::{
                 ChildState,
                 RootChildState,
             },

@@ -1533,3 +1533,36 @@ Open:
   `BaseChanged` would need a separate committed-edit counter.
 - The S0 baseline for the strategy ids is aliased (above); a later
   baseline should be saved with `--save-baseline` from a single run.
+
+### Module layout (post-S6)
+
+`context-trace/src/positioned` was restructured into directory modules
+(mechanical; no behavior or public API change; the module paths named in
+the sections above are the pre-restructuring ones):
+
+```
+positioned/
+  mod.rs          module declarations and the flat re-exports
+  model/          composition.rs (Occurrence, Composition, slice, maximal),
+                  location.rs, vertex.rs (VertexNode, PositionedVertex,
+                  PositionedLabels), error.rs (PositionedError)
+  store/          read.rs (VertexState, Generation, GraphRead, VertexRead,
+                  NodeRef), composition.rs (CompositionRead), write.rs
+                  (sealed raw::Write/VertexWrite, GraphWrite), has_graph.rs,
+                  navigate.rs
+  committed/      graph.rs (PositionedGraph, PositionedGraphRef, validate),
+                  access.rs (PositionedVertexRef, store-trait impls, guards)
+  edit/           mod.rs (GraphEdit), operations.rs (atom, create,
+                  add_occurrences, extend), publication.rs, check.rs
+  stage/          mod.rs (Stage, StageHandle, Translation, CommitError)
+    overlay/      staging.rs, lifted.rs, vertex.rs, view.rs, handle.rs
+    tagged/       mod.rs (StageId, tag helpers), composition.rs, vertex.rs,
+                  view.rs, handle.rs
+  interchange/    mod.rs (snapshots), convert.rs, diff.rs, fixtures.rs
+                  (test-api; still reachable as positioned::diff/fixtures)
+  path/, trace/   unchanged except trace/child.rs (was child/{state,
+                  iterator}.rs) and trace/cache/mod.rs (absorbs key.rs,
+                  new.rs)
+  tests/          trace/ (mod.rs, exhaustive.rs, query.rs), stage/
+                  (overlay.rs, tagged.rs), others unchanged
+```

@@ -5,6 +5,5 @@ mod guard;
 mod interchange;
 mod model;
 mod navigation;
-mod overlay;
-mod tagged;
+mod stage;
 mod trace;

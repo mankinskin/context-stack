@@ -16,7 +16,7 @@ use crate::{
     Token,
     TokenWidth,
     graph::vertex::VertexId,
-    positioned::access::GraphRead,
+    positioned::store::GraphRead,
 };
 
 /// How a matched span covers its root (legacy `PathCoverage`, classified

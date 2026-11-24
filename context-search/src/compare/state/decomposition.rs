@@ -10,7 +10,7 @@ use std::cmp::Ordering;
 
 use context_trace::{
     positioned::{
-        trace::child::iterator::ChildQueue,
+        trace::child::ChildQueue,
         GraphRead,
     },
     VertexId,

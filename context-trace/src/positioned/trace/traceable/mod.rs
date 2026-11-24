@@ -11,7 +11,6 @@ use crate::{
         VertexId,
     },
     positioned::{
-        access::GraphRead,
         path::{
             End,
             EndPath,
@@ -20,10 +19,11 @@ use crate::{
             Start,
             StartPath,
         },
+        store::GraphRead,
         trace::{
             QueryAnchor,
             TraceCtx,
-            child::state::ChildState,
+            child::ChildState,
         },
     },
 };
