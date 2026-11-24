@@ -16,6 +16,9 @@ depends_on: 20261122_PLAN_POSITIONED_INSERT.md (revision 3), 20261120_PLAN_POSIT
 **Insertion:**
 [20261122_PLAN_POSITIONED_INSERT](20261122_PLAN_POSITIONED_INSERT.md)
 (revision 3), implemented first.
+**Staging (R4):**
+[20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md)
+(staged vs committed tokens, dissolution; draft).
 **Prototype:**
 [`read_legacy_port.py`](../../../context-insert/agents/prototypes/read_legacy_port.py)
 (R0; execution manual in the prototypes
@@ -352,6 +355,27 @@ first prototype run (§6, rerun 2026-11-23). The final graph of
 `insert_deep_borders` equals the oracle again (a later input makes `aba`
 frequent), so only its read-lane case `insert_deep_borders__1` deviates.
 
+**Periodic family (`period_*`, 2026-11-23).** 23 scenarios `p^n` and
+`p^n t` for patterns of distinct atoms (`a`, `ab`, `abc`, `abcd`, `abcdef`;
+`t` a proper prefix of `p`). All 17 whole repetitions `p^n` equal the oracle
+(each period is one self-expansion of the root). All 6 with a partial tail
+deviate and are ignored with the rows above: `period_ab_x3_a`,
+`period_abc_x3_a`, `period_abc_x3_ab`, `period_abcd_x2_a`,
+`period_abcd_x2_abc`, `period_abcd_x3_ab`. The oracle tokens of `p^n t` are
+the border chain `p^k t` (`k < n`); `p^k` is a border of `p^n` but not of
+`p^n t`, so the tail invalidates the chain `p, …, p^(n−1)` the read has
+already created.
+
+**Retention invariant (R6, candidate).** Every vertex that is neither an
+atom nor a corpus input has at least two parent occurrences (entries
+`(parent, offset)`). It holds on all 1630 oracle graphs (v3, insert and
+read lanes). The reader violates it exactly in the 10 deviating graphs (9
+scenarios, `insert_deep_borders__1`), always for a vertex created by the
+current read. Dissolving such vertices repeatedly
+(`comp(U) := maximal(comp(U) − T@o ∪ (comp(T) + o))`, remove `T`) turns
+every reader output (94 scenarios, 140 read-lane cases) into its oracle
+graph (offline simulation on the dumped reader graphs, either order).
+
 A prefix of the input makes the token frequent; at the end of the input all
 its occurrences lie inside one larger token, so the oracle does not retain
 it. This is the roadmap's known fact "retention is not monotone within an
@@ -364,6 +388,16 @@ tokens at input end: a token created by this read whose occurrences all lie
 inside one other token is dissolved into that token). This replaces the
 "supplied retention" of the first draft and changes the roadmap's step 4
 milestone (`abcabca` without `abc`), which needs the step 5 rule.
+
+**Follow-up (2026-11-24):** the demotion is planned in
+[20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md): tokens
+created by a read are *staged* (content may change, may be dissolved) until
+the read commits its stage at input end; committed tokens have immutable
+content. Staged tokens with a single parent occurrence (violating R6) are
+dissolved into their parent after every root commit. The root manager's
+"owned root" becomes "staged and parentless". Both implementations
+(physical overlay graph, stage tag on vertices) are built behind common
+store traits and compared; the default is open there (D-S1).
 
 ## 6. Evidence (prototype R0)
 
@@ -402,7 +436,8 @@ part of R2 and fixes the expected-deviation list of §9.1.
 ## 7. Open questions
 
 1. **Provisional retention** (§5, P-R1): confirm that step 4 keeps the
-   legacy rule and step 5 adds demotion.
+   legacy rule and step 5 adds demotion. Demotion design:
+   [20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md).
 2. **Proof of G2 for root edits.** The prototype checks it on every edit;
    the argument "every junction is probed largest postfix first before
    anything is appended" needs a written proof, in particular for tokens
@@ -424,7 +459,7 @@ part of R2 and fixes the expected-deviation list of §9.1.
 | R1 **Done** | Positioned `segment.rs` and `RootManager` with the commits of §3.4 (`GraphEdit::extend`, `insert_next_match` and the probe-rejection test exist, §4.4) | Unit tests: commits keep `validate()` green; ownership rules |
 | R2 **Done** | Forward match and segments (§3.3), no expansion; read lane fixtures and loader (§9.1); new scenario `seam_overlap_append` (§9.2); prototype rerun on the current manifest | Read-lane cases whose prototype trace has no accepted expansion equal their oracle graph |
 | R3 **Done** | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate (§9): every read-lane case and every scenario of `context-read/tests/reader_behavior.rs` equals its oracle graph, except the expected deviations of §5 |
-| R4 | Step 5: demotion of provisional tokens, streaming retention | Roadmap step 5 gate |
+| R4 | Step 5: demotion of provisional tokens through a staging graph and dissolution ([20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md), tasks S0–S4), streaming retention | Staging plan gate: no expected deviations; roadmap step 5 gate |
 
 **Status (2026-11-23).** R1–R3 implemented in `context-read/src/{segment,
 root, forward, expand, read}.rs`. Step 4 gate: all 140 read-lane cases equal
