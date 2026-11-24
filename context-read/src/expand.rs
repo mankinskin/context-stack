@@ -2,11 +2,13 @@
 
 use context_insert::insert_next_match;
 use context_trace::{
+    StageIndex,
     Token,
     positioned::{
         GraphRead,
+        HasGraph,
         Navigate,
-        PositionedGraphRef,
+        StageHandle,
     },
 };
 
@@ -18,8 +20,8 @@ use crate::{
 /// An accepted probe and the span committing it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Accepted {
-    pub(crate) postfix: Token,
-    pub(crate) expansion: Token,
+    pub(crate) postfix: Token<StageIndex>,
+    pub(crate) expansion: Token<StageIndex>,
     pub(crate) span: Span,
 }
 
@@ -32,18 +34,18 @@ pub(crate) struct Accepted {
 /// probe would be rejected (reader plan §7, Q3).
 ///
 /// If `R[0, o) + E` is already a token, the root adopts it.
-pub(crate) fn expand(
-    graph: &PositionedGraphRef,
-    root: Token,
-    rest: &[Token],
+pub(crate) fn expand<H: StageHandle>(
+    handle: &mut H,
+    root: Token<StageIndex>,
+    rest: &[Token<StageIndex>],
     cursor: usize,
 ) -> Option<Accepted> {
     if cursor == 0 || rest.is_empty() {
         return None;
     }
     // Every postfix token of the root, largest first (§3.2).
-    let chain: Vec<Token> = graph
-        .read()
+    let chain: Vec<Token<StageIndex>> = handle
+        .graph()
         .vertex(root)
         .into_iter()
         .flat_map(|vertex| vertex.postfixes().map(|(_, postfix)| postfix))
@@ -52,7 +54,7 @@ pub(crate) fn expand(
         let mut query = Vec::with_capacity(rest.len() + 1);
         query.push(postfix);
         query.extend_from_slice(rest);
-        let expansion = insert_next_match(graph, query)
+        let expansion = insert_next_match(&mut *handle, query)
             .unwrap_or_else(|error| panic!("expansion probe failed: {}", error))
             .token();
         if expansion.width <= postfix.width {
@@ -63,7 +65,7 @@ pub(crate) fn expand(
         let mut union = Vec::with_capacity(consumed + 1);
         union.push(root);
         union.extend_from_slice(&rest[..consumed]);
-        let span = match find_complete(graph, union) {
+        let span = match find_complete(handle, union) {
             Some(token) => Span::ReplaceRoot(token),
             None => Span::Expand {
                 postfix,
@@ -81,6 +83,8 @@ pub(crate) fn expand(
 
 #[cfg(test)]
 mod tests {
+    use context_trace::positioned::OverlayHandle;
+
     use super::*;
     use crate::tests::fixture;
 
@@ -88,16 +92,23 @@ mod tests {
     #[test]
     fn rejected_probe_does_not_edit() {
         let (graph, names) = fixture("linear_abc");
-        let generation = graph.read().generation();
-        assert_eq!(expand(&graph, names["abc"], &[names["a"]], 3), None);
-        assert_eq!(graph.read().generation(), generation);
+        let mut handle = OverlayHandle::open(&graph);
+        assert_eq!(
+            expand(&mut handle, names["abc"].into(), &[names["a"].into()], 3),
+            None
+        );
+        assert_eq!(handle.graph().generation().stage, 0);
     }
 
     /// No probe at the start of a run.
     #[test]
     fn no_probe_at_run_start() {
         let (graph, names) = fixture("two_chars");
-        assert_eq!(expand(&graph, names["a"], &[names["b"]], 0), None);
+        let mut handle = OverlayHandle::open(&graph);
+        assert_eq!(
+            expand(&mut handle, names["a"].into(), &[names["b"].into()], 0),
+            None
+        );
     }
 
     /// An accepted probe returns the expansion, or the existing token of the
@@ -105,19 +116,20 @@ mod tests {
     #[test]
     fn accepted_probe() {
         let (graph, names) = fixture("closure_forward_seed");
-        let (ab, b, c) = (names["ab"], names["b"], names["c"]);
+        let mut handle = OverlayHandle::open(&graph);
+        let (ab, b, c) = (names["ab"].into(), names["b"].into(), names["c"].into());
         assert_eq!(
-            expand(&graph, ab, &[c], 1).map(|accepted| accepted.span),
+            expand(&mut handle, ab, &[c], 1).map(|accepted| accepted.span),
             Some(Span::Expand {
                 postfix: b,
-                expansion: names["bc"],
+                expansion: names["bc"].into(),
             })
         );
         let (graph, names) = fixture("canonical_closure");
-        let abc = names["abc"];
-        let generation = graph.read().generation();
-        let span = expand(&graph, names["ab"], &[names["c"]], 1).map(|accepted| accepted.span);
-        assert_eq!(span, Some(Span::ReplaceRoot(abc)));
-        assert_eq!(graph.read().generation(), generation);
+        let mut handle = OverlayHandle::open(&graph);
+        let span = expand(&mut handle, names["ab"].into(), &[names["c"].into()], 1)
+            .map(|accepted| accepted.span);
+        assert_eq!(span, Some(Span::ReplaceRoot(names["abc"].into())));
+        assert_eq!(handle.graph().generation().stage, 0);
     }
 }

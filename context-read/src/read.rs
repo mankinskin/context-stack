@@ -10,25 +10,41 @@ pub use crate::root::Commit;
 use crate::{
     expand::expand,
     forward::forward,
-    root::RootManager,
-    root::Span,
+    root::{
+        ReadStage,
+        Span,
+    },
     segment::{
         Segment,
         segments,
     },
+    staging::{
+        DefaultStaging,
+        StagingStrategy,
+    },
 };
 
 /// Read `input` into `graph` and return the token of the whole input, or
-/// `None` for empty input.
-///
-/// Every step (an unknown atom, a root expansion or a forward match) is
-/// committed to the root before the next search, so the input read so far is
-/// always a vertex of `graph`.
+/// `None` for empty input ([`read_with`] on [`DefaultStaging`]).
 pub fn read(
     graph: &PositionedGraphRef,
     input: impl IntoIterator<Item = char>,
 ) -> Option<Token> {
-    read_steps(graph, input, |_| {})
+    read_with::<DefaultStaging>(graph, input)
+}
+
+/// Read `input` into `graph` through a stage of strategy `S`, committed at
+/// the end of the input; the committed token of the whole input, or `None`
+/// for empty input.
+///
+/// Every step (an unknown atom, a root expansion or a forward match) is
+/// committed to the root before the next search, so the input read so far is
+/// always a vertex of the stage.
+pub fn read_with<S: StagingStrategy>(
+    graph: &PositionedGraphRef,
+    input: impl IntoIterator<Item = char>,
+) -> Option<Token> {
+    read_steps::<S>(graph, input, |_| {})
 }
 
 /// One committed reader step: what was consumed and how the root changed.
@@ -57,18 +73,18 @@ pub fn read_traced(
     input: impl IntoIterator<Item = char>,
 ) -> (Option<Token>, Vec<Step>) {
     let mut steps = Vec::new();
-    let root = read_steps(graph, input, |step| steps.push(step));
+    let root = read_steps::<DefaultStaging>(graph, input, |step| steps.push(step));
     (root, steps)
 }
 
-fn read_steps(
+fn read_steps<S: StagingStrategy>(
     graph: &PositionedGraphRef,
     input: impl IntoIterator<Item = char>,
     mut observe: impl FnMut(Step),
 ) -> Option<Token> {
-    let mut root = RootManager::default();
-    let mut commit = |root: &mut RootManager, kind, span| {
-        let commit = root.commit(graph, span);
+    let mut root = ReadStage::<S>::open(graph);
+    let mut commit = |root: &mut ReadStage<'_, S>, kind, span| {
+        let commit = root.commit(span);
         let width = root.token().map_or(0, |token| token.width.0);
         observe(Step {
             kind,
@@ -76,7 +92,7 @@ fn read_steps(
             root: width,
         });
     };
-    for Segment { unknown, known } in segments(graph, input) {
+    for Segment { unknown, known } in segments(&mut root.handle, input) {
         for atom in unknown {
             commit(&mut root, StepKind::Unknown, Span::Append(atom));
         }
@@ -85,7 +101,7 @@ fn read_steps(
             let rest = &known[cursor..];
             let (kind, span) = match root
                 .token()
-                .and_then(|token| expand(graph, token, rest, cursor))
+                .and_then(|token| expand(&mut root.handle, token, rest, cursor))
             {
                 Some(accepted) => (
                     StepKind::Expansion {
@@ -95,7 +111,8 @@ fn read_steps(
                     accepted.span,
                 ),
                 None => {
-                    let span = forward(graph, root.token(), rest);
+                    let token = root.token();
+                    let span = forward(&mut root.handle, token, rest);
                     (StepKind::Forward(root.consumed(span)), span)
                 },
             };
@@ -103,5 +120,5 @@ fn read_steps(
             commit(&mut root, kind, span);
         }
     }
-    root.token()
+    root.finish().map(|(token, _)| token)
 }

@@ -5,12 +5,19 @@ mod forward;
 mod read;
 mod root;
 mod segment;
+mod staging;
 pub use read::{
     Commit,
     Step,
     StepKind,
     read,
     read_traced,
+    read_with,
+};
+pub use staging::{
+    DefaultStaging,
+    OverlayStaging,
+    StagingStrategy,
 };
 
 /// Row-model reader, fenced off from the model-agnostic root.

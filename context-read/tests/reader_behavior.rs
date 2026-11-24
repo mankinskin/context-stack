@@ -8,10 +8,14 @@
 //! multi-input scenario) is checked by `read_gate`; the worked examples of
 //! the reader plan (§2) also check their step traces. Scenarios with
 //! provisional retention (reader plan §5) are ignored until step 5.
+//!
+//! Scenarios and the read gate run once per staging strategy
+//! (`strategies!`, staging plan §7.2): every strategy must give the oracle
+//! graphs, with the same ignored scenarios and read deviations.
 #[allow(dead_code)]
 mod support;
 
-use context_read::{Commit, Step, StepKind};
+use context_read::{Commit, StagingStrategy, Step, StepKind};
 use context_trace::positioned::{
     diff,
     fixtures::{read_cases, ReadCase},
@@ -19,16 +23,17 @@ use context_trace::positioned::{
 };
 use support::positioned::load_positioned;
 
-fn assert_scenario(name: &str) {
+fn assert_scenario<S: StagingStrategy>(name: &str) {
     let fixture = load_positioned(name);
     let graph = PositionedGraphRef::default();
     for input in &fixture.corpus {
-        context_read::read(&graph, input.chars()).expect("nonempty input");
+        context_read::read_with::<S>(&graph, input.chars()).expect("nonempty input");
+        graph
+            .read()
+            .validate()
+            .unwrap_or_else(|error| panic!("{}: invalid graph after {:?}: {}", name, input, error));
     }
     let graph = graph.read();
-    graph
-        .validate()
-        .unwrap_or_else(|error| panic!("{}: invalid graph: {}", name, error));
     let difference = diff(&fixture.graph, &graph.to_interchange());
     assert!(
         difference.is_empty(),
@@ -38,124 +43,152 @@ fn assert_scenario(name: &str) {
     );
 }
 
-macro_rules! scenarios {
+/// The scenario list, passed to macro `$m` (names and per-strategy tests).
+macro_rules! with_scenarios {
+    ($m:ident) => {
+        $m!(
+            two_chars,
+            linear_abc,
+            linear_unique,
+            linear_space,
+            linear_multiple,
+            linear_idempotent,
+            linear_digits,
+            linear_special,
+            linear_qwerty,
+            linear_wxyz,
+            builder,
+            repeat_aa,
+            repeat_aaa,
+            repeat_aaaa,
+            repeat_abab,
+            repeat_aba,
+            repeat_abba,
+            repeat_ababab,
+            repeat_aabb,
+            repeat_aabbaabb,
+            repeat_abcabc,
+            repeat_abcabcabc,
+            repeat_xyzxyzxyz,
+            repeat_separated,
+            repeat_ab_separated,
+            repeat_hello,
+            complex_overlap,
+            text,
+            text_extension,
+            sequence,
+            infix,
+            infix_short,
+            loose,
+            repeating_known,
+            multiple_overlaps,
+            cursor_seed,
+            connected_closure,
+            nested_closure,
+            successive_closures,
+            owned_tail,
+            whole_tail,
+            direct_tail,
+            canonical_closure,
+            nested_complements,
+            flat_complement,
+            self_overlap,
+            accepted_materialization,
+            tail_replacement,
+            closure_forward_seed,
+            closure_nested_seed,
+            closure_tail_seed,
+            #[ignore = "provisional retention (reader plan §5)"]
+            repeat_abcabca,
+            #[ignore = "provisional retention (reader plan §5)"]
+            repeat_ababa,
+            seam_bcd,
+            late_retention__1,
+            late_retention__2,
+            duplicate_observation,
+            substring_input,
+            deep_chains,
+            deep_prefix_chain,
+            deep_suffix_chain,
+            deep_overlap_chain,
+            deep_rotations,
+            deep_fibonacci,
+            deep_thue_morse,
+            deep_nested_repeat,
+            insert_small_periodic,
+            insert_shared_vertex,
+            #[ignore = "provisional retention (reader plan §5)"]
+            insert_periodic,
+            insert_deep_borders,
+            seam_overlap_append,
+            period_a_x5,
+            period_a_x6,
+            period_a_x7,
+            period_a_x8,
+            period_ab_x4,
+            period_ab_x5,
+            period_ab_x6,
+            period_abc_x4,
+            period_abc_x5,
+            period_abc_x6,
+            period_abcd_x2,
+            period_abcd_x3,
+            period_abcd_x4,
+            period_abcd_x5,
+            period_abcdef_x2,
+            period_abcdef_x3,
+            period_abcdef_x4,
+            #[ignore = "provisional retention (reader plan §5)"]
+            period_ab_x3_a,
+            #[ignore = "provisional retention (reader plan §5)"]
+            period_abc_x3_a,
+            #[ignore = "provisional retention (reader plan §5)"]
+            period_abc_x3_ab,
+            #[ignore = "provisional retention (reader plan §5)"]
+            period_abcd_x2_a,
+            #[ignore = "provisional retention (reader plan §5)"]
+            period_abcd_x3_ab,
+            #[ignore = "provisional retention (reader plan §5)"]
+            period_abcd_x2_abc,
+        );
+    };
+}
+
+macro_rules! scenario_names {
     ($($(#[$attr:meta])* $name:ident),* $(,)?) => {
         const SCENARIO_NAMES: &[&str] = &[$(stringify!($name)),*];
-        $(
+    };
+}
+with_scenarios!(scenario_names);
+
+/// One `#[test]` per scenario for the strategy `Strategy` in scope.
+macro_rules! scenarios {
+    ($($(#[$attr:meta])* $name:ident),* $(,)?) => {$(
         #[test]
         $(#[$attr])*
         #[allow(non_snake_case)] // `<name>__<n>` prefix fixtures
         fn $name() {
-            assert_scenario(stringify!($name));
+            super::assert_scenario::<Strategy>(stringify!($name));
         }
     )*};
 }
 
-scenarios!(
-    two_chars,
-    linear_abc,
-    linear_unique,
-    linear_space,
-    linear_multiple,
-    linear_idempotent,
-    linear_digits,
-    linear_special,
-    linear_qwerty,
-    linear_wxyz,
-    builder,
-    repeat_aa,
-    repeat_aaa,
-    repeat_aaaa,
-    repeat_abab,
-    repeat_aba,
-    repeat_abba,
-    repeat_ababab,
-    repeat_aabb,
-    repeat_aabbaabb,
-    repeat_abcabc,
-    repeat_abcabcabc,
-    repeat_xyzxyzxyz,
-    repeat_separated,
-    repeat_ab_separated,
-    repeat_hello,
-    complex_overlap,
-    text,
-    text_extension,
-    sequence,
-    infix,
-    infix_short,
-    loose,
-    repeating_known,
-    multiple_overlaps,
-    cursor_seed,
-    connected_closure,
-    nested_closure,
-    successive_closures,
-    owned_tail,
-    whole_tail,
-    direct_tail,
-    canonical_closure,
-    nested_complements,
-    flat_complement,
-    self_overlap,
-    accepted_materialization,
-    tail_replacement,
-    closure_forward_seed,
-    closure_nested_seed,
-    closure_tail_seed,
-    #[ignore = "provisional retention (reader plan §5)"]
-    repeat_abcabca,
-    #[ignore = "provisional retention (reader plan §5)"]
-    repeat_ababa,
-    seam_bcd,
-    late_retention__1,
-    late_retention__2,
-    duplicate_observation,
-    substring_input,
-    deep_chains,
-    deep_prefix_chain,
-    deep_suffix_chain,
-    deep_overlap_chain,
-    deep_rotations,
-    deep_fibonacci,
-    deep_thue_morse,
-    deep_nested_repeat,
-    insert_small_periodic,
-    insert_shared_vertex,
-    #[ignore = "provisional retention (reader plan §5)"]
-    insert_periodic,
-    insert_deep_borders,
-    seam_overlap_append,
-    period_a_x5,
-    period_a_x6,
-    period_a_x7,
-    period_a_x8,
-    period_ab_x4,
-    period_ab_x5,
-    period_ab_x6,
-    period_abc_x4,
-    period_abc_x5,
-    period_abc_x6,
-    period_abcd_x2,
-    period_abcd_x3,
-    period_abcd_x4,
-    period_abcd_x5,
-    period_abcdef_x2,
-    period_abcdef_x3,
-    period_abcdef_x4,
-    #[ignore = "provisional retention (reader plan §5)"]
-    period_ab_x3_a,
-    #[ignore = "provisional retention (reader plan §5)"]
-    period_abc_x3_a,
-    #[ignore = "provisional retention (reader plan §5)"]
-    period_abc_x3_ab,
-    #[ignore = "provisional retention (reader plan §5)"]
-    period_abcd_x2_a,
-    #[ignore = "provisional retention (reader plan §5)"]
-    period_abcd_x3_ab,
-    #[ignore = "provisional retention (reader plan §5)"]
-    period_abcd_x2_abc,
-);
+/// Scenarios and the read gate per staging strategy (staging plan §7.2).
+macro_rules! strategies {
+    ($($module:ident: $strategy:ty),* $(,)?) => {$(
+        mod $module {
+            type Strategy = $strategy;
+            with_scenarios!(scenarios);
+
+            #[test]
+            fn read_gate() {
+                super::assert_read_gate::<Strategy>();
+            }
+        }
+    )*};
+}
+
+strategies!(overlay: context_read::OverlayStaging);
 
 /// Every positioned manifest entry has exactly one scenario test above.
 #[test]
@@ -176,14 +209,14 @@ const READ_DEVIATIONS: &[&str] = &["insert_deep_borders__1"];
 
 /// Read `case.input` into its base graph; the differences from the oracle
 /// graph, if any.
-fn read_case(case: &ReadCase) -> Result<(), String> {
+fn read_case<S: StagingStrategy>(case: &ReadCase) -> Result<(), String> {
     let base = match &case.base {
         Some(base) => PositionedGraph::from_interchange(&base.graph)
             .map_err(|error| format!("invalid base: {error}"))?,
         None => PositionedGraph::default(),
     };
     let graph = PositionedGraphRef::new(base);
-    let root = context_read::read(&graph, case.input.chars()).ok_or("no root")?;
+    let root = context_read::read_with::<S>(&graph, case.input.chars()).ok_or("no root")?;
     let graph = graph.read();
     graph
         .validate()
@@ -202,13 +235,12 @@ fn read_case(case: &ReadCase) -> Result<(), String> {
 /// Every read of the read lane equals its oracle graph, except exactly the
 /// expected deviations (reader plan §9.1): a new and a fixed deviation both
 /// fail.
-#[test]
-fn read_gate() {
+fn assert_read_gate<S: StagingStrategy>() {
     let cases = read_cases();
     assert!(!cases.is_empty());
     let mut failures = Vec::new();
     for case in &cases {
-        let result = std::panic::catch_unwind(|| read_case(case))
+        let result = std::panic::catch_unwind(|| read_case::<S>(case))
             .unwrap_or_else(|_| Err("panicked".to_string()));
         if let Err(error) = result {
             failures.push((case.name.clone(), error));

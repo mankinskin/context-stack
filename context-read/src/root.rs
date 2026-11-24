@@ -1,60 +1,73 @@
 //! The input's own vertex and its commits (reader plan §3.4, §3.5; legacy
 //! `pipeline/root.rs`).
 //!
-//! The root is a vertex at all times. A root created by this read and
-//! without parents (*owned*) grows in place through `GraphEdit::extend`; an
-//! adopted token is never edited: a new owned root is created instead. The
-//! manager never searches.
+//! The root is a vertex at all times. Every edit of the read goes into its
+//! stage (staging plan §2.3). A staged, parentless composite root is
+//! *editable* (the former "owned" root) and grows in place through
+//! `GraphEdit::extend`; any other root (adopted, committed, an atom or with
+//! parents) is never edited: a new root is created instead. The stage never
+//! searches.
 
 use context_trace::{
+    StageIndex,
     Token,
     positioned::{
+        GraphEdit,
         GraphRead,
+        HasGraph,
         Occurrence,
         PositionedGraphRef,
+        StageHandle,
+        Translation,
         VertexRead,
+        VertexState,
         maximal,
     },
 };
+
+use crate::staging::StagingStrategy;
 
 /// One step of the reader, committed before the next search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Span {
     /// `t` starts at the end of the root.
-    Append(Token),
+    Append(Token<StageIndex>),
     /// `Y` is an existing token covering the root and the consumed input.
-    ReplaceRoot(Token),
+    ReplaceRoot(Token<StageIndex>),
     /// The root's postfix `postfix` extends to `expansion` (§3.2).
-    Expand { postfix: Token, expansion: Token },
+    Expand {
+        postfix: Token<StageIndex>,
+        expansion: Token<StageIndex>,
+    },
 }
 
 /// How a commit changed the root.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Commit {
-    /// An existing token became the root (not owned).
+    /// An existing token became the root (not editable).
     Adopt,
-    /// The owned root grew in place (`GraphEdit::extend`).
+    /// The editable root grew in place (`GraphEdit::extend`).
     InPlace,
-    /// A new owned root was created (`GraphEdit::create`).
+    /// A new editable root was created (`GraphEdit::create`).
     NewRoot,
 }
 
-/// The root of the input read so far.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct RootManager {
-    root: Option<Token>,
-    /// Created by this read; editable while it has no parents.
-    owned: bool,
+/// The stage of one read and the root of the input read so far.
+pub(crate) struct ReadStage<'g, S: StagingStrategy> {
+    pub(crate) handle: S::Handle<'g>,
+    root: Option<Token<StageIndex>>,
 }
 
-impl RootManager {
-    pub(crate) fn token(&self) -> Option<Token> {
-        self.root
+impl<'g, S: StagingStrategy> ReadStage<'g, S> {
+    pub(crate) fn open(graph: &'g PositionedGraphRef) -> Self {
+        Self {
+            handle: S::open(graph),
+            root: None,
+        }
     }
 
-    #[cfg(test)]
-    pub(crate) fn owned(&self) -> bool {
-        self.owned
+    pub(crate) fn token(&self) -> Option<Token<StageIndex>> {
+        self.root
     }
 
     /// Input atoms consumed by `span` (beyond the root).
@@ -73,20 +86,20 @@ impl RootManager {
         }
     }
 
-    /// Owned and parentless (legacy `is_editable`).
+    /// Staged, parentless and composite (staging plan §2.3; legacy
+    /// `is_editable`).
     fn editable(
         &self,
-        graph: &PositionedGraphRef,
-        root: Token,
+        root: Token<StageIndex>,
     ) -> bool {
-        self.owned
-            && graph
-                .read()
-                .vertex(root)
-                .is_some_and(|vertex| vertex.parents().next().is_none())
+        self.handle.graph().vertex(root).is_some_and(|vertex| {
+            vertex.state() == VertexState::Staged
+                && vertex.parents().next().is_none()
+                && vertex.node().composite().is_some()
+        })
     }
 
-    /// Apply `span` (table of §3.4) through one `GraphEdit`.
+    /// Apply `span` (table of §3.4) through one `GraphEdit` on the stage.
     ///
     /// # Panics
     ///
@@ -94,7 +107,6 @@ impl RootManager {
     /// bugs of the reader.
     pub(crate) fn commit(
         &mut self,
-        graph: &PositionedGraphRef,
         span: Span,
     ) -> Commit {
         let Some(root) = self.root else {
@@ -102,7 +114,6 @@ impl RootManager {
                 panic!("{:?} without a root", span);
             };
             self.root = Some(token);
-            self.owned = false;
             return Commit::Adopt;
         };
         let (occurrence, in_place) = match span {
@@ -112,12 +123,11 @@ impl RootManager {
                     "replacement must extend the root"
                 );
                 self.root = Some(token);
-                self.owned = false;
                 return Commit::Adopt;
             },
             Span::Append(token) => (
                 Occurrence::new(root.width.0, token),
-                token != root && self.editable(graph, root),
+                token != root && self.editable(root),
             ),
             Span::Expand {
                 postfix,
@@ -132,12 +142,12 @@ impl RootManager {
                 // (legacy `ClosurePolicy::SingleStep`).
                 (
                     Occurrence::new(root.width.0 - postfix.width.0, expansion),
-                    expansion != root && self.editable(graph, root),
+                    expansion != root && self.editable(root),
                 )
             },
         };
-        let mut guard = graph.write();
-        let mut edit = guard.edit();
+        let mut view = self.handle.stage();
+        let mut edit = GraphEdit::new(&mut view);
         let result = if in_place {
             edit.extend(root.index, occurrence)
         } else {
@@ -147,66 +157,97 @@ impl RootManager {
             panic!("root commit {:?} rejected: {}", span, error)
         });
         edit.finish();
+        drop(view);
         self.root = Some(token);
-        self.owned = true;
         if in_place {
             Commit::InPlace
         } else {
             Commit::NewRoot
         }
     }
+
+    /// Commit the stage; the root translated (`None` for empty input).
+    pub(crate) fn finish(self) -> Option<(Token, Translation)> {
+        let root = self.root?;
+        Some(self.handle.commit(root).unwrap_or_else(|error| {
+            panic!("committing the read failed: {}", error)
+        }))
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use context_trace::positioned::CompositionRead;
+
     use super::*;
-    use crate::tests::fixture;
+    use crate::{
+        staging::OverlayStaging,
+        tests::fixture,
+    };
+
+    type Stage<'g> = ReadStage<'g, OverlayStaging>;
 
     fn composition(
-        graph: &PositionedGraphRef,
-        token: Token,
-    ) -> Vec<Occurrence> {
-        graph
-            .read()
+        stage: &Stage<'_>,
+        token: Token<StageIndex>,
+    ) -> Vec<Occurrence<StageIndex>> {
+        stage
+            .handle
+            .graph()
             .vertex(token)
-            .and_then(|vertex| vertex.composition())
-            .map(|composition| composition.occurrences().to_vec())
+            .and_then(|vertex| vertex.node().composite())
+            .map(|composition| composition.occurrences().collect())
             .unwrap_or_default()
     }
 
-    /// `Append`: adopt without a root; a new owned root on an adopted root
-    /// (which stays unchanged); in place on an owned root; a new root when
-    /// the root is appended to itself.
+    fn editable(
+        stage: &Stage<'_>,
+    ) -> bool {
+        stage.editable(stage.token().unwrap())
+    }
+
+    /// Commit the stage and validate the committed graph.
+    fn finish(
+        graph: &PositionedGraphRef,
+        stage: Stage<'_>,
+    ) {
+        stage.finish().unwrap();
+        graph.read().validate().unwrap();
+    }
+
+    /// `Append`: adopt without a root; a new editable root on an adopted
+    /// root (which stays unchanged); in place on an editable root; a new
+    /// root when the root is appended to itself.
     #[test]
     fn append_rows() {
         let (graph, names) = fixture("two_chars");
-        let (a, b) = (names["a"], names["b"]);
+        let (a, b) = (names["a"].into(), names["b"].into());
         let generation = graph.read().generation();
-        let mut root = RootManager::default();
+        let mut root = Stage::open(&graph);
 
-        assert_eq!(root.commit(&graph, Span::Append(a)), Commit::Adopt);
-        assert_eq!((root.token(), root.owned()), (Some(a), false));
-        assert_eq!(graph.read().generation(), generation);
+        assert_eq!(root.commit(Span::Append(a)), Commit::Adopt);
+        assert_eq!(root.token(), Some(a));
+        assert!(!editable(&root), "an adopted atom is not editable");
+        assert_eq!(root.handle.graph().generation().stage, 0);
 
-        assert_eq!(root.commit(&graph, Span::Append(a)), Commit::NewRoot);
+        assert_eq!(root.commit(Span::Append(a)), Commit::NewRoot);
         let aa = root.token().unwrap();
-        assert!(root.owned() && aa.index != a.index && aa.width.0 == 2);
-        assert!(composition(&graph, aa).contains(&Occurrence::new(0, a)));
-        assert!(composition(&graph, aa).contains(&Occurrence::new(1, a)));
-        graph.read().validate().unwrap();
+        assert!(editable(&root) && aa.index != a.index && aa.width.0 == 2);
+        assert!(composition(&root, aa).contains(&Occurrence::new(0, a)));
+        assert!(composition(&root, aa).contains(&Occurrence::new(1, a)));
 
-        assert_eq!(root.commit(&graph, Span::Append(b)), Commit::InPlace);
+        assert_eq!(root.commit(Span::Append(b)), Commit::InPlace);
         let aab = root.token().unwrap();
         assert_eq!((aab.index, aab.width.0), (aa.index, 3));
-        assert!(composition(&graph, aab).contains(&Occurrence::new(2, b)));
-        graph.read().validate().unwrap();
+        assert!(composition(&root, aab).contains(&Occurrence::new(2, b)));
 
-        assert_eq!(root.commit(&graph, Span::Append(aab)), Commit::NewRoot);
+        assert_eq!(root.commit(Span::Append(aab)), Commit::NewRoot);
         let doubled = root.token().unwrap();
-        assert!(root.owned() && doubled.index != aab.index);
-        assert!(composition(&graph, doubled).contains(&Occurrence::new(0, aab)));
-        assert!(composition(&graph, doubled).contains(&Occurrence::new(3, aab)));
-        graph.read().validate().unwrap();
+        assert!(editable(&root) && doubled.index != aab.index);
+        assert!(composition(&root, doubled).contains(&Occurrence::new(0, aab)));
+        assert!(composition(&root, doubled).contains(&Occurrence::new(3, aab)));
+        assert_eq!(graph.read().generation(), generation, "the base is read-only");
+        finish(&graph, root);
     }
 
     /// `ReplaceRoot` adopts; the next append creates a new root and leaves
@@ -214,82 +255,97 @@ mod tests {
     #[test]
     fn replace_root_adopts() {
         let (graph, names) = fixture("two_chars");
-        let (a, b, ab) = (names["a"], names["b"], names["ab"]);
-        let mut root = RootManager::default();
-        root.commit(&graph, Span::Append(a));
-        assert_eq!(root.commit(&graph, Span::ReplaceRoot(ab)), Commit::Adopt);
-        assert_eq!((root.token(), root.owned()), (Some(ab), false));
-        let before = composition(&graph, ab);
-        assert_eq!(root.commit(&graph, Span::Append(b)), Commit::NewRoot);
+        let (a, b, ab) = (names["a"].into(), names["b"].into(), names["ab"].into());
+        let mut root = Stage::open(&graph);
+        root.commit(Span::Append(a));
+        assert_eq!(root.commit(Span::ReplaceRoot(ab)), Commit::Adopt);
+        assert_eq!(root.token(), Some(ab));
+        assert!(!editable(&root));
+        let before = composition(&root, ab);
+        assert_eq!(root.commit(Span::Append(b)), Commit::NewRoot);
         assert_ne!(root.token().unwrap().index, ab.index);
-        assert_eq!(composition(&graph, ab), before);
-        graph.read().validate().unwrap();
+        assert_eq!(composition(&root, ab), before);
+        finish(&graph, root);
     }
 
-    /// `Expand` on an owned root grows it in place at `|R| − |P|`.
+    /// `Expand` on an editable root grows it in place at `|R| − |P|`.
     #[test]
-    fn expand_owned_in_place() {
+    fn expand_editable_in_place() {
         let (graph, names) = fixture("linear_abc");
-        let abc = names["abc"];
-        let mut root = RootManager::default();
-        root.commit(&graph, Span::Append(abc));
-        root.commit(&graph, Span::Append(abc));
-        let owned = root.token().unwrap();
+        let abc = names["abc"].into();
+        let mut root = Stage::open(&graph);
+        root.commit(Span::Append(abc));
+        root.commit(Span::Append(abc));
+        let editable_root = root.token().unwrap();
         let expansion =
-            context_insert::insert(&graph, vec![abc, names["a"]]).unwrap();
+            context_insert::insert(&mut root.handle, vec![abc, names["a"].into()]).unwrap();
         let span = Span::Expand {
             postfix: abc,
             expansion,
         };
         assert_eq!(root.consumed(span), 1);
-        assert_eq!(root.commit(&graph, span), Commit::InPlace);
+        assert_eq!(root.commit(span), Commit::InPlace);
         let grown = root.token().unwrap();
-        assert_eq!((grown.index, grown.width.0), (owned.index, 7));
-        assert!(root.owned());
-        assert!(composition(&graph, grown).contains(&Occurrence::new(3, expansion)));
-        graph.read().validate().unwrap();
+        assert_eq!((grown.index, grown.width.0), (editable_root.index, 7));
+        assert!(editable(&root));
+        assert!(composition(&root, grown).contains(&Occurrence::new(3, expansion)));
+        finish(&graph, root);
     }
 
     /// `Expand` on an adopted root creates `maximal([R@0, E@o])`.
     #[test]
     fn expand_adopted_creates() {
         let (graph, names) = fixture("closure_forward_seed");
-        let (ab, b, bc) = (names["ab"], names["b"], names["bc"]);
-        let mut root = RootManager::default();
-        root.commit(&graph, Span::Append(ab));
+        let (ab, b, bc) = (names["ab"].into(), names["b"].into(), names["bc"].into());
+        let mut root = Stage::open(&graph);
+        root.commit(Span::Append(ab));
         let span = Span::Expand {
             postfix: b,
             expansion: bc,
         };
-        assert_eq!(root.commit(&graph, span), Commit::NewRoot);
+        assert_eq!(root.commit(span), Commit::NewRoot);
         let new = root.token().unwrap();
-        assert!(root.owned() && new.width.0 == 3);
-        assert!(composition(&graph, new).contains(&Occurrence::new(0, ab)));
-        assert!(composition(&graph, new).contains(&Occurrence::new(1, bc)));
-        graph.read().validate().unwrap();
+        assert!(editable(&root) && new.width.0 == 3);
+        assert!(composition(&root, new).contains(&Occurrence::new(0, ab)));
+        assert!(composition(&root, new).contains(&Occurrence::new(1, bc)));
+        finish(&graph, root);
     }
 
     /// A self-expansion (`E == R`) creates a new root even when `R` is
-    /// owned.
+    /// editable.
     #[test]
     fn self_expansion_creates() {
         let (graph, names) = fixture("two_chars");
-        let a = names["a"];
-        let mut root = RootManager::default();
-        root.commit(&graph, Span::Append(a));
-        root.commit(&graph, Span::Append(a));
+        let a = names["a"].into();
+        let mut root = Stage::open(&graph);
+        root.commit(Span::Append(a));
+        root.commit(Span::Append(a));
         let aa = root.token().unwrap();
-        assert!(root.owned());
+        assert!(editable(&root));
         let span = Span::Expand {
             postfix: a,
             expansion: aa,
         };
-        assert_eq!(root.commit(&graph, span), Commit::NewRoot);
+        assert_eq!(root.commit(span), Commit::NewRoot);
         let new = root.token().unwrap();
-        assert!(root.owned() && new.index != aa.index && new.width.0 == 3);
-        assert!(composition(&graph, new).contains(&Occurrence::new(0, aa)));
-        assert!(composition(&graph, new).contains(&Occurrence::new(1, aa)));
-        assert_eq!(composition(&graph, aa).len(), 2);
-        graph.read().validate().unwrap();
+        assert!(editable(&root) && new.index != aa.index && new.width.0 == 3);
+        assert!(composition(&root, new).contains(&Occurrence::new(0, aa)));
+        assert!(composition(&root, new).contains(&Occurrence::new(1, aa)));
+        assert_eq!(composition(&root, aa).len(), 2);
+        finish(&graph, root);
+    }
+
+    /// An atom new in this read is staged and parentless but not editable:
+    /// appending to it creates a new root (staging plan §2.3).
+    #[test]
+    fn staged_atom_root_is_not_editable() {
+        let graph = PositionedGraphRef::default();
+        let mut root = Stage::open(&graph);
+        let segments = crate::segment::segments(&mut root.handle, "xy".chars());
+        let (x, y) = (segments[0].unknown[0], segments[0].unknown[1]);
+        root.commit(Span::Append(x));
+        assert!(!editable(&root));
+        assert_eq!(root.commit(Span::Append(y)), Commit::NewRoot);
+        finish(&graph, root);
     }
 }

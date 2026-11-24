@@ -6,11 +6,13 @@
 //! same input is *known* (legacy `NewAtomIndex::{New, Known}`).
 
 use context_trace::{
+    StageIndex,
     ToToken,
     Token,
     positioned::{
+        GraphEdit,
         GraphRead,
-        PositionedGraphRef,
+        StageHandle,
     },
 };
 
@@ -19,18 +21,18 @@ use context_trace::{
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Segment {
     /// Atoms created by this read; they occur in no other token.
-    pub(crate) unknown: Vec<Token>,
+    pub(crate) unknown: Vec<Token<StageIndex>>,
     /// Atoms that had a vertex when they were read.
-    pub(crate) known: Vec<Token>,
+    pub(crate) known: Vec<Token<StageIndex>>,
 }
 
 /// Split `chars` into [`Segment`]s, creating unknown atoms on first sight.
-pub(crate) fn segments(
-    graph: &PositionedGraphRef,
+pub(crate) fn segments<H: StageHandle<Kind = context_trace::BaseGraphKind>>(
+    handle: &mut H,
     chars: impl IntoIterator<Item = char>,
 ) -> Vec<Segment> {
-    let mut graph = graph.write();
-    let mut edit = graph.edit();
+    let mut view = handle.stage();
+    let mut edit = GraphEdit::new(&mut view);
     let mut segments: Vec<Segment> = Vec::new();
     for c in chars {
         let known = edit.graph().atom(&c).map(|atom| atom.to_token());
@@ -55,6 +57,14 @@ pub(crate) fn segments(
 
 #[cfg(test)]
 mod tests {
+    use context_trace::positioned::{
+        HasGraph,
+        OverlayHandle,
+        PositionedGraphRef,
+        VertexRead,
+        VertexState,
+    };
+
     use super::*;
     use crate::tests::fixture;
 
@@ -63,8 +73,10 @@ mod tests {
         // `linear_abc` knows `a`, `b`, `c`.
         let (graph, _) = fixture("linear_abc");
         let generation = graph.read().generation();
-        let segments = segments(&graph, "xabyyc".chars());
-        let atom = |c| graph.read().atom(&c).unwrap().to_token();
+        let mut handle = OverlayHandle::open(&graph);
+        let segments = segments(&mut handle, "xabyyc".chars());
+        let view = handle.graph();
+        let atom = |c| view.atom(&c).unwrap().to_token();
         assert_eq!(
             segments,
             vec![
@@ -78,26 +90,41 @@ mod tests {
                 },
             ]
         );
+        assert_eq!(view.vertex(atom('x')).unwrap().state(), VertexState::Staged);
+        assert_eq!(view.vertex(atom('a')).unwrap().state(), VertexState::Committed);
+        assert_eq!(view.generation().stage, 1);
+        drop(view);
+        handle.commit(atom_token(&graph, 'a')).unwrap();
         assert_eq!(graph.read().generation().base, generation.base + 1);
         graph.read().validate().unwrap();
+    }
+
+    fn atom_token(
+        graph: &PositionedGraphRef,
+        c: char,
+    ) -> Token<StageIndex> {
+        graph.read().atom(&c).unwrap().to_token().into()
     }
 
     #[test]
     fn known_input_does_not_edit() {
         let (graph, _) = fixture("linear_abc");
-        let generation = graph.read().generation();
-        let segments = segments(&graph, "cab".chars());
+        let mut handle = OverlayHandle::open(&graph);
+        let segments = segments(&mut handle, "cab".chars());
         assert_eq!(segments.len(), 1);
         assert!(segments[0].unknown.is_empty());
         assert_eq!(segments[0].known.len(), 3);
-        assert_eq!(graph.read().generation(), generation);
+        assert_eq!(handle.graph().generation().stage, 0);
+        assert_eq!(handle.staged_count(), 0);
     }
 
     #[test]
     fn repeat_inside_one_input_is_known() {
         let graph = PositionedGraphRef::default();
-        let segments = segments(&graph, "aab".chars());
-        let atom = |c| graph.read().atom(&c).unwrap().to_token();
+        let mut handle = OverlayHandle::open(&graph);
+        let segments = segments(&mut handle, "aab".chars());
+        let view = handle.graph();
+        let atom = |c| view.atom(&c).unwrap().to_token();
         assert_eq!(
             segments,
             vec![

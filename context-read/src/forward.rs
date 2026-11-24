@@ -10,20 +10,21 @@ use context_search::{
     SearchError,
 };
 use context_trace::{
+    StageIndex,
     Token,
-    positioned::PositionedGraphRef,
+    positioned::StageHandle,
 };
 
 use crate::root::Span;
 
 /// The longest occurring prefix of `rest` as a token (inserted if it was not
 /// one); the root adopts `[root, t]` if that is already a token.
-pub(crate) fn forward(
-    graph: &PositionedGraphRef,
-    root: Option<Token>,
-    rest: &[Token],
+pub(crate) fn forward<H: StageHandle>(
+    handle: &mut H,
+    root: Option<Token<StageIndex>>,
+    rest: &[Token<StageIndex>],
 ) -> Span {
-    let token = match insert_next_match(graph, rest.to_vec()) {
+    let token = match insert_next_match(&mut *handle, rest.to_vec()) {
         Ok(outcome) => outcome.token(),
         Err(InsertError::Search(SearchError::SingleIndex(atom))) => atom,
         Err(error) => panic!("forward match failed: {}", error),
@@ -32,7 +33,7 @@ pub(crate) fn forward(
         token.width.0 > 0 && token.width.0 <= rest.len(),
         "forward match returned an invalid width"
     );
-    match root.and_then(|root| find_complete(graph, vec![root, token])) {
+    match root.and_then(|root| find_complete(handle, vec![root, token])) {
         Some(replacement) => Span::ReplaceRoot(replacement),
         None => Span::Append(token),
     }
@@ -40,11 +41,11 @@ pub(crate) fn forward(
 
 /// The existing token whose content is exactly `query`, if any. A lookup:
 /// never inserts.
-pub(crate) fn find_complete(
-    graph: &PositionedGraphRef,
-    query: Vec<Token>,
-) -> Option<Token> {
-    let response = graph
+pub(crate) fn find_complete<H: StageHandle>(
+    handle: &H,
+    query: Vec<Token<StageIndex>>,
+) -> Option<Token<StageIndex>> {
+    let response = handle
         .find_ancestor(query)
         .unwrap_or_else(|error| panic!("lookup failed: {}", error));
     (response.is_entire_root() && response.query_exhausted())
@@ -53,7 +54,11 @@ pub(crate) fn find_complete(
 
 #[cfg(test)]
 mod tests {
-    use context_trace::positioned::GraphRead;
+    use context_trace::positioned::{
+        GraphRead,
+        HasGraph,
+        OverlayHandle,
+    };
 
     use super::*;
     use crate::tests::fixture;
@@ -62,10 +67,10 @@ mod tests {
     #[test]
     fn one_atom_left() {
         let (graph, names) = fixture("linear_abc");
-        let generation = graph.read().generation();
-        let c = names["c"];
-        assert_eq!(forward(&graph, None, &[c]), Span::Append(c));
-        assert_eq!(graph.read().generation(), generation);
+        let mut handle = OverlayHandle::open(&graph);
+        let c = names["c"].into();
+        assert_eq!(forward(&mut handle, None, &[c]), Span::Append(c));
+        assert_eq!(handle.graph().generation().stage, 0);
     }
 
     /// `[R, t]` is adopted iff it is a complete token; a partial match of
@@ -73,31 +78,36 @@ mod tests {
     #[test]
     fn root_pair_adopted_only_when_complete() {
         let (graph, names) = fixture("two_chars");
-        let (a, b) = (names["a"], names["b"]);
-        assert_eq!(forward(&graph, Some(a), &[b]), Span::ReplaceRoot(names["ab"]));
+        let mut handle = OverlayHandle::open(&graph);
+        let (a, b) = (names["a"].into(), names["b"].into());
+        assert_eq!(
+            forward(&mut handle, Some(a), &[b]),
+            Span::ReplaceRoot(names["ab"].into())
+        );
 
         let (graph, names) = fixture("linear_abc");
-        let (a, b) = (names["a"], names["b"]);
-        let generation = graph.read().generation();
-        let count = graph.read().vertex_count();
-        assert_eq!(forward(&graph, Some(a), &[b]), Span::Append(b));
-        assert_eq!(graph.read().generation(), generation);
-        assert_eq!(graph.read().vertex_count(), count);
+        let mut handle = OverlayHandle::open(&graph);
+        let (a, b) = (names["a"].into(), names["b"].into());
+        assert_eq!(forward(&mut handle, Some(a), &[b]), Span::Append(b));
+        assert_eq!(handle.graph().generation().stage, 0);
+        assert_eq!(handle.staged_count(), 0);
     }
 
     /// The longest occurring prefix of the rest is inserted.
     #[test]
     fn longest_prefix_inserted() {
         let (graph, names) = fixture("linear_abc");
-        let (a, b) = (names["a"], names["b"]);
-        let Span::Append(token) = forward(&graph, None, &[a, b, a]) else {
+        let mut handle = OverlayHandle::open(&graph);
+        let (a, b) = (names["a"].into(), names["b"].into());
+        let Span::Append(token) = forward(&mut handle, None, &[a, b, a]) else {
             panic!("no root: append");
         };
         assert_eq!(token.width.0, 2);
         assert_eq!(
-            find_complete(&graph, vec![a, b]).map(|t| t.index),
+            find_complete(&handle, vec![a, b]).map(|t| t.index),
             Some(token.index)
         );
+        handle.commit(token).unwrap();
         graph.read().validate().unwrap();
     }
 }
