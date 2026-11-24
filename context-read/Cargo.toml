@@ -125,5 +125,13 @@ harness = false
 name = "staging"
 harness = false
 
+[[bench]]
+name = "staging_commit"
+harness = false
+
+[[bench]]
+name = "staging_memory"
+harness = false
+
 #[dev-dependencies.graph_app]
 #path = "../"
