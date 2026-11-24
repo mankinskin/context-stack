@@ -8,10 +8,9 @@ The loop is `context-read/src/legacy` unchanged; only the root edits differ:
 - known run, one step at a time, each committed before the next:
   1. expansion (`expand_root`, only after something of this run was
      consumed): walk the root's postfix tokens largest first (the chain of
-     last children), skipping postfixes wider than the consumed part of the
-     run. Search `[postfix, rest of run]`; the first match longer than the
-     postfix is accepted, inserted with `insert_match` if it is not a token
-     (expansion `E`), and integrated into the root at offset
+     last children). Search `[postfix, rest of run]`; the first match
+     longer than the postfix is accepted, inserted with `insert_match` if it
+     is not a token (expansion `E`), and integrated into the root at offset
      `|root| - |postfix|` (closure).
   2. otherwise forward match (`match_forward`): the longest prefix of the
      rest of the run that occurs, inserted if it is not a token; the root
@@ -31,16 +30,14 @@ prefix, unique minimal host), as in `common.py`.
 
 Usage:
     python3 read_legacy_port.py                 # gate over all fixture scenarios
-    python3 read_legacy_port.py --no-seam-bound # gate, probing postfixes wider than the consumed run
     python3 read_legacy_port.py abc abcabca     # trace reading these inputs in order
+    python3 read_legacy_port.py --dissolve [INPUTS...]  # with eager settle (dissolve.py)
 """
 import sys
 from collections import Counter
 
 from common import brute_cover, fmt, graph, graph_diff, maximal, minimal_hosts, scenarios
 from split_positions import join, split
-
-SEAM_BOUND = True
 
 
 def occurs(V, s):
@@ -133,8 +130,13 @@ def postfixes(V, R):
         yield v
 
 
-def read(V, I, st, log):
+def read(V, I, st, log, after_step=None, trail=None):
+    """Read `I` into a copy of `V`. `after_step(V, committed, root, consumed)`
+    runs after every root commit (`dissolve.py`); `committed` are the
+    vertices present before the read. `trail` collects the step decisions
+    `(kind, width, P, E, root)` and the postfixes probed per step."""
     V = {k: list(c) for k, c in V.items()}
+    committed = frozenset(V)
     root, i = Root(), 0
     st['root'] = None
     while i < len(I):
@@ -142,19 +144,22 @@ def read(V, I, st, log):
         while j < len(I) and I[j] not in V:
             V[I[j]] = []
             j += 1
-        for a in I[i:j]:
+        for n, a in enumerate(I[i:j]):
             root.append(V, a, st, log)
             st['root'] = root.token
+            if trail is not None:
+                trail.append((('unknown', 1, None, None, root.token), []))
+            if after_step:
+                after_step(V, committed, root.token, i + n + 1)
         i = j
         while j < len(I) and I[j] in V:
             j += 1
         run, cursor = I[i:j], 0
         while cursor < len(run):
-            rest, step = run[cursor:], None
+            rest, step, probed = run[cursor:], None, []
             if cursor > 0:
                 for P in postfixes(V, root.token):
-                    if len(P) > cursor and SEAM_BOUND:
-                        continue
+                    probed.append(P)
                     st['expansion probes'] += 1
                     m = longest_prefix(V, P + rest)
                     if m > len(P):
@@ -162,6 +167,7 @@ def read(V, I, st, log):
                         V = insert_match(V, E, st)
                         root.close(V, P, E, st, log)
                         step = m - len(P)
+                        decision = ('expansion', step, P, E)
                         break
             if step is None:
                 st['forward searches'] += 1
@@ -170,7 +176,12 @@ def read(V, I, st, log):
                 V = insert_match(V, t, st)
                 root.append(V, t, st, log)
                 step = m
+                decision = ('forward', step, None, t)
             st['root'] = root.token
+            if trail is not None:
+                trail.append((decision + (root.token,), probed))
+            if after_step:
+                after_step(V, committed, root.token, i + cursor + step)
             if root.owned:
                 check_root(V, root.token, st, log)
             cursor += step
@@ -231,6 +242,8 @@ def trace(inputs):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    if args[:1] == ['--no-seam-bound']:
-        SEAM_BOUND, args = False, args[1:]
-    trace(args) if args else gate()
+    if args[:1] == ['--dissolve']:
+        import dissolve
+        dissolve.main(args[1:])
+    else:
+        trace(args) if args else gate()

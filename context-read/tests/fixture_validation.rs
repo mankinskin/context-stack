@@ -161,3 +161,47 @@ fn read_fixtures_match_manifest_and_derivation() {
     // Loads every case: corpus = inputs, base = the previous case's graph.
     assert_eq!(read_cases().len(), entries.len());
 }
+
+/// Retention invariant G6 (dissolution plan §2.1): every vertex that is
+/// neither an atom nor a corpus input has at least two parent occurrences.
+fn retention_violations(fixture: &PositionedGraphSnapshot) -> Vec<String> {
+    let mut occurrences = std::collections::BTreeMap::<&str, usize>::new();
+    for cover in fixture.graph.vertices.values() {
+        for (_, child) in cover {
+            *occurrences.entry(child.as_str()).or_default() += 1;
+        }
+    }
+    fixture
+        .graph
+        .vertices
+        .iter()
+        .filter(|(key, cover)| !cover.is_empty() && !fixture.corpus.contains(key))
+        .filter(|(key, _)| occurrences.get(key.as_str()).copied().unwrap_or(0) < 2)
+        .map(|(key, _)| key.clone())
+        .collect()
+}
+
+/// G6 holds on every oracle graph of all positioned lanes (v3, insert,
+/// read).
+#[test]
+fn every_oracle_graph_satisfies_retention() {
+    use context_trace::positioned::fixtures::{
+        fixture_snapshots, insert_dir, manifest, read_cases,
+    };
+    let mut graphs: Vec<(String, PositionedGraphSnapshot)> = fixture_snapshots();
+    graphs.extend(manifest(&insert_dir()).into_iter().map(|entry| {
+        let path = insert_dir().join(format!("{}.json", entry.name));
+        let fixture = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        (entry.name, fixture)
+    }));
+    graphs.extend(read_cases().into_iter().map(|case| (case.name, case.expected)));
+    let violations: Vec<String> = graphs
+        .iter()
+        .filter_map(|(name, fixture)| {
+            let violating = retention_violations(fixture);
+            (!violating.is_empty()).then(|| format!("{name}: {violating:?}"))
+        })
+        .collect();
+    assert!(graphs.len() > 1000, "{} oracle graphs", graphs.len());
+    assert!(violations.is_empty(), "G6 violated:\n{}", violations.join("\n"));
+}

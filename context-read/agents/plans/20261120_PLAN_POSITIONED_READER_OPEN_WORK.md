@@ -146,6 +146,13 @@ fixtures for all scenarios except the expected deviations of P-R1.
 
 ## Step 5 — Streaming retention and retrospective updates
 
+**Plans:** demotion of provisional tokens within one read is planned in
+[20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md) (reader
+phase R4, behavior-neutral) and
+[20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md) (R5); only
+tokens still staged in the running read are removed, published tokens never
+are.
+
 Retention is append-only across completed inputs: new input may add vertices
 and change compositions and links, but never removes a published token or
 changes its string; every observed input stays exactly reconstructible.

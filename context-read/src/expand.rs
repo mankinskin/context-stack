@@ -44,9 +44,13 @@ pub(crate) struct Accepted {
     pub(crate) span: Span,
 }
 
-/// The first postfix `P` of `root` (largest first, at most `cursor` wide:
-/// the seam bound) whose match `[P] ++ rest` extends beyond `P`. The match
-/// is inserted as the expansion `E`; rejected probes do not edit the graph.
+/// The first postfix `P` of `root` (largest first) whose match
+/// `[P] ++ rest` extends beyond `P`. The match is inserted as the expansion
+/// `E`; rejected probes do not edit the graph.
+///
+/// No probe at `cursor == 0` (the start of a known run): the root then ends
+/// with an atom first seen in this read, which occurs only there, so every
+/// probe would be rejected (reader plan §7, Q3).
 ///
 /// If `R[0, o) + E` is already a token, the root adopts it.
 pub(crate) fn expand(
@@ -60,9 +64,6 @@ pub(crate) fn expand(
     }
     let chain = postfixes(&graph.read(), root);
     for postfix in chain {
-        if postfix.width.0 > cursor {
-            continue;
-        }
         let mut query = Vec::with_capacity(rest.len() + 1);
         query.push(postfix);
         query.extend_from_slice(rest);

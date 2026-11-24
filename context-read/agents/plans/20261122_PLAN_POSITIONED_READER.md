@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#positioned-composition` `#reader` `#expansion`
 summary: Positioned reader (roadmap steps 4–5), revision 2. The legacy reader loop is kept unchanged (segments; per step root-postfix expansion first, else forward match; every accepted match inserted; commit before the next search). Only root edits change: the root stays the input's own vertex, an owned root grows in place through GraphEdit::extend, the postfix chain is the chain of last children, and closure is one composition update without complements. Prototype R0 (read_legacy_port.py) reproduces the oracle on 164 of 166 fixture reads; the 2 others are provisional retention (roadmap step 5). Integration with insertion revision 3.
-status: 🚧 revision 2.1 — R1–R3 implemented (step 4 gate green with 4 expected provisional-retention deviations); R4 open
+status: 🚧 revision 2.2 — §7 decided (P-R1 closed, seam bound dropped, search reuse defined; task R3.1 done); R1–R3 implemented (step 4 gate green with 10 expected provisional-retention deviations: 9 scenarios, 1 read-lane case); R4 (staging graph, behavior-neutral) and R5 (dissolution) open
 date: 2026-11-23
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (steps 4–5)
 depends_on: 20261122_PLAN_POSITIONED_INSERT.md (revision 3), 20261120_PLAN_POSITIONED_SEARCH.md (done)
@@ -18,7 +18,10 @@ depends_on: 20261122_PLAN_POSITIONED_INSERT.md (revision 3), 20261120_PLAN_POSIT
 (revision 3), implemented first.
 **Staging (R4):**
 [20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md)
-(staged vs committed tokens, dissolution; draft).
+(staged vs committed tokens, store traits; behavior-neutral; draft).
+**Dissolution (R5):**
+[20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md)
+(G6, dissolution of provisional tokens; after R4; draft).
 **Prototype:**
 [`read_legacy_port.py`](../../../context-insert/agents/prototypes/read_legacy_port.py)
 (R0; execution manual in the prototypes
@@ -65,7 +68,8 @@ positioned model changes in the root edits.
    1. **Root expansion** (`expand_root`, only if `cursor > 0`). Walk the
       root's postfix tokens, largest first (`postfix_iter`: the widest last
       child at each level; the root itself is not yielded). Skip postfixes
-      wider than `cursor` (the seam bound). For postfix `P`, search
+      wider than `cursor` (the seam bound; dropped in the positioned
+      reader, §7). For postfix `P`, search
       `[P, rest of run]`. The first response that matches more than `P` is
       accepted and materialized (split + join of that response) into the
       expansion `E`, which starts with `P`.
@@ -145,7 +149,6 @@ the `[root, t]` lookup of §3.3.
 expand(root, rest, cursor):
   if cursor == 0: return None
   for P in postfixes(root.token):                 # largest first
-    if |P| > cursor: continue                     # seam bound (legacy)
     E := insert_next_match([P] ++ rest)?.token()
     if |E| > |P|:
       return Expand { postfix: P, expansion: E }  # consumes |E| − |P|
@@ -366,7 +369,7 @@ the border chain `p^k t` (`k < n`); `p^k` is a border of `p^n` but not of
 `p^n t`, so the tail invalidates the chain `p, …, p^(n−1)` the read has
 already created.
 
-**Retention invariant (R6, candidate).** Every vertex that is neither an
+**Retention invariant (G6, candidate).** Every vertex that is neither an
 atom nor a corpus input has at least two parent occurrences (entries
 `(parent, offset)`). It holds on all 1630 oracle graphs (v3, insert and
 read lanes). The reader violates it exactly in the 10 deviating graphs (9
@@ -384,20 +387,26 @@ input" (step 5). The legacy reader has the same behavior.
 Proposal (P-R1): step 4 keeps the legacy rule. Its gate expects oracle
 equality on all scenarios except these, which are listed as expected
 deviations and become the entry tests of step 5 (demoting provisional
-tokens at input end: a token created by this read whose occurrences all lie
-inside one other token is dissolved into that token). This replaces the
+tokens: a token created by this read whose occurrences all lie inside one
+other token is dissolved into that token; after every root commit, see
+the dissolution plan). This replaces the
 "supplied retention" of the first draft and changes the roadmap's step 4
 milestone (`abcabca` without `abc`), which needs the step 5 rule.
 
-**Follow-up (2026-11-24):** the demotion is planned in
-[20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md): tokens
-created by a read are *staged* (content may change, may be dissolved) until
-the read commits its stage at input end; committed tokens have immutable
-content. Staged tokens with a single parent occurrence (violating R6) are
-dissolved into their parent after every root commit. The root manager's
-"owned root" becomes "staged and parentless". Both implementations
-(physical overlay graph, stage tag on vertices) are built behind common
-store traits and compared; the default is open there (D-S1).
+**Follow-up (2026-11-24):** the demotion is planned in two steps.
+
+1. [20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md) (R4,
+   behavior-neutral): tokens created by a read are *staged* until the read
+   commits its stage at input end; committed tokens have immutable content.
+   The root manager's "owned root" becomes "staged and parentless". Both
+   implementations (physical overlay graph, stage tag on vertices) are
+   built behind common store traits and compared; the default is open
+   there (D-S1). The reader's output, including these deviations, does not
+   change.
+2. [20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md) (R5): staged
+   tokens with a single parent occurrence (violating the retention
+   invariant G6) are dissolved into their parent after every root commit;
+   `commit` asserts G6. This removes the expected deviations.
 
 ## 6. Evidence (prototype R0)
 
@@ -435,21 +444,28 @@ part of R2 and fixes the expected-deviation list of §9.1.
 
 ## 7. Open questions
 
-1. **Provisional retention** (§5, P-R1): confirm that step 4 keeps the
-   legacy rule and step 5 adds demotion. Demotion design:
-   [20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md).
+1. ~~Provisional retention (P-R1)~~ — closed (2026-11-24): step 4 keeps
+   the legacy rule; demotion is
+   [20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md) (R4) and
+   [20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md) (R5).
 2. **Proof of G2 for root edits.** The prototype checks it on every edit;
    the argument "every junction is probed largest postfix first before
    anything is appended" needs a written proof, in particular for tokens
    that cross a junction but start at a non-token postfix.
-3. **Seam bound.** Legacy skips postfixes wider than the consumed part of
-   the run. The fixtures never exercise it; keep it (legacy) and add a
-   fixture that does, or drop it after a proof.
-4. **Search reuse.** The roadmap asks that no position covered by a
-   `Response` is searched again. Expansion probes re-search the consumed
-   postfix `P`, but as one token, not atom by atom. Define the counter as
-   "no atom is consumed twice by a forward search" or reuse the forward
-   response for the first probe.
+3. ~~Seam bound~~ — decided (2026-11-24): dropped as superseded. Legacy
+   skips postfixes wider than the consumed part of the run; the fixtures
+   never exercise it (prototype with `--no-seam-bound`: identical). The
+   `cursor == 0` guard (no probe before the first known atom of a run) is
+   kept as a documented shortcut (decided 2026-11-24): such a probe is
+   always rejected, because a known run starts either at the input start
+   (no root) or after a segment of new atoms, and the root then ends with a
+   new atom `x` that occurs only there, so no `P + rest[0]` (`P` ends with
+   `x`) occurs. Task R3.1.
+4. ~~Search reuse~~ — decided (2026-11-24): the requirement is "no atom is
+   consumed twice by a forward search". Expansion probes re-search the
+   consumed postfix `P` as one token and are not counted. Every step
+   consumes a disjoint range of the input (`read_traced`: the consumed
+   widths of all steps add up to the input length). Task R3.1.
 
 ## 8. Phases
 
@@ -459,13 +475,16 @@ part of R2 and fixes the expected-deviation list of §9.1.
 | R1 **Done** | Positioned `segment.rs` and `RootManager` with the commits of §3.4 (`GraphEdit::extend`, `insert_next_match` and the probe-rejection test exist, §4.4) | Unit tests: commits keep `validate()` green; ownership rules |
 | R2 **Done** | Forward match and segments (§3.3), no expansion; read lane fixtures and loader (§9.1); new scenario `seam_overlap_append` (§9.2); prototype rerun on the current manifest | Read-lane cases whose prototype trace has no accepted expansion equal their oracle graph |
 | R3 **Done** | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate (§9): every read-lane case and every scenario of `context-read/tests/reader_behavior.rs` equals its oracle graph, except the expected deviations of §5 |
-| R4 | Step 5: demotion of provisional tokens through a staging graph and dissolution ([20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md), tasks S0–S4), streaming retention | Staging plan gate: no expected deviations; roadmap step 5 gate |
+| R3.1 **Done** | Cleanup after the decisions of §7: remove the seam bound from `expand` (the skip of postfixes wider than `cursor`, and its doc comment; `cursor` stays for the `cursor == 0` guard) and from the prototype's default; test that the steps of `read_traced` consume disjoint ranges covering the input (§7 Q4) | Step 4 gate unchanged |
+| R4 | Staging graph: staged vs committed vertices, store traits, both implementations, `ReadStage` ([20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md), tasks S0–S6); no behavior change | Staging plan gate: output identical to R3 (same expected deviations) for both strategies |
+| R5 | Step 5: dissolution of provisional tokens ([20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md), tasks D0–D6: commit at input end first, then early commit), streaming retention | Dissolution plan gate: no expected deviations; roadmap step 5 gate |
 
 **Status (2026-11-23).** R1–R3 implemented in `context-read/src/{segment,
 root, forward, expand, read}.rs`. Step 4 gate: all 140 read-lane cases equal
 their oracle graph except `insert_deep_borders__1`; all 71 scenarios of
-`reader_behavior.rs` pass except `repeat_abcabca`, `repeat_ababa` and
-`insert_periodic` (ignored, provisional retention, §5). Deviations from the
+`reader_behavior.rs` pass except `repeat_abcabca`, `repeat_ababa`,
+`insert_periodic` and the six `period_*` scenarios of §5 (ignored,
+provisional retention). Deviations from the
 plan text:
 
 - **Expected deviations.** §5 listed two; the prototype rerun on the current
@@ -522,7 +541,7 @@ Test changes for the gate:
 - `context-read/tests/reader_behavior.rs`: remove `#[ignore = "positioned
   reader pending"]` from the scenario macro; `repeat_abcabca`,
   `repeat_ababa` and `insert_periodic` (§5, rerun) get
-  `#[ignore = "provisional retention (reader plan §5)"]` until R4 (P-R1).
+  `#[ignore = "provisional retention (reader plan §5)"]` until R5 (P-R1).
 - New read-lane gate (§9.1).
 - Unit tests next to the modules (R1/R2): `segment` (unknown/known runs,
   a repeat inside one input becomes known), `root` (each row of the §3.4

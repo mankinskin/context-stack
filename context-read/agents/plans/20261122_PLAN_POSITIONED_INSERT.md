@@ -109,6 +109,15 @@ A string with two minimal host occurrences would occur in two different
 contexts. The oracle would then count it more often than each of its
 superstrings and retain it.
 
+**G6 (retention)** is defined in
+[20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md) §2.1: every
+committed vertex that is neither an atom nor an input has at least two
+parent occurrences. Inputs are the strings of `read` calls only; insertion
+is an internal building block of the reader and never marks an input. The
+insert gate (`oracle(C + [query])`) therefore checks G1–G5, not G6; the
+reader may violate G6 for staged vertices until `settle` (dissolution
+plan).
+
 ### 3.2 Response guarantees (positioned search, validated in search plan 2.6)
 
 | # | Guarantee |

@@ -229,6 +229,34 @@ fn read_gate() {
     );
 }
 
+/// No atom is consumed twice by a forward search (reader plan §7 Q4): every
+/// step consumes the next atoms after the root, so the steps' ranges are
+/// disjoint and cover the input.
+#[test]
+fn steps_consume_disjoint_ranges() {
+    for case in &read_cases() {
+            let base = match &case.base {
+                Some(base) => PositionedGraph::from_interchange(&base.graph).unwrap(),
+                None => PositionedGraph::default(),
+            };
+            let graph = PositionedGraphRef::new(base);
+            let (_, steps) = context_read::read_traced(&graph, case.input.chars());
+            let mut consumed = 0;
+            for step in &steps {
+                consumed += match step.kind {
+                    StepKind::Unknown => 1,
+                    StepKind::Forward(width) => width,
+                    StepKind::Expansion { postfix, expansion } => {
+                        assert!(expansion > postfix, "{}: empty expansion", case.name);
+                        expansion - postfix
+                    },
+                };
+                assert_eq!(step.root, consumed, "{}: {:?}", case.name, step);
+            }
+            assert_eq!(consumed, case.input.chars().count(), "{}", case.name);
+    }
+}
+
 /// Read every input of scenario `name` into one graph; the steps of the
 /// last read. The final graph must equal the scenario's oracle graph.
 fn trace_scenario(name: &str) -> Vec<Step> {

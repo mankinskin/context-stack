@@ -6,7 +6,9 @@ revision 3, roadmap step 3; revision 2:
 [20261120_PLAN_POSITIONED_INSERT](../../../context-read/agents/plans/20261120_PLAN_POSITIONED_INSERT.md))
 and the positioned reader plan
 ([20261122_PLAN_POSITIONED_READER](../../../context-read/agents/plans/20261122_PLAN_POSITIONED_READER.md),
-prototype R0). They validate algorithms on the v3 oracle fixtures before
+prototype R0) with the dissolution plan
+([20261124_PLAN_DISSOLUTION](../../../context-read/agents/plans/20261124_PLAN_DISSOLUTION.md),
+task D0). They validate algorithms on the v3 oracle fixtures before
 the Rust implementation and produce the plan's evidence numbers. They are
 reference material, not tests: the Rust gate (plan task 3.4) replaces them.
 
@@ -51,6 +53,7 @@ cached per corpus within one run; a gate takes a few seconds.
 | [naive_chains.py](naive_chains.py) | rejected: both response paths as they were before the insertion | Evidence (counterexample) |
 | [descend_closure.py](descend_closure.py) | superseded: recursive closure with host descent; streaming read mode | revision 1 → 2, D1 |
 | [read_legacy_port.py](read_legacy_port.py) | **accepted** reader prototype R0: the legacy reader loop (segments, root-postfix expansion, forward match) with positioned root edits; uses `split_positions.py` as `insert_match` | [reader plan](../../../context-read/agents/plans/20261122_PLAN_POSITIONED_READER.md) §3–§6 |
+| [dissolve.py](dissolve.py) | **accepted** dissolution prototype D0: `read_legacy_port.py` with eager `settle` (dissolve or discard staged tokens with ≤ 1 parent occurrence) after every root commit; per-step prefix-oracle, G6, order and committed-vertex checks; G6 on the oracle graphs | [dissolution plan](../../../context-read/agents/plans/20261124_PLAN_DISSOLUTION.md) §2, §5 |
 | [cover_merge.py](cover_merge.py) | rejected for the reader: read-only cover merge with an offset seam scan (first reader draft); the reader keeps the legacy root-postfix expansion instead | reader plan §0 |
 | [invariants.py](invariants.py) | F3 (unique minimal host) and I2 (overlap closure) on all fixtures | Part B "Facts and invariants" |
 | [find_examples.py](find_examples.py) | search for deep insert examples with minimal corpora | named fixtures of task 3.1 |
@@ -160,37 +163,81 @@ reader's in-progress cover, not to insertion).
 
 ```sh
 python3 read_legacy_port.py                       # read every fixture scenario input by input
-python3 read_legacy_port.py --no-seam-bound       # also probe postfixes wider than the consumed run
 python3 read_legacy_port.py abc abcabca           # trace reading these inputs in order
 python3 read_legacy_port.py abcd bcde xabcdey
+python3 read_legacy_port.py --dissolve [INPUTS...] # with eager settle, see dissolve.py
 ```
 
 Each input is read into the graph of its predecessors (the reader's own
 result; after a mismatch the scenario continues from the oracle graph) and
 compared with the oracle graph. Every owned-root edit is checked against the
-brute-force complete composition (G2) and overlap closure (G4). Expected gate
-output (identical with `--no-seam-bound`: the bound never filters a postfix
-on the fixtures):
+brute-force complete composition (G2) and overlap closure (G4). Expansion
+probes every postfix of the root (the former seam bound, skipping postfixes
+wider than the consumed run, never filtered one on the fixtures and was
+removed). Expected gate output:
 
 ```
-append in place: 140
-closure in place: 22
-closure new root: 23
-closure new root (self-expansion): 8
-expansion probes: 105
-forward searches: 160
-inserted: 57
-inserted into the input root: 22
-mismatch: only extra tokens (provisional retention): 2
-new root [root, t]: 147
-reads equal to the oracle: 164
-scenarios: 66
+append in place: 180
+closure in place: 38
+closure new root: 24
+closure new root (self-expansion): 61
+expansion probes: 188
+forward searches: 196
+inserted: 79
+inserted into the input root: 37
+mismatch: only extra tokens (provisional retention): 10
+new root [root, t]: 199
+reads equal to the oracle: 189
+scenarios: 94
 ```
 
-followed by the two mismatches, `repeat_abcabca` (extra `abc`) and
-`repeat_ababa` (extra `ab`): tokens retained by a prefix of the input and
-no longer frequent at its end (reader plan §5). No `G2`, `G4` or `error`
-line means none.
+followed by the ten mismatches (`repeat_abcabca` extra `abc`,
+`repeat_ababa` extra `ab`, `insert_periodic`, `insert_deep_borders`, six
+`period_*`): tokens retained by a prefix of the input and no longer
+frequent at its end (dissolution plan §0). No `G2`, `G4` or `error` line
+means none.
+
+### dissolve.py (accepted, dissolution prototype D0)
+
+```sh
+python3 dissolve.py                  # gate (same as read_legacy_port.py --dissolve)
+python3 dissolve.py abcabca          # trace with settle actions and per-step checks
+```
+
+Runs `read_legacy_port.read` with `settle` (dissolution plan §2.3) after
+every root commit (unknown-atom append, forward step, expansion step).
+Staged vertices are those created by the running read; committed vertices
+and atoms are never dissolved, the current root is exempt. After every step
+it checks: the graph equals `oracle(C + [I[:consumed]])` (atoms of the
+current unknown segment, created before they are consumed, are ignored);
+G6 on staged vertices; `settle` largest-first equals smallest-first;
+committed vertices are kept; every composition spells its vertex string and
+is complete (G2). After every input: the step decisions `(kind, width, P,
+E, root)` and the probed postfixes equal those of the same read without
+`settle` (redundancy lemma, plan §2.4; on a divergence it prints both
+decisions and the dissolved tokens with their parent occurrences),
+equality with `oracle(C + [I])` and G6 (inputs exempt). Finally G6 on the oracle graph of every prefix of every
+scenario's inputs. Expected output:
+
+```
+dissolved: 16
+dissolved into the root: 0
+oracle graphs: 199
+oracle graphs violating G6: 0
+reads: 199
+reads compared: 199
+reads equal to the oracle: 199
+reads violating G6: 0
+reads with identical decisions: 199
+scenarios: 94
+steps: 701
+steps equal to the prefix oracle: 701
+```
+
+Missing lines are zero: no discards, no differing probed postfixes, no
+diverging decisions, no order-dependent settle, no lost
+committed vertex, no G2 or staged-G6 violation, no error. Without `settle`
+the same checks report 10 reads and 11 steps unequal (and violating G6).
 
 ### cover_merge.py (rejected for the reader)
 
