@@ -826,3 +826,28 @@ cargo bench -p context-read
 - Insert gate unchanged (all cases).
 - S1 and S2 are performance-neutral against the S0 baseline; the strategy
   costs are recorded in S6.
+
+## 11. Results
+
+### S0 — pre-staging baseline (2026-11-24)
+
+`context-read/benches/staging.rs` (criterion 0.5, `bench` profile,
+warm-up 1 s, measurement 3 s, 30 samples; periodic group 10 samples),
+saved as criterion baseline `pre-staging`:
+
+```sh
+cargo bench -p context-read --no-default-features --features test-api --bench staging -- --save-baseline pre-staging
+```
+
+| Benchmark | Input | Time (median) | Throughput |
+|---|---|---|---|
+| `read/corpus/all` | all 94 v3 scenarios, each read into a fresh graph (1171 atoms) | 1.316 ms | 890 Katoms/s |
+| `read/periodic/abc^n_x/64` | `"abc"·64 + "x"` (193 atoms) | 828 µs | 233 Katoms/s |
+| `read/periodic/abc^n_x/256` | `"abc"·256 + "x"` (769 atoms) | 36.4 ms | 21.2 Katoms/s |
+| `read/periodic/abc^n_x/512` | `"abc"·512 + "x"` (1537 atoms) | 333 ms | 4.6 Katoms/s |
+| `find_ancestor/corpus_inputs` | every corpus input searched in its committed v3 fixture graph (`PositionedGraph`, 199 queries) | 869 µs | 229 Kqueries/s |
+
+- Periodic reads grow roughly cubically in `n` (×44 for 64 → 256, ×9.2
+  for 256 → 512); `n = 1024` takes 2.76 s per read and was dropped from the
+  bench to keep its runtime short.
+- Run-to-run noise on this machine (two consecutive runs): below 1 %.

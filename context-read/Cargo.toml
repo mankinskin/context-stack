@@ -121,5 +121,9 @@ criterion = { version = "0.5", features = ["html_reports"] }
 name = "grammar"
 harness = false
 
+[[bench]]
+name = "staging"
+harness = false
+
 #[dev-dependencies.graph_app]
 #path = "../"
