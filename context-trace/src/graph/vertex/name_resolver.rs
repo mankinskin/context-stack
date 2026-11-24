@@ -15,6 +15,13 @@ pub trait TokenNameResolver: Send + Sync {
         &self,
         index: usize,
     ) -> Option<String>;
+    /// The name of the staged vertex in `slot` of the current stage.
+    fn staged_token_name(
+        &self,
+        _slot: usize,
+    ) -> Option<String> {
+        None
+    }
 }
 
 thread_local! {
@@ -34,6 +41,15 @@ pub fn resolve_token_name(index: usize) -> Option<String> {
         r.borrow()
             .as_ref()
             .and_then(|resolver| resolver.token_name(index))
+    })
+}
+
+/// Resolve the name of staged slot `slot` with the current thread's resolver.
+pub fn resolve_staged_token_name(slot: usize) -> Option<String> {
+    RESOLVER.with(|r| {
+        r.borrow()
+            .as_ref()
+            .and_then(|resolver| resolver.staged_token_name(slot))
     })
 }
 

@@ -31,6 +31,7 @@ use super::{
         GraphRead,
         GraphWrite,
         VertexRead,
+        VertexState,
         raw::{
             SEAL,
             VertexWrite,
@@ -278,7 +279,10 @@ impl<'g, S: GraphWrite + ?Sized> GraphEdit<'g, S> {
     /// `comp(vertex) := maximal(comp(vertex) ∪ {occurrence})` with the width
     /// growing to `occurrence.end()`; returns the new token of `vertex`.
     ///
-    /// Only for vertices without parents (`HasParents`), and `occurrence`
+    /// Only for staged vertices (`NotStaged`; the content of committed
+    /// vertices is immutable, staging plan §2.1) without parents
+    /// (`HasParents`): on the committed store `extend` is always rejected.
+    /// `occurrence`
     /// must start at or before the end of `vertex` and reach beyond it
     /// (`OutsideVertex`). Debug and `test-api` builds also check that the
     /// occurrence agrees with `vertex` on their overlap (`OverlapMismatch`)
@@ -289,7 +293,11 @@ impl<'g, S: GraphWrite + ?Sized> GraphEdit<'g, S> {
         occurrence: Occurrence<S::Index>,
     ) -> Result<Token<S::Index>, Error<S>> {
         let (width, old) = self.composite(vertex)?;
-        if expect_vertex(&*self.graph, vertex)?.parents().next().is_some() {
+        let node = expect_vertex(&*self.graph, vertex)?;
+        if node.state() != VertexState::Staged {
+            return Err(PositionedError::NotStaged(vertex));
+        }
+        if node.parents().next().is_some() {
             return Err(PositionedError::HasParents(vertex));
         }
         if occurrence.offset.0 > width.0 || occurrence.end().0 <= width.0 {

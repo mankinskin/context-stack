@@ -33,6 +33,8 @@ pub trait VertexId:
 {
     /// The committed index, if this index addresses a committed vertex.
     fn committed(self) -> Option<CommittedIndex>;
+    /// The staged index, if this index addresses a staged vertex.
+    fn staged(self) -> Option<StagedIndex>;
 }
 
 /// A vertex of the committed graph.
@@ -46,6 +48,9 @@ impl sealed::Id for CommittedIndex {}
 impl VertexId for CommittedIndex {
     fn committed(self) -> Option<CommittedIndex> {
         Some(self)
+    }
+    fn staged(self) -> Option<StagedIndex> {
+        None
     }
 }
 
@@ -70,6 +75,9 @@ impl sealed::Id for StagedIndex {}
 impl VertexId for StagedIndex {
     fn committed(self) -> Option<CommittedIndex> {
         None
+    }
+    fn staged(self) -> Option<StagedIndex> {
+        Some(self)
     }
 }
 
@@ -111,10 +119,18 @@ const STAGED_BIT: usize = 1 << (usize::BITS - 1);
 
 /// Index space of a stage: a committed or a staged index, packed into one
 /// `usize` (top bit = staged).
+#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StageIndex(usize);
 
 impl StageIndex {
+    /// [`From<CommittedIndex>`] without the range check (hot paths of
+    /// stores whose committed indices are dense slots).
+    #[inline]
+    pub(crate) fn lift(index: CommittedIndex) -> Self {
+        debug_assert!(index.0 & STAGED_BIT == 0, "committed index {} out of range", index.0);
+        Self(index.0)
+    }
     pub fn is_staged(self) -> bool {
         self.0 & STAGED_BIT != 0
     }
@@ -131,6 +147,9 @@ impl sealed::Id for StageIndex {}
 impl VertexId for StageIndex {
     fn committed(self) -> Option<CommittedIndex> {
         self.split().left()
+    }
+    fn staged(self) -> Option<StagedIndex> {
+        self.split().right()
     }
 }
 

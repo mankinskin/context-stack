@@ -9,6 +9,7 @@ use crate::{
     TokenWidth,
     graph::vertex::{
         CommittedIndex,
+        StageIndex,
         VertexId,
         has_vertex_index::HasVertexIndex,
         wide::Wide,
@@ -16,6 +17,11 @@ use crate::{
 };
 
 /// A child token placed at an atom offset inside its owner.
+///
+/// `repr(C)` (as [`Token`]): occurrences of every index type of one store
+/// share their layout, so a stage can read committed compositions in its
+/// own index space without copying ([`Composition::lifted`]).
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Occurrence<I: VertexId = CommittedIndex> {
     pub offset: AtomPosition,
@@ -145,6 +151,19 @@ impl<I: VertexId> Composition<I> {
     pub fn occurrences(&self) -> &[Occurrence<I>] {
         &self.0
     }
+    /// The same composition with every child index mapped by `f` (index
+    /// spaces of the same graph: order, offsets and widths are kept).
+    pub(crate) fn map_index<J: VertexId>(
+        &self,
+        mut f: impl FnMut(I) -> J,
+    ) -> Composition<J> {
+        Composition(
+            self.0
+                .iter()
+                .map(|o| Occurrence::new(o.offset, Token::new(f(o.child.index), o.child.width)))
+                .collect(),
+        )
+    }
     /// Owner width implied by the composition (end of the last occurrence).
     pub fn width(&self) -> TokenWidth {
         TokenWidth(self.0.last().map_or(0, |o| o.end().0))
@@ -160,12 +179,7 @@ impl<I: VertexId> Composition<I> {
         &self,
         position: impl Into<AtomPosition>,
     ) -> Option<&Occurrence<I>> {
-        let position = position.into();
-        if position.0 >= self.width().0 {
-            return None;
-        }
-        let after = self.0.partition_point(|o| o.offset <= position);
-        Some(&self.0[after - 1])
+        slice::covering(&self.0, position.into())
     }
     /// The occurrence reaching `end` from furthest left: the first one with
     /// `end() ≥ end` (binary search; ends increase strictly with offsets).
@@ -174,11 +188,7 @@ impl<I: VertexId> Composition<I> {
         &self,
         end: impl Into<AtomPosition>,
     ) -> Option<&Occurrence<I>> {
-        let end = end.into();
-        if end.0 == 0 {
-            return None;
-        }
-        self.0.get(self.0.partition_point(|o| o.end() < end))
+        slice::ending_at(&self.0, end.into())
     }
     /// Occurrences strictly containing `position` (`offset < position < end`),
     /// a contiguous range because offsets and ends both increase strictly
@@ -188,10 +198,7 @@ impl<I: VertexId> Composition<I> {
         &self,
         position: impl Into<AtomPosition>,
     ) -> &[Occurrence<I>] {
-        let position = position.into();
-        let lo = self.0.partition_point(|o| o.end() <= position);
-        let hi = self.0.partition_point(|o| o.offset < position);
-        &self.0[lo..hi]
+        slice::crossing(&self.0, position.into())
     }
     /// The unique occurrence at offset 0.
     pub fn prefix(&self) -> &Occurrence<I> {
@@ -201,6 +208,61 @@ impl<I: VertexId> Composition<I> {
     /// with offsets, so it is the last one.
     pub fn postfix(&self) -> &Occurrence<I> {
         self.0.last().expect("a composition has at least two occurrences")
+    }
+}
+
+impl Composition<CommittedIndex> {
+    /// The occurrences with their children as [`StageIndex`]es: a stage
+    /// reads unchanged committed compositions without copying.
+    pub(crate) fn lifted(&self) -> &[Occurrence<StageIndex>] {
+        // SAFETY: `Occurrence` and `Token` are `repr(C)`, `VertexIndex` and
+        // `StageIndex` are `repr(transparent)` over `usize`, so both
+        // occurrence types have the same layout, and every `usize` is a
+        // valid `StageIndex`. Committed slots never have the staged bit set
+        // (`StageIndex::from` asserts it), so each lifted index addresses
+        // the same committed vertex.
+        unsafe { std::slice::from_raw_parts(self.0.as_ptr().cast(), self.0.len()) }
+    }
+}
+
+/// The search primitives of [`Composition`] on its occurrence slice, shared
+/// with stage views of compositions.
+pub(crate) mod slice {
+    use super::Occurrence;
+    use crate::{
+        AtomPosition,
+        graph::vertex::VertexId,
+    };
+
+    pub(crate) fn width<I: VertexId>(occurrences: &[Occurrence<I>]) -> usize {
+        occurrences.last().map_or(0, |o| o.end().0)
+    }
+    pub(crate) fn covering<I: VertexId>(
+        occurrences: &[Occurrence<I>],
+        position: AtomPosition,
+    ) -> Option<&Occurrence<I>> {
+        if position.0 >= width(occurrences) {
+            return None;
+        }
+        let after = occurrences.partition_point(|o| o.offset <= position);
+        Some(&occurrences[after - 1])
+    }
+    pub(crate) fn ending_at<I: VertexId>(
+        occurrences: &[Occurrence<I>],
+        end: AtomPosition,
+    ) -> Option<&Occurrence<I>> {
+        if end.0 == 0 {
+            return None;
+        }
+        occurrences.get(occurrences.partition_point(|o| o.end() < end))
+    }
+    pub(crate) fn crossing<I: VertexId>(
+        occurrences: &[Occurrence<I>],
+        position: AtomPosition,
+    ) -> &[Occurrence<I>] {
+        let lo = occurrences.partition_point(|o| o.end() <= position);
+        let hi = occurrences.partition_point(|o| o.offset < position);
+        &occurrences[lo..hi]
     }
 }
 

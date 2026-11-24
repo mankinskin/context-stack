@@ -5,4 +5,5 @@ mod guard;
 mod interchange;
 mod model;
 mod navigation;
+mod overlay;
 mod trace;

@@ -10,7 +10,10 @@
 //! out [`VertexRead`] vertex objects (`access.rs`), [`HasGraph`] /
 //! [`HasGraphMut`] abstract how a store is reached (`has_graph.rs`), and the
 //! committed store ([`PositionedGraph`], its lock guards and
-//! [`PositionedGraphRef`]) implements them (`committed.rs`).
+//! [`PositionedGraphRef`]) implements them (`committed.rs`). A read edits a
+//! stage ([`Stage`], [`StageHandle`], `stage.rs`); the overlay stage
+//! ([`OverlayHandle`], [`OverlayView`], `overlay.rs`) keeps its vertices
+//! next to the read-only committed graph until the commit.
 //!
 //! Read-only navigation (reader plan Phase 2) is split into separate APIs:
 //! - content reading (debug and `test-api` builds):
@@ -39,14 +42,19 @@ mod has_graph;
 pub mod interchange;
 pub mod location;
 mod navigate;
+mod overlay;
 pub mod path;
+mod stage;
 pub mod trace;
 
 #[cfg(feature = "edit")]
 #[doc(hidden)]
 pub use self::edit::GraphEdit;
 #[cfg(debug_assertions)]
-pub use self::graph::PositionedLabels;
+pub use self::{
+    graph::PositionedLabels,
+    overlay::OverlayLabels,
+};
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
 pub use self::location::IntervalView;
 #[cfg(any(test, feature = "test-api"))]
@@ -65,6 +73,20 @@ pub use self::{
         VertexState,
     },
     committed::PositionedVertexRef,
+    overlay::{
+        Lifted,
+        OverlayHandle,
+        OverlayVertex,
+        OverlayView,
+        StagedVertex,
+        StagingGraph,
+    },
+    stage::{
+        CommitError,
+        Stage,
+        StageHandle,
+        Translation,
+    },
     has_graph::{
         GraphAtom,
         HasGraph,

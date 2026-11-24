@@ -137,42 +137,6 @@ fn create_and_add_occurrences_keep_the_graph_valid_and_maintain_links() {
 }
 
 #[test]
-fn extend_grows_a_parentless_vertex() {
-    let mut graph: PositionedGraph = PositionedGraph::default();
-    let mut edit = graph.edit();
-    let a = edit.atom('a');
-    let b = edit.atom('b');
-    let c = edit.atom('c');
-    let ab = edit.create(vec![occ(0, a), occ(1, b)]).unwrap();
-    let bc = edit.create(vec![occ(0, b), occ(1, c)]).unwrap();
-    let root = edit.create(vec![occ(0, ab), occ(2, c)]).unwrap();
-    edit.finish();
-
-    let mut edit = graph.edit();
-    let abcab = edit.extend(root.index, occ(3, ab)).unwrap();
-    assert_eq!(abcab, Token::new(root.index, 5));
-    edit.graph().validate().unwrap();
-    let abcabc = edit.extend(root.index, occ(4, bc)).unwrap();
-    assert_eq!(abcabc, Token::new(root.index, 6));
-    let publication = edit.finish();
-    graph.validate().unwrap();
-
-    assert_eq!(
-        publication.edits,
-        [VertexEdit {
-            vertex: root.index,
-            added: vec![occ(3, ab), occ(4, bc)],
-            removed: vec![],
-        }]
-    );
-    assert_eq!(links(&graph, ab), [(root.index, 0), (root.index, 3)]);
-    assert_eq!(links(&graph, bc), [(root.index, 4)]);
-    assert_eq!(graph.vertex_data(root.index).unwrap().token(), abcabc);
-    #[cfg(debug_assertions)]
-    assert_eq!(graph.vertex_data(root.index).unwrap().label(), "abcabc");
-}
-
-#[test]
 fn add_occurrences_and_extend_reject_inputs_outside_their_preconditions() {
     let Ababab {
         mut graph,
@@ -195,23 +159,15 @@ fn add_occurrences_and_extend_reject_inputs_outside_their_preconditions() {
         edit.add_occurrences(abab.index, vec![occ(3, ab)]),
         Err(PositionedError::WidthChange { vertex: abab.index })
     );
+    // Committed content is immutable: `extend` is always rejected on the
+    // committed store (staged cases: `tests/overlay.rs`).
     assert_eq!(
         edit.extend(abab.index, occ(4, ab)),
-        Err(PositionedError::HasParents(abab.index))
-    );
-    assert_eq!(
-        edit.extend(ababab.index, occ(7, ab)),
-        Err(PositionedError::OutsideVertex {
-            vertex: ababab.index,
-            occurrence: occ(7, ab),
-        })
+        Err(PositionedError::NotStaged(abab.index))
     );
     assert_eq!(
         edit.extend(ababab.index, occ(4, ab)),
-        Err(PositionedError::OutsideVertex {
-            vertex: ababab.index,
-            occurrence: occ(4, ab),
-        })
+        Err(PositionedError::NotStaged(ababab.index))
     );
     assert_eq!(
         edit.add_occurrences(a.index, vec![occ(0, a)]),

@@ -214,6 +214,7 @@ impl HasSubLocation for SubToken {
 
 /// A vertex index with the vertex width. `I` is the index type of the store
 /// the token belongs to (staging plan §3.2).
+#[repr(C)]
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Token<I = CommittedIndex> {
     pub index: I,          // the token index
@@ -241,12 +242,19 @@ impl<I: VertexId> Token<I> {
         }
     }
 
-    /// Resolved name of a committed token; `None` for staged ones.
+    /// Resolved name of the token (staged tokens through the resolver of
+    /// their stage).
     #[cfg(any(test, feature = "test-api"))]
     pub fn get_string_repr(&self) -> Option<String> {
-        self.index
-            .committed()
-            .and_then(|index| crate::graph::vertex::name_resolver::resolve_token_name(*index))
+        use crate::graph::vertex::name_resolver::{
+            resolve_staged_token_name,
+            resolve_token_name,
+        };
+        match (self.index.committed(), self.index.staged()) {
+            (Some(index), _) => resolve_token_name(*index),
+            (None, Some(staged)) => resolve_staged_token_name(staged.slot()),
+            (None, None) => None,
+        }
     }
 }
 
@@ -370,6 +378,13 @@ impl PartialEq<VertexIndex> for &'_ mut Token {
         other: &VertexIndex,
     ) -> bool {
         self.index == *other
+    }
+}
+
+/// A committed token addressed in a stage.
+impl From<Token> for Token<crate::graph::vertex::StageIndex> {
+    fn from(token: Token) -> Self {
+        Token::new(crate::graph::vertex::StageIndex::from(token.index), token.width)
     }
 }
 

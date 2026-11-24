@@ -186,6 +186,8 @@ pub enum PositionedError<I: VertexId = CommittedIndex> {
     },
     /// The vertex has parents, so its width must not change.
     HasParents(I),
+    /// The vertex is committed, so its content must not change.
+    NotStaged(I),
     /// `occurrence` does not lie where the edit of `vertex` requires it.
     OutsideVertex {
         vertex: I,
@@ -261,6 +263,7 @@ impl<I: VertexId> fmt::Display for PositionedError<I> {
                 right.offset
             ),
             Self::HasParents(vertex) => write!(f, "vertex {} has parents", Plain(*vertex)),
+            Self::NotStaged(vertex) => write!(f, "vertex {} is committed", Plain(*vertex)),
             Self::OutsideVertex { vertex, occurrence } => write!(
                 f,
                 "occurrence {}@{} lies outside the editable range of vertex {}",

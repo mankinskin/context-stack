@@ -8,6 +8,7 @@ use std::{
 };
 
 /// Newtype for vertex indices that provides Display with string representation
+#[repr(transparent)]
 #[derive(
     Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
 )]
