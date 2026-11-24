@@ -358,6 +358,14 @@ pub struct Generation { pub base: u64, pub stage: u64 }
   Hot recursions dispatch through `node().composite()` / `node().atom()`
   rather than a `match` on `NodeRef` (the match made the composition
   address depend on the node tag; content reads were about 40 % slower).
+- *Implemented (S3, §11):* the overlay reads **every** composition as
+  `Lifted<'a>(&'a [Occurrence<StageIndex>])`: staged and copy-on-write
+  compositions directly, unchanged committed ones reinterpreted in place
+  (`Composition::lifted`; `Token` and `Occurrence` are `repr(C)`,
+  `VertexIndex` and `StageIndex` `repr(transparent)`), so no per-occurrence
+  `.into()` and no dispatch between two composition kinds. The search
+  primitives of `Composition` are shared slice helpers
+  (`composition::slice`).
 - **`string_repr(v: impl VertexRead)`** (free function, legacy
   `HasVertexStringRepr`): the vertex's string, computed by expanding the
   composition down to atoms. Works for staged vertices and in release
@@ -567,6 +575,12 @@ pub enum CommitError {
   stage does not store it. `commit` takes the root so that it is translated
   and so that the dissolution plan can mark it as input without changing
   the signature.
+- *Implemented (S3, §11):* `Translation` also has `len`/`is_empty`;
+  `From<Token> for Token<StageIndex>` lifts committed tokens into a stage.
+  Generation: every mutating edit of a stage bumps `Generation::stage`
+  once (the base generation stays as opened); `commit` adds the stage
+  counter to the base generation, so the committed generation after a read
+  equals the one of applying the edits directly.
 
 ### 3.7 Search, insertion and reader (context-search, context-insert, context-read)
 
@@ -627,7 +641,7 @@ pub fn read(graph: &PositionedGraphRef, input: impl IntoIterator<Item = char>)
 | `PositionedGraph<G>` and its `RwLock` guards | context-trace | `GraphRead`, `GraphWrite`, `HasGraph(Mut)` (guard `&Self`) | `CommittedIndex` | `&PositionedVertex` + graph reference |
 | `PositionedGraphRef<G>` | context-trace | `HasGraph`, `HasGraphMut` (lock guards) | `CommittedIndex` | — |
 | `StagingGraph<G>` | context-trace | storage only | — | — |
-| `OverlayView<'a, G>` (a) | context-trace | `GraphRead`, `GraphWrite`, `Stage`, `HasGraph(Mut)` (guard `&Self`) | `StageIndex` | `enum { Base(&PositionedVertex, Option<&CowComposition>, &LinkDelta), Staged(&StagedVertex) }` |
+| `OverlayView<'a, G>` (a) | context-trace | `GraphRead`, `GraphWrite`, `Stage`, `HasGraph(Mut)` (guard `&Self`) | `StageIndex` | `OverlayVertex { view: &OverlayView, index }` (two words; stored vertex and delta looked up per access, S3) |
 | `OverlayHandle<'g, G>` (a) | context-trace | `HasGraph`, `HasGraphMut`, `StageHandle` | `StageIndex` | — |
 | `TaggedView<'a, G>` (b) | context-trace | `GraphRead`, `GraphWrite`, `Stage`, `HasGraph(Mut)` (guard `&Self`) | `StageIndex` | `&PositionedVertex` + graph reference |
 | `TaggedHandle<'g, G>` (b) | context-trace | `HasGraph`, `HasGraphMut`, `StageHandle` | `StageIndex` | — |
@@ -684,15 +698,26 @@ needs) or deliberately not adopted:
 StagingGraph {
   vertices: Vec<StagedVertex>,                        # by StagedIndex (Slab in the dissolution plan)
   atoms: Map<Atom, StagedIndex>,                      # atoms new in this read
-  compositions: Map<CommittedIndex, Composition<StageIndex>>,  # copy-on-write shape of committed hosts
-  added_parents: Map<CommittedIndex, Set<(StageIndex, AtomPosition)>>,  # committed children
-  removed_parents: Map<CommittedIndex, Set<(StageIndex, AtomPosition)>>,
+  deltas: Map<CommittedIndex, BaseDelta>,             # changes of committed vertices, one lookup
   base_generation: u64,                               # base generation when opened
   generation: u64,
 }
-OverlayHandle<'g> { base: &'g PositionedGraphRef, stage: Mutex<StagingGraph> }
-OverlayView<'a>   { base: RwLockReadGuard<'a, PositionedGraph>, stage: MutexGuard<'a, StagingGraph> }
+BaseDelta {
+  composition: Option<Composition<StageIndex>>,       # copy-on-write shape of a committed host
+  added: Links<StageIndex>,                           # parent links not in the base
+  removed: Links<CommittedIndex>,                     # base parent links removed
+}
+OverlayHandle<'g> { base: &'g PositionedGraphRef, stage: RefCell<StagingGraph> }
+OverlayView<'a>   { base: RwLockReadGuard<'a, PositionedGraph>, stage: RefMut<'a, StagingGraph> }
 ```
+
+*Implemented (S3, §11):* the three per-vertex maps of revision 5 are one
+`deltas` map (a committed vertex access needs one lookup, skipped while the
+map is empty); the stage maps use a multiplicative (Fx-style) hasher. The
+stage is a `RefCell` instead of a `Mutex`: it belongs to one read, views are
+taken one at a time (a second live view panics instead of deadlocking), and
+the uncontended lock pair per view cost about 5 % on `read/corpus`; the
+handle is not `Sync`.
 
 The view holds the base read-locked even for writes; only
 `OverlayHandle::commit` takes the base write lock. `removed_parents` is
@@ -773,6 +798,11 @@ translates the only token it holds, the root.
 - `insert` outside a read (insert gate only) uses no stage (§2.2).
 - `GraphEdit::extend` precondition: staged and parentless (replaces
   `HasParents`).
+- *Implemented (S4, §11):* `segments`, `forward`, `expand` and
+  `find_complete` take the stage handle (`H: StageHandle`); tokens inside a
+  read are `Token<StageIndex>`. `ReadStage::finish` commits; empty input has
+  no root and drops its (empty) stage. `read_traced` stays on
+  `DefaultStaging`.
 - Tests stay as they are: the 9 scenarios ignored for provisional
   retention stay ignored, `READ_DEVIATIONS` stays unchanged (both are
   removed by the dissolution plan).
@@ -1088,3 +1118,163 @@ Open for S3:
   will show whether bounds are missing.
 - `StageHandle`, `Translation`, `Stage`, `Lifted` and the overlay are not
   started; `NotStaged` and the staged `extend` precondition come with them.
+
+### S3 — overlay stage (2026-11-24)
+
+New modules in `context-trace/src/positioned`: `stage.rs` (`Stage`,
+`StageHandle`, `Translation`, `CommitError::BaseChanged`) and `overlay.rs`
+(`StagingGraph`, `StagedVertex`, `OverlayHandle`, `OverlayView`,
+`OverlayVertex`, `Lifted`, `OverlayLabels`). `OverlayView` implements
+`GraphRead`, the sealed `raw::Write`, `Stage`, `HasGraph(Mut)` (guards
+`&Self` / `&mut Self`); `OverlayHandle` implements `HasGraph(Mut)` (views
+per call) and `StageHandle`. `PositionedError::NotStaged`; `extend`
+requires `state() == Staged` (checked after `Atom`, before `HasParents`),
+so it is always rejected on the committed store.
+
+Operations as in §4.3: reads of a committed index use the base vertex and
+its delta (copy-on-write composition, parents = base − removed + added),
+writes of a committed index go into its delta, staged vertices are pushed
+into the stage, atom lookup checks the stage first. `commit` takes the base
+write lock, checks the generation (`BaseChanged { opened, now }`), pushes
+the staged vertices in `StagedIndex` order (committed index = base length +
+slot, compositions and parent links translated), applies the deltas and
+adds the stage generation to the base generation. Result: the committed
+graph equals the graph of the same edits applied directly, including
+indices, parent links, labels, atom index and generation (vertex keys are
+fresh random keys in both paths).
+
+Deviations (the §3/§4 text is updated):
+
+- **One delta map** (`BaseDelta { composition, added, removed }`) instead of
+  three maps; Fx-style hasher for the stage maps.
+- **Vertex object** `OverlayVertex { view: &OverlayView, index }`, two
+  words like the committed one, instead of the enum of §3.8. The enum (base
+  vertex, optional delta, or staged vertex; 5–8 words) made content reads
+  2.7–3.5× slower than on the committed store: the object is copied through
+  the `read_into` recursion (store-forwarding stalls after each lookup) and
+  `node()` returned three words through memory. With the two-word object
+  and `#[inline(always)]` on the lookup and `node()`, content reads over an
+  empty stage take 1.03× and over an all-staged graph 1.17× the committed
+  time (`read_interval` of every vertex of the `abc^256 x` graph, 20×).
+- **`Lifted` for every overlay composition** (a slice in the stage's index
+  space; committed compositions reinterpreted in place, the only `unsafe` of
+  the change, justified by `repr(C)` / `repr(transparent)` layouts and the
+  range assertion of `StageIndex::from`). `StageIndex::lift` (crate-internal,
+  unchecked in release) for hot paths.
+- **`RefCell`** instead of `Mutex` for the stage (see §4.1).
+- **Labels (§3.3):** `VertexId::staged()`, `TokenNameResolver::staged_token_name`
+  (default `None`) and `resolve_staged_token_name`; `Token::get_string_repr`
+  resolves staged tokens through it; `OverlayView::name_resolver` /
+  `register_name_resolver` install `OverlayLabels` (base and staged labels).
+- No bound had to be added to search, tracing or insertion: the generic
+  code of S2 compiled unchanged for `StageIndex` stores.
+- Tests on the committed store that called `extend` (`tests/edit.rs`) now
+  expect `NotStaged`; the growth, `OutsideVertex` and `HasParents` cases
+  moved to a stage (`tests/overlay.rs`). No other test (insert gate
+  included) calls `extend` on the committed store.
+
+New tests (`positioned/tests/overlay.rs`, 7): `overlay_commit_equals_direct_edits`
+(two `GraphEdit` sequences — insertion of `baba` into committed hosts with
+base links removed; new atom, staged hosts over committed children, a
+staged host dropping a link it added to a committed child, a rejected
+create and a no-op edit — applied directly and on a stage, compared exactly
+after commit), `extend_rejects_committed_vertices`,
+`extend_grows_a_staged_parentless_vertex_only` (incl. `HasParents` on a
+staged vertex with parents), `commit_translates_staged_indices_in_creation_order`,
+`commit_rejects_a_changed_base`, `stage_generation_counts_edits_and_commit_adds_them`,
+`staged_labels_resolve_through_the_overlay`.
+
+### S4 — reader on the stage (2026-11-24)
+
+`context-read/src/staging.rs`: `StagingStrategy` (`open(&PositionedGraphRef)
+-> Handle<'_>`), `OverlayStaging`, `DefaultStaging = OverlayStaging`.
+`RootManager { root, owned }` is `ReadStage<'g, S> { handle, root:
+Option<Token<StageIndex>> }`; editable = `state() == Staged`, parentless and
+composite. `read_with::<S>` opens the stage, runs the unchanged loop and
+commit table, and commits at input end; `read` and `read_traced` use
+`DefaultStaging`. Insertion inside a read runs on `&mut handle`; the insert
+gate stays on the committed store.
+
+- **Ownership assertion.** `debug_assert_eq!(editable, owned && parentless)`
+  on every editability check held in all debug runs (context-read
+  `test-api` and `legacy-tests` suites, and the neutrality check below
+  including `abc^n x`, n = 8, 64, 256); the `owned` flag was then removed.
+  New unit test `staged_atom_root_is_not_editable` (§2.3, the composite
+  condition).
+- **Test macro** (`tests/reader_behavior.rs`): `with_scenarios!` holds the
+  scenario list once; `strategies!(overlay: context_read::OverlayStaging)`
+  instantiates every scenario and the read gate per strategy in module
+  `overlay`; S5 adds `tagged: context_read::TaggedStaging`. Scenarios now
+  validate the graph after every input. Ignored scenarios (9) and
+  `READ_DEVIATIONS` unchanged.
+- **Behavior neutrality.** Before any change, a temporary test dumped the
+  exact committed graph (generation, every vertex with index, width,
+  composition with child indices, parent links and debug label; the returned
+  root) after every read, with `validate()` after each: all 94 v3
+  scenarios read in order (corpus lane), all 140 read-lane cases on their
+  base graphs, and `abc^n x` for n = 8, 64, 256 — 237 dumps, recorded on
+  14209da. After S4 (and again after the final optimizations) all 237
+  dumps are byte-identical, including generations; the temporary test and
+  dumps are not committed.
+
+Gate (`passed / failed / ignored`, before (S2) → after S3+S4):
+
+| Command | Before | After |
+|---|---|---|
+| `cargo check … --no-default-features --features test-api` | ok | ok |
+| `cargo test -p context-read --no-default-features --features test-api` | 110 / 0 / 9 | 111 / 0 / 9 (+1 `staged_atom_root_is_not_editable`) |
+| `cargo test -p context-trace -p context-search -p context-insert --no-default-features --features test-api` | 89 / 0 / 12 | 95 / 0 / 12 (+7 overlay, −1 `extend_grows_a_parentless_vertex` moved to a stage) |
+| `cargo test --release -p context-insert --no-default-features --features test-api insert_gate` | 1 / 0 / 0 | 1 / 0 / 0 |
+| `cargo test -p context-read --features legacy-tests` | 193 / 0 / 18 | 194 / 0 / 18 |
+| `cargo test -p context-trace -p context-search -p context-insert --features legacy-tests` | 311 / 0 / 47 | 317 / 0 / 47 |
+| `cargo build --workspace --all-targets --exclude context-editor-kernel --exclude sandbox-app` | ok | ok |
+
+Benchmarks (`--baseline pre-staging`, medians; "S2 rerun" is the S2 build
+benched on the same machine directly before, for drift). New items:
+`find_ancestor/corpus_inputs_overlay` (every corpus input searched in its
+committed fixture graph through an empty `OverlayView`) and
+`commit/overlay/abc^n_x/n` (only `StageHandle::commit` of a stage holding
+the graph a read of `abc^n x` builds, replayed vertex by vertex into a
+stage over an empty base):
+
+| Benchmark | S0 | S2 rerun | S3+S4 | vs S0 (criterion) | vs S2 rerun |
+|---|---|---|---|---|---|
+| `read/corpus/all` | 1.316 ms | 1.381 ms | 1.779 ms | +37 % | +29 % |
+| `read/periodic/abc^n_x/64` | 828 µs | 861 µs | 1.034 ms | +22 % | +20 % |
+| `read/periodic/abc^n_x/256` | 36.4 ms | 36.4 ms | 41.9 ms | +14 % | +15 % |
+| `read/periodic/abc^n_x/512` | 333 ms | 341 ms | 376 ms | +13 % | +10 % |
+| `find_ancestor/corpus_inputs` (committed, code unchanged) | 869 µs | 879 µs | 916 µs | +5 % | +4 % (drift) |
+| `find_ancestor/corpus_inputs_overlay` | — | — | 873 µs | — | ≈ committed (−5 % vs the committed run) |
+| `commit/overlay/abc^n_x/64` (68 vertices) | — | — | 5.9 µs | — | 0.6 % of the read |
+| `commit/overlay/abc^n_x/256` (260 vertices) | — | — | 21.4 µs | — | 0.05 % of the read |
+| `commit/overlay/abc^n_x/512` (516 vertices) | — | — | 39.5 µs | — | 0.01 % of the read |
+
+- **Overlay overhead on reader throughput:** −22 % atoms/s on the corpus
+  (many tiny reads: per-read open, view and commit costs) and −9 … −17 % on
+  long periodic reads, where `test-api` content checks dominate (S2 §11);
+  pure search through an empty overlay costs nothing measurable. A
+  same-binary A/B of the corpus loop (example builds of S2 and S3+S4) gave
+  +17–19 %. A profile of the remaining corpus gap (S2 vs S3+S4, same
+  workload, flat profile) spreads it over the `test-api` link checks of
+  `GraphEdit::finish` through the overlay (`is_parent_at`, merged
+  `parents` of committed vertices with a delta; about a fifth), the commit
+  (pushing and translating vertices, rebuilding parent maps, dropping the
+  stage; about a fifth), the search through `OverlayView` and allocation.
+- Earlier designs, for the record (`read/corpus` / `abc^256 x` vs S0):
+  enum vertex object +58 % / +184 %; one `Lifted` slice type with the node
+  precomputed in the object: `abc^256 x` still 91 ms (probe binary, vs
+  36 ms); two-word object with inlined lookups +50 % / +16 %; Fx hasher
+  for the stage maps +39 % / +11 %; `RefCell` stage (final) +33–37 % /
+  +14 % (run-to-run drift of a few percent, see the committed
+  `find_ancestor` row).
+
+Open:
+
+- The corpus overhead (+29 % vs S2) is above the "within noise" bar of
+  S1/S2; it is a strategy cost (§7 "lookup cost", "commit cost") to be
+  compared with (b) in S5/S6. Candidates: avoid rebuilding parent maps at
+  commit (store staged links in committed form when the parent is
+  committed), cache the base vertex slice in the view, a cheaper merged
+  parent iteration.
+- `OverlayHandle` is not `Sync` (`RefCell`); concurrent reads (§4.4) need
+  a different stage cell.
