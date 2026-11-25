@@ -15,7 +15,10 @@ use crate::legacy::{
         getters::vertex::VertexSet,
         vertex::{
             VertexIndex,
-            data::VertexData,
+            data::{
+                VertexData,
+                VertexDataBuilder,
+            },
             has_vertex_index::HasVertexIndex,
             location::child::ChildLocation,
             pattern::{
@@ -95,13 +98,14 @@ impl GraphBuilder {
     }
     pub(crate) fn queue_node(
         &mut self,
-        node: BuilderNode,
-    ) {
-        self.graph.insert_vertex_data(VertexData::new(Token::new(
-            node.index.vertex_index(),
-            TokenWidth(node.range.clone().count()),
-        )));
-        self.queue.push_back(node);
+        range: BuildKey,
+    ) -> Token {
+        let token = self.graph.insert_vertex_builder(
+            VertexDataBuilder::new().width(TokenWidth(range.clone().count())),
+        );
+        self.range_map.insert(range.clone(), token.vertex_index());
+        self.queue.push_back(BuilderNode::new(token, range));
+        token
     }
 
     pub(crate) fn add_rules(
@@ -125,11 +129,7 @@ impl GraphBuilder {
                             .unwrap();
                         Token::new(*v, key.clone().count())
                     } else {
-                        let vid = self.graph.next_vertex_index();
-                        self.range_map.insert(key.clone(), vid);
-                        let c = Token::new(vid, key.clone().count());
-                        self.queue_node(BuilderNode::new(c, key.clone()));
-                        c
+                        self.queue_node(key.clone())
                     }
                 })
                 .collect();
@@ -141,11 +141,7 @@ impl GraphBuilder {
         }
     }
     pub(crate) fn fill_grammar(&mut self) {
-        let vid = self.graph.next_vertex_index();
-        self.queue_node(BuilderNode::new(
-            Token::new(vid, self.N),
-            0..=self.N - 1,
-        ));
+        self.queue_node(0..=self.N - 1);
         while let Some(node) = self.queue.pop_front() {
             self.add_rules(node);
         }

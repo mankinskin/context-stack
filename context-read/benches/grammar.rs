@@ -13,7 +13,10 @@ use criterion::{
 use derive_more::Deref;
 use derive_new::new;
 
-use context_trace::legacy::*;
+use context_trace::legacy::{
+    graph::vertex::data::VertexDataBuilder,
+    *,
+};
 
 type BuildKey = RangeInclusive<usize>;
 
@@ -80,13 +83,14 @@ impl GraphBuilder {
     }
     pub(crate) fn queue_node(
         &mut self,
-        node: BuilderNode,
-    ) {
-        self.graph.insert_vertex_data(VertexData::new(Token::new(
-            node.index.vertex_index(),
-            TokenWidth(node.range.clone().count()),
-        )));
-        self.queue.push_back(node);
+        range: BuildKey,
+    ) -> Token {
+        let token = self.graph.insert_vertex_builder(
+            VertexDataBuilder::new().width(TokenWidth(range.clone().count())),
+        );
+        self.range_map.insert(range.clone(), token.vertex_index());
+        self.queue.push_back(BuilderNode::new(token, range));
+        token
     }
 
     pub(crate) fn add_rules(
@@ -106,29 +110,23 @@ impl GraphBuilder {
                     let loc = ChildLocation::new(node.index, pid, sub_index);
                     if let Some(&v) = self.range_map.get(key) {
                         self.graph
-                            .with_vertex_mut(v, |node| node.add_parent(loc));
+                            .with_vertex_mut(v, |node| node.add_parent(loc))
+                            .unwrap();
                         Token::new(v, TokenWidth(key.clone().count()))
                     } else {
-                        let vid = self.graph.next_vertex_index();
-                        self.range_map.insert(key.clone(), vid);
-                        let c =
-                            Token::new(vid, TokenWidth(key.clone().count()));
-                        self.queue_node(BuilderNode::new(c, key.clone()));
-                        c
+                        self.queue_node(key.clone())
                     }
                 })
                 .collect();
-            self.graph.with_vertex_mut(node.index, |v| {
-                v.add_pattern_no_update(pid, pattern)
-            });
+            self.graph
+                .with_vertex_mut(node.index, |v| {
+                    v.add_pattern_no_update(pid, pattern)
+                })
+                .unwrap();
         }
     }
     pub(crate) fn fill_grammar(&mut self) {
-        let vid = self.graph.next_vertex_index();
-        self.queue_node(BuilderNode::new(
-            Token::new(vid, TokenWidth(self.N)),
-            0..=self.N - 1,
-        ));
+        self.queue_node(0..=self.N - 1);
         while let Some(node) = self.queue.pop_front() {
             self.add_rules(node);
         }
