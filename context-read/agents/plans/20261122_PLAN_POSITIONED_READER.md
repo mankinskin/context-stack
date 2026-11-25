@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-insert` `#context-search` `#positioned-composition` `#reader` `#expansion`
 summary: Positioned reader (roadmap steps 4–5), revision 2. The legacy reader loop is kept unchanged (segments; per step root-postfix expansion first, else forward match; every accepted match inserted; commit before the next search). Only root edits change: the root stays the input's own vertex, an owned root grows in place through GraphEdit::extend, the postfix chain is the chain of last children, and closure is one composition update without complements. Prototype R0 (read_legacy_port.py) reproduces the oracle on 164 of 166 fixture reads; the 2 others are provisional retention (roadmap step 5). Integration with insertion revision 3.
-status: 🚧 revision 2.2 — §7 decided (P-R1 closed, seam bound dropped, search reuse defined; task R3.1 done); R1–R3 implemented (step 4 gate green with 10 expected provisional-retention deviations: 9 scenarios, 1 read-lane case); R4 (staging graph, behavior-neutral) and R5 (dissolution) open
+status: 🚧 revision 2.2 — §7 decided (P-R1 closed, seam bound dropped, search reuse defined; task R3.1 done); R1–R3 implemented (step 4 gate green with 10 expected provisional-retention deviations: 9 scenarios, 1 read-lane case); R4 (staging graph, overlay) implemented; R5 (dissolution, 20261125_PLAN_DISSOLUTION rev 3) planned
 date: 2026-11-23
 parent: 20261120_PLAN_POSITIONED_READER_OPEN_WORK.md (steps 4–5)
 depends_on: 20261122_PLAN_POSITIONED_INSERT.md (revision 3), 20261120_PLAN_POSITIONED_SEARCH.md (done)
@@ -20,7 +20,7 @@ depends_on: 20261122_PLAN_POSITIONED_INSERT.md (revision 3), 20261120_PLAN_POSIT
 [20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md)
 (staged vs committed tokens, store traits; behavior-neutral; draft).
 **Dissolution (R5):**
-[20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md)
+[20261125_PLAN_DISSOLUTION](20261125_PLAN_DISSOLUTION.md)
 (G6, dissolution of provisional tokens; after R4; draft).
 **Prototype:**
 [`read_legacy_port.py`](../../../context-insert/agents/prototypes/read_legacy_port.py)
@@ -399,14 +399,15 @@ milestone (`abcabca` without `abc`), which needs the step 5 rule.
    behavior-neutral): tokens created by a read are *staged* until the read
    commits its stage at input end; committed tokens have immutable content.
    The root manager's "owned root" becomes "staged and parentless". Both
-   implementations (physical overlay graph, stage tag on vertices) are
-   built behind common store traits and compared; the default is open
-   there (D-S1). The reader's output, including these deviations, does not
-   change.
-2. [20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md) (R5): staged
-   tokens with a single parent occurrence (violating the retention
-   invariant G6) are dissolved into their parent after every root commit;
-   `commit` asserts G6. This removes the expected deviations.
+   implementations (physical overlay graph, stage tag on vertices) were
+   built behind common store traits and compared; the overlay is kept
+   (D-S1 final, 2026-11-25). The reader's output, including these
+   deviations, did not change. **Implemented.**
+2. [20261125_PLAN_DISSOLUTION](20261125_PLAN_DISSOLUTION.md) (R5): staged
+   tokens with ≤ 1 parent occurrence (violating the retention invariant
+   G6) are dissolved into their parent or discarded by an eager, local
+   `settle` after every reader step; `commit` panics on a G6 violation.
+   This removes the expected deviations.
 
 ## 6. Evidence (prototype R0)
 
@@ -447,7 +448,7 @@ part of R2 and fixes the expected-deviation list of §9.1.
 1. ~~Provisional retention (P-R1)~~ — closed (2026-11-24): step 4 keeps
    the legacy rule; demotion is
    [20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md) (R4) and
-   [20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md) (R5).
+   [20261125_PLAN_DISSOLUTION](20261125_PLAN_DISSOLUTION.md) (R5).
 2. **Proof of G2 for root edits.** The prototype checks it on every edit;
    the argument "every junction is probed largest postfix first before
    anything is appended" needs a written proof, in particular for tokens
@@ -476,8 +477,8 @@ part of R2 and fixes the expected-deviation list of §9.1.
 | R2 **Done** | Forward match and segments (§3.3), no expansion; read lane fixtures and loader (§9.1); new scenario `seam_overlap_append` (§9.2); prototype rerun on the current manifest | Read-lane cases whose prototype trace has no accepted expansion equal their oracle graph |
 | R3 **Done** | Root expansion and closure (§3.2, §3.4), self-expansion rule | Step 4 gate (§9): every read-lane case and every scenario of `context-read/tests/reader_behavior.rs` equals its oracle graph, except the expected deviations of §5 |
 | R3.1 **Done** | Cleanup after the decisions of §7: remove the seam bound from `expand` (the skip of postfixes wider than `cursor`, and its doc comment; `cursor` stays for the `cursor == 0` guard) and from the prototype's default; test that the steps of `read_traced` consume disjoint ranges covering the input (§7 Q4) | Step 4 gate unchanged |
-| R4 | Staging graph: staged vs committed vertices, store traits, both implementations, `ReadStage` ([20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md), tasks S0–S6); no behavior change | Staging plan gate: output identical to R3 (same expected deviations) for both strategies |
-| R5 | Step 5: dissolution of provisional tokens ([20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md), tasks D0–D6: commit at input end first, then early commit), streaming retention | Dissolution plan gate: no expected deviations; roadmap step 5 gate |
+| R4 **Done** | Staging graph: staged vs committed vertices, store traits, both implementations, `ReadStage` ([20261124_PLAN_STAGING_GRAPH](20261124_PLAN_STAGING_GRAPH.md), tasks S0–S6); no behavior change | Staging plan gate: output identical to R3 (same expected deviations) for both strategies |
+| R5 | Step 5: dissolution of provisional tokens ([20261125_PLAN_DISSOLUTION](20261125_PLAN_DISSOLUTION.md), tasks D2–D7: settle after every step and commit at input end, then early commit (§4.6 there, interface open)), streaming retention | Dissolution plan gate: no expected deviations; roadmap step 5 gate |
 
 **Status (2026-11-23).** R1–R3 implemented in `context-read/src/{segment,
 root, forward, expand, read}.rs`. Step 4 gate: all 140 read-lane cases equal

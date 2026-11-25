@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-read` `#context-trace` `#context-insert` `#context-search` `#positioned-composition` `#reader` `#staging`
-summary: Staging graph for the positioned reader, behavior-neutral infrastructure. Tokens created during a read are staged (content may change through the owned-root `extend`); everything else is committed (content immutable forever, only composition shape may change). The read commits its stage at input end. Replaces the root manager's implicit ownership flag by an explicit vertex state. The stores are abstracted by traits with typed vertex indices (CommittedIndex, StagedIndex, StageIndex) and vertex objects (GraphRead hands out VertexRead objects; Navigate on vertices; sealed GraphWrite/VertexWrite behind a generic GraphEdit; Stage; legacy-style HasGraph/HasGraphMut access traits whose guards are GraphRead/GraphWrite views; StageHandle with commit and Translation; StagingStrategy; shared HasVertexIndex/Wide/ToToken accessors), so search, insertion and the reader are written once. Two implementations are built side by side and benchmarked: (a) a physical overlay graph next to the committed graph; (b) a stage tag on vertices of the one graph. The reader's output does not change; dissolution of provisional tokens is the follow-up plan 20261124_PLAN_DISSOLUTION.
-status: ✅ implemented (S0–S6, 2026-11-24) — revision 5; (a) overlay is the default (D-S1), (b) tag implemented behind the same traits and benchmarked (§11 S5/S6: tagged is faster on the corpus and equal on periodic reads; recommendation for a later D-S1 revision in §11 S6); dissolution follows in 20261124_PLAN_DISSOLUTION
+summary: Staging graph for the positioned reader, behavior-neutral infrastructure. Tokens created during a read are staged (content may change through the owned-root `extend`); everything else is committed (content immutable forever, only composition shape may change). The read commits its stage at input end. Replaces the root manager's implicit ownership flag by an explicit vertex state. The stores are abstracted by traits with typed vertex indices (CommittedIndex, StagedIndex, StageIndex) and vertex objects (GraphRead hands out VertexRead objects; Navigate on vertices; sealed GraphWrite/VertexWrite behind a generic GraphEdit; Stage; legacy-style HasGraph/HasGraphMut access traits whose guards are GraphRead/GraphWrite views; StageHandle with commit and Translation; StagingStrategy; shared HasVertexIndex/Wide/ToToken accessors), so search, insertion and the reader are written once. Two implementations are built side by side and benchmarked: (a) a physical overlay graph next to the committed graph; (b) a stage tag on vertices of the one graph. The reader's output does not change; dissolution of provisional tokens is the follow-up plan 20261125_PLAN_DISSOLUTION.
+status: ✅ implemented (S0–S6, 2026-11-24) — revision 5; D-S1 final (2026-11-25): (a) overlay only; (b) tag was implemented and benchmarked (§11 S5/S6) and is removed by the dissolution plan (20261125_PLAN_DISSOLUTION task D2, with `StagingStrategy`, `read_with` and the `pre-staging` baseline); the remaining performance items of §11 move to a later profiling plan
 date: 2026-11-24
 parent: 20261122_PLAN_POSITIONED_READER.md (phase R4)
 depends_on: 20261122_PLAN_POSITIONED_READER.md (R1–R3 implemented), 20261122_PLAN_POSITIONED_INSERT.md (revision 3, GraphEdit D8)
@@ -13,7 +13,7 @@ depends_on: 20261122_PLAN_POSITIONED_READER.md (R1–R3 implemented), 20261122_P
 `context-insert` and `context-search` (graph parameter made generic, §3).
 **Reader:** [20261122_PLAN_POSITIONED_READER](20261122_PLAN_POSITIONED_READER.md)
 (phase R4).
-**Follow-up:** [20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md)
+**Follow-up:** [20261125_PLAN_DISSOLUTION](20261125_PLAN_DISSOLUTION.md)
 (phase R5): G6, `dissolve`, `settle`; the first change of the reader's
 output, built on this plan.
 **Insertion:** [20261122_PLAN_POSITIONED_INSERT](20261122_PLAN_POSITIONED_INSERT.md)
@@ -28,7 +28,7 @@ output, built on this plan.
   creates is indistinguishable from corpus tokens.
 - **Dissolution needs a boundary.** Provisional-retention deviations (10
   cases) are fixed by dissolving tokens the running read created
-  ([20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md)). That is only
+  ([20261125_PLAN_DISSOLUTION](20261125_PLAN_DISSOLUTION.md)). That is only
   sound if such tokens are identifiable and every other token is immutable.
 - **Several stores.** Combining several vertex stores into one coherent
   graph (a stage next to the committed graph; later several concurrent
@@ -148,7 +148,7 @@ The reader keeps an `owned` debug assertion until S4's gate is green
 | commit `Expand` | `extend(S2, S3@3)`: S2 `[S3@0, S3@3]` |
 | `handle.commit(S2)` | S1, S2, S3 committed; S1 `abc` keeps a single parent occurrence: today's deviation, unchanged |
 
-The [dissolution plan](20261124_PLAN_DISSOLUTION.md) adds a `settle` step
+The [dissolution plan](20261125_PLAN_DISSOLUTION.md) adds a `settle` step
 before the commit that dissolves `abc` (S1; its §2.5).
 
 ## 3. Store abstraction (traits)
@@ -495,7 +495,7 @@ always `Committed`) `extend` is therefore always rejected; today's
 `RootManager` only calls it on owned roots, which are staged in a stage.
 
 Removal of vertices (`dissolve`, `discard`, a `remove` primitive) is not
-part of this plan; the [dissolution plan](20261124_PLAN_DISSOLUTION.md) (§3 there) adds it to
+part of this plan; the [dissolution plan](20261125_PLAN_DISSOLUTION.md) (§4.2 there) adds it to
 these traits.
 
 ### 3.6 `HasGraph`, `HasGraphMut`, `Stage`, `StageHandle`, `Translation` (context-trace)
@@ -892,7 +892,12 @@ the comparison with `settle` (its §6).
 ## 8. Open questions
 
 1. ~~D-S1~~ — decided: (a) overlay is the default and is implemented
-   first (§7).
+   first (§7). **Final (2026-11-25):** overlay only. The tagged stage (b)
+   is removed together with `StagingStrategy`, `read_with` and the
+   `pre-staging` baseline (dissolution plan §4.1, task D2). The open items
+   of §11 S4/S6 (overlay overhead, `Sync` handle, unattributed per-read
+   cost) are deferred to a later profiling and optimization plan; the (b)
+   items (base-edit protection, aliased baseline) are void.
 2. ~~Standalone insertion~~ — decided: no stage; insertion is not public,
    only `read` is (§2.2).
 3. ~~Index space of (a)~~ — decided (revision 3): typed indices
@@ -1514,7 +1519,7 @@ change types only, the stored data is the same)):
 
 **Recommendation:** keep (a) overlay as the default through the
 dissolution plan, and keep (b) behind `TaggedStaging` for its comparison
-rerun (dissolution plan §6). The performance difference alone (−10 % on
+rerun (dissolution plan §4.5, task D6). The performance difference alone (−10 % on
 small reads, nothing on long ones) does not outweigh isolation and the
 simpler removal. Revisit D-S1 in favor of (b) only if, with `settle`, (b)
 keeps a corpus advantage of ≥ 10 % without a table translation at commit

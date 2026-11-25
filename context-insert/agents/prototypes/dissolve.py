@@ -117,7 +117,7 @@ def snapshot(hook, snaps):
 
 
 def compare_decisions(name, prev, I, V0, plain, settled, st, bad):
-    """Redundancy lemma (dissolution plan §2.4): the step decisions
+    """Redundancy lemma (dissolution plan §3.4): the step decisions
     `(kind, width, P, E, root)` with and without `settle` are equal. On a
     divergence, record both decisions, the probed postfixes and the tokens
     dissolved before the step with their parent occurrences in the plain graph."""

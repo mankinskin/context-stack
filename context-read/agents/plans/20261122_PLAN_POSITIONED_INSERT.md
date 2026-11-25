@@ -110,7 +110,7 @@ contexts. The oracle would then count it more often than each of its
 superstrings and retain it.
 
 **G6 (retention)** is defined in
-[20261124_PLAN_DISSOLUTION](20261124_PLAN_DISSOLUTION.md) §2.1: every
+[20261125_PLAN_DISSOLUTION](20261125_PLAN_DISSOLUTION.md) §3.1: every
 committed vertex that is neither an atom nor an input has at least two
 parent occurrences. Inputs are the strings of `read` calls only; insertion
 is an internal building block of the reader and never marks an input. The

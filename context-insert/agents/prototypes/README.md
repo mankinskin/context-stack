@@ -7,7 +7,7 @@ revision 3, roadmap step 3; revision 2:
 and the positioned reader plan
 ([20261122_PLAN_POSITIONED_READER](../../../context-read/agents/plans/20261122_PLAN_POSITIONED_READER.md),
 prototype R0) with the dissolution plan
-([20261124_PLAN_DISSOLUTION](../../../context-read/agents/plans/20261124_PLAN_DISSOLUTION.md),
+([20261125_PLAN_DISSOLUTION](../../../context-read/agents/plans/20261125_PLAN_DISSOLUTION.md),
 task D0). They validate algorithms on the v3 oracle fixtures before
 the Rust implementation and produce the plan's evidence numbers. They are
 reference material, not tests: the Rust gate (plan task 3.4) replaces them.
@@ -53,7 +53,8 @@ cached per corpus within one run; a gate takes a few seconds.
 | [naive_chains.py](naive_chains.py) | rejected: both response paths as they were before the insertion | Evidence (counterexample) |
 | [descend_closure.py](descend_closure.py) | superseded: recursive closure with host descent; streaming read mode | revision 1 → 2, D1 |
 | [read_legacy_port.py](read_legacy_port.py) | **accepted** reader prototype R0: the legacy reader loop (segments, root-postfix expansion, forward match) with positioned root edits; uses `split_positions.py` as `insert_match` | [reader plan](../../../context-read/agents/plans/20261122_PLAN_POSITIONED_READER.md) §3–§6 |
-| [dissolve.py](dissolve.py) | **accepted** dissolution prototype D0: `read_legacy_port.py` with eager `settle` (dissolve or discard staged tokens with ≤ 1 parent occurrence) after every root commit; per-step prefix-oracle, G6, order and committed-vertex checks; G6 on the oracle graphs | [dissolution plan](../../../context-read/agents/plans/20261124_PLAN_DISSOLUTION.md) §2, §5 |
+| [dissolve.py](dissolve.py) | **accepted** dissolution prototype D0: `read_legacy_port.py` with eager `settle` (dissolve or discard staged tokens with ≤ 1 parent occurrence) after every root commit; per-step prefix-oracle, G6, order and committed-vertex checks; G6 on the oracle graphs | [dissolution plan](../../../context-read/agents/plans/20261125_PLAN_DISSOLUTION.md) §3, §5.3 |
+| [early_commit.py](early_commit.py) | dissolution prototype D1b (part): root right-maximality RM (dissolution into the root) and the early-commit rule (safe = maximal repeat with fixed contexts; off-chain / parent-walk form), stability of early tokens, validity of a physical early-commit base view | [dissolution plan](../../../context-read/agents/plans/20261125_PLAN_DISSOLUTION.md) §3.4, §4.6 |
 | [cover_merge.py](cover_merge.py) | rejected for the reader: read-only cover merge with an offset seam scan (first reader draft); the reader keeps the legacy root-postfix expansion instead | reader plan §0 |
 | [invariants.py](invariants.py) | F3 (unique minimal host) and I2 (overlap closure) on all fixtures | Part B "Facts and invariants" |
 | [find_examples.py](find_examples.py) | search for deep insert examples with minimal corpora | named fixtures of task 3.1 |
@@ -194,7 +195,7 @@ scenarios: 94
 followed by the ten mismatches (`repeat_abcabca` extra `abc`,
 `repeat_ababa` extra `ab`, `insert_periodic`, `insert_deep_borders`, six
 `period_*`): tokens retained by a prefix of the input and no longer
-frequent at its end (dissolution plan §0). No `G2`, `G4` or `error` line
+frequent at its end (dissolution plan §1). No `G2`, `G4` or `error` line
 means none.
 
 ### dissolve.py (accepted, dissolution prototype D0)
@@ -204,7 +205,7 @@ python3 dissolve.py                  # gate (same as read_legacy_port.py --disso
 python3 dissolve.py abcabca          # trace with settle actions and per-step checks
 ```
 
-Runs `read_legacy_port.read` with `settle` (dissolution plan §2.3) after
+Runs `read_legacy_port.read` with `settle` (dissolution plan §3.3) after
 every root commit (unknown-atom append, forward step, expansion step).
 Staged vertices are those created by the running read; committed vertices
 and atoms are never dissolved, the current root is exempt. After every step
@@ -214,7 +215,7 @@ G6 on staged vertices; `settle` largest-first equals smallest-first;
 committed vertices are kept; every composition spells its vertex string and
 is complete (G2). After every input: the step decisions `(kind, width, P,
 E, root)` and the probed postfixes equal those of the same read without
-`settle` (redundancy lemma, plan §2.4; on a divergence it prints both
+`settle` (redundancy lemma, plan §3.4; on a divergence it prints both
 decisions and the dissolved tokens with their parent occurrences),
 equality with `oracle(C + [I])` and G6 (inputs exempt). Finally G6 on the oracle graph of every prefix of every
 scenario's inputs. Expected output:
@@ -285,3 +286,48 @@ and recomposed after appending the inputs after `+`.
 
 When the fixtures change, re-run the gates and update the evidence table of
 the plan. Keep the expected outputs in this file in sync with the plan.
+
+### early_commit.py (dissolution prototype D1b, part)
+
+```sh
+python3 early_commit.py              # scenarios and 3544 random corpora
+python3 early_commit.py abcXabcYab   # trace: root, postfix chain, safe and early tokens per step
+```
+
+Runs `read_legacy_port.read` with `dissolve.settle` after every step and
+checks, after every settled step (dissolution plan §3.4, §4.6):
+
+- RM: `root + next atom` occurs in no vertex (when the next atom is known);
+- the early-commit rule by definition (maximal repeat with >= 2 left and
+  >= 2 fixed right contexts in the committed inputs and the consumed
+  prefix) against its graph-local form: every settled staged composite off
+  the root's postfix chain is safe; on the chain, the parent-occurrence
+  walk `fixed_right` agrees with the definition (and how often it misses a
+  context when only parentless committed vertices are known as inputs);
+- no early token (safe, staged children early: the closure a physical
+  commit needs) is dissolved later or missing from the final oracle;
+- on the scenarios: the base view `committed + early` (brute-force
+  compositions) for G4 / G5 and early tokens with < 2 parent occurrences.
+
+Expected output (2026-11-25; lines omitted are zero):
+
+```
+RM checks: 21185
+base views checked: 67
+base views with early tokens p < 2: 67
+chain tokens: 15060
+chain tokens safe: 1750
+chain: safe but missed without input marks: 11
+dissolved: 492
+early commits: 7168
+off-chain tokens: 13845
+reads: 5269
+safe tokens blocked by closure (step): 292
+steps: 28630
+steps with a root with parents: 1348
+```
+
+No RM violation, no unsafe off-chain token, no walk/definition difference,
+no early token dissolved later, no G4 / G5 violation of a base view. Every
+base view has early tokens whose second parent occurrence is in the open
+root (G6 fails in a physically committed base, plan §5.1).
