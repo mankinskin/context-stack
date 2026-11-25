@@ -12,6 +12,7 @@ agents/
   designs/           ← algorithm and data-structure design documents
   analysis/          ← algorithm analysis, state investigations, failure post-mortems
   guides/            ← how-to guides and reference material
+  responses/         ← saved agent responses kept for later reference
   docs/              ← MCP-served crate documentation (module-level)
 ```
 
@@ -24,6 +25,7 @@ agents/
 | Algorithm design | `designs/` | Before implementing non-trivial algorithms or data structures |
 | Post-mortem / investigation | `analysis/` | After a bug investigation or algorithm comparison |
 | How-to / reference | `guides/` | When a pattern or workflow is worth preserving for future agents |
+| Saved agent response | `responses/` | When an agent answer is kept as reference for later implementation |
 
 ## Naming Convention
 
