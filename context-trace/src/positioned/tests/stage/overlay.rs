@@ -77,9 +77,8 @@ pub(super) fn base() -> (PositionedGraph, Names) {
     )
 }
 
-/// Exact equality: indices, widths, states, compositions, parent links,
-/// labels, atom index, generation and no open stage (not the random vertex
-/// keys).
+/// Exact equality: indices, widths, compositions, parent links, labels,
+/// atom index and generation (not the random vertex keys).
 pub(super) fn assert_identical(
     left: &PositionedGraph,
     right: &PositionedGraph,
@@ -88,13 +87,12 @@ pub(super) fn assert_identical(
         graph
             .vertices
             .iter()
-            .map(|v| format!("{} {:?} {:?} {:?}", v, v.state, v.node, v.parents))
+            .map(|v| format!("{} {:?} {:?}", v, v.node, v.parents))
             .collect::<Vec<_>>()
     };
     assert_eq!(strip(left), strip(right));
     assert_eq!(left.atoms, right.atoms);
     assert_eq!(left.generation, right.generation);
-    assert_eq!((left.stage, right.stage), (None, None));
 }
 
 /// Insertion of `baba` into `ababab` (insert plan §9.3) by hand, in two
@@ -128,8 +126,11 @@ where
     baba
 }
 
-/// New atom, new composites over committed children, and a staged host
-/// dropping a link it added to a committed child (`a@0` replaced by `ab@0`).
+/// Atom lookup (`c` is created beforehand: a stage commits new atoms through
+/// `OverlayHandle::atom`), new composites over committed children, and a
+/// staged host dropping a link it added to a committed child (`a@0` replaced
+/// by `ab@0`). The root `bcabcabc` gives `bc` and `abc` two parent
+/// occurrences each (a valid vertex set for the commit).
 pub(super) fn new_atom_and_recompose<S: GraphWrite<Kind = BaseGraphKind>>(
     graph: &mut S,
     n: Names,
@@ -147,27 +148,39 @@ where
     let mut edit = GraphEdit::new(graph);
     assert!(edit.create(vec![occ(0, ab)]).is_err());
     edit.add_occurrences(abc.index, vec![occ(0, ab)]).unwrap();
-    let abcab = edit.create(vec![occ(0, abc), occ(3, ab)]).unwrap();
+    let root = edit
+        .create(vec![occ(0, bc), occ(2, abc), occ(5, abc)])
+        .unwrap();
     edit.finish();
     let mut edit = GraphEdit::new(graph);
     assert_eq!(edit.atom('a'), a);
     assert_eq!(edit.finish().created, vec![]);
-    abcab
+    root
 }
 
-/// Applying `sequence` on a stage and committing gives exactly the graph of
-/// applying it directly.
+/// Creating `atoms` and then applying `sequence` on a stage and committing
+/// gives exactly the graph of applying both directly.
 fn assert_overlay_equals_direct(
+    atoms: &[char],
     sequence: impl FnOnce(&mut PositionedGraph, Names) -> Token,
     staged: impl FnOnce(&mut OverlayView<'_>, Names) -> Token<StageIndex>,
 ) {
-    let (base, names) = base();
-    let mut direct = base.clone();
+    let (initial, names) = base();
+    let mut direct = initial.clone();
+    let mut edit = direct.edit();
+    for &atom in atoms {
+        edit.atom(atom);
+    }
+    edit.finish();
+    let base = direct.clone();
     let expected = sequence(&mut direct, names);
     direct.validate().unwrap();
 
-    let graph = PositionedGraphRef::new(base.clone());
+    let graph = PositionedGraphRef::new(initial);
     let mut handle = OverlayHandle::open(&graph);
+    for &atom in atoms {
+        handle.atom(atom).unwrap();
+    }
     let root = {
         let mut view = handle.stage();
         let root = staged(&mut view, names);
@@ -195,8 +208,10 @@ fn assert_overlay_equals_direct(
 
 #[test]
 fn overlay_commit_equals_direct_edits() {
-    assert_overlay_equals_direct(insert_baba, |view, n| insert_baba(view, n));
-    assert_overlay_equals_direct(new_atom_and_recompose, |view, n| {
+    assert_overlay_equals_direct(&[], insert_baba, |view, n| {
+        insert_baba(view, n)
+    });
+    assert_overlay_equals_direct(&['c'], new_atom_and_recompose, |view, n| {
         new_atom_and_recompose(view, n)
     });
 }
@@ -228,14 +243,14 @@ fn extend_grows_a_staged_parentless_vertex_only() {
     let graph = PositionedGraphRef::new(base);
     let mut handle = OverlayHandle::open(&graph);
     let (a, b, ab) = (lift(n.a), lift(n.b), lift(n.ab));
-    let (root, bc, c) = {
+    let c = handle.atom('c').unwrap();
+    let (root, bc) = {
         let mut view = handle.stage();
         let mut edit = GraphEdit::new(&mut view);
-        let c = edit.atom('c');
         let bc = edit.create(vec![occ(0, b), occ(1, c)]).unwrap();
         let root = edit.create(vec![occ(0, ab), occ(2, c)]).unwrap();
         edit.finish();
-        (root, bc, c)
+        (root, bc)
     };
     let mut view = handle.stage();
     let mut edit = GraphEdit::new(&mut view);
@@ -273,9 +288,15 @@ fn extend_grows_a_staged_parentless_vertex_only() {
     );
     #[cfg(debug_assertions)]
     assert_eq!(view.vertex(root).unwrap().label(), "abcabc");
+    // A valid vertex set for the commit: `outer` discarded, `bc@1` added
+    // (`bc` gets two parent occurrences, `abcabc` is the root).
+    let mut edit = GraphEdit::new(&mut view);
+    edit.discard(outer.index, abcabc.index).unwrap();
+    edit.add_occurrences(root.index, vec![occ(1, bc)]).unwrap();
+    edit.finish();
     drop(view);
 
-    let (outer, translation) = handle.commit(outer).unwrap();
+    let (_, translation) = handle.commit(abcabc).unwrap();
     let graph = graph.read();
     graph.validate().unwrap();
     let root = translation.token(abcabc);
@@ -291,63 +312,66 @@ fn extend_grows_a_staged_parentless_vertex_only() {
     );
     assert_eq!(
         links(translation.token(bc)),
-        [(root.index, [4.into()].into())].into()
+        [(root.index, [1.into(), 4.into()].into())].into()
     );
-    assert_eq!(links(root), [(outer.index, [0.into()].into())].into());
+    assert_eq!(links(root), [].into());
     #[cfg(debug_assertions)]
-    assert_eq!(graph.vertex_data(outer).unwrap().label(), "abcabca");
+    assert_eq!(graph.vertex_data(root).unwrap().label(), "abcabc");
 }
 
 #[test]
-fn commit_translates_staged_indices_in_creation_order() {
+fn commit_translates_staged_indices_in_slot_order() {
     let (base, n) = base();
     let count = base.vertex_count();
     let graph = PositionedGraphRef::new(base);
     let mut handle = OverlayHandle::open(&graph);
-    let (c, ca, abab) = {
+    let c = handle.atom('c').unwrap();
+    assert_eq!(c, Token::new(StageIndex::lift(VertexIndex(count)), 1));
+    assert_eq!(
+        graph.read().atom(&'c').unwrap().to_token(),
+        Token::new(VertexIndex(count), 1),
+        "new atoms are committed at once"
+    );
+    let (ca, caca, abab) = {
         let mut view = handle.stage();
         let mut edit = GraphEdit::new(&mut view);
-        let c = edit.atom('c');
+        assert_eq!(edit.atom('c'), c);
         let ca = edit.create(vec![occ(0, c), occ(1, lift(n.a))]).unwrap();
+        let caca = edit.create(vec![occ(0, ca), occ(2, ca)]).unwrap();
         edit.finish();
-        assert_eq!(view.vertex(c).unwrap().state(), VertexState::Staged);
-        assert_eq!(
-            view.vertex(lift::<StageIndex>(n.a)).unwrap().state(),
-            VertexState::Committed
-        );
+        assert_eq!(view.vertex(ca).unwrap().state(), VertexState::Staged);
+        assert_eq!(view.vertex(c).unwrap().state(), VertexState::Committed);
         assert_eq!(view.atom(&'c').unwrap().to_token(), c);
         assert_eq!(view.atom(&'a').unwrap().to_token(), lift(n.a));
-        (c, ca, lift::<StageIndex>(n.abab))
+        (ca, caca, lift::<StageIndex>(n.abab))
     };
-    assert_eq!(c.index, StagedIndex::new(0).into());
+    assert_eq!(ca.index, StagedIndex::new(0).into());
     assert_eq!(handle.staged_count(), 2);
-    assert!(
-        graph.read().atom(&'c').is_none(),
-        "staged atoms stay in the stage"
-    );
-    let (root, translation) = handle.commit(ca).unwrap();
+    let (root, translation) = handle.commit(caca).unwrap();
     assert_eq!(translation.index(c.index), VertexIndex(count));
-    assert_eq!(root, Token::new(VertexIndex(count + 1), 2));
+    assert_eq!(translation.index(ca.index), VertexIndex(count + 1));
+    assert_eq!(root, Token::new(VertexIndex(count + 2), 4));
     assert_eq!(
         translation.token(abab),
         n.abab,
         "committed indices are unchanged"
     );
-    let graph = graph.read();
-    graph.validate().unwrap();
-    assert_eq!(graph.atom(&'c').unwrap().to_token(), translation.token(c));
+    graph.read().validate().unwrap();
 }
 
 #[test]
 fn commit_rejects_a_changed_base() {
-    let (base, _) = base();
+    let (base, n) = base();
     let graph = PositionedGraphRef::new(base);
     let opened = graph.read().generation().base;
+    let count = graph.read().vertex_count();
     let mut handle = OverlayHandle::open(&graph);
     let root = {
         let mut view = handle.stage();
         let mut edit = GraphEdit::new(&mut view);
-        let root = edit.atom('c');
+        let root = edit
+            .create(vec![occ(0, lift(n.b)), occ(1, lift(n.a))])
+            .unwrap();
         edit.finish();
         root
     };
@@ -359,7 +383,7 @@ fn commit_rejects_a_changed_base() {
             now: opened + 1,
         })
     );
-    assert!(graph.read().atom(&'c').is_none());
+    assert_eq!(graph.read().vertex_count(), count + 1, "only `z` committed");
 }
 
 #[test]

@@ -12,11 +12,15 @@ use context_trace::{
     StageIndex,
     Token,
     positioned::{
+        Candidates,
         GraphEdit,
         GraphRead,
         HasGraph,
         Occurrence,
+        OverlayHandle,
         PositionedGraphRef,
+        Publication,
+        Settled,
         StageHandle,
         Translation,
         VertexRead,
@@ -24,8 +28,6 @@ use context_trace::{
         maximal,
     },
 };
-
-use crate::staging::StagingStrategy;
 
 /// One step of the reader, committed before the next search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,15 +55,15 @@ pub enum Commit {
 }
 
 /// The stage of one read and the root of the input read so far.
-pub(crate) struct ReadStage<'g, S: StagingStrategy> {
-    pub(crate) handle: S::Handle<'g>,
+pub(crate) struct ReadStage<'g> {
+    pub(crate) handle: OverlayHandle<'g>,
     root: Option<Token<StageIndex>>,
 }
 
-impl<'g, S: StagingStrategy> ReadStage<'g, S> {
+impl<'g> ReadStage<'g> {
     pub(crate) fn open(graph: &'g PositionedGraphRef) -> Self {
         Self {
-            handle: S::open(graph),
+            handle: OverlayHandle::open(graph),
             root: None,
         }
     }
@@ -99,7 +101,8 @@ impl<'g, S: StagingStrategy> ReadStage<'g, S> {
         })
     }
 
-    /// Apply `span` (table of §3.4) through one `GraphEdit` on the stage.
+    /// Apply `span` (table of §3.4) through one `GraphEdit` on the stage;
+    /// its edit record (`None` for `Adopt`, which does not edit).
     ///
     /// # Panics
     ///
@@ -108,13 +111,13 @@ impl<'g, S: StagingStrategy> ReadStage<'g, S> {
     pub(crate) fn commit(
         &mut self,
         span: Span,
-    ) -> Commit {
+    ) -> (Commit, Option<Publication<StageIndex>>) {
         let Some(root) = self.root else {
             let Span::Append(token) = span else {
                 panic!("{:?} without a root", span);
             };
             self.root = Some(token);
-            return Commit::Adopt;
+            return (Commit::Adopt, None);
         };
         let (occurrence, in_place) = match span {
             Span::ReplaceRoot(token) => {
@@ -123,7 +126,7 @@ impl<'g, S: StagingStrategy> ReadStage<'g, S> {
                     "replacement must extend the root"
                 );
                 self.root = Some(token);
-                return Commit::Adopt;
+                return (Commit::Adopt, None);
             },
             Span::Append(token) => (
                 Occurrence::new(root.width.0, token),
@@ -156,14 +159,35 @@ impl<'g, S: StagingStrategy> ReadStage<'g, S> {
         let token = result.unwrap_or_else(|error| {
             panic!("root commit {:?} rejected: {}", span, error)
         });
-        edit.finish();
+        let publication = edit.finish();
         drop(view);
         self.root = Some(token);
-        if in_place {
+        let kind = if in_place {
             Commit::InPlace
         } else {
             Commit::NewRoot
-        }
+        };
+        (kind, Some(publication))
+    }
+
+    /// Restore invariant (S) after a step (dissolution plan §3.3): dissolve
+    /// or discard the staged composites among `candidates` (and their
+    /// cascades) with ≤ 1 parent occurrence, through one `GraphEdit` on the
+    /// stage; the root is renamed if it moved.
+    pub(crate) fn settle(
+        &mut self,
+        candidates: Candidates,
+    ) -> Settled {
+        let Some(mut root) = self.root else {
+            return Settled::default();
+        };
+        let mut view = self.handle.stage();
+        let mut edit = GraphEdit::new(&mut view);
+        let settled = edit.settle(candidates, &mut root);
+        edit.finish();
+        drop(view);
+        self.root = Some(root);
+        settled
     }
 
     /// Commit the stage; the root translated (`None` for empty input).
@@ -180,12 +204,9 @@ mod tests {
     use context_trace::positioned::CompositionRead;
 
     use super::*;
-    use crate::{
-        staging::OverlayStaging,
-        tests::fixture,
-    };
+    use crate::tests::fixture;
 
-    type Stage<'g> = ReadStage<'g, OverlayStaging>;
+    type Stage<'g> = ReadStage<'g>;
 
     fn composition(
         stage: &Stage<'_>,
@@ -225,23 +246,23 @@ mod tests {
         let generation = graph.read().generation();
         let mut root = Stage::open(&graph);
 
-        assert_eq!(root.commit(Span::Append(a)), Commit::Adopt);
+        assert_eq!(root.commit(Span::Append(a)).0, Commit::Adopt);
         assert_eq!(root.token(), Some(a));
         assert!(!editable(&root), "an adopted atom is not editable");
         assert_eq!(root.handle.graph().generation().stage, 0);
 
-        assert_eq!(root.commit(Span::Append(a)), Commit::NewRoot);
+        assert_eq!(root.commit(Span::Append(a)).0, Commit::NewRoot);
         let aa = root.token().unwrap();
         assert!(editable(&root) && aa.index != a.index && aa.width.0 == 2);
         assert!(composition(&root, aa).contains(&Occurrence::new(0, a)));
         assert!(composition(&root, aa).contains(&Occurrence::new(1, a)));
 
-        assert_eq!(root.commit(Span::Append(b)), Commit::InPlace);
+        assert_eq!(root.commit(Span::Append(b)).0, Commit::InPlace);
         let aab = root.token().unwrap();
         assert_eq!((aab.index, aab.width.0), (aa.index, 3));
         assert!(composition(&root, aab).contains(&Occurrence::new(2, b)));
 
-        assert_eq!(root.commit(Span::Append(aab)), Commit::NewRoot);
+        assert_eq!(root.commit(Span::Append(aab)).0, Commit::NewRoot);
         let doubled = root.token().unwrap();
         assert!(editable(&root) && doubled.index != aab.index);
         assert!(composition(&root, doubled).contains(&Occurrence::new(0, aab)));
@@ -258,11 +279,11 @@ mod tests {
         let (a, b, ab) = (names["a"].into(), names["b"].into(), names["ab"].into());
         let mut root = Stage::open(&graph);
         root.commit(Span::Append(a));
-        assert_eq!(root.commit(Span::ReplaceRoot(ab)), Commit::Adopt);
+        assert_eq!(root.commit(Span::ReplaceRoot(ab)).0, Commit::Adopt);
         assert_eq!(root.token(), Some(ab));
         assert!(!editable(&root));
         let before = composition(&root, ab);
-        assert_eq!(root.commit(Span::Append(b)), Commit::NewRoot);
+        assert_eq!(root.commit(Span::Append(b)).0, Commit::NewRoot);
         assert_ne!(root.token().unwrap().index, ab.index);
         assert_eq!(composition(&root, ab), before);
         finish(&graph, root);
@@ -284,7 +305,7 @@ mod tests {
             expansion,
         };
         assert_eq!(root.consumed(span), 1);
-        assert_eq!(root.commit(span), Commit::InPlace);
+        assert_eq!(root.commit(span).0, Commit::InPlace);
         let grown = root.token().unwrap();
         assert_eq!((grown.index, grown.width.0), (editable_root.index, 7));
         assert!(editable(&root));
@@ -303,7 +324,7 @@ mod tests {
             postfix: b,
             expansion: bc,
         };
-        assert_eq!(root.commit(span), Commit::NewRoot);
+        assert_eq!(root.commit(span).0, Commit::NewRoot);
         let new = root.token().unwrap();
         assert!(editable(&root) && new.width.0 == 3);
         assert!(composition(&root, new).contains(&Occurrence::new(0, ab)));
@@ -326,7 +347,7 @@ mod tests {
             postfix: a,
             expansion: aa,
         };
-        assert_eq!(root.commit(span), Commit::NewRoot);
+        assert_eq!(root.commit(span).0, Commit::NewRoot);
         let new = root.token().unwrap();
         assert!(editable(&root) && new.index != aa.index && new.width.0 == 3);
         assert!(composition(&root, new).contains(&Occurrence::new(0, aa)));
@@ -335,17 +356,24 @@ mod tests {
         finish(&graph, root);
     }
 
-    /// An atom new in this read is staged and parentless but not editable:
-    /// appending to it creates a new root (staging plan §2.3).
+    /// An atom new in this read is committed at once: as a root it is
+    /// adopted, not editable, and appending to it creates a new root.
     #[test]
-    fn staged_atom_root_is_not_editable() {
+    fn new_atom_root_is_not_editable() {
         let graph = PositionedGraphRef::default();
         let mut root = Stage::open(&graph);
         let segments = crate::segment::segments(&mut root.handle, "xy".chars());
         let (x, y) = (segments[0].unknown[0], segments[0].unknown[1]);
-        root.commit(Span::Append(x));
+        assert!(!x.index.is_staged() && !y.index.is_staged());
+        assert_eq!(root.commit(Span::Append(x)).0, Commit::Adopt);
         assert!(!editable(&root));
-        assert_eq!(root.commit(Span::Append(y)), Commit::NewRoot);
+        assert_eq!(root.commit(Span::Append(y)).0, Commit::NewRoot);
+        let xy = root.token().unwrap();
+        assert!(xy.index.is_staged() && editable(&root));
+        assert_eq!(
+            composition(&root, xy),
+            vec![Occurrence::new(0, x), Occurrence::new(1, y)]
+        );
         finish(&graph, root);
     }
 }

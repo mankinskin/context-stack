@@ -30,7 +30,10 @@ use crate::{
     positioned::{
         committed::PositionedGraph,
         model::VertexNode,
-        stage::Stage,
+        stage::{
+            Moved,
+            Stage,
+        },
         store::{
             Generation,
             GraphRead,
@@ -120,11 +123,7 @@ impl<G: GraphKind> GraphRead for OverlayView<'_, G> {
         &self,
         value: &AtomOf<G>,
     ) -> Option<OverlayVertex<'_, G>> {
-        let index = match self.stage.atoms.get(value) {
-            Some(&staged) => staged.into(),
-            None => StageIndex::from(*self.base.atoms.get(value)?),
-        };
-        self.vertex(index)
+        self.vertex(StageIndex::from(*self.base.atoms.get(value)?))
     }
     fn vertices(&self) -> impl Iterator<Item = OverlayVertex<'_, G>> + '_ {
         (0..self.base.vertices.len())
@@ -179,6 +178,10 @@ impl<G: GraphKind> raw::Write for OverlayView<'_, G> {
         node: VertexNode<AtomOf<G>, StageIndex>,
         width: TokenWidth,
     ) -> StageIndex {
+        assert!(
+            matches!(node, VertexNode::Composite(_)),
+            "atoms are committed through OverlayHandle::atom"
+        );
         let index = StagedIndex::new(self.stage.vertices.len());
         self.stage.vertices.push(StagedVertex {
             width,
@@ -192,19 +195,77 @@ impl<G: GraphKind> raw::Write for OverlayView<'_, G> {
     fn register_atom(
         &mut self,
         _: Seal,
-        value: AtomOf<G>,
-        index: StageIndex,
+        _: AtomOf<G>,
+        _: StageIndex,
     ) {
-        let staged = index
-            .staged()
-            .unwrap_or_else(|| panic!("atom {index} is committed already"));
-        self.stage.atoms.insert(value, staged);
+        panic!("atoms are committed through OverlayHandle::atom")
     }
     fn bump_generation(
         &mut self,
         _: Seal,
     ) {
         self.stage.generation += 1;
+    }
+}
+
+impl<G: GraphKind> raw::Remove for OverlayView<'_, G> {
+    fn remove(
+        &mut self,
+        _: Seal,
+        index: StageIndex,
+    ) -> Option<Moved> {
+        let slot = index
+            .staged()
+            .unwrap_or_else(|| panic!("committed vertex {index} cannot be removed"))
+            .slot();
+        let stage = &mut *self.stage;
+        debug_assert!(
+            stage.vertices[slot].parents.is_empty(),
+            "removed vertex {index} has parents"
+        );
+        #[cfg(debug_assertions)]
+        if let VertexNode::Composite(composition) = &stage.vertices[slot].node {
+            let children: Vec<StageIndex> = composition.children().collect();
+            for child in children {
+                debug_assert!(
+                    stage
+                        .links_mut(child)
+                        .is_none_or(|links| !links.contains_key(&index)),
+                    "child {child} still links to removed vertex {index}"
+                );
+            }
+        }
+        stage.generation += 1;
+        let last = stage.vertices.len() - 1;
+        stage.vertices.swap_remove(slot);
+        if slot == last {
+            return None;
+        }
+        let moved = Moved {
+            from: StagedIndex::new(last).into(),
+            to: index,
+        };
+        let vertex = &stage.vertices[slot];
+        let children: Vec<StageIndex> = match &vertex.node {
+            VertexNode::Composite(composition) => composition.children().collect(),
+            VertexNode::Atom(_) => Vec::new(),
+        };
+        let parents: Vec<StageIndex> = vertex.parents.keys().copied().collect();
+        for child in children {
+            let links = stage
+                .links_mut(child)
+                .expect("a child links to its staged parent");
+            if let Some(offsets) = links.remove(&moved.from) {
+                links.insert(moved.to, offsets);
+            }
+        }
+        for parent in parents {
+            let composition = stage
+                .composition_mut(parent)
+                .expect("a parent of a staged vertex has a staged composition");
+            *composition = composition.clone().map_index(|child| moved.apply(child));
+        }
+        Some(moved)
     }
 }
 

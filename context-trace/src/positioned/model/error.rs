@@ -76,6 +76,11 @@ pub enum PositionedError<I: VertexId = CommittedIndex> {
     },
     /// The edit would change the width of `vertex`.
     WidthChange { vertex: I },
+    /// `vertex` has `count` parent occurrences, which the operation does
+    /// not allow (dissolution: exactly one; discard: none; retention: ≥ 2).
+    ParentCount { vertex: I, count: usize },
+    /// The operation is not allowed on the stage root.
+    IsRoot(I),
 }
 
 impl<I: VertexId> fmt::Display for PositionedError<I> {
@@ -155,6 +160,12 @@ impl<I: VertexId> fmt::Display for PositionedError<I> {
             Self::WidthChange { vertex } => {
                 write!(f, "edit would change the width of vertex {}", Plain(*vertex))
             },
+            Self::ParentCount { vertex, count } => write!(
+                f,
+                "vertex {} has {count} parent occurrences",
+                Plain(*vertex)
+            ),
+            Self::IsRoot(vertex) => write!(f, "vertex {} is the root", Plain(*vertex)),
         }
     }
 }

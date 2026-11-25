@@ -25,7 +25,6 @@ use crate::{
         VertexId,
         VertexIndex,
     },
-    positioned::store::VertexState,
 };
 
 /// What a vertex consists of.
@@ -41,8 +40,6 @@ pub struct PositionedVertex<G: GraphKind = BaseGraphKind> {
     pub(crate) index: VertexIndex,
     pub(crate) key: VertexKey,
     pub(crate) width: TokenWidth,
-    /// `Staged` only while a tagged stage is open (staging plan §5).
-    pub(crate) state: VertexState,
     pub(crate) node: VertexNode<AtomOf<G>>,
     /// Parent vertex → offsets at which this vertex occurs in it.
     pub(crate) parents: BTreeMap<VertexIndex, BTreeSet<AtomPosition>>,
@@ -63,9 +60,6 @@ impl<G: GraphKind> PositionedVertex<G> {
     }
     pub fn token(&self) -> Token {
         Token::new(self.index, self.width)
-    }
-    pub fn state(&self) -> VertexState {
-        self.state
     }
     pub fn node(&self) -> &VertexNode<AtomOf<G>> {
         &self.node

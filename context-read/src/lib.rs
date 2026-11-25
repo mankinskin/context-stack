@@ -5,20 +5,12 @@ mod forward;
 mod read;
 mod root;
 mod segment;
-mod staging;
 pub use read::{
     Commit,
     Step,
     StepKind,
     read,
     read_traced,
-    read_with,
-};
-pub use staging::{
-    DefaultStaging,
-    OverlayStaging,
-    StagingStrategy,
-    TaggedStaging,
 };
 
 /// Row-model reader, fenced off from the model-agnostic root.
@@ -27,6 +19,8 @@ pub mod legacy;
 
 #[cfg(test)]
 mod tests {
+    mod steps;
+
     use std::collections::BTreeMap;
 
     use context_trace::{

@@ -35,16 +35,19 @@ fence to `rust,ignore` via `cfg_attr(not(feature = "legacy-tests"), doc = …)`.
 
 **Positioned model** (`src/positioned/`, root, no legacy dependency; layout:
 `model/` data types, `store/` store traits, `committed/` the committed
-store, `edit/` the `GraphEdit` mutation layer, `stage/` the overlay and
-tagged stages, `interchange/` snapshots and test data, `path/`, `trace/`):
+store, `edit/` the `GraphEdit` mutation layer, `stage/` the overlay
+stage, `interchange/` snapshots and test data, `path/`, `trace/`):
 `interchange/` (v3 `PositionedGraphData`/`PositionedGraphSnapshot` and the
 structural validator, re-exported by `ngrams::output`), `model/composition.rs`
 (`Occurrence`, `Composition`), `model/location.rs` (`OccurrenceLocation`,
 `IntervalView`), `committed/graph.rs` (`PositionedGraph`,
 `PositionedGraphRef = Arc<RwLock<_>>`), `model/vertex.rs`
 (`PositionedVertex`), `interchange/convert.rs`
-(`test-api`: `from_interchange`/`to_interchange`; `from_interchange_named`
-also returns the fixture key → token name map), `interchange/diff.rs` (`test-api`:
+(`test-api`: `from_interchange`/`to_interchange`, `store_interchange` for
+any store; `from_interchange_named` also returns the fixture key → token
+name map), `edit/dissolve.rs` (`GraphEdit::dissolve`/`discard`/`settle` of
+staged tokens with ≤ 1 parent occurrence, `Candidates`, `Removal`,
+`Settled`; dissolution plan D4), `interchange/diff.rs` (`test-api`:
 `diff` → `GraphDiff`), content reading `store/navigate.rs` (debug and `test-api`
 builds: `PositionedGraph::read_interval`, content of an `IntervalView`, each
 position once), search navigation
@@ -91,6 +94,10 @@ re-exported from `legacy::trace::cache::key::directed`.
   reciprocal parent links. Under `debug_assertions` or `test-api` it also
   checks one vertex per content (`DuplicateContent`) and overlap agreement
   (`OverlapMismatch`) by traversal into a temporary set dropped afterwards.
+  Retention (G6: every composite that is not an input has ≥ 2 parent
+  occurrences) is checked separately: `validate_retention(inputs)`
+  (`test-api`), and at runtime only by `OverlayHandle::commit`, which panics
+  on a staged composite other than the root with < 2 parent occurrences.
 - **Expectations come from the oracle.** Tests address vertices only through
   the `test-api` name map and derive expectations from v3 fixture strings,
   never from graph content lookups or reader output.

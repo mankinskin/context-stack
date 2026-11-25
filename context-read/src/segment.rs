@@ -2,17 +2,17 @@
 //! plan §3.1, §8.1; legacy `segment.rs`, `input.rs`).
 //!
 //! An atom is *unknown* if the graph has no vertex for it when it is read.
-//! It is created at once through `GraphEdit::atom`, so a later repeat in the
-//! same input is *known* (legacy `NewAtomIndex::{New, Known}`).
+//! It is committed at once through [`OverlayHandle::atom`], so a later repeat
+//! in the same input is *known* (legacy `NewAtomIndex::{New, Known}`).
 
 use context_trace::{
     StageIndex,
     ToToken,
     Token,
     positioned::{
-        GraphEdit,
         GraphRead,
-        StageHandle,
+        HasGraph,
+        OverlayHandle,
     },
 };
 
@@ -26,17 +26,23 @@ pub(crate) struct Segment {
     pub(crate) known: Vec<Token<StageIndex>>,
 }
 
-/// Split `chars` into [`Segment`]s, creating unknown atoms on first sight.
-pub(crate) fn segments<H: StageHandle<Kind = context_trace::BaseGraphKind>>(
-    handle: &mut H,
+/// Split `chars` into [`Segment`]s, committing unknown atoms on first sight
+/// (no view of `handle` is alive meanwhile).
+///
+/// # Panics
+/// If the committed graph was edited while the stage was open.
+pub(crate) fn segments(
+    handle: &mut OverlayHandle<'_>,
     chars: impl IntoIterator<Item = char>,
 ) -> Vec<Segment> {
-    let mut view = handle.stage();
-    let mut edit = GraphEdit::new(&mut view);
     let mut segments: Vec<Segment> = Vec::new();
     for c in chars {
-        let known = edit.graph().atom(&c).map(|atom| atom.to_token());
-        let token = known.unwrap_or_else(|| edit.atom(c));
+        let known = handle.graph().atom(&c).map(|atom| atom.to_token());
+        let token = known.unwrap_or_else(|| {
+            handle
+                .atom(c)
+                .unwrap_or_else(|error| panic!("creating atom {:?} failed: {}", c, error))
+        });
         match (known.is_some(), segments.last_mut()) {
             (true, Some(segment)) => segment.known.push(token),
             (false, Some(segment)) if segment.known.is_empty() =>
@@ -51,16 +57,14 @@ pub(crate) fn segments<H: StageHandle<Kind = context_trace::BaseGraphKind>>(
             }),
         }
     }
-    edit.finish();
     segments
 }
 
 #[cfg(test)]
 mod tests {
     use context_trace::positioned::{
-        HasGraph,
-        OverlayHandle,
         PositionedGraphRef,
+        StageHandle,
         VertexRead,
         VertexState,
     };
@@ -90,12 +94,15 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(view.vertex(atom('x')).unwrap().state(), VertexState::Staged);
+        assert_eq!(view.vertex(atom('x')).unwrap().state(), VertexState::Committed);
         assert_eq!(view.vertex(atom('a')).unwrap().state(), VertexState::Committed);
-        assert_eq!(view.generation().stage, 1);
+        assert_eq!(view.generation().stage, 0);
+        assert_eq!(view.generation().base, generation.base + 2);
         drop(view);
+        assert_eq!(handle.staged_count(), 0);
+        assert_eq!(graph.read().generation().base, generation.base + 2);
         handle.commit(atom_token(&graph, 'a')).unwrap();
-        assert_eq!(graph.read().generation().base, generation.base + 1);
+        assert_eq!(graph.read().generation().base, generation.base + 2);
         graph.read().validate().unwrap();
     }
 

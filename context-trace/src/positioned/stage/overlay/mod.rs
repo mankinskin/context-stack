@@ -2,8 +2,11 @@
 //! [`StagingGraph`] next to the committed graph. The base is read-only while
 //! the stage is open; [`StageHandle::commit`] writes everything at once.
 //!
-//! - Staged vertices live in the stage, addressed by [`StagedIndex`]; atoms
-//!   new in the read are staged as well (atom lookup checks the stage first).
+//! - Staged vertices live in the stage, addressed by [`StagedIndex`]; they
+//!   are composites only: atoms new in the read are committed at once
+//!   through [`OverlayHandle::atom`]. Removal is a swap-remove: the last
+//!   staged vertex moves into the freed slot and is renamed
+//!   ([`Moved`](super::Moved)).
 //! - Changes of committed vertices (insertion into committed hosts) are a
 //!   copy-on-write composition and a parent-link delta per vertex.
 //! - [`OverlayView`] (base read guard and stage guard) is the store the

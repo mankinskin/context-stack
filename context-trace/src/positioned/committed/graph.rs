@@ -39,7 +39,6 @@ use crate::{
             PositionedError,
             PositionedVertex,
         },
-        stage::tagged::StageId,
         store::GraphRead,
     },
 };
@@ -65,8 +64,6 @@ pub struct PositionedGraph<G: GraphKind = BaseGraphKind> {
     pub(crate) atoms: HashMap<AtomOf<G>, VertexIndex>,
     /// Bumped by the first mutation of every edit.
     pub(crate) generation: u64,
-    /// The open tagged stage, if any (staging plan §5).
-    pub(crate) stage: Option<StageId>,
 }
 
 impl<G: GraphKind> Default for PositionedGraph<G> {
@@ -75,7 +72,6 @@ impl<G: GraphKind> Default for PositionedGraph<G> {
             vertices: Vec::new(),
             atoms: HashMap::new(),
             generation: 0,
-            stage: None,
         }
     }
 }
@@ -126,6 +122,34 @@ impl<G: GraphKind> PositionedGraph<G> {
         }
         #[cfg(any(debug_assertions, feature = "test-api"))]
         self.validate_content()?;
+        Ok(())
+    }
+
+    /// Retention invariant G6 (dissolution plan §3.1): every composite not
+    /// in `inputs` has at least two parent occurrences, else `ParentCount`.
+    /// Separate from [`Self::validate`]: insertion outside a read does not
+    /// keep G6.
+    #[cfg(any(test, feature = "test-api"))]
+    pub fn validate_retention(
+        &self,
+        inputs: impl IntoIterator<Item = CommittedIndex>,
+    ) -> Result<(), PositionedError> {
+        use crate::positioned::store::VertexRead;
+        let inputs: std::collections::HashSet<CommittedIndex> =
+            inputs.into_iter().collect();
+        for vertex in self.vertices() {
+            let index = vertex.vertex_index();
+            if vertex.node().composite().is_none() || inputs.contains(&index) {
+                continue;
+            }
+            let count = vertex.parent_count();
+            if count < 2 {
+                return Err(PositionedError::ParentCount {
+                    vertex: index,
+                    count,
+                });
+            }
+        }
         Ok(())
     }
 

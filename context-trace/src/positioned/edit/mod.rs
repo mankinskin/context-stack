@@ -9,18 +9,27 @@
 //! `context-read`.
 //!
 //! The edit itself and its bookkeeping live here, the public operations in
-//! `operations.rs`, the [`Publication`] record in `publication.rs` and the
+//! `operations.rs`, dissolution of staged vertices in `dissolve.rs`, the
+//! [`Publication`] record in `publication.rs` and the
 //! store-generic checks shared with `PositionedGraph::validate` in
 //! `check.rs`.
 #![cfg_attr(not(feature = "edit"), allow(dead_code))]
 
 pub(crate) mod check;
+mod dissolve;
 mod operations;
 mod publication;
 
-pub use self::publication::{
-    Publication,
-    VertexEdit,
+pub use self::{
+    dissolve::{
+        Candidates,
+        Removal,
+        Settled,
+    },
+    publication::{
+        Publication,
+        VertexEdit,
+    },
 };
 
 use std::collections::{

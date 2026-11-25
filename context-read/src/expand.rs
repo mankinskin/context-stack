@@ -1,11 +1,15 @@
 //! Root expansion (reader plan §3.2; legacy `expand_root`).
 
-use context_insert::insert_next_match;
+use context_insert::{
+    InsertOutcome,
+    insert_next_match,
+};
 use context_trace::{
     StageIndex,
     Token,
     positioned::{
         GraphRead,
+        Publication,
         HasGraph,
         Navigate,
         StageHandle,
@@ -17,12 +21,14 @@ use crate::{
     root::Span,
 };
 
-/// An accepted probe and the span committing it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// An accepted probe, the span committing it and the edit record of the
+/// insertion, if it created the expansion.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Accepted {
     pub(crate) postfix: Token<StageIndex>,
     pub(crate) expansion: Token<StageIndex>,
     pub(crate) span: Span,
+    pub(crate) publication: Option<Publication<StageIndex>>,
 }
 
 /// The first postfix `P` of `root` (largest first) whose match
@@ -54,12 +60,20 @@ pub(crate) fn expand<H: StageHandle>(
         let mut query = Vec::with_capacity(rest.len() + 1);
         query.push(postfix);
         query.extend_from_slice(rest);
-        let expansion = insert_next_match(&mut *handle, query)
-            .unwrap_or_else(|error| panic!("expansion probe failed: {}", error))
-            .token();
+        let outcome = insert_next_match(&mut *handle, query)
+            .unwrap_or_else(|error| panic!("expansion probe failed: {}", error));
+        let expansion = outcome.token();
         if expansion.width <= postfix.width {
+            debug_assert!(
+                !matches!(outcome, InsertOutcome::Created { .. }),
+                "a rejected probe created a token"
+            );
             continue;
         }
+        let publication = match outcome {
+            InsertOutcome::Created { publication, .. } => Some(publication),
+            _ => None,
+        };
         let consumed = expansion.width.0 - postfix.width.0;
         assert!(consumed <= rest.len(), "expansion beyond the run");
         let mut union = Vec::with_capacity(consumed + 1);
@@ -76,6 +90,7 @@ pub(crate) fn expand<H: StageHandle>(
             postfix,
             expansion,
             span,
+            publication,
         });
     }
     None

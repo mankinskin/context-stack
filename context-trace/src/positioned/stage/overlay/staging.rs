@@ -13,6 +13,8 @@ use std::{
     },
 };
 
+use either::Either;
+
 use crate::{
     AtomOf,
     AtomPosition,
@@ -23,7 +25,6 @@ use crate::{
     graph::vertex::{
         CommittedIndex,
         StageIndex,
-        StagedIndex,
         VertexIndex,
     },
     positioned::{
@@ -34,7 +35,6 @@ use crate::{
             VertexNode,
         },
         stage::Translation,
-        store::VertexState,
     },
 };
 
@@ -125,7 +125,7 @@ pub(super) fn remove_link<I: Ord>(
     removed
 }
 
-/// A vertex created in the stage.
+/// A composite created in the stage (atoms are committed at once).
 #[derive(Clone, Debug)]
 pub struct StagedVertex<G: GraphKind = BaseGraphKind> {
     pub(super) width: TokenWidth,
@@ -148,10 +148,9 @@ pub(super) struct BaseDelta {
 /// The staged part of an overlay (staging plan §4.1).
 #[derive(Clone, Debug)]
 pub struct StagingGraph<G: GraphKind = BaseGraphKind> {
-    /// By [`StagedIndex`], in creation order.
+    /// By [`StagedIndex`](crate::graph::vertex::StagedIndex), in slot order: creation order until a removal
+    /// moves the last vertex into the freed slot.
     pub(super) vertices: Vec<StagedVertex<G>>,
-    /// Atoms new in this stage.
-    pub(super) atoms: StageMap<AtomOf<G>, StagedIndex>,
     /// Copy-on-write compositions and link deltas of committed vertices.
     pub(super) deltas: StageMap<CommittedIndex, BaseDelta>,
     /// Generation of the base when the stage was opened.
@@ -164,10 +163,42 @@ impl<G: GraphKind> StagingGraph<G> {
     pub(super) fn new(base_generation: u64) -> Self {
         Self {
             vertices: Vec::new(),
-            atoms: StageMap::default(),
             deltas: StageMap::default(),
             base_generation,
             generation: 0,
+        }
+    }
+    /// The stage's parent links of `child`: a staged child's own links, a
+    /// committed child's added links (links to staged parents live only
+    /// there); `None` for a committed child without delta.
+    pub(super) fn links_mut(
+        &mut self,
+        child: StageIndex,
+    ) -> Option<&mut Links<StageIndex>> {
+        match child.split() {
+            Either::Left(committed) =>
+                self.deltas.get_mut(&committed).map(|delta| &mut delta.added),
+            Either::Right(staged) =>
+                Some(&mut self.vertices[staged.slot()].parents),
+        }
+    }
+    /// The stage's composition of `parent`: a staged composite's own, a
+    /// committed vertex's copy-on-write composition (a committed vertex
+    /// references a staged child only through it); `None` otherwise.
+    pub(super) fn composition_mut(
+        &mut self,
+        parent: StageIndex,
+    ) -> Option<&mut Composition<StageIndex>> {
+        match parent.split() {
+            Either::Left(committed) => self
+                .deltas
+                .get_mut(&committed)
+                .and_then(|delta| delta.composition.as_mut()),
+            Either::Right(staged) =>
+                match &mut self.vertices[staged.slot()].node {
+                    VertexNode::Composite(composition) => Some(composition),
+                    VertexNode::Atom(_) => None,
+                },
         }
     }
     /// Push every staged vertex and apply every delta to `base`
@@ -191,20 +222,16 @@ impl<G: GraphKind> StagingGraph<G> {
         };
         base.vertices.reserve(self.vertices.len());
         for (vertex, &index) in self.vertices.into_iter().zip(translation.slots()) {
-            let node = match vertex.node {
-                VertexNode::Atom(atom) => {
-                    base.atoms.insert(atom, index);
-                    VertexNode::Atom(atom)
-                },
-                VertexNode::Composite(composition) => VertexNode::Composite(
-                    composition.map_index(|child| translation.index(child)),
-                ),
+            let VertexNode::Composite(composition) = vertex.node else {
+                unreachable!("atoms are committed through OverlayHandle::atom")
             };
+            let node = VertexNode::Composite(
+                composition.map_index(|child| translation.index(child)),
+            );
             base.vertices.push(PositionedVertex {
                 index,
                 key: VertexKey::default(),
                 width: vertex.width,
-                state: VertexState::Committed,
                 node,
                 parents: links(vertex.parents),
                 #[cfg(debug_assertions)]

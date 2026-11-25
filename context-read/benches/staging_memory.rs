@@ -1,8 +1,7 @@
-//! Heap memory of a read per staging strategy (staging plan §7.1): peak
+//! Heap memory of a read (staging plan §7.1): peak
 //! heap growth during the read and the heap retained by the committed graph
 //! afterwards, measured with a counting global allocator. Separate from the
-//! `staging` bench so the allocator does not change its timings (and their
-//! comparison with the pre-staging baseline).
+//! `staging` bench so the allocator does not change its timings.
 //!
 //! ```sh
 //! cargo bench -p context-read --bench staging_memory --no-default-features --features test-api
@@ -20,12 +19,7 @@ use std::{
     },
 };
 
-use context_read::{
-    OverlayStaging,
-    StagingStrategy,
-    TaggedStaging,
-    read_with,
-};
+use context_read::read;
 use context_trace::positioned::{
     PositionedGraphRef,
     fixtures::{
@@ -83,12 +77,12 @@ static ALLOCATOR: Counting = Counting;
 
 /// Peak heap growth while reading `inputs` into a fresh graph, and the heap
 /// the graph retains afterwards (bytes).
-fn measure<S: StagingStrategy>(inputs: &[String]) -> (usize, usize) {
+fn measure(inputs: &[String]) -> (usize, usize) {
     let before = CURRENT.load(Relaxed);
     PEAK.store(before, Relaxed);
     let graph = PositionedGraphRef::default();
     for input in inputs {
-        read_with::<S>(&graph, input.chars());
+        read(&graph, input.chars());
     }
     let peak = PEAK.load(Relaxed) - before;
     let retained = CURRENT.load(Relaxed) - before;
@@ -96,19 +90,18 @@ fn measure<S: StagingStrategy>(inputs: &[String]) -> (usize, usize) {
     (peak, retained)
 }
 
-fn row<S: StagingStrategy>(
-    strategy: &str,
+fn row(
     case: &str,
     inputs: &[Vec<String>],
 ) {
     let (mut peak, mut retained) = (0, 0);
     for inputs in inputs {
-        let (p, r) = measure::<S>(inputs);
+        let (p, r) = measure(inputs);
         peak = peak.max(p);
         retained += r;
     }
     println!(
-        "| {case} | {strategy} | {:.1} | {:.1} |",
+        "| {case} | {:.1} | {:.1} |",
         peak as f64 / 1024.0,
         retained as f64 / 1024.0
     );
@@ -120,13 +113,11 @@ fn main() {
         .map(|scenario| scenario.inputs)
         .collect();
     let periodic = |n: usize| vec![vec![format!("{}x", "abc".repeat(n))]];
-    println!("| Input | Strategy | Peak growth (KiB) | Retained (KiB) |");
-    println!("|---|---|---|---|");
-    row::<OverlayStaging>("overlay", "corpus (max peak, total retained)", &corpus);
-    row::<TaggedStaging>("tagged", "corpus (max peak, total retained)", &corpus);
+    println!("| Input | Peak growth (KiB) | Retained (KiB) |");
+    println!("|---|---|---|");
+    row("corpus (max peak, total retained)", &corpus);
     for n in [64, 256, 512] {
         let case = format!("abc^{n} x");
-        row::<OverlayStaging>("overlay", &case, &periodic(n));
-        row::<TaggedStaging>("tagged", &case, &periodic(n));
+        row(&case, &periodic(n));
     }
 }

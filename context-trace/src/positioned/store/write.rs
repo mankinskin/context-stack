@@ -13,8 +13,14 @@ pub(crate) mod raw {
         AtomPosition,
         GraphKind,
         TokenWidth,
-        graph::vertex::VertexId,
-        positioned::model::VertexNode,
+        graph::vertex::{
+            StageIndex,
+            VertexId,
+        },
+        positioned::{
+            model::VertexNode,
+            stage::Moved,
+        },
     };
 
     /// Proof of being inside `context-trace`.
@@ -54,6 +60,30 @@ pub(crate) mod raw {
             &mut self,
             seal: Seal,
         );
+    }
+
+    /// Removal of staged vertices (stages only).
+    pub trait Remove: Write {
+        /// Remove the staged vertex `index`, which has no parent links and
+        /// whose children no longer link to it (checked by `GraphEdit`).
+        /// Swap-remove: the last staged vertex moves into the freed slot and
+        /// every reference to it is renamed before returning; `None` if
+        /// `index` was the last slot.
+        fn remove(
+            &mut self,
+            seal: Seal,
+            index: StageIndex,
+        ) -> Option<Moved>;
+    }
+
+    impl<T: Remove + ?Sized> Remove for &mut T {
+        fn remove(
+            &mut self,
+            seal: Seal,
+            index: StageIndex,
+        ) -> Option<Moved> {
+            (**self).remove(seal, index)
+        }
     }
 
     /// Write handle of one vertex.

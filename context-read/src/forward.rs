@@ -9,34 +9,43 @@ use context_search::{
     Find,
     SearchError,
 };
+use context_insert::InsertOutcome;
 use context_trace::{
     StageIndex,
     Token,
-    positioned::StageHandle,
+    positioned::{
+        Publication,
+        StageHandle,
+    },
 };
 
 use crate::root::Span;
 
 /// The longest occurring prefix of `rest` as a token (inserted if it was not
-/// one); the root adopts `[root, t]` if that is already a token.
+/// one); the root adopts `[root, t]` if that is already a token. Also the
+/// edit record of the insertion, if it created `t`.
 pub(crate) fn forward<H: StageHandle>(
     handle: &mut H,
     root: Option<Token<StageIndex>>,
     rest: &[Token<StageIndex>],
-) -> Span {
-    let token = match insert_next_match(&mut *handle, rest.to_vec()) {
-        Ok(outcome) => outcome.token(),
-        Err(InsertError::Search(SearchError::SingleIndex(atom))) => atom,
+) -> (Span, Option<Publication<StageIndex>>) {
+    let (token, publication) = match insert_next_match(&mut *handle, rest.to_vec()) {
+        Ok(InsertOutcome::Created {
+            token, publication, ..
+        }) => (token, Some(publication)),
+        Ok(outcome) => (outcome.token(), None),
+        Err(InsertError::Search(SearchError::SingleIndex(atom))) => (atom, None),
         Err(error) => panic!("forward match failed: {}", error),
     };
     assert!(
         token.width.0 > 0 && token.width.0 <= rest.len(),
         "forward match returned an invalid width"
     );
-    match root.and_then(|root| find_complete(handle, vec![root, token])) {
+    let span = match root.and_then(|root| find_complete(handle, vec![root, token])) {
         Some(replacement) => Span::ReplaceRoot(replacement),
         None => Span::Append(token),
-    }
+    };
+    (span, publication)
 }
 
 /// The existing token whose content is exactly `query`, if any. A lookup:
@@ -69,7 +78,7 @@ mod tests {
         let (graph, names) = fixture("linear_abc");
         let mut handle = OverlayHandle::open(&graph);
         let c = names["c"].into();
-        assert_eq!(forward(&mut handle, None, &[c]), Span::Append(c));
+        assert_eq!(forward(&mut handle, None, &[c]).0, Span::Append(c));
         assert_eq!(handle.graph().generation().stage, 0);
     }
 
@@ -81,14 +90,14 @@ mod tests {
         let mut handle = OverlayHandle::open(&graph);
         let (a, b) = (names["a"].into(), names["b"].into());
         assert_eq!(
-            forward(&mut handle, Some(a), &[b]),
+            forward(&mut handle, Some(a), &[b]).0,
             Span::ReplaceRoot(names["ab"].into())
         );
 
         let (graph, names) = fixture("linear_abc");
         let mut handle = OverlayHandle::open(&graph);
         let (a, b) = (names["a"].into(), names["b"].into());
-        assert_eq!(forward(&mut handle, Some(a), &[b]), Span::Append(b));
+        assert_eq!(forward(&mut handle, Some(a), &[b]).0, Span::Append(b));
         assert_eq!(handle.graph().generation().stage, 0);
         assert_eq!(handle.staged_count(), 0);
     }
@@ -99,9 +108,12 @@ mod tests {
         let (graph, names) = fixture("linear_abc");
         let mut handle = OverlayHandle::open(&graph);
         let (a, b) = (names["a"].into(), names["b"].into());
-        let Span::Append(token) = forward(&mut handle, None, &[a, b, a]) else {
-            panic!("no root: append");
+        let (Span::Append(token), Some(publication)) = forward(&mut handle, None, &[a, b, a])
+        else {
+            panic!("no root: append a created token");
         };
+        assert_eq!(publication.created.len(), 1);
+        assert_eq!(publication.created[0].index, token.index);
         assert_eq!(token.width.0, 2);
         assert_eq!(
             find_complete(&handle, vec![a, b]).map(|t| t.index),

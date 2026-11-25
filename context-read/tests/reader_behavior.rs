@@ -6,35 +6,34 @@
 //!
 //! The read lane (`tests/fixtures/v3/read`, one oracle graph per read of a
 //! multi-input scenario) is checked by `read_gate`; the worked examples of
-//! the reader plan (§2) also check their step traces. Scenarios with
-//! provisional retention (reader plan §5) are ignored until step 5.
-//!
-//! Scenarios and the read gate run once per staging strategy
-//! (`strategies!`, staging plan §7.2): every strategy must give the oracle
-//! graphs, with the same ignored scenarios and read deviations.
+//! the reader plan (§2) also check their step traces. After every read the
+//! committed graph is validated, including retention invariant G6 with the
+//! inputs read so far (dissolution plan §3.1).
 #[allow(dead_code)]
 mod support;
 
-use context_read::{Commit, OverlayStaging, StagingStrategy, Step, StepKind, TaggedStaging};
-use context_trace::{
-    positioned::{
-        diff,
-        fixtures::{read_cases, ReadCase},
-        GraphRead, PositionedGraph, PositionedGraphRef,
-    },
-    Token,
+use context_read::{Commit, Step, StepKind};
+use context_trace::positioned::{
+    diff,
+    fixtures::{read_cases, ReadCase},
+    PositionedGraph, PositionedGraphRef,
 };
 use support::positioned::load_positioned;
 
-fn assert_scenario<S: StagingStrategy>(name: &str) {
+fn assert_scenario(name: &str) {
     let fixture = load_positioned(name);
     let graph = PositionedGraphRef::default();
+    let mut inputs = Vec::new();
     for input in &fixture.corpus {
-        context_read::read_with::<S>(&graph, input.chars()).expect("nonempty input");
-        graph
-            .read()
+        let root = context_read::read(&graph, input.chars()).expect("nonempty input");
+        inputs.push(root.index);
+        let committed = graph.read();
+        committed
             .validate()
             .unwrap_or_else(|error| panic!("{}: invalid graph after {:?}: {}", name, input, error));
+        committed
+            .validate_retention(inputs.iter().copied())
+            .unwrap_or_else(|error| panic!("{}: G6 violated after {:?}: {}", name, input, error));
     }
     let graph = graph.read();
     let difference = diff(&fixture.graph, &graph.to_interchange());
@@ -46,7 +45,7 @@ fn assert_scenario<S: StagingStrategy>(name: &str) {
     );
 }
 
-/// The scenario list, passed to macro `$m` (names and per-strategy tests).
+/// The scenario list, passed to macro `$m` (names and tests).
 macro_rules! with_scenarios {
     ($m:ident) => {
         $m!(
@@ -101,9 +100,7 @@ macro_rules! with_scenarios {
             closure_forward_seed,
             closure_nested_seed,
             closure_tail_seed,
-            #[ignore = "provisional retention (reader plan §5)"]
             repeat_abcabca,
-            #[ignore = "provisional retention (reader plan §5)"]
             repeat_ababa,
             seam_bcd,
             late_retention__1,
@@ -120,7 +117,6 @@ macro_rules! with_scenarios {
             deep_nested_repeat,
             insert_small_periodic,
             insert_shared_vertex,
-            #[ignore = "provisional retention (reader plan §5)"]
             insert_periodic,
             insert_deep_borders,
             seam_overlap_append,
@@ -141,17 +137,11 @@ macro_rules! with_scenarios {
             period_abcdef_x2,
             period_abcdef_x3,
             period_abcdef_x4,
-            #[ignore = "provisional retention (reader plan §5)"]
             period_ab_x3_a,
-            #[ignore = "provisional retention (reader plan §5)"]
             period_abc_x3_a,
-            #[ignore = "provisional retention (reader plan §5)"]
             period_abc_x3_ab,
-            #[ignore = "provisional retention (reader plan §5)"]
             period_abcd_x2_a,
-            #[ignore = "provisional retention (reader plan §5)"]
             period_abcd_x3_ab,
-            #[ignore = "provisional retention (reader plan §5)"]
             period_abcd_x2_abc,
         );
     };
@@ -164,95 +154,22 @@ macro_rules! scenario_names {
 }
 with_scenarios!(scenario_names);
 
-/// One `#[test]` per scenario for the strategy `Strategy` in scope.
+/// One `#[test]` per scenario.
 macro_rules! scenarios {
     ($($(#[$attr:meta])* $name:ident),* $(,)?) => {$(
         #[test]
         $(#[$attr])*
         #[allow(non_snake_case)] // `<name>__<n>` prefix fixtures
         fn $name() {
-            super::assert_scenario::<Strategy>(stringify!($name));
+            assert_scenario(stringify!($name));
         }
     )*};
 }
+with_scenarios!(scenarios);
 
-/// Scenarios and the read gate per staging strategy (staging plan §7.2).
-macro_rules! strategies {
-    ($($module:ident: $strategy:ty),* $(,)?) => {$(
-        mod $module {
-            type Strategy = $strategy;
-            with_scenarios!(scenarios);
-
-            #[test]
-            fn read_gate() {
-                super::assert_read_gate::<Strategy>();
-            }
-        }
-    )*};
-}
-
-strategies!(
-    overlay: context_read::OverlayStaging,
-    tagged: context_read::TaggedStaging,
-);
-
-/// The exact committed graph (generation, every vertex with index, width,
-/// state, composition, parent links and label) and the returned root.
-fn dump(graph: &PositionedGraphRef, root: Option<Token>) -> String {
-    let graph = graph.read();
-    let mut out = format!("{root:?} {:?}\n", graph.generation());
-    for vertex in graph.vertices() {
-        let data = vertex.data();
-        #[cfg(debug_assertions)]
-        let label = data.label();
-        #[cfg(not(debug_assertions))]
-        let label = "";
-        out += &format!(
-            "{} {:?} {:?} {:?} {:?} {label:?}\n",
-            data.index(),
-            data.width(),
-            data.state(),
-            data.node(),
-            data.parents()
-        );
-    }
-    out
-}
-
-/// Differential test of the strategies (staging plan §7.2): reads through
-/// (a) and (b) commit exactly the same graph after every read, including
-/// indices (both commit in creation order; (b) commits new atoms at once),
-/// for the corpus, the read lane and a long periodic input.
 #[test]
-fn strategies_commit_identical_graphs() {
-    fn reads<S: StagingStrategy>(base: &PositionedGraph, inputs: &[String]) -> Vec<String> {
-        let graph = PositionedGraphRef::new(base.clone());
-        inputs
-            .iter()
-            .map(|input| dump(&graph, context_read::read_with::<S>(&graph, input.chars())))
-            .collect()
-    }
-    let mut cases: Vec<(String, PositionedGraph, Vec<String>)> = support::positioned::scenarios()
-        .into_iter()
-        .map(|scenario| (scenario.name, PositionedGraph::default(), scenario.inputs))
-        .collect();
-    for case in read_cases() {
-        let base = case
-            .base
-            .as_ref()
-            .map_or_else(PositionedGraph::default, |base| {
-                PositionedGraph::from_interchange(&base.graph).unwrap()
-            });
-        cases.push((case.name, base, vec![case.input]));
-    }
-    cases.push(("abc^64 x".into(), PositionedGraph::default(), vec![format!("{}x", "abc".repeat(64))]));
-    for (name, base, inputs) in &cases {
-        assert_eq!(
-            reads::<OverlayStaging>(base, inputs),
-            reads::<TaggedStaging>(base, inputs),
-            "{name}"
-        );
-    }
+fn read_gate() {
+    assert_read_gate();
 }
 
 /// Every positioned manifest entry has exactly one scenario test above.
@@ -268,24 +185,37 @@ fn manifest_is_covered() {
     assert_eq!(names, tests, "positioned manifest and reader tests differ");
 }
 
-/// Read-lane cases whose oracle graph differs from the reader's by
-/// provisional retention (reader plan §5); fixed by the prototype rerun.
-const READ_DEVIATIONS: &[&str] = &["insert_deep_borders__1"];
-
 /// Read `case.input` into its base graph; the differences from the oracle
 /// graph, if any.
-fn read_case<S: StagingStrategy>(case: &ReadCase) -> Result<(), String> {
-    let base = match &case.base {
-        Some(base) => PositionedGraph::from_interchange(&base.graph)
-            .map_err(|error| format!("invalid base: {error}"))?,
-        None => PositionedGraph::default(),
+fn read_case(case: &ReadCase) -> Result<(), String> {
+    let (base, mut inputs) = match &case.base {
+        Some(base) => {
+            let (graph, names) = PositionedGraph::from_interchange_named(&base.graph)
+                .map_err(|error| format!("invalid base: {error}"))?;
+            let inputs = base
+                .corpus
+                .iter()
+                .map(|input| {
+                    names
+                        .get(input)
+                        .map(|token| token.index)
+                        .ok_or_else(|| format!("base input {input:?} is no vertex"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            (graph, inputs)
+        },
+        None => (PositionedGraph::default(), Vec::new()),
     };
     let graph = PositionedGraphRef::new(base);
-    let root = context_read::read_with::<S>(&graph, case.input.chars()).ok_or("no root")?;
+    let root = context_read::read(&graph, case.input.chars()).ok_or("no root")?;
+    inputs.push(root.index);
     let graph = graph.read();
     graph
         .validate()
         .map_err(|error| format!("invalid graph: {error}"))?;
+    graph
+        .validate_retention(inputs)
+        .map_err(|error| format!("G6 violated: {error}"))?;
     if root.width.0 != case.input.chars().count() {
         return Err(format!("root width {}", root.width.0));
     }
@@ -297,27 +227,24 @@ fn read_case<S: StagingStrategy>(case: &ReadCase) -> Result<(), String> {
     }
 }
 
-/// Every read of the read lane equals its oracle graph, except exactly the
-/// expected deviations (reader plan §9.1): a new and a fixed deviation both
-/// fail.
-fn assert_read_gate<S: StagingStrategy>() {
+/// Every read of the read lane equals its oracle graph (reader plan §9.1,
+/// dissolution plan §5.2).
+fn assert_read_gate() {
     let cases = read_cases();
     assert!(!cases.is_empty());
     let mut failures = Vec::new();
     for case in &cases {
-        let result = std::panic::catch_unwind(|| read_case::<S>(case))
+        let result = std::panic::catch_unwind(|| read_case(case))
             .unwrap_or_else(|_| Err("panicked".to_string()));
         if let Err(error) = result {
             failures.push((case.name.clone(), error));
         }
     }
-    let failed: Vec<&str> = failures.iter().map(|(name, _)| name.as_str()).collect();
     assert!(
-        failed == READ_DEVIATIONS,
-        "{} of {} read cases fail, expected deviations {:?}:\n{}",
+        failures.is_empty(),
+        "{} of {} read cases fail:\n{}",
         failures.len(),
         cases.len(),
-        READ_DEVIATIONS,
         failures
             .iter()
             .map(|(name, error)| format!("{name}: {error}"))
@@ -332,25 +259,25 @@ fn assert_read_gate<S: StagingStrategy>() {
 #[test]
 fn steps_consume_disjoint_ranges() {
     for case in &read_cases() {
-            let base = match &case.base {
-                Some(base) => PositionedGraph::from_interchange(&base.graph).unwrap(),
-                None => PositionedGraph::default(),
+        let base = match &case.base {
+            Some(base) => PositionedGraph::from_interchange(&base.graph).unwrap(),
+            None => PositionedGraph::default(),
+        };
+        let graph = PositionedGraphRef::new(base);
+        let (_, steps) = context_read::read_traced(&graph, case.input.chars());
+        let mut consumed = 0;
+        for step in &steps {
+            consumed += match step.kind {
+                StepKind::Unknown => 1,
+                StepKind::Forward(width) => width,
+                StepKind::Expansion { postfix, expansion } => {
+                    assert!(expansion > postfix, "{}: empty expansion", case.name);
+                    expansion - postfix
+                },
             };
-            let graph = PositionedGraphRef::new(base);
-            let (_, steps) = context_read::read_traced(&graph, case.input.chars());
-            let mut consumed = 0;
-            for step in &steps {
-                consumed += match step.kind {
-                    StepKind::Unknown => 1,
-                    StepKind::Forward(width) => width,
-                    StepKind::Expansion { postfix, expansion } => {
-                        assert!(expansion > postfix, "{}: empty expansion", case.name);
-                        expansion - postfix
-                    },
-                };
-                assert_eq!(step.root, consumed, "{}: {:?}", case.name, step);
-            }
-            assert_eq!(consumed, case.input.chars().count(), "{}", case.name);
+            assert_eq!(step.root, consumed, "{}: {:?}", case.name, step);
+        }
+        assert_eq!(consumed, case.input.chars().count(), "{}", case.name);
     }
 }
 
@@ -371,8 +298,15 @@ fn trace_scenario(name: &str) -> Vec<Step> {
     steps
 }
 
+/// A step that dissolves and discards nothing.
 fn step(kind: StepKind, commit: Commit, root: usize) -> Step {
-    Step { kind, commit, root }
+    Step {
+        kind,
+        commit,
+        root,
+        dissolved: 0,
+        discarded: 0,
+    }
 }
 
 /// `xabcdey` on `abcd, bcde`: append `x`; forward `abcd`; expansion

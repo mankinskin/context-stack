@@ -2,11 +2,10 @@
 //! its handle commits them, and the [`Translation`] of staged into committed
 //! indices.
 //!
-//! Two implementations: the physical [`overlay`] next to the read-only
-//! committed graph and the logical [`tagged`] stage inside it.
+//! The implementation is the physical [`overlay`] next to the read-only
+//! committed graph.
 
 pub mod overlay;
-pub mod tagged;
 
 use std::fmt;
 
@@ -18,66 +17,62 @@ use crate::{
         CommittedIndex,
         StageIndex,
         StagedIndex,
-        VertexIndex,
     },
     positioned::store::{
         GraphWrite,
         HasGraphMut,
+        raw,
     },
 };
 
 /// A store with an open stage: indices are [`StageIndex`], new vertices are
-/// staged.
-pub trait Stage: GraphWrite<Index = StageIndex> {
-    /// The staged vertices in creation order.
+/// staged and staged vertices can be removed (swap-remove, [`Moved`]).
+pub trait Stage: GraphWrite<Index = StageIndex> + raw::Remove {
+    /// The staged vertices in slot order (creation order until a removal
+    /// moves the last vertex into the freed slot).
     fn staged(&self) -> impl Iterator<Item = StagedIndex> + '_;
 }
 
-/// Staged → committed; committed indices are unchanged.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Translation(Map);
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Map {
-    /// Committed index by [`StagedIndex`] slot (overlay: vertices moved).
-    Table(Vec<CommittedIndex>),
-    /// A staged slot is its committed slot (tag: only the tag bit is
-    /// cleared); the number of formerly staged vertices.
-    Untag(usize),
+/// A staged vertex moved from slot `from` to slot `to` by a removal
+/// (swap-remove: `from` was the last slot, `to` the removed vertex's).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Moved {
+    pub from: StageIndex,
+    pub to: StageIndex,
 }
 
-impl Default for Translation {
-    fn default() -> Self {
-        Self(Map::Table(Vec::new()))
+impl Moved {
+    /// `index` after the move: `from` becomes `to`, every other index is
+    /// unchanged.
+    pub fn apply(
+        self,
+        index: StageIndex,
+    ) -> StageIndex {
+        if index == self.from { self.to } else { index }
     }
 }
+
+/// Staged → committed; committed indices are unchanged.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Translation(Vec<CommittedIndex>);
 
 impl Translation {
     pub(crate) fn table(committed: Vec<CommittedIndex>) -> Self {
-        Self(Map::Table(committed))
+        Self(committed)
     }
-    pub(crate) fn untag(staged: usize) -> Self {
-        Self(Map::Untag(staged))
-    }
-    /// The committed indices of a table, by staged slot.
+    /// The committed indices by staged slot.
     pub(crate) fn slots(&self) -> &[CommittedIndex] {
-        match &self.0 {
-            Map::Table(committed) => committed,
-            Map::Untag(_) => &[],
-        }
+        &self.0
     }
     /// # Panics
-    /// If `index` is staged but not part of the committed stage (overlay).
+    /// If `index` is staged but not part of the committed stage.
     pub fn index(
         &self,
         index: StageIndex,
     ) -> CommittedIndex {
-        match (index.split(), &self.0) {
-            (Either::Left(committed), _) => committed,
-            (Either::Right(staged), Map::Table(committed)) =>
-                committed[staged.slot()],
-            (Either::Right(staged), Map::Untag(_)) =>
-                VertexIndex(staged.slot()),
+        match index.split() {
+            Either::Left(committed) => committed,
+            Either::Right(staged) => self.0[staged.slot()],
         }
     }
     pub fn token(
@@ -88,13 +83,10 @@ impl Translation {
     }
     /// Number of translated (formerly staged) vertices.
     pub fn len(&self) -> usize {
-        match &self.0 {
-            Map::Table(committed) => committed.len(),
-            &Map::Untag(staged) => staged,
-        }
+        self.0.len()
     }
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.0.is_empty()
     }
 }
 
@@ -108,6 +100,10 @@ pub trait StageHandle: HasGraphMut<Index = StageIndex> {
     fn stage(&mut self) -> Self::View<'_>;
     /// Commit every staged vertex and every change of committed vertices to
     /// the committed graph; `root` translated.
+    ///
+    /// # Panics
+    /// If a staged composite other than `root` has fewer than two parent
+    /// occurrences (an invalid vertex set, retention invariant G6).
     fn commit(
         self,
         root: Token<StageIndex>,

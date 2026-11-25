@@ -7,17 +7,21 @@ use super::{
     PositionedCover,
     PositionedGraphData,
 };
+use std::fmt::Display;
+
 use crate::positioned::{
+    CompositionRead,
     GraphRead,
+    NodeRef,
     Occurrence,
     PositionedGraph,
+    VertexRead,
     string_repr,
-    VertexNode,
 };
 use crate::{
+    AtomOf,
     GraphKind,
     Token,
-    graph::vertex::VertexIndex,
 };
 
 impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
@@ -75,29 +79,36 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
         Ok((graph, tokens))
     }
 
-    /// ID-free content-keyed covers of every vertex.
+    /// ID-free content-keyed covers of every vertex ([`store_interchange`]).
     ///
     /// Export only: the interchange format is keyed by content, so names are
     /// read by traversal here and never stored in the graph.
     pub fn to_interchange(&self) -> PositionedGraphData {
-        let name = |index: VertexIndex| -> String {
-            string_repr(self.vertex(index).expect("vertex of this graph"))
-        };
-        let vertices = self
-            .vertices
-            .iter()
-            .map(|vertex| {
-                let cover = match vertex.node() {
-                    VertexNode::Atom(_) => Vec::new(),
-                    VertexNode::Composite(composition) => composition
-                        .occurrences()
-                        .iter()
-                        .map(|o| (o.offset.0, name(o.child.index)))
-                        .collect(),
-                };
-                (name(vertex.index()), cover)
-            })
-            .collect();
-        PositionedGraphData { vertices }
+        store_interchange(self)
     }
+}
+
+/// ID-free content-keyed covers of every vertex of any store (also an open
+/// stage), named by [`string_repr`].
+pub fn store_interchange<S: GraphRead + ?Sized>(store: &S) -> PositionedGraphData
+where
+    AtomOf<S::Kind>: Display,
+{
+    let name = |index: S::Index| -> String {
+        string_repr(store.vertex(index).expect("vertex of this store"))
+    };
+    let vertices = store
+        .vertices()
+        .map(|vertex| {
+            let cover = match vertex.node() {
+                NodeRef::Atom(_) => Vec::new(),
+                NodeRef::Composite(composition) => composition
+                    .occurrences()
+                    .map(|o| (o.offset.0, name(o.child.index)))
+                    .collect(),
+            };
+            (string_repr(vertex), cover)
+        })
+        .collect();
+    PositionedGraphData { vertices }
 }

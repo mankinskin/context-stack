@@ -137,6 +137,28 @@ pub(crate) fn validate_vertex<'a, V: VertexRead<'a>>(
     Ok(())
 }
 
+/// Structure, widths and reciprocal links of every vertex of `store`, and
+/// G4 for every composite (debug and `test-api` builds): the checks of
+/// `PositionedGraph::validate` that need no content traversal, for any
+/// store (also an open stage).
+#[cfg(any(test, feature = "test-api"))]
+pub fn validate_store<S: GraphRead + ?Sized>(
+    store: &S
+) -> Result<(), PositionedError<S::Index>> {
+    for vertex in store.vertices() {
+        validate_vertex(vertex)?;
+        #[cfg(any(debug_assertions, feature = "test-api"))]
+        if let NodeRef::Composite(composition) = vertex.node() {
+            check_overlap_closure(
+                store,
+                vertex.vertex_index(),
+                composition.occurrences(),
+            )?;
+        }
+    }
+    Ok(())
+}
+
 /// G4, structurally: for adjacent overlapping `L@l`, `R@r`, the largest
 /// token starting at `r − l` in `L` ends at `|L|`, i.e. the overlap is a
 /// vertex. Non-adjacent pairs are not checked.

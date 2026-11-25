@@ -71,7 +71,6 @@ fn positioned_graph_has_no_content_keyed_field() {
             ("vertices", "Vec<PositionedVertex<G>>"),
             ("atoms", "HashMap<AtomOf<G>, VertexIndex>"),
             ("generation", "u64"),
-            ("stage", "Option<StageId>"),
         ],
         &[],
     );
@@ -81,7 +80,6 @@ fn positioned_graph_has_no_content_keyed_field() {
             ("index", "VertexIndex"),
             ("key", "VertexKey"),
             ("width", "TokenWidth"),
-            ("state", "VertexState"),
             ("node", "VertexNode<AtomOf<G>>"),
             ("parents", "BTreeMap<VertexIndex, BTreeSet<AtomPosition>>"),
         ],

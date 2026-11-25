@@ -188,21 +188,6 @@ impl StageIndex {
         debug_assert!(index.0 & STAGED_BIT == 0, "committed index {} out of range", index.0);
         Self(index.0)
     }
-    /// The slot of a store addressing staged and committed vertices in one
-    /// vector (tag stage), with the tag bit set iff `staged`.
-    #[inline]
-    pub(crate) fn tagged(
-        slot: usize,
-        staged: bool,
-    ) -> Self {
-        debug_assert!(slot & STAGED_BIT == 0, "slot {slot} out of range");
-        Self(slot | if staged { STAGED_BIT } else { 0 })
-    }
-    /// The index without the tag bit.
-    #[inline]
-    pub(crate) fn slot(self) -> usize {
-        self.0 & !STAGED_BIT
-    }
     pub fn is_staged(self) -> bool {
         self.0 & STAGED_BIT != 0
     }

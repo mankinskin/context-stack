@@ -700,8 +700,66 @@ c@2, a@3]` and no `abc`. The same holds for the other 8 scenarios and
 
 ## 6. Results
 
-To be filled by the implementation (D5 gate output, D6 benchmark
-numbers).
+**D5 (2026-11-25).** Gate §5.4 green. `reader_behavior`: 100 tests
+(94 scenarios, none ignored; `read_gate` 140 / 140 cases with
+`validate_retention`, 0 deviations). Per-step lane
+(`src/tests/steps.rs`): 94 scenarios, 701 / 701 steps equal their oracle
+graph, (S) and `validate_store` on every step; 16 dissolutions, 0 discards
+in total (the prototype's numbers). The context-read suite also passes in
+`--release`.
+
+### D6 benchmarks (2026-11-25)
+
+`cargo bench -p context-read --no-default-features --features test-api`,
+release profile, Linux workstation; medians (criterion
+`median.point_estimate`, 95 % CI in brackets). No baseline comparison.
+
+| Benchmark id | Median |
+|---|---|
+| `read/corpus/all` | 1.892 ms [1.887, 1.897] |
+| `read/periodic/abc^n_x/64` | 1.010 ms [0.999, 1.039] |
+| `read/periodic/abc^n_x/256` | 41.77 ms [41.41, 41.95] |
+| `read/periodic/abc^n_x/512` | 364.3 ms [362.2, 370.0] |
+| `find_ancestor/corpus_inputs` | 861.5 µs [839.5, 865.2] |
+| `find_ancestor/corpus_inputs_overlay` | 855.0 µs [854.0, 855.8] |
+| `commit/overlay/abc^n_x/64` | 5.55 µs [5.45, 5.68] |
+| `commit/overlay/abc^n_x/256` | 18.27 µs [18.03, 18.58] |
+| `commit/overlay/abc^n_x/512` | 36.69 µs [35.44, 38.02] |
+| `grammar_worst_case` | — (panics, see below) |
+
+`staging_memory`:
+
+| Input | Peak growth (KiB) | Retained (KiB) |
+|---|---|---|
+| corpus (max peak, total retained) | 53.9 | 446.1 |
+| abc^64 x | 53.9 | 39.5 |
+| abc^256 x | 199.4 | 152.0 |
+| abc^512 x | 393.4 | 302.0 |
+
+Notes:
+
+- `grammar` (only `context_trace::legacy`; unchanged by this plan) panics
+  during setup (`legacy/graph/vertex/data/core.rs:111`: pattern width
+  mismatch in `T0w1`) and aborts `cargo bench` before the other benches;
+  they were run with `--bench <name>`. Not addressed here.
+- `staging_commit` panicked after D3 (its replay created atoms through
+  `GraphEdit::atom` on the stage, which is no longer allowed); it now
+  commits atoms via `OverlayHandle::atom` before replaying composites.
+
+Settle statistics from `read_traced` over the v3 corpora
+(`fixtures/v3/scenarios.json`; each scenario's inputs read in order into
+one graph). `Step` does not report candidates, so they are not recorded.
+
+| | Reads | Steps | Dissolved | Discarded |
+|---|---|---|---|---|
+| total (94 scenarios) | 199 | 701 | 16 | 0 |
+| max per read | — | — | 3 (`insert_periodic`, `ababababa`) | 0 |
+
+Scenarios with a dissolution (one read each unless noted):
+`insert_periodic` 3; `period_ab_x3_a`, `period_abc_x3_a`,
+`period_abc_x3_ab`, `period_abcd_x3_ab` 2 each; `repeat_abcabca`,
+`repeat_ababa`, `period_abcd_x2_a`, `period_abcd_x2_abc`,
+`insert_deep_borders` (3 reads) 1 each. All other reads: 0.
 
 ## 7. Decisions
 

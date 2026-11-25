@@ -19,13 +19,13 @@
 //! - `committed/`: the committed store ([`PositionedGraph`], its lock guards
 //!   and [`PositionedGraphRef`]) implements them (`committed/access.rs`);
 //! - `edit/`: `GraphEdit`, the only mutation layer, with its
-//!   `Publication` record and the store-generic checks;
+//!   `Publication` record, the dissolution of staged vertices
+//!   ([`Candidates`], [`Removal`], [`Settled`]) and the store-generic
+//!   checks;
 //! - `stage/`: a read edits a stage ([`Stage`], [`StageHandle`],
 //!   `stage/mod.rs`); the overlay stage ([`OverlayHandle`], [`OverlayView`],
 //!   `stage/overlay/`) keeps its vertices next to the read-only committed
-//!   graph until the commit; the tagged stage ([`TaggedHandle`],
-//!   [`TaggedView`], `stage/tagged/`) writes into the committed graph and
-//!   marks its vertices [`VertexState::Staged`] until the commit;
+//!   graph until the commit;
 //! - `interchange`: content-keyed snapshots, with conversion, `diff`
 //!   and `fixtures` in `test-api` builds;
 //! - `path` and `trace`: search paths and trace states (below).
@@ -62,13 +62,12 @@ pub use self::edit::GraphEdit;
 #[cfg(debug_assertions)]
 pub use self::{
     model::PositionedLabels,
-    stage::{
-        overlay::OverlayLabels,
-        tagged::TaggedLabels,
-    },
+    stage::overlay::OverlayLabels,
 };
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
 pub use self::model::IntervalView;
+#[cfg(any(test, feature = "test-api"))]
+pub use self::edit::check::validate_store;
 #[cfg(any(test, feature = "test-api"))]
 pub use self::interchange::diff::{
     GraphDiff,
@@ -81,7 +80,10 @@ pub use self::{
         PositionedVertexRef,
     },
     edit::{
+        Candidates,
         Publication,
+        Removal,
+        Settled,
         VertexEdit,
     },
     model::{
@@ -96,6 +98,7 @@ pub use self::{
     },
     stage::{
         CommitError,
+        Moved,
         Stage,
         StageHandle,
         Translation,
@@ -106,13 +109,6 @@ pub use self::{
             OverlayView,
             StagedVertex,
             StagingGraph,
-        },
-        tagged::{
-            StageId,
-            TaggedComposition,
-            TaggedHandle,
-            TaggedVertex,
-            TaggedView,
         },
     },
     store::{
