@@ -16,7 +16,7 @@ use std::{
     time::Instant,
 };
 
-use context_trace::legacy::{
+use context_trace_legacy::{
     graph::vertex::key::VertexKey,
     HashSet,
 };

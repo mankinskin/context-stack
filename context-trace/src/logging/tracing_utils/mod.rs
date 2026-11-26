@@ -11,7 +11,7 @@ mod config;
 mod debug_to_json;
 mod field_visitor;
 mod formatter;
-mod graph_ref;
+pub mod graph_ref;
 mod panic;
 mod path;
 mod span_fields;

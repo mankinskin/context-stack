@@ -1,4 +1,4 @@
-use context_trace::legacy::VertexKey;
+use context_trace_legacy::VertexKey;
 use tracing::{Level, Span};
 
 use super::{

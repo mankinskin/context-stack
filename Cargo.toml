@@ -3,9 +3,13 @@ resolver = "2"
 members = [
   "context-api",
   "context-insert",
+  "context-insert-legacy",
   "context-read",
+  "context-read-legacy",
   "context-search",
+  "context-search-legacy",
   "context-trace",
+  "context-trace-legacy",
   "context-trace-macros",
   "ngrams",
   "tools/cli/context-cli",

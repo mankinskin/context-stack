@@ -1,0 +1,121 @@
+use std::collections::BTreeSet;
+use tracing::debug;
+
+use crate::{
+    interval::IntervalGraph,
+    join::context::node::merge::{
+        PartitionRange,
+        RequiredPartitions,
+    },
+    split::{
+        cache::{
+            position::PosKey,
+            vertex::RootAugmentation,
+        },
+        context::SplitCacheCtx,
+        provenance::RequirementOrigin,
+        trace::SplitTraceState,
+    },
+};
+use context_trace_legacy::{
+    graph::getters::ErrorReason,
+    *,
+};
+
+#[derive(Debug)]
+pub(crate) struct SplitRunStep;
+
+#[derive(Debug)]
+pub(crate) struct SplitRun<G: HasGraph> {
+    ctx: SplitCacheCtx<G>,
+    incomplete: BTreeSet<Token>,
+}
+impl<G: HasGraph> SplitRun<G> {
+    pub(crate) fn init(
+        &mut self
+    ) -> Result<
+        (Vec<SplitTraceState>, PartitionRange, RequiredPartitions),
+        ErrorReason,
+    > {
+        let root = self.ctx.states_ctx.ctx.root;
+        let RootAugmentation {
+            next,
+            target_range,
+            required,
+            inner_offsets,
+            wrapper_offsets,
+        } = self
+            .ctx
+            .cache
+            .augment_root(&self.ctx.states_ctx.trav, root)?;
+        let provenance = &mut self.ctx.states_ctx.provenance;
+        for offset in inner_offsets {
+            provenance.require(
+                PosKey::new(root, offset),
+                RequirementOrigin::InnerAugmentation,
+            );
+        }
+        for offset in wrapper_offsets {
+            provenance
+                .require(PosKey::new(root, offset), RequirementOrigin::Wrapper);
+        }
+        Ok((next, target_range, required))
+    }
+    pub(crate) fn finish(mut self) -> SplitCacheCtx<G> {
+        self.ctx
+            .cache
+            .augment_nodes(&mut self.ctx.states_ctx, self.incomplete);
+        self.ctx
+    }
+}
+impl<G: HasGraph> Iterator for SplitRun<G> {
+    type Item = SplitRunStep;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.ctx.states_ctx.states.next().map(|state| {
+            self.ctx.apply_trace_state(&state);
+            self.incomplete.insert(state.index);
+            let complete = self
+                .incomplete
+                .split_off(&TokenWidth(*state.index.width() + 1));
+            self.ctx
+                .cache
+                .augment_nodes(&mut self.ctx.states_ctx, complete);
+            SplitRunStep
+        })
+    }
+}
+impl<G: HasGraph> From<SplitCacheCtx<G>> for SplitRun<G> {
+    fn from(ctx: SplitCacheCtx<G>) -> Self {
+        Self {
+            ctx,
+            incomplete: Default::default(),
+        }
+    }
+}
+impl<G: HasGraph> TryFrom<SplitCacheCtx<G>> for IntervalGraph {
+    type Error = ErrorReason;
+    fn try_from(cache: SplitCacheCtx<G>) -> Result<Self, Self::Error> {
+        Self::try_from(SplitRun::from(cache))
+    }
+}
+impl<G: HasGraph> TryFrom<SplitRun<G>> for IntervalGraph {
+    type Error = ErrorReason;
+    fn try_from(mut run: SplitRun<G>) -> Result<Self, Self::Error> {
+        debug!("IntervalGraph::try_from - init");
+        let (next, target_range, required) = run.init()?;
+        run.ctx.states.queue.extend(next);
+        debug!("IntervalGraph::try_from - run iterator to end");
+        run.all(|_| true); // run iterator to end
+        debug!("SplitRun::try_from - calling finish");
+        let cache = run.finish();
+        debug!("SplitRun::try_from - finish done, creating IntervalGraph");
+        Ok(Self {
+            root: cache.states_ctx.ctx.root,
+            provenance: cache.states_ctx.provenance,
+            states: cache.states_ctx.states,
+            cache: cache.cache,
+            target_range,
+            required,
+        })
+    }
+}

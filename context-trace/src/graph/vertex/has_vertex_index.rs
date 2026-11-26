@@ -53,13 +53,6 @@ impl HasVertexIndex for StageIndex {
     }
 }
 
-#[cfg(feature = "legacy")]
-impl HasVertexIndex for crate::legacy::VertexData {
-    type Index = VertexIndex;
-    fn vertex_index(&self) -> VertexIndex {
-        self.token.vertex_index()
-    }
-}
 impl<I: VertexId> HasVertexIndex for Token<I> {
     type Index = I;
     fn vertex_index(&self) -> I {

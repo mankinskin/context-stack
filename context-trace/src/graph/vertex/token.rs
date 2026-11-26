@@ -32,26 +32,7 @@ use crate::graph::vertex::{
     has_vertex_index::HasVertexIndex,
     wide::{
         Wide,
-        WideMut,
     },
-};
-#[cfg(feature = "legacy")]
-use crate::legacy::{
-    graph::vertex::{
-        pattern::id::PatternId,
-        location::{
-            SubLocation,
-            child::ChildLocation,
-            pattern::PatternLocation,
-        },
-    },
-};
-#[cfg(feature = "legacy")]
-use crate::key::{
-    DownKey,
-    DownPosition,
-    UpKey,
-    UpPosition,
 };
 
 #[derive(
@@ -185,32 +166,6 @@ impl crate::logging::compact_format::CompactFormat for TokenWidth {
     }
 }
 
-#[cfg(feature = "legacy")]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SubToken {
-    pub(crate) token: Token,
-    pub(crate) location: SubLocation,
-}
-#[cfg(feature = "legacy")]
-pub trait HasToken {
-    fn token(&self) -> Token;
-}
-#[cfg(feature = "legacy")]
-impl HasToken for SubToken {
-    fn token(&self) -> Token {
-        self.token
-    }
-}
-#[cfg(feature = "legacy")]
-pub trait HasSubLocation {
-    fn sub_location(&self) -> &SubLocation;
-}
-#[cfg(feature = "legacy")]
-impl HasSubLocation for SubToken {
-    fn sub_location(&self) -> &SubLocation {
-        &self.location
-    }
-}
 
 /// A vertex index with the vertex width. `I` is the index type of the store
 /// the token belongs to (staging plan §3.2).
@@ -259,20 +214,6 @@ impl<I: VertexId> Token<I> {
 }
 
 impl Token {
-    #[cfg(feature = "legacy")]
-    pub fn to_pattern_location(
-        self,
-        pattern_id: PatternId,
-    ) -> PatternLocation {
-        PatternLocation::new(self, pattern_id)
-    }
-    #[cfg(feature = "legacy")]
-    pub fn to_child_location(
-        self,
-        sub: SubLocation,
-    ) -> ChildLocation {
-        ChildLocation::new(self, sub.pattern_id, sub.sub_index)
-    }
 }
 #[allow(dead_code)]
 impl<I> Token<I> {
@@ -283,20 +224,6 @@ impl<I> Token<I> {
 
 #[allow(dead_code)]
 impl Token {
-    #[cfg(feature = "legacy")]
-    pub(crate) fn down_key(
-        self,
-        pos: impl Into<DownPosition>,
-    ) -> DownKey {
-        DownKey::new(self, pos.into())
-    }
-    #[cfg(feature = "legacy")]
-    pub(crate) fn up_key(
-        self,
-        pos: impl Into<UpPosition>,
-    ) -> UpKey {
-        UpKey::new(self, pos.into())
-    }
 }
 
 impl<I: VertexId> Ord for Token<I> {
@@ -417,12 +344,6 @@ impl<I> IntoIterator for Token<I> {
 impl<I> Wide for Token<I> {
     fn width(&self) -> TokenWidth {
         self.width
-    }
-}
-
-impl<I> WideMut for Token<I> {
-    fn width_mut(&mut self) -> &mut TokenWidth {
-        &mut self.width
     }
 }
 

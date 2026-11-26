@@ -1,7 +1,5 @@
 #![deny(clippy::disallowed_methods)]
-#![cfg_attr(feature = "legacy", feature(type_changing_struct_update))]
 
-pub mod direction;
 
 pub mod graph;
 /// Trace-cache keys (token + directed atom position), shared by both models.
@@ -13,9 +11,6 @@ pub mod positioned;
 // Logging utilities (tracing and formatting)
 pub mod logging;
 
-/// Row-model implementation, fenced off from the model-agnostic root.
-#[cfg(feature = "legacy")]
-pub mod legacy;
 
 // Hidden re-export for use in macros only (not part of public API)
 #[doc(hidden)]
@@ -28,8 +23,6 @@ pub use context_trace_macros::{
     instrument_trait_impl,
 };
 
-#[cfg(any(test, feature = "test-api"))]
-pub mod tests;
 
 #[cfg(not(any(test, feature = "test-api")))]
 pub use std::collections::{
@@ -51,15 +44,8 @@ pub type HashSet<T> =
 pub type HashMap<K, V> =
     std::collections::HashMap<K, V, BuildHasherDefault<DefaultHasher>>;
 
-#[cfg(any(test, feature = "test-api"))]
-pub use tests::test_case::TestEnv;
 
 pub use crate::{
-    direction::{
-        Direction,
-        Left,
-        Right,
-    },
     graph::{
         kind::{
             AtomOf,
@@ -81,7 +67,6 @@ pub use crate::{
                 HasVertexIndex,
                 ToToken,
             },
-            has_vertex_key::HasVertexKey,
             key::VertexKey,
             token::{
                 Token,

@@ -14,9 +14,6 @@ pub use read::{
     read_traced,
 };
 
-/// Row-model reader, fenced off from the model-agnostic root.
-#[cfg(feature = "legacy")]
-pub mod legacy;
 
 #[cfg(test)]
 mod tests {

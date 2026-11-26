@@ -5,21 +5,7 @@ name = "context-read"
 version = "0.1.0"
 resolver = "2"
 [features]
-default = ["legacy"]
-# Row-model implementation in `context_read::legacy`.
-legacy = [
-    "context-insert/legacy",
-    "context-search/legacy",
-    "context-trace/legacy",
-]
 test-hashing = []
-# Run the legacy row-model test suite (ignored by default).
-legacy-tests = [
-    "legacy",
-    "context-insert/legacy-tests",
-    "context-search/legacy-tests",
-    "context-trace/legacy-tests",
-]
 test-api = []
 async = ["dep:tokio", "dep:tokio-stream"]
 # `oracle_speedup` bench: no per-run time budget by default.
@@ -120,10 +106,6 @@ context-trace = { path = "../context-trace", default-features = false, features 
 bincode = "1"
 ngrams = { path = "../ngrams" }
 criterion = { version = "0.5", features = ["html_reports"] }
-
-[[bench]]
-name = "grammar"
-harness = false
 
 [[bench]]
 name = "staging"

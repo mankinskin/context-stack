@@ -10,7 +10,7 @@ use std::{
     path::PathBuf,
 };
 
-use context_trace::legacy::logging::build_capture_dispatch;
+use context_trace_legacy::logging::build_capture_dispatch;
 
 use super::TestCorpus;
 use crate::{

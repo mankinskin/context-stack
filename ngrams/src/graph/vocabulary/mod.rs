@@ -19,7 +19,7 @@ use crate::graph::{
     },
     Corpus,
 };
-use context_trace::legacy::{
+use context_trace_legacy::{
     graph::{
         vertex::{
             has_vertex_index::{

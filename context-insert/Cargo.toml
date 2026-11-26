@@ -6,15 +6,6 @@ edition = "2024"
 [lib]
 
 [features]
-default = ["legacy"]
-# Row-model implementation in `context_insert::legacy`.
-legacy = ["context-search/legacy", "context-trace/legacy"]
-# Run the legacy row-model test suite (ignored by default).
-legacy-tests = [
-    "legacy",
-    "context-search/legacy-tests",
-    "context-trace/legacy-tests",
-]
 test-api = ["context-trace/test-api", "context-search/test-api"]
 
 [dependencies]

@@ -16,6 +16,3 @@ pub use insert::{
 #[cfg(test)]
 mod tests;
 
-/// Row-model insertion, fenced off from the model-agnostic root.
-#[cfg(feature = "legacy")]
-pub mod legacy;

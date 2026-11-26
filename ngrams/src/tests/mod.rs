@@ -35,7 +35,7 @@ use crate::{
         StatusHandle,
     },
 };
-use context_trace::legacy::{
+use context_trace_legacy::{
     graph::vertex::key::VertexKey,
     HashSet,
 };

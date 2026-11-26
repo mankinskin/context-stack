@@ -1,0 +1,62 @@
+[package]
+name = "context-trace-legacy"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+test-api = ["context-trace/test-api"]
+legacy-tests = []
+
+[dependencies]
+context-trace = { path = "../context-trace" }
+
+dashmap = { version = "6", features = ["serde"] }
+context-trace-macros = { path = "../context-trace-macros" }
+syntect = { version = "5.2", default-features = false, features = [
+    "default-fancy",
+] }
+itertools = "^0.14"
+indexmap = { version = "^2.7", features = ["serde"] }
+tracing = { version = "^0.1", features = ["attributes", "valuable"] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "fmt",
+    "ansi",
+    "json",
+] }
+uuid = { version = "^1.10", features = ["v4", "fast-rng", "serde", "js"] }
+derive_builder = "^0.20"
+lazy_static = "^1.4"
+either = "^1.6"
+derive_more = { version = "2", features = ["full"] }
+auto_impl = "1.2.0"
+derive-new = "0.7"
+tap = "^1"
+nrfind = "1"
+derivative = "2.2"
+linked_hash_set = "0.1"
+linked-hash-map = "0.5"
+one-of = "0.2"
+charify = "0.1"
+once_cell = "1.20"
+toml = "0.8"
+maplit = "1.0"
+ts-rs = { version = "10", features = ["serde-json-impl", "no-serde-warnings"] }
+
+[dependencies.pretty_assertions]
+features = ["unstable"]
+version = "^1.4"
+
+[dependencies.petgraph]
+git = "https://github.com/mankinskin/petgraph"
+
+[dev-dependencies]
+bincode = "1"
+
+
+
+[dependencies.serde]
+features = ["derive"]
+version = "^1"
+[dependencies.serde_json]
+version = "^1"

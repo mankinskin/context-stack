@@ -29,7 +29,7 @@ pub struct Scenario {
 ///
 /// Kept for existing row consumers and fixtures until they migrate to v3.
 pub mod legacy {
-    use context_trace::legacy::*;
+    use context_trace_legacy::*;
     use serde::{
         Deserialize,
         Serialize,

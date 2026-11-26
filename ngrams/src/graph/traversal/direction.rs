@@ -9,7 +9,7 @@ use crate::graph::vocabulary::{
     NGramId,
     Vocabulary,
 };
-use context_trace::legacy::graph::vertex::{
+use context_trace_legacy::graph::vertex::{
     token::Token,
     wide::Wide,
     VertexIndex,

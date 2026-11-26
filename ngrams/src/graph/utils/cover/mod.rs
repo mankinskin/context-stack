@@ -5,7 +5,7 @@ pub(crate) mod frequency;
 pub(crate) mod parent;
 
 use child::ChildCoverPass;
-use context_trace::legacy::{
+use context_trace_legacy::{
     graph::{
         vertex::{
             data::{

@@ -58,7 +58,9 @@ features = ["wasm_js"]
 
 [dependencies.context-trace]
 path = "../context-trace"
-features = ["legacy"]
+
+[dependencies.context-trace-legacy]
+path = "../context-trace-legacy"
 
 #[dev-dependencies.ngrams]
 #path = "."

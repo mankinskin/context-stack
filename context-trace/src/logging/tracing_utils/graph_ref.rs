@@ -12,52 +12,6 @@ pub trait AsGraphRef<G: crate::graph::kind::GraphKind> {
         G::Atom: std::fmt::Display;
 }
 
-#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
-impl<G: crate::graph::kind::GraphKind> AsGraphRef<G> for &crate::legacy::Hypergraph<G> {
-    fn register_test_graph(self)
-    where
-        G: Send + Sync + 'static,
-        G::Atom: std::fmt::Display,
-    {
-        crate::legacy::graph::test_graph::register_test_graph(self);
-    }
-}
 
-#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
-impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
-    for &crate::legacy::HypergraphRef<G>
-{
-    fn register_test_graph(self)
-    where
-        G: Send + Sync + 'static,
-        G::Atom: std::fmt::Display,
-    {
-        // Use the new register_test_graph_ref to avoid cloning
-        crate::legacy::graph::test_graph::register_test_graph_ref(self);
-    }
-}
 
-#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
-impl<G: crate::graph::kind::GraphKind> AsGraphRef<G> for crate::legacy::Hypergraph<G> {
-    fn register_test_graph(self)
-    where
-        G: Send + Sync + 'static,
-        G::Atom: std::fmt::Display,
-    {
-        crate::legacy::graph::test_graph::register_test_graph(&self);
-    }
-}
 
-#[cfg(all(feature = "legacy", any(test, feature = "test-api")))]
-impl<G: crate::graph::kind::GraphKind> AsGraphRef<G>
-    for crate::legacy::HypergraphRef<G>
-{
-    fn register_test_graph(self)
-    where
-        G: Send + Sync + 'static,
-        G::Atom: std::fmt::Display,
-    {
-        // Use the new register_test_graph_ref to avoid cloning
-        crate::legacy::graph::test_graph::register_test_graph_ref(&self);
-    }
-}

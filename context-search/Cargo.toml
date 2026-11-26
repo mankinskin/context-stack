@@ -4,11 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["legacy"]  #["log_stdout", "log_gui"]
-# Row-model implementation in `context_search::legacy`.
-legacy = ["context-trace/legacy"]
-# Run the legacy row-model test suite (ignored by default).
-legacy-tests = ["legacy", "context-trace/legacy-tests"]
 test-api = []
 
 [dependencies]

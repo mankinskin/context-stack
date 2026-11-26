@@ -30,7 +30,7 @@ use itertools::Itertools;
 use ngram::NGram;
 use pretty_assertions::assert_eq;
 
-use context_trace::legacy::{
+use context_trace_legacy::{
     graph::{
         getters,
         vertex::key::VertexKey,

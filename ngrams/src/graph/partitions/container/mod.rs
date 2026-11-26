@@ -3,7 +3,7 @@
 mod builder;
 
 use builder::PartitionBuilder;
-use context_trace::legacy::{
+use context_trace_legacy::{
     graph::{
         vertex::{
             data::{

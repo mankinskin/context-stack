@@ -1,7 +1,4 @@
-#[cfg(feature = "legacy")]
-use crate::legacy::direction::pattern::PatternDirection;
 use crate::{
-    direction::Right,
     graph::vertex::atom::Atomize,
 };
 use serde::{
@@ -18,10 +15,6 @@ pub trait GraphKind:
     Debug + Clone + Default + PartialEq + Eq + Send + Sync
 {
     type Atom: Atomize + Display + DeserializeOwned;
-    #[cfg(feature = "legacy")]
-    type Direction: PatternDirection;
-    #[cfg(not(feature = "legacy"))]
-    type Direction: crate::direction::Direction;
 }
 
 pub type AtomOf<K> = <K as GraphKind>::Atom;
@@ -34,5 +27,4 @@ pub struct BaseGraphKind;
 
 impl GraphKind for BaseGraphKind {
     type Atom = char;
-    type Direction = Right;
 }

@@ -2259,6 +2259,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "context-insert-legacy"
+version = "0.1.0"
+dependencies = [
+ "auto_impl",
+ "context-search-legacy",
+ "context-trace",
+ "context-trace-legacy",
+ "derivative",
+ "derive-new",
+ "derive_builder",
+ "derive_more 2.1.1",
+ "either",
+ "indexmap 2.14.0",
+ "itertools 0.14.0",
+ "lazy_static",
+ "linked-hash-map",
+ "linked_hash_set",
+ "maplit",
+ "nrfind",
+ "one-of",
+ "petgraph 0.8.2",
+ "pretty_assertions",
+ "serde",
+ "strum 0.27.2",
+ "tap",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "context-mcp"
 version = "0.1.0"
 dependencies = [
@@ -2324,11 +2355,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "context-read-legacy"
+version = "0.1.0"
+dependencies = [
+ "auto_impl",
+ "bincode",
+ "context-insert-legacy",
+ "context-search-legacy",
+ "context-trace",
+ "context-trace-legacy",
+ "criterion",
+ "derivative",
+ "derive-new",
+ "derive_builder",
+ "derive_more 2.1.1",
+ "either",
+ "indexmap 2.14.0",
+ "itertools 0.14.0",
+ "lazy_static",
+ "linked-hash-map",
+ "linked_hash_set",
+ "maplit",
+ "ngrams",
+ "nrfind",
+ "one-of",
+ "petgraph 0.8.2",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "strum 0.27.2",
+ "tap",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "context-search"
 version = "0.1.0"
 dependencies = [
  "auto_impl",
  "context-trace",
+ "derivative",
+ "derive-new",
+ "derive_builder",
+ "derive_more 2.1.1",
+ "either",
+ "indexmap 2.14.0",
+ "itertools 0.14.0",
+ "lazy_static",
+ "linked-hash-map",
+ "linked_hash_set",
+ "maplit",
+ "nrfind",
+ "one-of",
+ "petgraph 0.8.2",
+ "pretty_assertions",
+ "serde",
+ "strum 0.27.2",
+ "tap",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "context-search-legacy"
+version = "0.1.0"
+dependencies = [
+ "auto_impl",
+ "context-trace",
+ "context-trace-legacy",
  "derivative",
  "derive-new",
  "derive_builder",
@@ -2359,6 +2456,43 @@ dependencies = [
  "auto_impl",
  "bincode",
  "charify",
+ "context-trace-macros",
+ "dashmap",
+ "derivative",
+ "derive-new",
+ "derive_builder",
+ "derive_more 2.1.1",
+ "either",
+ "indexmap 2.14.0",
+ "itertools 0.14.0",
+ "lazy_static",
+ "linked-hash-map",
+ "linked_hash_set",
+ "maplit",
+ "nrfind",
+ "once_cell",
+ "one-of",
+ "petgraph 0.8.2",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "syntect",
+ "tap",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "ts-rs",
+ "uuid",
+]
+
+[[package]]
+name = "context-trace-legacy"
+version = "0.1.0"
+dependencies = [
+ "auto_impl",
+ "bincode",
+ "charify",
+ "context-trace",
  "context-trace-macros",
  "dashmap",
  "derivative",
@@ -5857,6 +5991,7 @@ dependencies = [
  "ciborium",
  "clap",
  "context-trace",
+ "context-trace-legacy",
  "csv",
  "derivative",
  "derive-getters",
