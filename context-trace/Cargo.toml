@@ -9,7 +9,12 @@ default = ["legacy"]
 legacy = []
 # Run the legacy row-model test suite (ignored by default).
 legacy-tests = ["legacy"]
-test-api = []
+test-api = ["interchange"]
+# `PositionedGraph` <-> interchange conversion (`from_interchange`,
+# `to_interchange`, `store_interchange`).
+interchange = []
+# `Serialize`/`Deserialize` for `PositionedGraph` (validated on load).
+serde = []
 # Hidden mutation layer `positioned::GraphEdit`; only context-insert and
 # context-read may enable it (guard test in `positioned::tests::guard`).
 edit = []
@@ -57,6 +62,7 @@ version = "^1.4"
 git = "https://github.com/mankinskin/petgraph"
 
 [dev-dependencies]
+bincode = "1"
 
 [[example]]
 name = "insert_manifest"

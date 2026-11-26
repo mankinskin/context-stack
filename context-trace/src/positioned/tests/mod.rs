@@ -7,3 +7,5 @@ mod model;
 mod navigation;
 mod stage;
 mod trace;
+#[cfg(feature = "serde")]
+mod serde;

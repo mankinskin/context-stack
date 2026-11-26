@@ -116,6 +116,8 @@ optional = true
 features = ["sync", "time", "io-util"]
 
 [dev-dependencies]
+context-trace = { path = "../context-trace", default-features = false, features = ["serde"] }
+bincode = "1"
 ngrams = { path = "../ngrams" }
 criterion = { version = "0.5", features = ["html_reports"] }
 

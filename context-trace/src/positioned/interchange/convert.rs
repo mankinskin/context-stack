@@ -1,5 +1,6 @@
 //! Conversion between [`PositionedGraph`] and the interchange format
-//! (`test-api`: fixture loading and test comparison).
+//! (feature `interchange`: import/export of oracle-format documents,
+//! fixture loading and test comparison).
 
 use std::collections::BTreeMap;
 

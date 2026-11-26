@@ -6,13 +6,13 @@
 //! (re-exported as `ngrams::output`) and converted to and from
 //! [`super::PositionedGraph`].
 //!
-//! `test-api` adds that conversion (`convert.rs`, also from any store:
-//! `store_interchange`), graph comparison
-//! ([`diff`]) and the reader fixtures ([`fixtures`]).
+//! The `interchange` feature (implied by `test-api`) adds that conversion
+//! (`convert.rs`, also from any store: `store_interchange`); `test-api`
+//! adds graph comparison ([`diff`]) and the reader fixtures ([`fixtures`]).
 
-#[cfg(any(test, feature = "test-api"))]
+#[cfg(any(test, feature = "interchange"))]
 mod convert;
-#[cfg(any(test, feature = "test-api"))]
+#[cfg(any(test, feature = "interchange"))]
 pub use self::convert::store_interchange;
 #[cfg(any(test, feature = "test-api"))]
 pub mod diff;

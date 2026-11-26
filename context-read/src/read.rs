@@ -83,6 +83,16 @@ pub fn read_traced(
     (root, steps)
 }
 
+/// [`read`], passing every committed step to `observe` as it happens (e.g.
+/// for progress reports).
+pub fn read_observed(
+    graph: &PositionedGraphRef,
+    input: impl IntoIterator<Item = char>,
+    mut observe: impl FnMut(&Step),
+) -> Option<Token> {
+    read_steps(graph, input, |view| observe(&view.step))
+}
+
 /// A settled step and the stage after it (for the per-step tests).
 pub(crate) struct StepView<'a, 'g> {
     pub(crate) step: Step,
