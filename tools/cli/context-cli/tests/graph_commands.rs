@@ -501,17 +501,26 @@ fn usage_errors_exit_2() {
 }
 
 #[test]
-fn server_mode_not_available_yet() {
+fn unreachable_server_and_local_override() {
     let store = Store::new();
+    // A port that was just free: connections are refused.
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let url = format!("http://127.0.0.1:{port}");
     store
         .cmd()
-        .args(["--server", "http://127.0.0.1:1", "list"])
+        .args(["--server", &url, "list"])
         .assert()
-        .code(1)
-        .stderr(predicate::str::contains("stage 4"));
+        .code(3)
+        .stderr(predicate::str::contains(format!(
+            "cannot reach server {url}"
+        )));
     store
         .cmd()
-        .env("CONTEXT_SERVER", "http://127.0.0.1:1")
+        .env("CONTEXT_SERVER", &url)
         .args(["--local", "list"])
         .assert()
         .success();

@@ -6,10 +6,17 @@
 
 mod args;
 mod backend;
+#[cfg(any(feature = "server", feature = "mcp"))]
+mod daemon;
 mod error;
 mod input;
+#[cfg(feature = "mcp")]
+mod mcp;
 mod output;
 mod progress;
+#[cfg(feature = "server")]
+mod serve;
+mod shell;
 
 use std::{
     fs,
@@ -31,10 +38,12 @@ use clap::{
 use context_api::{
     Command,
     CommandResult,
-    ErrorKind,
+    Event,
     Outcome,
     Request,
     Response,
+    Topic,
+    client::RemoteBackend,
     types::{
         ExportFormat,
         Gate,
@@ -53,10 +62,12 @@ use crate::{
         ExportFormatArg,
         InputArgs,
         OutputFormat,
+        TopCommand,
     },
     backend::{
         Backend,
         LocalBackend,
+        Selection,
     },
     error::{
         CliError,
@@ -73,7 +84,15 @@ fn main() -> ExitCode {
     let matches = Cli::command().get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     let sub = matches.subcommand().map(|(_, m)| m);
-    ExitCode::from(run(&cli, sub))
+    let code = match &cli.command {
+        TopCommand::Graph(command) => run(&cli, command, sub),
+        TopCommand::Shell(args) => shell::run(&cli, args),
+        #[cfg(feature = "server")]
+        TopCommand::Serve(args) => serve::run(args.clone()),
+        #[cfg(feature = "mcp")]
+        TopCommand::Mcp(args) => mcp::run(&cli, args),
+    };
+    ExitCode::from(code)
 }
 
 /// What to do with a successful result besides printing it.
@@ -101,37 +120,92 @@ struct Prepared {
     input_bytes: usize,
 }
 
+/// A request id unlikely to collide with other clients' (matches progress
+/// events of a remote read to this process).
+fn request_id() -> u64 {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or_default();
+    (u64::from(std::process::id()) << 32) | u64::from(nanos)
+}
+
+/// Run a command remotely, showing read progress from the server's events
+/// when `progress`. The response carries no id (as a local one).
+fn execute_remote(
+    remote: &RemoteBackend,
+    command: Command,
+    progress: bool,
+) -> Response {
+    let id = progress.then(request_id);
+    let watcher = id.zip(command.graph()).and_then(|(id, graph)| {
+        let sink = progress::sink();
+        remote
+            .watch(graph, &[Topic::ReadProgress], move |event| {
+                if let Event::ReadProgress { request, .. } = &event
+                    && request.is_none_or(|request| request == id)
+                {
+                    sink(&event);
+                }
+            })
+            .ok()
+    });
+    let mut response = backend::execute_remote(remote, Request { id, command });
+    drop(watcher);
+    response.id = None;
+    response
+}
+
 fn run(
     cli: &Cli,
+    command: &CliCommand,
     sub: Option<&ArgMatches>,
 ) -> u8 {
     let format = cli.output_format();
-    if cli.server.is_some() && !cli.local {
-        let err = CliError::new(
-            ErrorKind::Unsupported,
-            "client mode is not available yet (stage 4)",
-        )
-        .with_hint(
-            "run without --server (unset CONTEXT_SERVER or pass --local)",
-        );
-        return report_error(&err.response, err.exit, format);
-    }
     let stdin_tty = std::io::stdin().is_terminal();
-    let prepared =
-        match prepare(cli, sub, &mut std::io::stdin().lock(), stdin_tty) {
-            Ok(prepared) => prepared,
-            Err(err) => return report_error(&err.response, err.exit, format),
-        };
+    let prepared = match prepare(
+        command,
+        format,
+        sub,
+        &mut std::io::stdin().lock(),
+        stdin_tty,
+    ) {
+        Ok(prepared) => prepared,
+        Err(err) => return report_error(&err.response, err.exit, format),
+    };
+    let selection = Selection::choose(
+        cli.local,
+        cli.server.as_deref(),
+        cli.token.as_deref(),
+        &cli.store,
+        prepared.command.graph(),
+    );
+    if !cli.quiet
+        && let Some(note) = selection.note()
+    {
+        eprintln!("{note}");
+    }
     let progress = !cli.quiet
         && prepared.input_bytes > progress::PROGRESS_THRESHOLD
         && std::io::stderr().is_terminal();
-    let backend =
-        LocalBackend::new(cli.store.clone(), progress.then(progress::sink));
-    let response = backend.execute(Request::new(prepared.command));
+    let response = match selection {
+        Selection::Local => {
+            let backend = LocalBackend::new(
+                cli.store.clone(),
+                progress.then(progress::sink),
+            );
+            backend.execute(Request::new(prepared.command))
+        },
+        Selection::Remote { url, token, .. } => execute_remote(
+            &RemoteBackend::new(url, token),
+            prepared.command,
+            progress,
+        ),
+    };
     if progress {
         progress::finish();
     }
-    finish(cli, response, &prepared.post, format)
+    finish(command.name(), response, &prepared.post, format)
 }
 
 fn report_error(
@@ -149,9 +223,11 @@ fn report_error(
     exit
 }
 
-/// Build the API command of the CLI command.
+/// Build the API command of the CLI command (`format`: the effective
+/// output format).
 fn prepare(
-    cli: &Cli,
+    command: &CliCommand,
+    format: OutputFormat,
     sub: Option<&ArgMatches>,
     stdin: &mut dyn Read,
     stdin_tty: bool,
@@ -161,7 +237,7 @@ fn prepare(
         post: Post::None,
         input_bytes: 0,
     };
-    Ok(match &cli.command {
+    Ok(match command {
         CliCommand::New(a) => simple(Command::New {
             graph: a.graph.clone(),
             overwrite: a.force,
@@ -269,7 +345,7 @@ fn prepare(
         CliCommand::Export(a) => {
             if a.format == ExportFormatArg::Native
                 && a.output.is_none()
-                && cli.output_format() == OutputFormat::Text
+                && format == OutputFormat::Text
             {
                 return Err(CliError::usage("native export is binary and is not written to stdout")
                     .with_hint("pass -o FILE, or --format json before the command for the base64 envelope"));
@@ -350,7 +426,7 @@ fn import_data(path: &Path) -> Result<ImportData, CliError> {
 
 /// Handle the response: file outputs, printing and the exit code.
 fn finish(
-    cli: &Cli,
+    name: &str,
     response: Response,
     post: &Post,
     format: OutputFormat,
@@ -386,7 +462,7 @@ fn finish(
                     export.bytes,
                     path.display()
                 ),
-                _ => output::text(command_name(cli), result),
+                _ => output::text(name, result),
             };
             if !text.is_empty() {
                 println!("{text}");
@@ -408,25 +484,6 @@ fn finish(
             if !report.valid =>
             EXIT_COMMAND,
         _ => EXIT_OK,
-    }
-}
-
-fn command_name(cli: &Cli) -> &'static str {
-    match &cli.command {
-        CliCommand::New(_) => "new",
-        CliCommand::Create(_) => "create",
-        CliCommand::Read(_) => "read",
-        CliCommand::Search(_) => "search",
-        CliCommand::Show(_) => "show",
-        CliCommand::Vertex(_) => "vertex",
-        CliCommand::Inputs(_) => "inputs",
-        CliCommand::Info(_) => "info",
-        CliCommand::Stats(_) => "stats",
-        CliCommand::Validate(_) => "validate",
-        CliCommand::Export(_) => "export",
-        CliCommand::Import(_) => "import",
-        CliCommand::List(_) => "list",
-        CliCommand::Delete(_) => "delete",
     }
 }
 
@@ -522,7 +579,16 @@ mod tests {
         let matches = Cli::command().try_get_matches_from(args).unwrap();
         let cli = Cli::from_arg_matches(&matches).unwrap();
         let sub = matches.subcommand().map(|(_, m)| m);
-        prepare(&cli, sub, &mut stdin.as_bytes(), false)
+        let TopCommand::Graph(command) = &cli.command else {
+            panic!("graph command expected")
+        };
+        prepare(
+            command,
+            cli.output_format(),
+            sub,
+            &mut stdin.as_bytes(),
+            false,
+        )
     }
 
     fn labels_and_texts(command: &Command) -> Vec<(String, Option<String>)> {

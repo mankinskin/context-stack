@@ -9,6 +9,7 @@ use context_mcp::{
     DEFAULT_MAX_OUTPUT,
     DEFAULT_RENDER_CAP,
     McpConfig,
+    parse_size,
 };
 
 #[derive(Debug, Parser)]
@@ -33,27 +34,6 @@ struct Args {
     /// Hard vertex cap of `context_render`.
     #[arg(long, value_name = "N", default_value_t = DEFAULT_RENDER_CAP)]
     render_cap: usize,
-}
-
-fn parse_size(text: &str) -> Result<usize, String> {
-    let text = text.trim();
-    let split = text
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(text.len());
-    let (number, unit) = text.split_at(split);
-    let number: usize = number
-        .parse()
-        .map_err(|_| format!("invalid size '{text}'"))?;
-    let factor = match unit.trim().to_ascii_lowercase().as_str() {
-        "" | "b" => 1,
-        "k" | "kb" | "kib" => 1024,
-        "m" | "mb" | "mib" => 1024 * 1024,
-        _ =>
-            return Err(format!(
-                "invalid size unit in '{text}' (use B, KiB or MiB)"
-            )),
-    };
-    Ok(number * factor)
 }
 
 #[tokio::main]

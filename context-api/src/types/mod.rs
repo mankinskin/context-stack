@@ -15,6 +15,32 @@ use serde::{
 
 use crate::ts_export;
 
+/// Integer-keyed maps: JSON object keys are strings, and inside the
+/// flattened [`crate::Response`] serde cannot parse them as integers, so
+/// the keys are read as strings and parsed here.
+mod histogram {
+    use std::collections::BTreeMap;
+
+    use serde::{
+        Deserialize,
+        Deserializer,
+        de::Error,
+    };
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D
+    ) -> Result<BTreeMap<usize, usize>, D::Error> {
+        BTreeMap::<String, usize>::deserialize(deserializer)?
+            .into_iter()
+            .map(|(key, count)| {
+                key.parse().map(|key| (key, count)).map_err(|_| {
+                    D::Error::custom(format!("invalid histogram key '{key}'"))
+                })
+            })
+            .collect()
+    }
+}
+
 /// A graph: a name in the store (`<store>/<name>.ctx`) or a path ending in
 /// `.ctx`.
 pub type GraphRef = String;
@@ -299,8 +325,10 @@ ts_export! {
         pub summary: GraphSummary,
         pub max_width: usize,
         /// Width → number of vertices.
+        #[serde(deserialize_with = "histogram::deserialize")]
         pub width_histogram: BTreeMap<usize, usize>,
         /// Parent occurrence count → number of vertices.
+        #[serde(deserialize_with = "histogram::deserialize")]
         pub parent_count_histogram: BTreeMap<usize, usize>,
         /// Average number of occurrences per composition.
         pub avg_composition_size: f64,

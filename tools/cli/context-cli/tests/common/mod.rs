@@ -3,11 +3,22 @@
 #![allow(dead_code)]
 
 use std::{
+    io::{
+        BufRead,
+        BufReader,
+    },
     path::{
         Path,
         PathBuf,
     },
-    time::Duration,
+    process::{
+        Child,
+        Stdio,
+    },
+    time::{
+        Duration,
+        Instant,
+    },
 };
 
 use context_api::{
@@ -55,6 +66,7 @@ impl Store {
             assert_cmd::Command::new(env!("CARGO_BIN_EXE_context-cli"));
         cmd.env_remove("CONTEXT_SERVER")
             .env_remove("CONTEXT_STORE")
+            .env_remove("CONTEXT_TOKEN")
             .arg("--store")
             .arg(self.path());
         cmd
@@ -144,4 +156,92 @@ pub fn parse_response(stdout: &[u8]) -> Response {
     );
     serde_json::from_str(text)
         .unwrap_or_else(|e| panic!("not a Response ({e}): {text}"))
+}
+
+/// A `context-cli serve` child process on an ephemeral port.
+pub struct ServerProcess {
+    pub url: String,
+    pub pid: u32,
+    child: Option<Child>,
+}
+
+impl ServerProcess {
+    /// `context-cli --store STORE serve --http 127.0.0.1:0 ARGS...`; waits
+    /// for the listening line.
+    pub fn start(
+        store: &Path,
+        args: &[&str],
+    ) -> Self {
+        let mut child =
+            std::process::Command::new(env!("CARGO_BIN_EXE_context-cli"))
+                .env_remove("CONTEXT_SERVER")
+                .env_remove("CONTEXT_STORE")
+                .env_remove("CONTEXT_TOKEN")
+                .env("RUST_LOG", "warn")
+                .arg("--store")
+                .arg(store)
+                .args(["serve", "--http", "127.0.0.1:0"])
+                .args(args)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect("spawn context-cli serve");
+        let mut line = String::new();
+        BufReader::new(child.stdout.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        let listening: serde_json::Value = serde_json::from_str(&line)
+            .unwrap_or_else(|e| panic!("no listening line ({e}): {line:?}"));
+        Self {
+            url: listening["listening"].as_str().unwrap().to_string(),
+            pid: listening["pid"].as_u64().unwrap() as u32,
+            child: Some(child),
+        }
+    }
+
+    /// Graceful shutdown (SIGINT): saves graphs, removes discovery files.
+    pub fn stop(mut self) {
+        self.shutdown();
+    }
+
+    fn shutdown(&mut self) {
+        let Some(mut child) = self.child.take() else {
+            return;
+        };
+        let _ = std::process::Command::new("kill")
+            .args(["-INT", &self.pid.to_string()])
+            .status();
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while Instant::now() < deadline {
+            if let Ok(Some(_)) = child.try_wait() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+impl Drop for ServerProcess {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+/// Replace store paths by `<STORE>` and timestamps by `<TIME>`.
+pub fn normalize(
+    text: &str,
+    stores: &[&Path],
+) -> String {
+    let mut text = text.to_string();
+    for store in stores {
+        text = text.replace(&store.display().to_string(), "<STORE>");
+    }
+    let time = regex::Regex::new(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})",
+    )
+    .unwrap();
+    time.replace_all(&text, "<TIME>").into_owned()
 }
