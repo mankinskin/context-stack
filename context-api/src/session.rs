@@ -3,10 +3,6 @@
 use std::{
     collections::HashMap,
     fs,
-    panic::{
-        self,
-        AssertUnwindSafe,
-    },
     path::PathBuf,
     sync::{
         Arc,
@@ -18,7 +14,11 @@ use std::{
             Ordering,
         },
     },
+    thread,
 };
+
+/// Stack of the thread every command runs on.
+const COMMAND_STACK_SIZE: usize = 256 << 20;
 
 use context_trace::positioned::{
     GraphRead,
@@ -207,8 +207,19 @@ impl Session {
         if let Err(err) = checked {
             return Response::from_result(id, Err(err));
         }
-        let result = panic::catch_unwind(AssertUnwindSafe(|| self.run(id, command)))
-            .unwrap_or_else(|payload| {
+        // The algorithms recurse over the nesting depth of the graph, which
+        // grows with repetitive input, so commands run on a thread with a
+        // large (lazily committed) stack; a panic there is caught by `join`.
+        let joined = thread::scope(|scope| {
+            thread::Builder::new()
+                .name("context-command".into())
+                .stack_size(COMMAND_STACK_SIZE)
+                .spawn_scoped(scope, || self.run(id, command))
+                .map(|handle| handle.join())
+        });
+        let result = match joined {
+            Ok(Ok(result)) => result,
+            Ok(Err(payload)) => {
                 let message = payload
                     .downcast_ref::<&str>()
                     .map(|s| s.to_string())
@@ -220,7 +231,9 @@ impl Session {
                 Err(ApiError::Internal(format!(
                     "command panicked: {message}; unsaved changes of the graph were dropped"
                 )))
-            });
+            },
+            Err(err) => Err(ApiError::Internal(format!("cannot start command thread: {err}"))),
+        };
         Response::from_result(id, result)
     }
 
@@ -1036,6 +1049,22 @@ mod tests {
 
         config.allow_graph_paths = true;
         run(&Session::new(config), Command::New { graph: path, overwrite: false }).unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_reads_do_not_overflow() {
+        let (_dir, session) = session(false);
+        // Every prefix of a run of one char is a vertex: nesting depth = length.
+        let run_of_a = "a".repeat(300);
+        let response = std::thread::Builder::new()
+            .stack_size(64 << 10)
+            .spawn(move || {
+                run(&session, Command::Create { graph: "g".into(), inputs: vec![text(&run_of_a)], split: Split::None, overwrite: false })
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+        assert!(matches!(response, Ok(CommandResult::Read(report)) if report.inputs[0].chars == 300));
     }
 
     #[test]

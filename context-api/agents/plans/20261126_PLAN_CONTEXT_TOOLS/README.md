@@ -211,4 +211,6 @@ Correctness anchors (independent of the implementation under test):
 | Labels are O(width) (`string_repr`) | Truncated labels (`--label-width`), snippets built by `Navigate::start_at` descent over the needed range only |
 | Remote file inputs leak server files | Server never reads paths unless started with `--allow-fs <dir>`; the client reads files locally and sends text |
 | A reader panic corrupts a server-held graph | `catch_unwind` per mutating command; poisoned graph reloaded from its last save; error returned |
+| Reader cost (measured 2026-11-26, release): 20 KB of plan text 45 s, 50 KB > 5 min; a run of one char is cubic (1 000 chars 2.5 s, 3 000 chars 64 s) | Algorithm work in context-read, outside this plan; tools run reads off the async runtime and report progress. Indexing large corpora is blocked on reader performance |
+| Recursion over the nesting depth (= input length for runs of one char) overflowed 2 MB worker stacks and aborted the process (not catchable) | Every command runs on a thread with a 256 MiB lazily committed stack (`Session::execute`); iterative algorithms remain a context-read task |
 | Large inputs block the server | `spawn_blocking`, streamed `text/plain` read endpoint, progress events, body size limit |
