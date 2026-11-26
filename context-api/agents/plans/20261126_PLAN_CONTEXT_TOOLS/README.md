@@ -220,7 +220,7 @@ Correctness anchors (independent of the implementation under test):
 All stages are implemented on branch `feat/context-tools`. Test counts at
 completion: context-api 118 (incl. 36 acceptance tests: oracle comparison
 on 1 939 corpora, brute-force search over ~30k queries, fixture round
-trips, gate), context-cli 41, context-http 23, context-mcp 9+; algorithm
+trips, gate), context-cli 41, context-http 23, context-mcp 8; algorithm
 crates unchanged (275). Manual end-to-end check: server holding a graph,
 auto-discovered CLI reads and searches from a second process, curl,
 WebSocket, shell, MCP proxy over stdio, graceful shutdown.
