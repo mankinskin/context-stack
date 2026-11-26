@@ -19,6 +19,34 @@ SingleIndex(Token), UnknownAtom }` for positioned search.
 
 **Rule:** the legacy crates are frozen (no new code). New (positioned-model) code goes into this crate and must not depend on the legacy crates. Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
+## Paths and trace
+
+Moved here from context-trace (search plan 2.2); everything is re-exported
+at the crate root (`context_search::{RolePath, TraceCache, DirectedKey, …}`).
+
+- **`src/path/`**: role-generic `RolePath<R: PathRole, Root: PathRoot>`
+  (`role_path.rs`, mirroring legacy `RolePath`/`RootedRolePath`); roles
+  `Start`/`End` carry the trace direction, storage order (start bottom-up,
+  end top-down), span boundary, canonical border predicate, `locate` and
+  trace key positions (`role.rs`, the only place with position arithmetic);
+  roots are a graph `Token` or a `QueryRoot` pattern (`root.rs`); aliases
+  `StartPath`, `EndPath`, `QueryPath = RolePath<End, QueryRoot>`;
+  `RangePath<Root>` with absolute `span`, `HasRolePath<Start/End>`,
+  `SpanCoverage` (`range.rs`); `PathNavigate` (`navigate.rs`: `end_at`,
+  `advance_end_path`) extends the `context_trace::positioned::Navigate`
+  core.
+- **`src/trace/`** (mirrors the legacy `trace/`): `ParentState`
+  (`state/`), `ChildState`/`RootChildState` (`child.rs`), `TraceCache`
+  with offset-labelled edges and query-position keys (`cache/`),
+  `TraceCtx`, `Traceable` commands (`traceable/`: `PrefixCommand`,
+  `PostfixCommand`, `RangeCommand`).
+- **`src/trace/key/`**: cache keys `DirectedKey`, `UpKey`, `DownKey`,
+  `UpPosition`, `DownPosition`, `HasAtomPosition`.
+
+Tests: `src/tests/navigation.rs` (`Navigate` and `PathNavigate` on every v3
+fixture vertex and position), `src/tests/trace/` (paths, trace states and
+trace cache on every fixture).
+
 Advanced pattern search and traversal operations for hierarchical graph structures. Provides sophisticated algorithms for finding patterns, sequences, and relationships within hypergraph data structures.
 
 ## Features
@@ -52,6 +80,8 @@ Advanced pattern search and traversal operations for hierarchical graph structur
 - `traversal/`: Configurable traversal policies and strategies
 
 **Navigation System** 
+- `path/`: role paths (`RolePath`, `StartPath`, `EndPath`, `QueryPath`, `RangePath`), `PathNavigate`
+- `trace/`: trace states, `TraceCache` and its keys
 - `cursor/`: Position tracking and path-based navigation
 - `match/`: Pattern matching algorithms and root cursor management
 - `state/`: Search state management (start, end, intermediate states)
@@ -144,7 +174,7 @@ Patterns can contain other patterns, creating nested structures. The search engi
 Search operations can be paused and resumed, allowing for incremental processing of large pattern spaces.
 
 ### **Cache Integration**
-Leverages the trace cache from `context-trace` to avoid redundant computations and speed up repeated searches.
+Uses this crate's own trace cache (`trace/`, `TraceCache`) to avoid redundant computations and speed up repeated searches.
 
 ## Performance Features
 
@@ -172,7 +202,7 @@ Leverages the trace cache from `context-trace` to avoid redundant computations a
 See `TESTING_PLAN.md` for comprehensive analysis and mitigation strategies.
 
 ## Dependencies
-- **context-trace**: Core graph structures and tracing capabilities
+- **context-trace**: Positioned graph store and `Navigate` core
 - **derive-new**: Constructor generation for search contexts
 - **pretty_assertions**: Enhanced test output formatting
 
@@ -199,7 +229,7 @@ The crate includes comprehensive tests for:
 ## Integration
 
 Works seamlessly with other context framework components:
-- **context-trace**: Provides the underlying graph and tracing infrastructure
+- **context-trace**: Provides the underlying graph store and navigation core
 - **context-insert**: Uses search results to guide insertion operations
 - **context-read**: Leverages pattern finding for high-level reading operations
 

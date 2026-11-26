@@ -10,8 +10,10 @@ test-api = ["interchange"]
 interchange = []
 # `Serialize`/`Deserialize` for `PositionedGraph` (validated on load).
 serde = []
-# Hidden mutation layer `positioned::GraphEdit`; only context-insert and
-# context-read may enable it (guard test in `positioned::tests::guard`).
+# Hidden sealed write primitives `positioned::raw` (used by
+# `context_insert::edit::GraphEdit` and the overlay stage of context-read);
+# only context-insert and context-read may enable it (guard test in
+# `positioned::tests::guard`).
 edit = []
 
 [dependencies]

@@ -1,5 +1,13 @@
 # Context-Trace: High-Level Overview
 
+> **Legacy only.** This guide describes the row model (`Hypergraph`,
+> `direction/`, row `path/` and `trace/`) in the crate
+> [`context-trace-legacy`](../context-trace-legacy/README.md). This crate
+> holds the shared ids and the positioned graph store
+> ([README](README.md)); positioned paths, trace states, `TraceCache` and
+> its keys are in [`context-search`](../context-search/README.md#paths-and-trace),
+> `GraphEdit` in [`context-insert`](../context-insert/README.md#mutation-edit).
+
 > **Foundation crate providing graph structures, path operations, and tracing infrastructure for the context framework.**
 
 ## What is Context-Trace?
@@ -503,18 +511,16 @@ let root = rooted.root_parent();
 ## Integration with Other Crates
 
 ### Used By context-search
-- Provides graph structure for search operations
-- TraceCache used for efficient search state tracking
-- Path types used for search results
+- Positioned store and `Navigate` core for search
+- Search owns paths, trace states and `TraceCache` (`context_search::{path, trace}`)
 
-### Used By context-insert  
-- Graph structure modified by insertion operations
-- Paths used to represent insertion targets
-- Cache leveraged for split-join operations
+### Used By context-insert
+- Store traits and the raw write primitives (hidden feature `edit`) under
+  `context_insert::edit::GraphEdit`
 
 ### Used By context-read
-- Graph structure for reading operations
-- Path types for sequence navigation
+- Store traits and raw primitives under the overlay stage
+  (`context_read::stage`)
 - Token and vertex types for data access
 
 ---

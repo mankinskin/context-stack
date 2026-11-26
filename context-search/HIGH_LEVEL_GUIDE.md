@@ -1,5 +1,12 @@
 # Context-Search: High-Level Overview
 
+> **Mostly legacy.** Row-model types below (`RootedRolePath`, `fold`,
+> `traversal/`, `container/`) are in
+> [`context-search-legacy`](../context-search-legacy/README.md). The
+> positioned search owns its paths and the trace cache itself
+> (`context_search::{path, trace}`, not context-trace); see the
+> [README](README.md#paths-and-trace).
+
 > **Search and traversal engine for pattern matching in hierarchical hypergraphs.**
 
 ## What is Context-Search?
@@ -616,10 +623,9 @@ fn test_partial_search() {
 ## Integration with Other Crates
 
 ### Depends On context-trace
-- Uses Hypergraph for graph structure
-- Uses TraceCache for efficient navigation
-- Uses Path types for results
+- Uses the positioned store (`PositionedGraph`, `GraphRead`) and the `Navigate` core
 - Uses Token and VertexIndex for identification
+- Paths, trace states and `TraceCache` are this crate's own (`path/`, `trace/`)
 
 ### Used By context-insert
 - Search results guide insertion decisions

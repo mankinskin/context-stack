@@ -45,7 +45,7 @@ doctests (`graph::test_graph`, `HasVertexStringRepr`) switch their fence to
   - `has_graph.rs`: graph access trait (`HasGraph`, `TravKind`)
   - `traceable/`: traceability operations
   - `cache/`: trace caching (position, vertex, key management; the
-    directed keys re-export `context_trace::key`)
+    directed keys are a frozen copy of `context_search::trace::key`)
   - `child/`: child tracing (iterators, states)
   - `state/`: tracing state management (base state, parent states)
 - **`logging/`**: `path_format.rs` (path formatting for logs)

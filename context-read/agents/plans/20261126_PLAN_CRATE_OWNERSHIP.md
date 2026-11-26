@@ -1,7 +1,7 @@
 ---
 tags: `#plan` `#context-trace` `#context-search` `#context-insert` `#context-read` `#refactoring` `#crate-layout` `#legacy`
 summary: Re-home every item of the context stack in the crate that owns its responsibility (trace < search < insert < read) and extract the row-model code unchanged into four crates `context-*-legacy`. context-trace keeps only the shared model, store contracts, committed store, validation, interchange format and infrastructure; search gets paths, trace states, cache keys; insert gets `GraphEdit` with every mutation (incl. dissolve/stabilize and the `Stage` contract); read gets the overlay stage and commit. Legacy extraction validated by a spike (all four crates build, test totals equal the baseline).
-status: 📋 planned (2026-11-26). Legacy extraction (Part L) validated by a throwaway spike; positioned relocation (Part P) analysed, not prototyped.
+status: ✅ implemented (2026-11-26) on branch refactor/crate-ownership; see §11 for the record and deviations.
 date: 2026-11-26
 depends_on: 20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md (legacy modules), 20261124_PLAN_STAGING_GRAPH.md (store traits, seal), 20261125_PLAN_DISSOLUTION.md, 20261126_PLAN_CHEAP_STABILIZATION.md
 ---
@@ -686,3 +686,65 @@ Acceptance criteria:
 | D5 | `from_interchange` without `GraphEdit` | Table construction + `validate` (as serde already does). Risk: vertex indices or generation differ from today; P0.2 adds an equality test before anything moves. |
 | D6 | Seal exposure | The raw primitives become nameable with feature `edit` (insert, read only, guarded). Mutation stays limited to the insert and read algorithms (repository rule); the overlay's raw writes, including its commit, are documented as reader-internal. |
 | D7 | `positioned` namespace | Kept for this plan; flattening is a separate follow-up. |
+
+## 11. Implementation record (2026-11-26)
+
+Branch `refactor/crate-ownership`, one commit per task:
+
+| Commit | Task |
+|---|---|
+| `3ce9c46` | L1–L4 legacy crates (spike patch applied unchanged) |
+| `a46f19b` | L5: T9 doctests, R3 v2 lane + validator tests, legacy docs |
+| `81b26c2` | review fixes: standalone `context-trace-legacy` tests (dev-dependency on `context-trace/test-api`), workspace metadata members |
+| `38ac8b7` | P0.1 `positioned::check` |
+| `5a97a5b` | P0.2–P0.5 table import, exported raw primitives, commit over primitives |
+| `0ece841` | P1 paths, trace states, keys → search (frozen key copy in trace-legacy) |
+| `bc6c168` | context-read edition 2018 → 2024 (prerequisite of P2) |
+| `1c45ecc` | P2 overlay stage → read |
+| `acda6f0` | P3 `GraphEdit`, dissolve, stabilize, `Stage` → insert (`EditExt`) |
+| `2a4c4e9` | P4 fixture lanes and manifest examples |
+| `11c2b89` | P5 `PathNavigate` |
+| `b3b7828` | V1 layering guard |
+
+Deviations from the plan text:
+
+- The raw primitives are exported as `context_trace::positioned::raw`
+  (`store` stays a private module), not `positioned::store::raw`.
+- context-read moved to edition 2024 before P2: the overlay code relies on
+  2024 semantics (let chains, formatted panic messages, array
+  `IntoIterator`, temporary scopes); `cargo fix --edition` needed no code
+  change.
+- `AtomPosition`'s field is `pub` (it already derived `Deref`/`DerefMut`);
+  needed by the moved path/trace code.
+- The read lane lives in context-read's integration-test support
+  (`tests/support/read_lane.rs`, also included by the `read_manifest`
+  example) instead of `src/fixtures.rs`: only the integration tests use it,
+  and a `test-api`-gated module would make plain `cargo test -p context-read`
+  fail to compile.
+- The table-import equality test (P0.2) needs `GraphEdit`, so it moved to
+  context-insert in P3 (O7). Model tests that mixed `create` and
+  `validate` were split: `create` halves in insert, `validate` halves on
+  table-built graphs in trace (+2 tests).
+- The overlay commit was rewritten over the existing primitives (no new
+  primitive), as decided before implementation.
+
+Final test totals (passed / ignored):
+
+| Crate | Baseline | After | Note |
+|---|---|---|---|
+| trace | 205 / 39 | 47 / 9 | + trace-legacy 110 / 30 |
+| search | 77 / 7 | 29 / 0 | + search-legacy 57 / 7 |
+| insert | 67 / 1 | 22 / 0 | + insert-legacy 54 / 1 |
+| read | 212 / 10 | 163 / 1 | + read-legacy 83 / 9 |
+| sum | 561 / 57 | 565 / 57 | +4: equality test, layering guard, 2 split tests |
+| ngrams | 50 / 3 | 50 / 3 | |
+| context-api | 118 / 0 | 118 / 0 | the 3 baseline failures were from a concurrent run |
+| context-cli / -mcp / -http | — | 41 / 0, 8 / 0, 23 / 1 | |
+
+V2 audit (§3.2 script over the non-test code of search, insert and read):
+every `context_trace` identifier not used by all three is pinned by code
+that stays in context-trace (store traits, model, ids, `Located`,
+`OccurrenceLocation`, `descend`/`location` behind `start_at`, …), is shared
+test infrastructure (`FixtureGraph`, `Scenario`, `test-api`) or is the seal
+(`SEAL`, exception E1).
+

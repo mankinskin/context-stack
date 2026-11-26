@@ -16,9 +16,24 @@ legacy search, only navigation (positions instead of rows) differs.
 
 ```
 src/
-├── lib.rs (32) - exports `Find`, `Searchable`, `Response`, `SearchError`
+├── lib.rs (89) - exports `Find`, `Searchable`, `Response`, `SearchError`,
+│                 paths, trace states, `TraceCache` and keys
 ├── error.rs (42) - `SearchError`
 ├── policy.rs (58)
+├── path/ - search paths (moved from context-trace)
+│   ├── mod.rs (58)
+│   ├── role.rs (270) - `PathRole`, `Start`, `End`, position arithmetic
+│   ├── role_path.rs (329) - `RolePath`, `StartPath`, `EndPath`, `QueryPath`
+│   ├── root.rs (160) - `PathRoot`, `QueryRoot`
+│   ├── range.rs (148) - `RangePath`, `HasRolePath`, `SpanCoverage`
+│   └── navigate.rs (117) - `PathNavigate` (`end_at`, `advance_end_path`)
+├── trace/ - trace states and cache (moved from context-trace)
+│   ├── mod.rs (189) - `TraceCtx`, `TraceDirection`, `QueryAnchor`
+│   ├── child.rs (166) - `ChildState`, `RootChildState`
+│   ├── state/ (mod.rs 41, parent.rs 185) - `ParentState`
+│   ├── cache/ (mod.rs 214, position.rs 69, vertex/) - `TraceCache`
+│   ├── key/ (mod.rs 176, up.rs 113, down.rs 112) - `DirectedKey`, `UpKey`, `DownKey`
+│   └── traceable/ (mod.rs 146, role.rs 65) - `Traceable` commands
 ├── cursor/ - cursor typestates and checkpoints
 │   ├── mod.rs (164)
 │   ├── checkpointed.rs (314)
@@ -50,5 +65,7 @@ src/
     ├── deep.rs (250)
     ├── exhaustive.rs (585)
     ├── validate.rs (335)
+    ├── navigation.rs (136) - `Navigate`/`PathNavigate` on v3 fixtures
+    ├── trace/ (mod.rs 269, query.rs 131, exhaustive.rs 275) - paths, states, cache
     └── util.rs (112)
 ```

@@ -10,20 +10,32 @@ The row model (pattern-row `Hypergraph`, `direction/`, row `graph/`,
 - **Shared (model-agnostic):** `logging/`, `graph/kind.rs` (`GraphKind`),
   `graph/vertex/{atom, id, key, token, wide, has_vertex_index}`,
   `graph/vertex/name_resolver.rs` (thread-local `TokenNameResolver` hook used by
-  `Token`/`VertexIndex` display), `key/` (trace-cache keys), `position.rs`
-  (`AtomPosition`).
-- **`positioned/` (no legacy dependency):** `interchange.rs` (v3
-  format + structural validator), `composition.rs` (`Occurrence`,
-  `Composition`), `location.rs` (`OccurrenceLocation`,
-  `IntervalView`), `graph.rs` (`PositionedGraph`, `PositionedGraphRef`,
-  validation, debug-only labels and `PositionedLabels` name resolver),
-  `convert.rs` (`test-api`: `from_interchange`, `from_interchange_named` name
-  map, `to_interchange`), `diff.rs` (`test-api`), content reading `read.rs`
-  (debug and `test-api`: `PositionedGraph::read_interval`), `fixtures.rs`
-  (`test-api` v3 fixture loader, `FixtureGraph`), `tests/` (`fixtures.rs` round
-  trip, name map, labels; `model.rs` model and validation rules;
-  `navigation.rs` `read_interval` and navigation on v3 fixtures;
-  `guard.rs` no content-keyed field; `diff.rs`, `interchange.rs`).
+  `Token`/`VertexIndex` display), `position.rs` (`AtomPosition`).
+- **`positioned/` (no legacy dependency):**
+
+```
+src/positioned/
+├── mod.rs - exports; `raw` only with hidden feature `edit`
+├── check.rs - store-generic structural checks, `validate_store`
+├── model/ - composition.rs, location.rs, vertex.rs, error.rs
+├── store/ - read.rs (`GraphRead`, `VertexRead`), composition.rs,
+│            has_graph.rs, navigate.rs (`Navigate`, `read_interval`),
+│            write.rs (`GraphWrite`, sealed `raw` primitives)
+├── committed/ - graph.rs (`PositionedGraph`, validation, debug labels),
+│                access.rs, serde.rs, table.rs (table construction)
+├── interchange/ - mod.rs (v3 format + validator), convert.rs,
+│                  diff.rs, fixtures.rs (`Scenario`, `FixtureGraph`)
+└── tests/ - composition.rs, diff.rs, fixtures.rs (round trip, name map,
+             labels), guard.rs (no content-keyed field, `edit` feature
+             users, `crates_depend_only_on_lower_layers`), interchange.rs,
+             model.rs, navigation.rs, serde.rs
+```
+
+Paths, trace states, the trace cache and its keys moved to
+[`context-search`](../context-search/FILE_INDEX.md); `GraphEdit` and the
+insert fixture lane to [`context-insert`](../context-insert/FILE_INDEX.md);
+the overlay stage and the read fixture lane to
+[`context-read`](../context-read/FILE_INDEX.md).
 
 **Rule:** the legacy crates are frozen (no new code). New (positioned-model) code goes into this crate and must not depend on `context-trace-legacy`. Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 

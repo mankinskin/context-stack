@@ -11,9 +11,31 @@ IntoReadInput}`). This crate is the positioned reader `context_read::read`
 ([reader plan](agents/plans/20261122_PLAN_POSITIONED_READER.md), phases
 R1–R3: `segment.rs`, `root.rs`, `forward.rs`, `expand.rs`, `read.rs`). Black-box tests:
 `tests/reader_behavior.rs` and `tests/fixture_validation.rs` (v3 fixtures);
-`tests/support/` holds `positioned.rs` (v3) and the shared `mod.rs`.
+`tests/support/` holds `positioned.rs` (v3), the read lane `read_lane.rs`
+and the shared `mod.rs`.
 
 **Rule:** the legacy crates are frozen (no new code). New (positioned-model) code goes into this crate and must not depend on the legacy crates. Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
+
+## Overlay stage (`stage/`)
+
+The overlay stage of a read (moved here from context-trace; staging plan
+§4) lives in `src/stage/` (`context_read::stage`):
+
+- `stage/mod.rs`: `StageHandle` (`stage()` view implementing
+  `context_insert::edit::Stage`, `commit(root)` → committed token and
+  `Translation`), `CommitError::BaseChanged` (generation check).
+- `stage/overlay/`: `OverlayHandle` (`handle.rs`; new atoms are committed
+  at once, `commit` writes the stage through the raw primitives of
+  context-trace and panics on a staged composite other than the root with
+  < 2 parent occurrences), `StagingGraph`/`StagedVertex` (`staging.rs`),
+  `Lifted` compositions (`lifted.rs`), `OverlayVertex(Mut)` (`vertex.rs`),
+  `OverlayView` and debug-only `OverlayLabels` (`view.rs`).
+
+Mutation of the stage goes through `GraphEdit` on the view
+(`GraphEdit::new(&mut handle.stage())`, or `.edit()` with
+`use context_insert::edit::EditExt;`).
+Tests: `src/tests/stage/` (`overlay.rs`, `dissolve.rs`, `stable.rs`).
+The crate uses edition 2024.
 
 Graph reading and expansion operations for the context framework.
 Provides ordered, recursive hypergraph operations for sequenced tokenized
@@ -38,7 +60,9 @@ reader's root-postfix expansion and accumulation in
 [`context-read-legacy`](../context-read-legacy/README.md#block-expansion-and-accumulation).
 
 ## Dependencies
-- **context-trace**: Core graph structures and operations
+- **context-trace**: Positioned graph store, raw write primitives (feature `edit`), shared v3 fixtures
+- **context-search**: Search, paths, `TraceCache`
+- **context-insert**: `GraphEdit`, the `Stage` contract
 - Standard Rust collections and iterators
 - Test framework integration
 

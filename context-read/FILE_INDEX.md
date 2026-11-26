@@ -18,17 +18,25 @@ reader `context_read::read`.
 
 ```
 src/
-├── lib.rs (41) - exports `read`, `read_observed`, `read_traced`, `Step`, `Commit`
+├── lib.rs (44) - exports `read`, `read_observed`, `read_traced`, `Step`, `Commit`; module `stage`
 ├── read.rs (177) - reader entry points and step trace
 ├── segment.rs (149) - characters → atoms, known/unknown runs
 ├── root.rs (412) - the input's own vertex and its commits
 ├── forward.rs (125) - forward match
 ├── expand.rs (150) - root expansion
-└── tests/ (steps.rs 436, observed.rs 96)
+├── stage/ - overlay stage (moved from context-trace)
+│   ├── mod.rs (117) - `StageHandle`, `Translation`, `CommitError`
+│   └── overlay/ (mod.rs 46, handle.rs 162 `OverlayHandle`, staging.rs 293
+│                 `StagingGraph`, `StagedVertex`, lifted.rs 87 `Lifted`,
+│                 vertex.rs 375 `OverlayVertex(Mut)`, view.rs 308 `OverlayView`)
+└── tests/ (steps.rs 436, observed.rs 96, stage/: overlay.rs 452,
+            dissolve.rs 1048, stable.rs 486)
 tests/
 ├── reader_behavior.rs (427) - v3 scenarios, `read_gate`
 ├── fixture_validation.rs (229) - v3, insert and read lanes
-├── support/ (mod.rs 40, positioned.rs 27)
+├── support/ (mod.rs 41, positioned.rs 27, read_lane.rs 86 - read lane:
+│             `read_dir`, `read_manifest`, `ReadCase`, `read_cases`)
 └── fixtures/v3/ - authoritative v3 fixtures (`insert/`, `read/` lanes)
+examples/read_manifest.rs (41) - rewrite the read lane manifest
 benches/ - oracle_speedup.rs, staging.rs, staging_commit.rs, staging_memory.rs
 ```

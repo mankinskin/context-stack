@@ -7,55 +7,61 @@ lives in the crate [`context-trace-legacy`](../context-trace-legacy/README.md)
 (`context_trace_legacy::…`), which depends on this crate for the shared items.
 This crate holds only the shared, model-agnostic items and the positioned model:
 
-- **Shared:** `logging/`, `graph/kind.rs` (`GraphKind`), `graph/vertex/{atom,
-  id, key, token, wide, has_vertex_index}`, `graph/vertex/name_resolver.rs`
-  (thread-local `TokenNameResolver` hook used by `Token`/`VertexIndex`
-  display), `key/` (trace-cache keys), `position.rs` (`AtomPosition`).
+- **Shared:** `logging/` (tracing setup, test log capture),
+  `graph/kind.rs` (`GraphKind`), `graph/vertex/{atom, id, key, token, wide,
+  has_vertex_index}`, `graph/vertex/name_resolver.rs` (thread-local
+  `TokenNameResolver` hook used by `Token`/`VertexIndex` display),
+  `position.rs` (`AtomPosition`), deterministic `HashMap`/`HashSet`, the
+  proc-macro re-exports.
 - **`positioned/`:** the positioned model (below).
 
 **Rule:** the legacy crates are frozen (no new code). New (positioned-model)
 code goes into this crate and must not depend on `context-trace-legacy`.
 Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
-**Positioned model** (`src/positioned/`, root, no legacy dependency; layout:
-`model/` data types, `store/` store traits, `committed/` the committed
-store, `edit/` the `GraphEdit` mutation layer, `stage/` the overlay
-stage, `interchange/` snapshots and test data, `path/`, `trace/`):
-`interchange/` (v3 `PositionedGraphData`/`PositionedGraphSnapshot` and the
-structural validator, re-exported by `ngrams::output`), `model/composition.rs`
-(`Occurrence`, `Composition`), `model/location.rs` (`OccurrenceLocation`,
-`IntervalView`), `committed/graph.rs` (`PositionedGraph`,
-`PositionedGraphRef = Arc<RwLock<_>>`), `model/vertex.rs`
-(`PositionedVertex`), `interchange/convert.rs`
-(`test-api`: `from_interchange`/`to_interchange`, `store_interchange` for
-any store; `from_interchange_named` also returns the fixture key → token
-name map), `edit/dissolve.rs` (`GraphEdit::dissolve`/`discard`/`settle` of
-staged tokens with ≤ 1 parent occurrence, `Candidates`, `Removal`,
-`Settled`; dissolution plan D4), `interchange/diff.rs` (`test-api`:
-`diff` → `GraphDiff`), content reading `store/navigate.rs` (debug and `test-api`
-builds: `PositionedGraph::read_interval`, content of an `IntervalView`, each
-position once), search navigation
-`store/navigate.rs` (`start_at`, `prefix_child`, `parent_occurrences`,
-`atom_token`, `advance_end_path`, `token`; `Composition::covering`/`prefix`),
-search paths `path/` (role-generic `RolePath<R: PathRole, Root: PathRoot>`
-mirroring legacy `RolePath`/`RootedRolePath`: roles `Start`/`End` carry
-the trace direction, storage order (start bottom-up, end top-down), span
-boundary, canonical border predicate, `locate` and trace key positions;
-roots are a graph `Token` or a `QueryRoot` pattern; aliases `StartPath`,
-`EndPath`, `QueryPath = RolePath<End, QueryRoot>`; `RangePath<Root>` with
-absolute `span` and `HasRolePath<Start/End>`; `SpanCoverage`; position
-arithmetic confined to `path/role.rs` for later multi-dimensional inputs),
-trace states and cache `trace/` (mirrors the legacy `trace/`: `ParentState`,
-`ChildState`/`RootChildState`, `TraceCache` with offset-labelled edges and
-query-position keys, `Traceable` commands; search plan 2.2), `interchange/fixtures.rs` (`test-api`:
-`fixture_snapshots` and `fixture_graphs` → `FixtureGraph { name, corpus, graph, names }`,
-shared with context-search). Tests round-trip and validate every v3 fixture
-of `context-read/tests/fixtures/v3` and check `read_interval` and the
-search navigation primitives on every fixture vertex and position
-(`tests/navigation.rs`), and paths, trace states and trace cache on every
-fixture (`tests/trace/`). Trace-cache keys (`DirectedKey`, `UpKey`,
-`DownKey`, `UpPosition`, `DownPosition`) live in the root module `key.rs`,
-re-exported by `context_trace_legacy::trace::cache::key::directed`.
+**Layering:** trace < search < insert < read; a crate depends only on
+lower layers (test `crates_depend_only_on_lower_layers` in
+`src/positioned/tests/guard.rs`). Moved out of this crate:
+
+| Item | Owner |
+|---|---|
+| search paths (`RolePath`, `StartPath`, `EndPath`, `QueryPath`, `RangePath`, `PathNavigate`) | [`context_search::path`](../context-search/README.md#paths-and-trace) |
+| trace states, `TraceCache`, cache keys (`DirectedKey`, `UpKey`, `DownKey`) | [`context_search::trace`](../context-search/README.md#paths-and-trace) |
+| mutation (`GraphEdit`, `EditExt`, dissolution, stabilization, `Stage`), insert fixture lane, `insert_manifest` example | [`context_insert::{edit, fixtures}`](../context-insert/README.md#mutation-edit) |
+| overlay stage (`StageHandle`, `OverlayHandle`, `StagingGraph`), read fixture lane, `read_manifest` example | [`context_read::stage`](../context-read/README.md#overlay-stage-stage) |
+
+**Positioned model** (`src/positioned/`, no legacy dependency):
+
+- `model/`: `Occurrence`, `Composition` (`composition.rs`),
+  `OccurrenceLocation`, `IntervalView` (`location.rs`), `PositionedVertex`
+  (`vertex.rs`), `PositionedError`.
+- `store/`: read traits `GraphRead`/`VertexRead` (`read.rs`),
+  `CompositionRead` (`composition.rs`), `HasGraph`/`HasGraphMut`
+  (`has_graph.rs`), `Navigate` (`navigate.rs`: `start_at`, `prefix_child`,
+  `postfix_child`, `prefixes`, `postfixes`, `parent_occurrences`; debug and
+  `test-api` builds: `read_interval`, content of an `IntervalView`, each
+  position once), `GraphWrite` over the sealed raw write primitives
+  (`write.rs`, `context_trace::positioned::raw`, exported only with the
+  hidden feature `edit`, enabled only by context-insert and context-read).
+- `committed/`: `PositionedGraph`, `PositionedGraphRef = Arc<RwLock<_>>`
+  (`graph.rs`), store trait impls (`access.rs`), validated (de)serialization
+  (`serde.rs`, feature `serde`), table construction (`table.rs`).
+- `check.rs`: hidden store-generic structural checks shared with the higher
+  crates; `validate_store` (`test-api`).
+- `interchange/`: v3 `PositionedGraphData`/`PositionedGraphSnapshot` and
+  the structural validator (`mod.rs`, re-exported by `ngrams::output`);
+  `convert.rs` (feature `interchange`: `from_interchange`/`to_interchange`
+  via table construction, `store_interchange` for any store;
+  `from_interchange_named` also returns the fixture key → token name map);
+  `diff.rs` (`test-api`: `diff` → `GraphDiff`); `fixtures.rs` (`test-api`:
+  `Scenario`, `fixtures_dir`, `manifest`, `snapshot`, `fixture_snapshots`,
+  `fixture_graphs` → `FixtureGraph { name, corpus, graph, names }`, shared
+  with the higher crates).
+
+Tests (`src/positioned/tests/`) round-trip and validate every v3 fixture of
+`context-read/tests/fixtures/v3` and check `read_interval` and the
+`Navigate` primitives on every fixture vertex and position
+(`navigation.rs`).
 
 **Binding rules** (`context-read/agents/plans/20261120_PLAN_POSITIONED_READER_OPEN_WORK.md`):
 
@@ -81,27 +87,27 @@ re-exported by `context_trace_legacy::trace::cache::key::directed`.
   Retention (G6: every composite that is not an input has ≥ 2 parent
   occurrences) is checked separately: `validate_retention(inputs)`
   (`test-api`), and at runtime only by `OverlayHandle::commit`, which panics
-  on a staged composite other than the root with < 2 parent occurrences.
+  on a staged composite other than the root with < 2 parent occurrences
+  (`context_read::stage::overlay::OverlayHandle`).
 - **Expectations come from the oracle.** Tests address vertices only through
   the `test-api` name map and derive expectations from v3 fixture strings,
   never from graph content lookups or reader output.
 
-Foundational component of the context framework providing core graph 
-structures, path operations, and tracing capabilities. Implements 
-hypergraph data structures with sophisticated path navigation and 
-bidirectional tracing.
+Foundational component of the context framework: vertex ids, atoms,
+widths, logging and the positioned graph store with its read traits,
+navigation core and interchange. Paths and tracing are in
+[`context-search`](../context-search/README.md), mutation in
+[`context-insert`](../context-insert/README.md).
 
 ## Features
-- Hypergraph structure with vertex and token management
+- Positioned graph store (`PositionedGraph`) and store traits
 - Thread-safe graph references (Arc/RwLock)
-- Role-based path operations with accessors/mutators
-- Bidirectional tracing (bottom-up and top-down)
-- Comprehensive cache management
-- State continuation support
+- Navigation core (`Navigate`) for search
+- v3 interchange, diff and shared fixtures (`test-api`)
+- Test tracing and log capture
 
 ## Structure
-- **`graph/`**: shared vertex ids, `Token`, atoms, `GraphKind`
-- **`key/`**: trace-cache keys (`DirectedKey`, `UpKey`, `DownKey`)
+- **`graph/`**: shared vertex ids, `Token`, atoms, widths, `GraphKind`
 - **`logging/`**: tracing setup, formatters, test log capture
 - **`positioned/`**: positioned graph model (see above)
 
@@ -140,9 +146,11 @@ RUST_TEST_LOG_STDOUT=1 RUST_LOG=debug cargo test
 
 Failed tests always preserve their log files in `target/test-logs/` for inspection.
 
-**Features**: `test-api` (deterministic testing), default (logging)
+**Features**: `interchange` (conversion), `serde`, `test-api` (implies
+`interchange`; diff, fixtures, name map), hidden `edit` (raw write
+primitives for context-insert and context-read).
 
 ## Architecture
-Layered design with graph data structures, path navigation system, 
-and comprehensive tracing capabilities for state management and 
-search operations.
+Positioned graph store with read traits and a navigation core; higher
+layers (search, insert, read) build on it and never on each other's
+internals in reverse.

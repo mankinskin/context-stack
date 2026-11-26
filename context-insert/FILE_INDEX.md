@@ -17,13 +17,26 @@ Python prototypes of positioned insertion (split graph and join, merge, invarian
 
 ```
 src/
-├── lib.rs (18) - exports `insert`, `insert_match`, `insert_next_match`,
-│                 `InsertOutcome`, `InsertError`
+├── lib.rs (23) - exports `insert`, `insert_match`, `insert_next_match`,
+│                 `InsertOutcome`, `InsertError`; modules `edit`, `fixtures`
 ├── insert/mod.rs (165) - `insert_match` and wrappers
 ├── split/mod.rs (373) - `SplitGraph` (split positions with roles)
 ├── join/mod.rs (149) - bottom-up `join` through `GraphEdit`
+├── edit/ - mutation layer (moved from context-trace)
+│   ├── mod.rs (340) - `GraphEdit`, `EditExt`
+│   ├── operations.rs (215) - `atom`, `create`, `add_occurrences`, `extend`
+│   ├── publication.rs (38) - `Publication`, `VertexEdit`
+│   ├── dissolve.rs (337) - `Candidates`, `Removal`, `Settled`
+│   ├── stable.rs (115) - stabilization
+│   └── stage.rs (31) - `Stage` contract
+├── fixtures.rs (139) - insert lane (`test-api`): `insert_cases`, `insert_manifest`
 └── tests/
-    ├── mod.rs (157)
-    ├── split.rs (183)
-    └── insert.rs (328) - insert lane (`context-read/tests/fixtures/v3/insert`)
+    ├── mod.rs (162)
+    ├── split.rs (181)
+    ├── insert.rs (333) - insert lane (`context-read/tests/fixtures/v3/insert`)
+    ├── edit.rs (364) - `GraphEdit` operations
+    ├── fixtures.rs (22) - insert lane cases
+    └── interchange.rs (103) - table import vs. `GraphEdit` import
+examples/
+└── insert_manifest.rs (36) - rewrite the insert lane manifest
 ```

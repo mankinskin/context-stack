@@ -57,6 +57,58 @@ algorithm; vertices are addressed by `VertexIndex`. Tests (`src/tests/`)
 run every case of the insert lane (`context-read/tests/fixtures/v3/insert`)
 against its oracle graph.
 
+## Mutation (`edit/`)
+
+`GraphEdit` is the only mutation layer of the positioned graph (moved here
+from context-trace; insert plan rev 3, §8). It writes through the sealed raw
+primitives `context_trace::positioned::raw` (hidden feature `edit` of
+context-trace, enabled only by context-insert and context-read). Every
+operation changes one vertex plus the parent links of the children it adds
+or removes and checks its preconditions first; a rejected operation leaves
+the graph unchanged.
+
+- `edit/mod.rs`: `GraphEdit<S: GraphWrite>`; `EditExt` gives `.edit()` on
+  any `GraphWrite` store (`use context_insert::edit::EditExt;`), or use
+  `GraphEdit::new`; `finish` → `Publication`.
+- `edit/operations.rs`: `atom`, `create`, `add_occurrences`, `extend`.
+- `edit/publication.rs`: `Publication { created, … }`, `VertexEdit`.
+- `edit/dissolve.rs`: `dissolve`/`discard`/`settle` of staged tokens with
+  ≤ 1 parent occurrence (`Candidates`, `Removal`, `Settled`; dissolution
+  plan D4).
+- `edit/stable.rs`: early stabilization by fixed parent occurrences
+  (`stabilize`, `stabilize_candidates`).
+- `edit/stage.rs`: the `Stage` contract (a `GraphWrite<Index = StageIndex>`
+  store with staged vertices) that dissolution and stabilization need;
+  implemented by `context_read::stage`.
+
+```rust
+use context_insert::edit::EditExt;
+use context_trace::positioned::{Occurrence, PositionedGraph};
+
+let mut graph = PositionedGraph::default(); // or `graph_ref.write()`
+let mut edit = graph.edit();
+let (a, b) = (edit.atom('a'), edit.atom('b'));
+let ab = edit.create(vec![Occurrence::new(0, a), Occurrence::new(1, b)])?;
+let publication = edit.finish(); // `publication.created` ends with `ab`
+```
+
+## Insert fixture lane (`fixtures`, feature `test-api`)
+
+`src/fixtures.rs` (moved from context-trace): `insert_dir`,
+`insert_queries`, `insert_manifest`, `InsertCase`, `insert_cases` over
+`context-read/tests/fixtures/v3/insert` (built on the shared
+`context_trace::positioned::fixtures`). Rewrite the lane manifest with
+
+```bash
+cargo run -p context-insert --features test-api --example insert_manifest
+```
+
+then generate the cases with the ngrams CLI (see
+[context-read](../context-read/README.md#insert-fixtures-v3insert)).
+Tests: `src/tests/edit.rs` (`GraphEdit` operations and rejections),
+`src/tests/fixtures.rs` (insert lane), `src/tests/interchange.rs` (table
+import equals the import through one `GraphEdit`).
+
 Graph insertion operations for the context framework. Handles the 
 complex process of inserting new patterns into existing graph structures 
 through sophisticated splitting, joining, and interval management operations.
@@ -74,8 +126,8 @@ The row-model structure, usage and concepts (split-join with
 [`context-insert-legacy`](../context-insert-legacy/README.md).
 
 ## Dependencies
-- **context-trace**: Core graph structures and tracing
-- **context-search**: Search operations and foldable patterns
+- **context-trace**: Positioned graph store, raw write primitives (feature `edit`)
+- **context-search**: Search, `Response`, paths and `TraceCache`
 - **itertools**: Iterator utilities for complex operations
 - **derive-new**: Simplified struct construction
 - **tracing**: Logging and debugging support
@@ -86,7 +138,7 @@ cargo test          # Run tests
 cargo doc --open    # Generate documentation
 ```
 
-**Features**: `test-api` (testing utilities), default (standard configuration)
+**Features**: `test-api` (insert fixture lane, `insert_manifest` example), default (standard configuration)
 
 ## Architecture
 Multi-phase insertion pipeline with split-join architecture, 
