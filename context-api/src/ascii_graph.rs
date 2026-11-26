@@ -28,6 +28,19 @@ pub enum AsciiRenderMode {
     Dag,
 }
 
+/// The vertex a child label refers to: `ab@2` (a child annotated with its
+/// offset) is the vertex `ab`.
+fn vertex_label(label: &str) -> &str {
+    match label.rsplit_once('@') {
+        Some((vertex, offset))
+            if !vertex.is_empty()
+                && !offset.is_empty()
+                && offset.bytes().all(|b| b.is_ascii_digit()) =>
+            vertex,
+        _ => label,
+    }
+}
+
 fn grammar_layout(
     rules: &[AsciiOwnedRule],
     id_by_label: &BTreeMap<String, usize>,
@@ -144,8 +157,9 @@ pub fn render_layered_ascii_owned_with_mode(
         all_labels.insert(rule.parent.clone());
         for pat in &rule.patterns {
             for child in pat {
+                let child = vertex_label(child).to_string();
                 all_labels.insert(child.clone());
-                edges_by_label.insert((rule.parent.clone(), child.clone()));
+                edges_by_label.insert((rule.parent.clone(), child));
             }
         }
     }
@@ -249,6 +263,23 @@ mod tests {
 
         assert!(simple.contains("Grammar layout (aligned)"));
         assert!(simple.contains("Atoms: a, b, c"));
+        let overlapping = render_layered_ascii_owned(&[
+            AsciiOwnedRule {
+                parent: "aba".into(),
+                patterns: vec![vec!["ab@0".into(), "ba@1".into()]],
+            },
+            AsciiOwnedRule {
+                parent: "ab".into(),
+                patterns: vec![vec!["a".into(), "b".into()]],
+            },
+            AsciiOwnedRule {
+                parent: "ba".into(),
+                patterns: vec![vec!["b".into(), "a".into()]],
+            },
+        ])
+        .unwrap();
+        assert!(overlapping.contains("Atoms: a, b\n"), "{overlapping}");
+        assert!(overlapping.contains("[ab@0, ba@1]"), "{overlapping}");
         assert!(simple.contains("(abc)"));
         assert!(simple.contains("[ab, c]"));
         assert!(simple.contains("(abab)"));

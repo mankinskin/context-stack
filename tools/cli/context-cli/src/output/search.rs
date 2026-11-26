@@ -74,14 +74,7 @@ pub(super) fn search(result: &SearchResult) -> String {
         let positions: Vec<_> = occurrences
             .items
             .iter()
-            .map(|item| {
-                format!(
-                    "{}:{}:{}",
-                    one_line(&item.label),
-                    item.line,
-                    item.column
-                )
-            })
+            .map(|item| source_position(&one_line(&item.label), item.line, item.column))
             .collect();
         let width = positions
             .iter()
@@ -191,4 +184,33 @@ fn steps(
         let _ = write!(out, " ─@{}→ {}", step.offset, token(&step.child));
     }
     out
+}
+
+/// `label:line:column` in source coordinates: inputs split from a source
+/// are labelled `source:first_line`, and the occurrence line is relative to
+/// the input.
+fn source_position(
+    label: &str,
+    line: usize,
+    column: usize,
+) -> String {
+    match label.rsplit_once(':') {
+        Some((source, first)) if !source.is_empty() => match first.parse::<usize>() {
+            Ok(first) if first > 0 => format!("{source}:{}:{column}", first + line - 1),
+            _ => format!("{label}:{line}:{column}"),
+        },
+        _ => format!("{label}:{line}:{column}"),
+    }
+}
+
+#[cfg(test)]
+mod source_position_tests {
+    use super::source_position;
+
+    #[test]
+    fn split_labels_map_to_source_lines() {
+        assert_eq!(source_position("notes.md:12", 3, 5), "notes.md:14:5");
+        assert_eq!(source_position("<stdin>:1", 1, 1), "<stdin>:1:1");
+        assert_eq!(source_position("<text>", 2, 4), "<text>:2:4");
+    }
 }
