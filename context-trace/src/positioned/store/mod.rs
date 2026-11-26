@@ -10,9 +10,10 @@
 //!   from a composition (`composition.rs`); [`NodeRef`] is either an atom
 //!   value or one (`read.rs`).
 //! - [`GraphWrite`] adds the raw write primitives of [`raw::Write`], which
-//!   cannot be named outside `context-trace` and whose methods take a
-//!   [`raw::Seal`] that cannot be constructed there: only `GraphEdit`
-//!   mutates (insert plan D8) (`write.rs`).
+//!   cannot be named outside `context-trace` without the hidden feature
+//!   `edit` and whose methods take a [`raw::Seal`]: only `GraphEdit` and
+//!   the stages mutate (insert plan D8, crate ownership plan E1)
+//!   (`write.rs`).
 //! - [`HasGraph`] / [`HasGraphMut`] abstract how a store is reached
 //!   (`has_graph.rs`); [`Navigate`] is local navigation on vertex objects
 //!   (`navigate.rs`).
@@ -46,10 +47,12 @@ pub use self::{
     },
     write::GraphWrite,
 };
-pub(crate) use self::{
-    has_graph::{
-        impl_has_graph,
-        impl_has_graph_mut,
-    },
-    write::raw,
+pub(crate) use self::has_graph::{
+    impl_has_graph,
+    impl_has_graph_mut,
 };
+#[cfg(feature = "edit")]
+#[doc(hidden)]
+pub use self::write::raw;
+#[cfg(not(feature = "edit"))]
+pub(crate) use self::write::raw;

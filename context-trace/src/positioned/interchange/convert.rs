@@ -11,6 +11,7 @@ use super::{
 use std::fmt::Display;
 
 use crate::positioned::{
+    Composition,
     CompositionRead,
     GraphRead,
     NodeRef,
@@ -23,12 +24,17 @@ use crate::{
     AtomOf,
     GraphKind,
     Token,
+    graph::vertex::VertexIndex,
+    positioned::committed::table::{
+        StoredGraph,
+        StoredNode,
+    },
 };
 
 impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
-    /// Build a graph from structurally valid interchange data through one
-    /// `GraphEdit` (atoms, then composites by increasing width) and validate
-    /// it.
+    /// Build a graph from structurally valid interchange data as a table
+    /// (atoms, then composites by increasing width; generation 1 unless
+    /// empty) and validate it.
     pub fn from_interchange(data: &PositionedGraphData) -> Result<Self, String> {
         Self::build_from_interchange(data).map(|(graph, _)| graph)
     }
@@ -58,25 +64,34 @@ impl<G: GraphKind<Atom = char>> PositionedGraph<G> {
             .iter()
             .partition(|(_, cover): &(&String, &PositionedCover)| cover.is_empty());
         composites.sort_by_key(|(content, _)| (content.chars().count(), *content));
-        let mut graph = Self::default();
         let mut tokens: BTreeMap<&str, Token> = BTreeMap::new();
-        let mut edit = graph.edit();
+        let mut vertices = Vec::with_capacity(data.vertices.len());
         for (content, _) in atoms {
             let atom = content.chars().next().expect("validated nonempty");
-            tokens.insert(content, edit.atom(atom));
+            tokens.insert(content, Token::new(VertexIndex(vertices.len()), 1));
+            vertices.push(StoredNode::Atom(atom));
         }
         for (content, cover) in composites {
             let occurrences = cover
                 .iter()
                 .map(|(offset, child)| Occurrence::new(*offset, tokens[child.as_str()]))
                 .collect();
-            let token = edit
-                .create(occurrences)
+            let composition = Composition::new(occurrences)
                 .map_err(|error| format!("{content:?}: {error}"))?;
-            tokens.insert(content, token);
+            tokens.insert(
+                content,
+                Token::new(VertexIndex(vertices.len()), composition.width().0),
+            );
+            vertices.push(StoredNode::Composite(
+                composition
+                    .occurrences()
+                    .iter()
+                    .map(|o| (o.offset.0, o.child.index.0))
+                    .collect(),
+            ));
         }
-        edit.finish();
-        graph.validate().map_err(|error| error.to_string())?;
+        let generation = u64::from(!vertices.is_empty());
+        let graph = Self::try_from(StoredGraph { vertices, generation })?;
         Ok((graph, tokens))
     }
 

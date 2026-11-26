@@ -22,7 +22,6 @@ use crate::{
     BaseGraphKind,
     GraphKind,
     TokenWidth,
-    VertexKey,
     graph::vertex::{
         CommittedIndex,
         StageIndex,
@@ -32,10 +31,14 @@ use crate::{
         committed::PositionedGraph,
         model::{
             Composition,
-            PositionedVertex,
             VertexNode,
         },
         stage::Translation,
+        store::raw::{
+            SEAL,
+            VertexWrite as _,
+            Write as _,
+        },
     },
 };
 
@@ -218,13 +221,14 @@ impl<G: GraphKind> StagingGraph<G> {
         }
     }
     /// Push every live staged vertex and apply every delta to `base`
-    /// (staging plan §4.3); holes are skipped, so the committed indices are
-    /// dense. The base must be the one the stage was opened on, unchanged.
+    /// (staging plan §4.3) through the sealed raw primitives; holes are
+    /// skipped, so the committed indices are dense. The base must be the one
+    /// the stage was opened on, unchanged.
     pub(super) fn commit_into(
         self,
         base: &mut PositionedGraph<G>,
     ) -> Translation {
-        let mut next = base.vertices.len();
+        let mut next = base.next_index(SEAL).0;
         let translation = Translation::table(
             self.vertices
                 .iter()
@@ -236,13 +240,6 @@ impl<G: GraphKind> StagingGraph<G> {
                 })
                 .collect(),
         );
-        let links = |links: Links<StageIndex>| -> Links<CommittedIndex> {
-            links
-                .into_iter()
-                .map(|(parent, offsets)| (translation.index(parent), offsets))
-                .collect()
-        };
-        base.vertices.reserve(translation.len());
         for (vertex, &index) in self.vertices.into_iter().zip(translation.slots()) {
             let (Some(vertex), Some(index)) = (vertex, index) else {
                 continue;
@@ -250,36 +247,47 @@ impl<G: GraphKind> StagingGraph<G> {
             let VertexNode::Composite(composition) = vertex.node else {
                 unreachable!("atoms are committed through OverlayHandle::atom")
             };
-            let node = VertexNode::Composite(
-                composition.map_index(|child| translation.index(child)),
+            // Children may be pushed later: `push` does not resolve them.
+            let pushed = base.push(
+                SEAL,
+                VertexNode::Composite(
+                    composition.map_index(|child| translation.index(child)),
+                ),
+                vertex.width,
             );
-            base.vertices.push(PositionedVertex {
-                index,
-                key: VertexKey::default(),
-                width: vertex.width,
-                node,
-                parents: links(vertex.parents),
-                #[cfg(debug_assertions)]
-                label: vertex.label,
-            });
+            debug_assert_eq!(pushed, index);
+            let mut target = base.vertex_mut(SEAL, index).expect("pushed vertex");
+            for (parent, offsets) in vertex.parents {
+                let parent = translation.index(parent);
+                for offset in offsets {
+                    target.link_parent(parent, offset);
+                }
+            }
+            #[cfg(debug_assertions)]
+            target.set_label(vertex.label);
         }
         for (index, delta) in self.deltas {
-            let vertex = &mut base.vertices[index.0];
+            let mut vertex = base.vertex_mut(SEAL, index).expect("committed vertex");
             if let Some(composition) = delta.composition {
-                vertex.node = VertexNode::Composite(
+                vertex.set_node(VertexNode::Composite(
                     composition.map_index(|child| translation.index(child)),
-                );
+                ));
             }
             for (parent, offsets) in delta.removed {
                 for offset in offsets {
-                    remove_link(&mut vertex.parents, &parent, offset);
+                    vertex.unlink_parent(parent, offset);
                 }
             }
-            for (parent, offsets) in links(delta.added) {
-                vertex.parents.entry(parent).or_default().extend(offsets);
+            for (parent, offsets) in delta.added {
+                let parent = translation.index(parent);
+                for offset in offsets {
+                    vertex.link_parent(parent, offset);
+                }
             }
         }
-        base.generation += self.generation;
+        for _ in 0..self.generation {
+            base.bump_generation(SEAL);
+        }
         translation
     }
 }

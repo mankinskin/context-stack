@@ -1,6 +1,9 @@
 //! Model-only rules: complete compositions on create and reciprocal links.
 //! Structural cover rules are tested on the interchange validator; the edit
-//! layer in `edit.rs`.
+//! layer in `edit.rs`. Graphs are built as tables (interchange import); the
+//! `create` cases move with `GraphEdit` (crate ownership plan P3).
+
+use std::collections::BTreeMap;
 
 use crate::{
     AtomPosition,
@@ -16,28 +19,34 @@ use crate::{
         PositionedError,
         PositionedGraph,
         VertexNode,
+        interchange::PositionedGraphData,
     },
 };
 
-/// `ababa = [aba@0, aba@2]`, `aba = [a@0, b@1, a@2]`.
+/// `ababa = [aba@0, aba@2]`, `aba = [a@0, b@1, a@2]`, built as a table, and
+/// the name → token map.
+fn ababa_named() -> (PositionedGraph, BTreeMap<String, Token>) {
+    let cover = |children: &[(usize, &str)]| -> Vec<(usize, String)> {
+        children.iter().map(|&(offset, child)| (offset, child.to_string())).collect()
+    };
+    let data = PositionedGraphData {
+        vertices: [
+            ("a", cover(&[])),
+            ("b", cover(&[])),
+            ("aba", cover(&[(0, "a"), (1, "b"), (2, "a")])),
+            ("ababa", cover(&[(0, "aba"), (2, "aba")])),
+        ]
+        .into_iter()
+        .map(|(content, cover)| (content.to_string(), cover))
+        .collect(),
+    };
+    PositionedGraph::from_interchange_named(&data).unwrap()
+}
+
+/// [`ababa_named`] with the tokens of `aba` and `ababa`.
 fn ababa() -> (PositionedGraph, Token, Token) {
-    let mut graph = PositionedGraph::default();
-    let mut edit = graph.edit();
-    let a = edit.atom('a');
-    let b = edit.atom('b');
-    let aba = edit
-        .create(vec![
-            Occurrence::new(2, a),
-            Occurrence::new(0, a),
-            Occurrence::new(1, b),
-        ])
-        .unwrap();
-    let ababa = edit
-        .create(vec![Occurrence::new(0, aba), Occurrence::new(2, aba)])
-        .unwrap();
-    edit.finish();
-    graph.validate().unwrap();
-    (graph, aba, ababa)
+    let (graph, names) = ababa_named();
+    (graph, names["aba"], names["ababa"])
 }
 
 #[test]
@@ -114,8 +123,8 @@ fn validate_rejects_broken_reciprocal_links() {
 
 #[test]
 fn occurrence_paths_and_intervals_are_checked_against_the_graph() {
-    let (mut graph, aba, ababa) = ababa();
-    let b = graph.edit().atom('b');
+    let (graph, names) = ababa_named();
+    let (b, aba, ababa) = (names["b"], names["aba"], names["ababa"]);
     let step = |parent: Token, offset: usize, child: Token| OccurrenceLocation {
         parent: parent.index,
         offset: offset.into(),

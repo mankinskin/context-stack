@@ -63,7 +63,10 @@ pub use self::interchange::{
 
 #[cfg(feature = "edit")]
 #[doc(hidden)]
-pub use self::edit::GraphEdit;
+pub use self::{
+    edit::GraphEdit,
+    store::raw,
+};
 #[cfg(debug_assertions)]
 pub use self::{
     model::PositionedLabels,

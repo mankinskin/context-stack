@@ -2,7 +2,13 @@
 //! `GraphEdit` and search (written once for every store, staging plan §3.5).
 //! Public for the higher crates of the stack only (`#[doc(hidden)]`).
 
-#[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
+#[cfg(any(
+    debug_assertions,
+    test,
+    feature = "test-api",
+    feature = "serde",
+    feature = "interchange"
+))]
 use crate::positioned::store::Navigate;
 use crate::{
     Token,
@@ -146,8 +152,14 @@ pub fn validate_vertex<'a, V: VertexRead<'a>>(
 /// G4 for every composite (debug and `test-api` builds): the checks of
 /// `PositionedGraph::validate` that need no content traversal, for any
 /// store (also an open stage). Also run on every deserialized graph
-/// (feature `serde`), in every build.
-#[cfg(any(test, feature = "test-api", feature = "serde"))]
+/// (feature `serde`) and interchange import (feature `interchange`), in
+/// every build.
+#[cfg(any(
+    test,
+    feature = "test-api",
+    feature = "serde",
+    feature = "interchange"
+))]
 pub fn validate_store<S: GraphRead + ?Sized>(
     store: &S
 ) -> Result<(), PositionedError<S::Index>> {
@@ -167,7 +179,13 @@ pub fn validate_store<S: GraphRead + ?Sized>(
 /// G4, structurally: for adjacent overlapping `L@l`, `R@r`, the largest
 /// token starting at `r − l` in `L` ends at `|L|`, i.e. the overlap is a
 /// vertex. Non-adjacent pairs are not checked.
-#[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
+#[cfg(any(
+    debug_assertions,
+    test,
+    feature = "test-api",
+    feature = "serde",
+    feature = "interchange"
+))]
 #[doc(hidden)]
 pub fn check_overlap_closure<S: GraphRead + ?Sized>(
     graph: &S,

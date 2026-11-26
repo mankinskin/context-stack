@@ -499,7 +499,7 @@ Verification: search 20 + insert 13 tests pass with the same totals;
   except the `Stage` trait, which stays in context-trace until P3
   (`positioned/store/stage.rs` for one commit).
 - `OverlayView`/`OverlayVertex`/`OverlayVertexMut` implement
-  `context_trace::positioned::store::raw::{Write, VertexWrite, Remove, Stabilize}`
+  `context_trace::positioned::raw::{Write, VertexWrite, Remove, Stabilize}`
   (feature `edit`, already enabled by context-read).
 - Replace every direct access to `PositionedGraph` internals in the
   overlay by public API:
@@ -534,7 +534,7 @@ Verification: read 129 tests and the staging benches compile and pass;
   split of `new`/`edit` disappears.
 - Paths inside the moved code: `crate::positioned::{store,model,check,committed}` →
   `context_trace::positioned::…`, `raw::SEAL` from
-  `context_trace::positioned::store::raw`.
+  `context_trace::positioned::raw`.
 - context-read: `GraphEdit`, `Publication`, `Candidates`, `Settled`,
   `Stage` from `context_insert::edit`; the overlay implements
   `context_insert::edit::Stage`.

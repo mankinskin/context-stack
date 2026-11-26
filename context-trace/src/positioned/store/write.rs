@@ -2,11 +2,15 @@
 
 use super::GraphRead;
 
-/// Raw write primitives (staging plan §3.5). The module is private to
-/// `context-trace` and every method takes a [`Seal`](raw::Seal), so other
-/// crates can neither name, implement nor call them, even through a
-/// [`GraphWrite`] bound.
-pub(crate) mod raw {
+/// Raw write primitives (staging plan §3.5). Every method takes a
+/// [`Seal`](raw::Seal). Without the hidden feature `edit` the module is
+/// private to `context-trace`, so other crates can neither name, implement
+/// nor call the primitives, even through a [`GraphWrite`] bound. With `edit`
+/// (enabled only by `context-insert` and `context-read`, guard
+/// `only_insertion_and_the_reader_enable_the_edit_feature`) it is exported
+/// as `context_trace::positioned::raw`: the seal then proves being inside
+/// context-trace, context-insert or context-read (crate ownership plan E1).
+pub mod raw {
     use super::GraphRead;
     use crate::{
         AtomOf,
@@ -20,11 +24,12 @@ pub(crate) mod raw {
         positioned::model::VertexNode,
     };
 
-    /// Proof of being inside `context-trace`.
+    /// Proof of being inside `context-trace` (or, with feature `edit`,
+    /// `context-insert` or `context-read`).
     #[derive(Clone, Copy, Debug)]
     pub struct Seal(pub(crate) ());
 
-    pub(crate) const SEAL: Seal = Seal(());
+    pub const SEAL: Seal = Seal(());
 
     pub trait Write: GraphRead {
         type VertexMut<'a>: VertexWrite<Kind = Self::Kind, Index = Self::Index>
@@ -178,6 +183,6 @@ pub(crate) mod raw {
 
 /// A store `GraphEdit` can write. Implemented for every store with the
 /// sealed raw primitives; the primitives themselves stay unnameable outside
-/// `context-trace`.
+/// `context-trace` without feature `edit`.
 pub trait GraphWrite: GraphRead + raw::Write {}
 impl<T: raw::Write + ?Sized> GraphWrite for T {}
