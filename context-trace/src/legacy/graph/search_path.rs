@@ -1397,19 +1397,4 @@ mod tests {
             },
         ]
     }
-
-    #[test]
-    #[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
-    fn generate_cross_language_fixtures() {
-        let fixtures = build_fixtures();
-        let json = serde_json::to_string_pretty(&fixtures).unwrap();
-        let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..") // up to context-engine root
-            .join(
-                "tools/log-viewer/frontend/src/search-path/test-fixtures.json",
-            );
-        std::fs::create_dir_all(fixture_path.parent().unwrap()).unwrap();
-        std::fs::write(&fixture_path, &json).unwrap();
-        eprintln!("Wrote test fixtures to {}", fixture_path.display());
-    }
 }
