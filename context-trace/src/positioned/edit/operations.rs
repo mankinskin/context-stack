@@ -2,16 +2,16 @@
 //! occurrences and extension of staged vertices.
 
 #[cfg(any(debug_assertions, feature = "test-api"))]
-use super::check::check_overlap_closure;
+use crate::positioned::check::check_overlap_closure;
 #[cfg(debug_assertions)]
-use super::check::composed_label;
+use crate::positioned::check::composed_label;
 use super::{
     Error,
     GraphEdit,
-    check::{
-        check_child,
-        expect_vertex,
-    },
+};
+use crate::positioned::check::{
+    check_child,
+    expect_vertex,
 };
 use crate::{
     AtomOf,

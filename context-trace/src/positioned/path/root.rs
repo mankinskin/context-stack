@@ -16,7 +16,7 @@ use crate::{
         wide::Wide,
     },
     positioned::{
-        edit::check::expect_token,
+        check::expect_token,
         model::OccurrenceLocation,
         store::GraphRead,
     },

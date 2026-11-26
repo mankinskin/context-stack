@@ -18,7 +18,7 @@ use std::ops::Range;
 use crate::{
     TokenWidth,
     positioned::{
-        edit::check::check_overlap_closure,
+        check::check_overlap_closure,
         store::Navigate,
     },
 };
@@ -34,7 +34,7 @@ use crate::{
         has_vertex_index::HasVertexIndex,
     },
     positioned::{
-        edit::check::validate_vertex,
+        check::validate_vertex,
         model::{
             PositionedError,
             PositionedVertex,

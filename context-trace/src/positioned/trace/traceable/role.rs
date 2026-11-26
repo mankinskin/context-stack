@@ -8,7 +8,7 @@ use crate::{
     Token,
     graph::vertex::wide::Wide,
     positioned::{
-        edit::check::expect_token,
+        check::expect_token,
         path::{
             PathRole,
             RolePath,

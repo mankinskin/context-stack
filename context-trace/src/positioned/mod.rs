@@ -44,6 +44,8 @@
 //!   [`EndPath`], [`QueryPath`]; [`RangePath`], `path/`) and trace states / trace cache ([`ParentState`],
 //!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2.
 
+#[doc(hidden)]
+pub mod check;
 mod committed;
 mod edit;
 pub mod interchange;
@@ -70,7 +72,7 @@ pub use self::{
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
 pub use self::model::IntervalView;
 #[cfg(any(test, feature = "test-api"))]
-pub use self::edit::check::validate_store;
+pub use self::check::validate_store;
 #[cfg(any(test, feature = "test-api"))]
 pub use self::interchange::diff::{
     GraphDiff,

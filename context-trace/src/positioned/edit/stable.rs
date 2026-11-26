@@ -6,8 +6,8 @@
 use super::{
     Error,
     GraphEdit,
-    check::expect_vertex,
 };
+use crate::positioned::check::expect_vertex;
 use crate::{
     graph::vertex::{
         StageIndex,

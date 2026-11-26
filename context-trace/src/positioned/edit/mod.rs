@@ -12,10 +12,9 @@
 //! `operations.rs`, dissolution of staged vertices in `dissolve.rs`, early
 //! stabilization by fixed parent occurrences in `stable.rs`, the
 //! [`Publication`] record in `publication.rs` and the store-generic checks
-//! shared with `PositionedGraph::validate` in `check.rs`.
+//! shared with `PositionedGraph::validate` in `positioned/check.rs`.
 #![cfg_attr(not(feature = "edit"), allow(dead_code))]
 
-pub(crate) mod check;
 mod dissolve;
 mod operations;
 mod publication;
@@ -38,9 +37,9 @@ use std::collections::{
     BTreeSet,
 };
 
-use self::check::expect_vertex;
+use crate::positioned::check::expect_vertex;
 #[cfg(any(debug_assertions, feature = "test-api"))]
-use self::check::{
+use crate::positioned::check::{
     check_overlap_closure,
     validate_vertex,
 };

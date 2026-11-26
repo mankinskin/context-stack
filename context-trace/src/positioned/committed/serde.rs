@@ -21,7 +21,7 @@ use serde::{
 
 use super::PositionedGraph;
 #[cfg(debug_assertions)]
-use crate::positioned::edit::check::composed_label;
+use crate::positioned::check::composed_label;
 use crate::{
     AtomOf,
     GraphKind,
@@ -30,7 +30,7 @@ use crate::{
     VertexKey,
     graph::vertex::VertexIndex,
     positioned::{
-        edit::check::validate_store,
+        check::validate_store,
         model::{
             Composition,
             Occurrence,

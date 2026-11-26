@@ -1,5 +1,6 @@
-//! Store-generic structural checks, shared by `PositionedGraph::validate`
-//! and `GraphEdit` (written once for every store, staging plan §3.5).
+//! Store-generic structural checks, shared by `PositionedGraph::validate`,
+//! `GraphEdit` and search (written once for every store, staging plan §3.5).
+//! Public for the higher crates of the stack only (`#[doc(hidden)]`).
 
 #[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
 use crate::positioned::store::Navigate;
@@ -30,7 +31,8 @@ use crate::{
 };
 
 /// The vertex `index`, or `UnknownVertex`.
-pub(crate) fn expect_vertex<S: GraphRead + ?Sized>(
+#[doc(hidden)]
+pub fn expect_vertex<S: GraphRead + ?Sized>(
     graph: &S,
     index: S::Index,
 ) -> Result<S::Vertex<'_>, PositionedError<S::Index>> {
@@ -43,7 +45,8 @@ pub(crate) fn expect_vertex<S: GraphRead + ?Sized>(
 ///
 /// # Panics
 /// If `index` is unknown.
-pub(crate) fn expect_token<S: GraphRead + ?Sized>(
+#[doc(hidden)]
+pub fn expect_token<S: GraphRead + ?Sized>(
     graph: &S,
     index: S::Index,
 ) -> Token<S::Index> {
@@ -54,7 +57,8 @@ pub(crate) fn expect_token<S: GraphRead + ?Sized>(
 }
 
 /// The child of `occurrence` exists and has the recorded width.
-pub(crate) fn check_child<S: GraphRead + ?Sized>(
+#[doc(hidden)]
+pub fn check_child<S: GraphRead + ?Sized>(
     graph: &S,
     occurrence: &Occurrence<S::Index>,
 ) -> Result<(), PositionedError<S::Index>> {
@@ -70,7 +74,8 @@ pub(crate) fn check_child<S: GraphRead + ?Sized>(
 }
 
 /// Structure, width and reciprocal links of `vertex`.
-pub(crate) fn validate_vertex<'a, V: VertexRead<'a>>(
+#[doc(hidden)]
+pub fn validate_vertex<'a, V: VertexRead<'a>>(
     vertex: V
 ) -> Result<(), PositionedError<V::Index>> {
     let index = vertex.vertex_index();
@@ -163,7 +168,8 @@ pub fn validate_store<S: GraphRead + ?Sized>(
 /// token starting at `r − l` in `L` ends at `|L|`, i.e. the overlap is a
 /// vertex. Non-adjacent pairs are not checked.
 #[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
-pub(crate) fn check_overlap_closure<S: GraphRead + ?Sized>(
+#[doc(hidden)]
+pub fn check_overlap_closure<S: GraphRead + ?Sized>(
     graph: &S,
     owner: S::Index,
     occurrences: impl IntoIterator<Item = Occurrence<S::Index>>,
@@ -199,7 +205,8 @@ pub(crate) fn check_overlap_closure<S: GraphRead + ?Sized>(
 /// covered by the previous occurrences. Assumes one `char` per atom label
 /// (true for `char` atoms).
 #[cfg(debug_assertions)]
-pub(crate) fn composed_label<S: GraphRead + ?Sized>(
+#[doc(hidden)]
+pub fn composed_label<S: GraphRead + ?Sized>(
     graph: &S,
     occurrences: impl IntoIterator<Item = Occurrence<S::Index>>,
 ) -> String {
