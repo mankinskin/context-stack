@@ -12,7 +12,6 @@ use super::{
     View,
     render::{
         check_gate,
-        resolve_vertex,
         subgraph,
     },
     text,
@@ -96,7 +95,7 @@ pub(crate) fn import(
             let mut meta = GraphMeta::new(name);
             let read_at = file::now();
             for (i, corpus_text) in snapshot.corpus.iter().enumerate() {
-                let token = resolve_vertex(&graph, &VertexRef::Text(corpus_text.clone()))
+                let token = text::resolve_vertex(&graph, &VertexRef::Text(corpus_text.clone()))
                     .map_err(|e| invalid(&format!("corpus text {i}"), e.to_string()))?;
                 meta.inputs.push(InputRecord {
                     id: i as u32,

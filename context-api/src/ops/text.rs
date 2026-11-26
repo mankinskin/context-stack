@@ -150,6 +150,15 @@ pub(crate) fn resolve_vertex(
                 })
         },
         VertexRef::Text(text) => {
+            let mut chars = text.chars();
+            if let (Some(atom), None) = (chars.next(), chars.next()) {
+                return graph.atom(&atom).map(|vertex| vertex.vertex_index()).ok_or_else(|| {
+                    ApiError::NotAVertex {
+                        text: text.clone(),
+                        host: None,
+                    }
+                });
+            }
             let not_a_vertex = |host: Option<String>| ApiError::NotAVertex {
                 text: text.clone(),
                 host,
@@ -227,6 +236,12 @@ mod tests {
         ));
         assert!(matches!(
             resolve_vertex(&graph, &VertexRef::Text("xyz".into())),
+            Err(ApiError::NotAVertex { host: None, .. })
+        ));
+        let a = resolve_vertex(&graph, &VertexRef::Text("a".into())).unwrap();
+        assert_eq!(text(&graph, a), "a");
+        assert!(matches!(
+            resolve_vertex(&graph, &VertexRef::Text("z".into())),
             Err(ApiError::NotAVertex { host: None, .. })
         ));
         assert!(matches!(

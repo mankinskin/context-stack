@@ -148,26 +148,6 @@ pub(crate) fn check_gate(
     Ok(())
 }
 
-/// [`text::resolve_vertex`], plus single-char texts (atoms), which the
-/// ancestor search does not resolve.
-pub(crate) fn resolve_vertex(
-    graph: &PositionedGraph,
-    vertex: &VertexRef,
-) -> Result<VertexIndex, ApiError> {
-    if let VertexRef::Text(text) = vertex {
-        let mut chars = text.chars();
-        if let (Some(c), None) = (chars.next(), chars.next()) {
-            return graph.atom(&c).map(|atom| atom.vertex_index()).ok_or_else(|| {
-                ApiError::NotAVertex {
-                    text: text.clone(),
-                    host: None,
-                }
-            });
-        }
-    }
-    text::resolve_vertex(graph, vertex)
-}
-
 /// `render_cap`: the session's hard vertex cap that `gate.force` cannot lift.
 pub(crate) fn render(
     view: &View<'_>,
@@ -179,7 +159,7 @@ pub(crate) fn render(
     render_cap: Option<usize>,
 ) -> Result<RenderOutput, ApiError> {
     let graph = view.graph;
-    let root = root.map(|root| resolve_vertex(graph, root)).transpose()?;
+    let root = root.map(|root| text::resolve_vertex(graph, root)).transpose()?;
     let sub = subgraph(graph, root, depth);
     check_gate(sub.vertices.len(), sub.label_chars(graph), gate, render_cap)?;
 
