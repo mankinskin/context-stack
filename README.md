@@ -6,7 +6,10 @@ context-stack is the standalone repository for the extracted graph, search, inse
 
 | Child crate or folder | What it contains | Direct README |
 | --- | --- | --- |
-| [context-api](context-api/README.md) | API-level entry points for context operations. | [context-api/README.md](context-api/README.md) |
+| [context-api](context-api/README.md) | Command API of the stack: graph store (`.ctx` files), sessions, read, search views, render, export/import. | [context-api/README.md](context-api/README.md) |
+| [tools/cli/context-cli](tools/cli/context-cli/README.md) | `context-cli`: graph commands, interactive shell, client mode, `serve` and `mcp` subcommands. | [tools/cli/context-cli/README.md](tools/cli/context-cli/README.md) |
+| [tools/http/context-http](tools/http/context-http/README.md) | HTTP and WebSocket server over `context-api` (library and `context-http` binary). | [tools/http/context-http/README.md](tools/http/context-http/README.md) |
+| [tools/mcp/context-mcp](tools/mcp/context-mcp/README.md) | MCP server with typed tools, local or proxying a running server. | [tools/mcp/context-mcp/README.md](tools/mcp/context-mcp/README.md) |
 | [context-trace](context-trace/README.md) | Foundational graph structures, traversal, and tracing primitives. | [context-trace/README.md](context-trace/README.md) |
 | [context-search](context-search/README.md) | Search and traversal layers built on the trace crate. | [context-search/README.md](context-search/README.md) |
 | [context-insert](context-insert/README.md) | Insert and mutation workflows for the graph structures. | [context-insert/README.md](context-insert/README.md) |
@@ -17,7 +20,14 @@ Additional folders without repository-level READMEs yet include `context-trace-m
 
 ## Installable Content
 
-This repository does not publish a root-level executable binary. The root surface is a library workspace made up of the child crates above, and each crate README is the direct entry point for its API and workflow details.
+The user-facing executable is `context-cli` (`cargo install --path tools/cli/context-cli`): create graphs from text, search them, render small graphs, serve them over HTTP/WebSocket and MCP. `context-http` and `context-mcp` are also available as standalone binaries. The algorithm crates are libraries; each crate README is the entry point for its API.
+
+```bash
+context-cli create notes -f notes/ --recursive --glob '*.md'
+context-cli search notes "brown fox" --view occurrences
+context-cli serve notes &          # later commands use the running server
+context-cli shell notes
+```
 
 ## Workspace Commands
 

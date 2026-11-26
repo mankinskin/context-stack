@@ -1,159 +1,131 @@
 # context-api
 
-Unified API for hypergraph workspace management and operations.
-
-This crate provides the single public interface for all hypergraph operations across the context-engine workspace. It wraps `context-trace`, `context-search`, `context-insert`, and (in Phase 2) `context-read` behind a workspace-oriented, command-based API with feature-gated adapters for CLI, MCP, HTTP, and future protocols.
-
-## Architecture
+The command API of the context stack. Every tool — the
+[CLI and shell](../tools/cli/context-cli/README.md), the
+[HTTP/WebSocket server](../tools/http/context-http/README.md) and the
+[MCP server](../tools/mcp/context-mcp/README.md) — sends a `Request` to a
+`Session` (in process or through a server) and gets a `Response`, so every
+transport returns the same JSON.
 
 ```text
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ context-cli  │  │ context-mcp  │  │ context-http │
-│ (bin)        │  │ (bin)        │  │ (bin)        │
-└──────┬───────┘  └──────┬───────┘  └──────┬───────┘
-       └─────────────────┴────────┬────────┘
-                                  │
-                           ┌──────┴───────┐
-                           │  context-api │  ← you are here
-                           └──────┬───────┘
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        │                         │                         │
- context-insert ──► context-search ──► context-trace
+context-cli / shell ─┐
+context-http ────────┼──► Session::execute(Request) -> Response
+context-mcp ─────────┘          │
+                    context-read · context-search · context-trace
 ```
+
+`read` (with `create` and `import`) is the only command that adds vertices:
+text is read with `context_read::read`. There is no insert command. Search
+uses positioned `context-search`; nothing uses the legacy row model.
+
+Plan and design notes:
+[agents/plans/20261126_PLAN_CONTEXT_TOOLS](agents/plans/20261126_PLAN_CONTEXT_TOOLS/README.md).
 
 ## Usage
 
-### Rust consumers — use the `WorkspaceApi` trait
-
 ```rust
-use context_api::prelude::*;
-use context_api::workspace::manager::WorkspaceManager;
+use context_api::{Command, CommandResult, Request, Session, SessionConfig};
+use context_api::types::{Input, SearchView, Split};
 
-let mut mgr = WorkspaceManager::current_dir().unwrap();
+let session = Session::new(SessionConfig::new(".context-engine"));
+let create = Command::Create {
+    graph: "notes".into(),
+    inputs: vec![Input::Text { text: "the quick brown fox".into(), label: None }],
+    split: Split::None,
+    overwrite: false,
+};
+session.execute(Request::new(create)).into_result()?;
 
-// Create a workspace
-let info = mgr.create_workspace("demo").unwrap();
-
-// Add atoms (single characters)
-mgr.add_atom("demo", 'a').unwrap();
-mgr.add_atom("demo", 'b').unwrap();
-mgr.add_atom("demo", 'c').unwrap();
-
-// Create a simple pattern from existing atoms
-let pattern = mgr.add_simple_pattern("demo", vec!['a', 'b']).unwrap();
-println!("Created pattern: {} (index {})", pattern.label, pattern.index);
-
-// Inspect the graph
-let stats = mgr.get_statistics("demo").unwrap();
-println!("Vertices: {}, Atoms: {}, Patterns: {}",
-    stats.vertex_count, stats.atom_count, stats.pattern_count);
-
-// Save and close
-mgr.save_workspace("demo").unwrap();
-mgr.close_workspace("demo").unwrap();
+let search = Command::Search {
+    graph: "notes".into(),
+    query: "brown".into(),
+    view: SearchView::Occurrences,
+    limits: Default::default(),
+};
+if let CommandResult::Search(result) = session.execute(Request::new(search)).into_result()? {
+    println!("{:?}", result.occurrences);
+}
 ```
 
-### Adapter layers — use the `Command` / `CommandResult` enums
+JSON (all transports):
 
-```rust
-use context_api::commands::{Command, execute};
-use context_api::workspace::manager::WorkspaceManager;
-
-let mut mgr = WorkspaceManager::current_dir().unwrap();
-
-// Deserialize a command from JSON
-let cmd: Command = serde_json::from_str(
-    r#"{"command":"create_workspace","name":"demo"}"#
-).unwrap();
-
-// Execute and serialize the result
-let result = execute(&mut mgr, cmd).unwrap();
-let json = serde_json::to_string(&result).unwrap();
-println!("{json}");
+```jsonc
+// request
+{"id": 1, "command": "search", "graph": "notes", "query": "brown", "view": "contexts"}
+// success
+{"id": 1, "ok": {"search": {"graph": "notes", "query": "brown", "outcome": {...}, "contexts": {...}}}}
+// failure
+{"id": 1, "error": {"kind": "not_found", "message": "graph 'x' not found", "hint": "..."}}
 ```
 
-## Feature Flags
+## Commands
 
-| Feature   | Description                                          | Default |
-|-----------|------------------------------------------------------|---------|
-| `ts-gen`  | Enable TypeScript type generation via `ts-rs`        | off     |
-| `dev`     | Extra debug commands and verbose internal logging    | off     |
+| Command | Purpose |
+|---|---|
+| `new`, `create`, `read` | create an empty graph; create from inputs; read inputs (`text`, or `file` below `allow_fs`) with optional `split` (`lines`, `paragraphs`), `dry_run`, `steps`, `save` policy |
+| `search` | find a query; views `summary`, `path` (the search response), `contexts` (ancestors containing the match, narrowest first), `occurrences` (positions in the read inputs with line, column and snippet), `parents` |
+| `vertex`, `inputs`, `info`, `stats`, `validate` | inspect a vertex (by index or text), the input log, counts, histograms, structural and retention checks |
+| `render` | `ascii`, `ascii_dag`, `dot`, `mermaid`, `json` of the graph or of the descendants of `root` (with `depth`), behind a size gate |
+| `export`, `import` | v3 interchange JSON (the oracle format, gated) or the native `.ctx` bytes |
+| `list`, `delete`, `save`, `close` | store and session lifecycle |
+| `list_logs` … `delete_logs` | trace logs (feature `logs`) |
 
-## Workspace Storage
+Search outcomes: `not_found` (unknown chars or empty query), `vertex` (the
+query is a vertex), `in_host` (the query occurs inside its narrowest host),
+`partial` (only a query prefix is in the graph). Result lists honour
+`Limits` (`limit`, `context_width`, `label_width`, `max_depth`,
+`max_visited`) and report `truncated` / `total`.
 
-Workspaces are stored under a `.context-engine/` directory relative to the base directory (typically the project root):
+The render gate defaults to 64 vertices and 4 096 label characters;
+`Gate::force` lifts it, except for the session's `render_cap`.
+
+## Storage
 
 ```text
-.context-engine/<workspace-name>/
-├── graph.bin       # bincode-serialized Hypergraph
-├── metadata.json   # human-readable workspace metadata (timestamps, description)
-└── .lock           # advisory file lock (fs2)
+<store>/notes.ctx              graph file: magic, version, JSON metadata
+                               (input log, counts), bincode graph, crc32
+<store>/notes.ctx.lock         advisory lock (exclusive while a writer has it open)
+<store>/notes.ctx.server.json  present while a server holds the graph
 ```
 
-- **Persistence**: Explicit save semantics — changes are only written to disk when `save_workspace` is called.
-- **Concurrency**: Multi-reader, single-writer model using advisory file locks (`fs2`). Only one process should have a workspace open for writing at a time.
-- **Atomic writes**: Graph and metadata files are written atomically (write to `.tmp`, then rename) to prevent corruption on crash.
+- Graphs are addressed by name (`<store>/<name>.ctx`) or, where allowed
+  (`SessionConfig::allow_graph_paths`, or below `allow_fs`), by a path
+  ending in `.ctx`.
+- Saves replace the file atomically (temporary file, fsync, rename); a
+  crash leaves the previous file. `create` writes the file once, at the end.
+- Loading validates the checksum, the graph (context-trace `serde`
+  feature: structure, store checks) and the input log.
+- Old row-model workspaces (`<store>/<name>/metadata.json`) are rejected
+  with a hint to re-create the graph from its source text.
 
-## API Types
+## Sessions
 
-All public types are in the `types` module and are serializable via `serde`:
+`SessionConfig` selects the behaviour of a transport:
 
-| Type              | Description                                          |
-|-------------------|------------------------------------------------------|
-| `AtomInfo`        | A single atom (character) vertex                     |
-| `TokenInfo`       | Lightweight info about any vertex (index, label, width) |
-| `PatternInfo`     | A newly created pattern with its children            |
-| `VertexInfo`      | Detailed vertex information (children, parents, etc.) |
-| `WorkspaceInfo`   | Workspace summary (name, counts, timestamps)         |
-| `GraphStatistics` | Aggregate graph metrics                              |
-| `TokenRef`        | Reference a token by index or label string           |
-| `GraphSnapshot`   | Full graph topology snapshot (re-exported from context-trace) |
+| Field | One-shot CLI | Server / shell / MCP |
+|---|---|---|
+| `keep_open` | false: open, run, close per command | true: graphs stay open (exclusive lock) |
+| `save` | `OnWrite` | `OnWrite` or `Manual` (save on `save`, `close`, `shutdown`) |
+| `allow_fs` | `None` (the CLI reads files itself) | directory for `file` inputs and path graph refs |
+| `render_cap`, `max_visited_cap` | — | hard limits for remote clients |
 
-## Error Model
+`Session::execute` takes `&self`: mutations of a graph are serialized by a
+per-graph writer slot, queries run concurrently. Every command runs on a
+thread with a large stack (the algorithms recurse over the nesting depth);
+an algorithm panic drops the graph's unsaved state and returns an
+`internal` error. Events (`read_progress`, `graph_changed`, `saved`) go to
+an `EventSink`.
 
-Errors are organized by domain and composed into a top-level `ApiError`:
+## Features
 
-```text
-ApiError
-├── Workspace(WorkspaceError)   — lifecycle errors (not found, already exists, lock conflict, I/O)
-├── Atom(AtomError)             — atom operation errors
-├── Pattern(PatternError)       — pattern validation and creation errors
-├── Search(SearchError)         — search errors (Phase 2)
-├── Insert(InsertError)         — insert errors (Phase 2)
-└── Read(ReadError)             — read errors (Phase 2)
-```
+| Feature | Default | Purpose |
+|---|---|---|
+| `logs` | on | trace capture and log queries (`<graph>.ctx.logs/`) |
+| `client` | off | `client::RemoteBackend` (HTTP), server discovery, WebSocket event streams |
+| `ts-gen` | off | TypeScript bindings in `packages/context-types/src/generated/` (`cargo test -p context-api --features ts-gen --lib export_bindings`) |
 
-## CLI
-
-The companion `context-cli` binary (in `tools/context-cli/`) provides both subcommand and REPL interfaces:
+## Tests
 
 ```bash
-# Subcommand interface
-context-cli create demo
-context-cli add-atom demo a
-context-cli add-atom demo b
-context-cli add-pattern demo ab
-context-cli stats demo
-context-cli save demo
-
-# Interactive REPL
-context-cli repl
-
-# Help
-context-cli
+cargo test -p context-api   # unit tests and tests/acceptance (oracle, brute-force search, round trips, gate)
 ```
-
-## Phase Plan
-
-This crate is being built incrementally:
-
-| Phase | Scope                        | Status |
-|-------|------------------------------|--------|
-| 1     | Foundation + CLI             | 🚧     |
-| 2     | Algorithm Commands           | 📋     |
-| 3     | MCP Adapter                  | 📋     |
-| 4     | HTTP + GraphQL Adapter       | 📋     |
-| 5     | TypeScript Types + Advanced  | 📋     |
-
-See `agents/plans/20260310_PLAN_CONTEXT_API_OVERVIEW.md` for the full plan.
