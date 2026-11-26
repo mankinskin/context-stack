@@ -17,6 +17,7 @@ use crate::{
         CommittedIndex,
         StageIndex,
         StagedIndex,
+        VertexId as _,
     },
     positioned::store::{
         GraphWrite,
@@ -26,11 +27,48 @@ use crate::{
 };
 
 /// A store with an open stage: indices are [`StageIndex`], new vertices are
-/// staged and staged vertices can be removed (swap-remove, [`Moved`]).
-pub trait Stage: GraphWrite<Index = StageIndex> + raw::Remove {
-    /// The staged vertices in slot order (creation order until a removal
-    /// moves the last vertex into the freed slot).
+/// staged, unstable staged vertices can be removed (swap-remove, [`Moved`])
+/// and marked stable ([`Swap`]).
+pub trait Stage: GraphWrite<Index = StageIndex> + raw::Stabilize {
+    /// The staged vertices in slot order (not creation order: removals and
+    /// stabilizations move vertices); the first [`Self::stable`] are stable.
     fn staged(&self) -> impl Iterator<Item = StagedIndex> + '_;
+    /// Length of the stable slot prefix. Stable vertices are never removed
+    /// (cheap stabilization plan 20261126).
+    fn stable(&self) -> usize;
+    /// Whether `index` is a stable staged vertex.
+    fn is_stable(
+        &self,
+        index: StageIndex,
+    ) -> bool {
+        index
+            .staged()
+            .is_some_and(|staged| staged.slot() < self.stable())
+    }
+}
+
+/// Two staged vertices exchanged slots (a stabilization).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Swap {
+    pub a: StageIndex,
+    pub b: StageIndex,
+}
+
+impl Swap {
+    /// `index` after the swap: `a` and `b` are exchanged, every other index
+    /// is unchanged.
+    pub fn apply(
+        self,
+        index: StageIndex,
+    ) -> StageIndex {
+        if index == self.a {
+            self.b
+        } else if index == self.b {
+            self.a
+        } else {
+            index
+        }
+    }
 }
 
 /// A staged vertex moved from slot `from` to slot `to` by a removal

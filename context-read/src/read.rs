@@ -34,7 +34,10 @@ use crate::{
 /// committed to the root before the next search, so the input read so far is
 /// always a vertex of the stage. After every step, staged tokens left with
 /// at most one parent occurrence are dissolved or discarded (dissolution
-/// plan §3.3), so the stage always holds the graph of the input read so far.
+/// plan §3.3), so the stage always holds the graph of the input read so far;
+/// then staged tokens with two fixed parent occurrences (ending strictly
+/// inside the parent, or in a committed or stable parent) are marked stable
+/// (cheap stabilization plan §2.2, Rule S′): no continuation removes them.
 pub fn read(
     graph: &PositionedGraphRef,
     input: impl IntoIterator<Item = char>,
@@ -42,8 +45,8 @@ pub fn read(
     read_steps(graph, input, |_| {})
 }
 
-/// One committed reader step: what was consumed, how the root changed and
-/// what the following `settle` removed.
+/// One committed reader step: what was consumed, how the root changed, what
+/// the following `settle` removed and how many tokens became stable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Step {
     pub kind: StepKind,
@@ -54,6 +57,9 @@ pub struct Step {
     pub dissolved: usize,
     /// Staged tokens without parent occurrences removed.
     pub discarded: usize,
+    /// Staged tokens marked stable by Rule S′ in this step (never removed
+    /// again).
+    pub stabilized: usize,
 }
 
 /// What a [`Step`] consumed (widths in atoms).
@@ -93,32 +99,36 @@ pub(crate) fn read_steps(
 ) -> Option<Token> {
     let mut root = ReadStage::open(graph);
     // Commit `span`, then settle the candidates of the step: the records of
-    // the insertion and of the commit, and the previous root if it lost its
-    // exemption.
+    // the insertion and of the commit, the previous root if it lost its
+    // exemption and the root's previous last child if the root grew in place.
     let mut commit = |root: &mut ReadStage<'_>,
                       kind,
                       span,
                       inserted: Option<Publication<StageIndex>>| {
         let previous = root.token();
-        let (commit, committed) = root.commit(span);
+        let (commit, committed, last) = root.commit(span);
         let mut candidates = Candidates::default();
         for publication in inserted.iter().chain(committed.iter()) {
             candidates.record(publication);
+        }
+        if let Some(last) = last {
+            candidates.push_gained(last);
         }
         if let Some(previous) = previous.filter(|previous| {
             root.token().map(|token| token.index) != Some(previous.index)
         }) {
             candidates.push(previous.index);
         }
-        let settled = root.settle(candidates);
+        let settlement = root.settle(candidates);
         let token = root.token();
         observe(&StepView {
             step: Step {
                 kind,
                 commit,
                 root: token.map_or(0, |token| token.width.0),
-                dissolved: settled.dissolved,
-                discarded: settled.discarded,
+                dissolved: settlement.settled.dissolved,
+                discarded: settlement.settled.discarded,
+                stabilized: settlement.stabilized,
             },
             handle: &root.handle,
             root: token,

@@ -181,10 +181,8 @@ fn retention_violations(fixture: &PositionedGraphSnapshot) -> Vec<String> {
         .collect()
 }
 
-/// G6 holds on every oracle graph of all positioned lanes (v3, insert,
-/// read).
-#[test]
-fn every_oracle_graph_satisfies_retention() {
+/// Every oracle graph of all positioned lanes (v3, insert, read) by name.
+fn oracle_graphs() -> Vec<(String, PositionedGraphSnapshot)> {
     use context_trace::positioned::fixtures::{
         fixture_snapshots, insert_dir, manifest, read_cases,
     };
@@ -195,6 +193,14 @@ fn every_oracle_graph_satisfies_retention() {
         (entry.name, fixture)
     }));
     graphs.extend(read_cases().into_iter().map(|case| (case.name, case.expected)));
+    graphs
+}
+
+/// G6 holds on every oracle graph of all positioned lanes (v3, insert,
+/// read).
+#[test]
+fn every_oracle_graph_satisfies_retention() {
+    let graphs = oracle_graphs();
     let violations: Vec<String> = graphs
         .iter()
         .filter_map(|(name, fixture)| {
@@ -204,4 +210,68 @@ fn every_oracle_graph_satisfies_retention() {
         .collect();
     assert!(graphs.len() > 1000, "{} oracle graphs", graphs.len());
     assert!(violations.is_empty(), "G6 violated:\n{}", violations.join("\n"));
+}
+
+/// A left or right context of an occurrence (dissolution plan C.0): an
+/// atom, or the start / end of text `k`.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Context {
+    Atom(char),
+    Boundary(usize),
+}
+
+/// The atoms, inputs and maximal repeats of `corpus`, by brute force: every
+/// substring of ≥ 2 atoms with ≥ 2 distinct left and ≥ 2 distinct right
+/// contexts over its occurrences (C.0).
+fn maximal_repeat_vertices(corpus: &[String]) -> BTreeSet<String> {
+    use std::collections::BTreeMap;
+    let texts: Vec<Vec<char>> = corpus.iter().map(|text| text.chars().collect()).collect();
+    let mut contexts = BTreeMap::<&[char], (BTreeSet<Context>, BTreeSet<Context>)>::new();
+    for (k, text) in texts.iter().enumerate() {
+        for start in 0..text.len() {
+            for end in start + 2..=text.len() {
+                let (left, right) = contexts.entry(&text[start..end]).or_default();
+                left.insert(match start {
+                    0 => Context::Boundary(k),
+                    _ => Context::Atom(text[start - 1]),
+                });
+                right.insert(match text.get(end) {
+                    Some(&next) => Context::Atom(next),
+                    None => Context::Boundary(k),
+                });
+            }
+        }
+    }
+    let mut vertices: BTreeSet<String> = corpus.iter().cloned().collect();
+    vertices.extend(texts.iter().flatten().map(char::to_string));
+    vertices.extend(
+        contexts
+            .into_iter()
+            .filter(|(_, (left, right))| left.len() >= 2 && right.len() >= 2)
+            .map(|(s, _)| s.iter().collect()),
+    );
+    vertices
+}
+
+/// M1 (dissolution plan C.1): the vertex strings of every oracle graph are
+/// exactly the atoms, inputs and maximal repeats of its corpus.
+#[test]
+fn oracle_vertex_sets_are_maximal_repeats() {
+    let graphs = oracle_graphs();
+    let failures: Vec<String> = graphs
+        .iter()
+        .filter_map(|(name, fixture)| {
+            let expected = maximal_repeat_vertices(&fixture.corpus);
+            let actual: BTreeSet<String> = fixture.graph.vertices.keys().cloned().collect();
+            (actual != expected).then(|| {
+                format!(
+                    "{name}: missing {:?}, extra {:?}",
+                    expected.difference(&actual).collect::<Vec<_>>(),
+                    actual.difference(&expected).collect::<Vec<_>>()
+                )
+            })
+        })
+        .collect();
+    assert!(graphs.len() > 1000, "{} oracle graphs", graphs.len());
+    assert!(failures.is_empty(), "M1 violated:\n{}", failures.join("\n"));
 }

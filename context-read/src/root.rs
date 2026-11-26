@@ -13,6 +13,7 @@ use context_trace::{
     Token,
     positioned::{
         Candidates,
+        CompositionRead as _,
         GraphEdit,
         GraphRead,
         HasGraph,
@@ -52,6 +53,14 @@ pub enum Commit {
     InPlace,
     /// A new editable root was created (`GraphEdit::create`).
     NewRoot,
+}
+
+/// The result of [`ReadStage::settle`]: the removals and the number of
+/// vertices stabilized in the same edit.
+#[derive(Debug, Default)]
+pub(crate) struct Settlement {
+    pub(crate) settled: Settled,
+    pub(crate) stabilized: usize,
 }
 
 /// The stage of one read and the root of the input read so far.
@@ -102,7 +111,10 @@ impl<'g> ReadStage<'g> {
     }
 
     /// Apply `span` (table of §3.4) through one `GraphEdit` on the stage;
-    /// its edit record (`None` for `Adopt`, which does not edit).
+    /// its edit record (`None` for `Adopt`, which does not edit) and, when
+    /// the root grew in place, its previous last child, which now ends
+    /// strictly inside the root (event E3 of the cheap stabilization plan
+    /// §3).
     ///
     /// # Panics
     ///
@@ -111,13 +123,13 @@ impl<'g> ReadStage<'g> {
     pub(crate) fn commit(
         &mut self,
         span: Span,
-    ) -> (Commit, Option<Publication<StageIndex>>) {
+    ) -> (Commit, Option<Publication<StageIndex>>, Option<StageIndex>) {
         let Some(root) = self.root else {
             let Span::Append(token) = span else {
                 panic!("{:?} without a root", span);
             };
             self.root = Some(token);
-            return (Commit::Adopt, None);
+            return (Commit::Adopt, None, None);
         };
         let (occurrence, in_place) = match span {
             Span::ReplaceRoot(token) => {
@@ -126,7 +138,7 @@ impl<'g> ReadStage<'g> {
                     "replacement must extend the root"
                 );
                 self.root = Some(token);
-                return (Commit::Adopt, None);
+                return (Commit::Adopt, None, None);
             },
             Span::Append(token) => (
                 Occurrence::new(root.width.0, token),
@@ -149,6 +161,22 @@ impl<'g> ReadStage<'g> {
                 )
             },
         };
+        // By G2 exactly one child occurrence ends at the root's end.
+        let last = if in_place {
+            self.handle
+                .graph()
+                .vertex(root)
+                .and_then(|vertex| {
+                    vertex.node().composite().and_then(|composition| {
+                        composition
+                            .occurrences()
+                            .find(|o| usize::from(o.offset) + o.child.width.0 == root.width.0)
+                    })
+                })
+                .map(|o| o.child.index)
+        } else {
+            None
+        };
         let mut view = self.handle.stage();
         let mut edit = GraphEdit::new(&mut view);
         let result = if in_place {
@@ -167,27 +195,34 @@ impl<'g> ReadStage<'g> {
         } else {
             Commit::NewRoot
         };
-        (kind, Some(publication))
+        (kind, Some(publication), last)
     }
 
     /// Restore invariant (S) after a step (dissolution plan §3.3): dissolve
     /// or discard the staged composites among `candidates` (and their
-    /// cascades) with ≤ 1 parent occurrence, through one `GraphEdit` on the
-    /// stage; the root is renamed if it moved.
+    /// cascades) with ≤ 1 parent occurrence; then stabilize by Rule S′
+    /// (cheap stabilization plan §2.2, §3) from the gained candidates and
+    /// the cascade of every stabilization. One `GraphEdit` on the stage; the
+    /// root is renamed if it moved.
     pub(crate) fn settle(
         &mut self,
         candidates: Candidates,
-    ) -> Settled {
+    ) -> Settlement {
         let Some(mut root) = self.root else {
-            return Settled::default();
+            return Settlement::default();
         };
         let mut view = self.handle.stage();
         let mut edit = GraphEdit::new(&mut view);
-        let settled = edit.settle(candidates, &mut root);
+        let mut settled = edit.settle(candidates, &mut root);
+        let stabilized =
+            edit.stabilize_candidates(std::mem::take(&mut settled.gained), &mut root);
         edit.finish();
         drop(view);
         self.root = Some(root);
-        settled
+        Settlement {
+            settled,
+            stabilized,
+        }
     }
 
     /// Commit the stage; the root translated (`None` for empty input).
@@ -201,8 +236,6 @@ impl<'g> ReadStage<'g> {
 
 #[cfg(test)]
 mod tests {
-    use context_trace::positioned::CompositionRead;
-
     use super::*;
     use crate::tests::fixture;
 
@@ -257,7 +290,9 @@ mod tests {
         assert!(composition(&root, aa).contains(&Occurrence::new(0, a)));
         assert!(composition(&root, aa).contains(&Occurrence::new(1, a)));
 
-        assert_eq!(root.commit(Span::Append(b)).0, Commit::InPlace);
+        // In place: the previous last child `a@1` now ends inside (E3).
+        let (kind, _, last) = root.commit(Span::Append(b));
+        assert_eq!((kind, last), (Commit::InPlace, Some(a.index)));
         let aab = root.token().unwrap();
         assert_eq!((aab.index, aab.width.0), (aa.index, 3));
         assert!(composition(&root, aab).contains(&Occurrence::new(2, b)));

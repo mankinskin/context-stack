@@ -298,14 +298,16 @@ fn trace_scenario(name: &str) -> Vec<Step> {
     steps
 }
 
-/// A step that dissolves and discards nothing.
-fn step(kind: StepKind, commit: Commit, root: usize) -> Step {
+/// A step that dissolves and discards nothing and stabilizes `stabilized`
+/// staged tokens.
+fn step(kind: StepKind, commit: Commit, root: usize, stabilized: usize) -> Step {
     Step {
         kind,
         commit,
         root,
         dissolved: 0,
         discarded: 0,
+        stabilized,
     }
 }
 
@@ -317,10 +319,10 @@ fn seam_overlap_append_steps() {
     assert_eq!(
         trace_scenario("seam_overlap_append"),
         vec![
-            step(Unknown, Adopt, 1),
-            step(Forward(4), NewRoot, 5),
-            step(Expansion { postfix: 3, expansion: 4 }, InPlace, 6),
-            step(Unknown, InPlace, 7),
+            step(Unknown, Adopt, 1, 0),
+            step(Forward(4), NewRoot, 5, 0),
+            step(Expansion { postfix: 3, expansion: 4 }, InPlace, 6, 0),
+            step(Unknown, InPlace, 7, 0),
         ]
     );
 }
@@ -333,24 +335,93 @@ fn accepted_materialization_steps() {
     assert_eq!(
         trace_scenario("accepted_materialization"),
         vec![
-            step(Forward(3), Adopt, 3),
-            step(Forward(3), NewRoot, 6),
-            step(Expansion { postfix: 3, expansion: 4 }, InPlace, 7),
+            step(Forward(3), Adopt, 3, 0),
+            step(Forward(3), NewRoot, 6, 0),
+            step(Expansion { postfix: 3, expansion: 4 }, InPlace, 7, 0),
         ]
     );
 }
 
 /// `aaa`: append `a`; forward `a` (new root `aa`); self-expansion
-/// `a → aa` (`E` is the root), a new root.
+/// `a → aa` (`E` is the root), a new root; `aa` stays unstable: of its
+/// parent occurrences `root@0`, `root@1` only the first ends inside the
+/// root (Rule S′, cheap stabilization plan §2.2).
 #[test]
 fn repeat_aaa_steps() {
     use {Commit::*, StepKind::*};
     assert_eq!(
         trace_scenario("repeat_aaa"),
         vec![
-            step(Unknown, Adopt, 1),
-            step(Forward(1), NewRoot, 2),
-            step(Expansion { postfix: 1, expansion: 2 }, NewRoot, 3),
+            step(Unknown, Adopt, 1, 0),
+            step(Forward(1), NewRoot, 2, 0),
+            step(Expansion { postfix: 1, expansion: 2 }, NewRoot, 3, 0),
+        ]
+    );
+}
+
+
+/// Read `input` into an empty graph; its steps. The committed graph must be
+/// valid.
+fn trace_input(input: &str) -> Vec<Step> {
+    let graph = PositionedGraphRef::default();
+    let (_, steps) = context_read::read_traced(&graph, input.chars());
+    graph.read().validate().unwrap();
+    steps
+}
+
+/// `abcabd`: after the last step `ab` has `root@0` and `root@3`, both
+/// strictly inside the root (Rule S′ (i)): stabilized. `ab@3` ended at the
+/// root's end before `d` was appended in place (event E3).
+#[test]
+fn abcabd_stabilizes_ab() {
+    use {Commit::*, StepKind::*};
+    assert_eq!(
+        trace_input("abcabd"),
+        vec![
+            step(Unknown, Adopt, 1, 0),
+            step(Unknown, NewRoot, 2, 0),
+            step(Unknown, InPlace, 3, 0),
+            step(Forward(2), InPlace, 5, 0),
+            step(Unknown, InPlace, 6, 1),
+        ]
+    );
+}
+
+/// `abcabca`: `abc` is dissolved into `abca` at the last step and `abca`
+/// ends the root (`root@3`, not fixed): nothing is stabilized.
+#[test]
+fn abcabca_stabilizes_nothing() {
+    use {Commit::*, StepKind::*};
+    assert_eq!(
+        trace_input("abcabca"),
+        vec![
+            step(Unknown, Adopt, 1, 0),
+            step(Unknown, NewRoot, 2, 0),
+            step(Unknown, InPlace, 3, 0),
+            step(Forward(3), NewRoot, 6, 0),
+            Step {
+                dissolved: 1,
+                ..step(Expansion { postfix: 3, expansion: 4 }, InPlace, 7, 0)
+            },
+        ]
+    );
+}
+
+/// `abcabcabcx`: appending `x` in place makes `abcabc@3` end inside the
+/// root; with `abcabc@0` it is stabilized, then `abc` by the cascade (its
+/// occurrences in the now stable `abcabc`).
+#[test]
+fn abcabcabcx_stabilizes_by_cascade() {
+    use {Commit::*, StepKind::*};
+    assert_eq!(
+        trace_input("abcabcabcx"),
+        vec![
+            step(Unknown, Adopt, 1, 0),
+            step(Unknown, NewRoot, 2, 0),
+            step(Unknown, InPlace, 3, 0),
+            step(Forward(3), NewRoot, 6, 0),
+            step(Expansion { postfix: 3, expansion: 6 }, NewRoot, 9, 0),
+            step(Unknown, InPlace, 10, 2),
         ]
     );
 }

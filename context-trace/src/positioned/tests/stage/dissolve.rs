@@ -148,19 +148,19 @@ fn commit_detects_a_foreign_edit_after_an_own_atom() {
 }
 
 /// The stage of [`staged_bab_last`].
-struct Slots {
-    ba: Token<StageIndex>,
-    aba: Token<StageIndex>,
-    baba: Token<StageIndex>,
-    bc: Token<StageIndex>,
-    bab: Token<StageIndex>,
+pub(super) struct Slots {
+    pub(super) ba: Token<StageIndex>,
+    pub(super) aba: Token<StageIndex>,
+    pub(super) baba: Token<StageIndex>,
+    pub(super) bc: Token<StageIndex>,
+    pub(super) bab: Token<StageIndex>,
 }
 
 /// On [`base`] plus the committed atom `c`: the insertion of `baba` with
 /// `bab` created last (staged children `ba`, committed child `ab`, staged
 /// parent `baba`, committed parent `abab`), and the parentless `bc` in a
 /// middle slot.
-fn staged_bab_last(
+pub(super) fn staged_bab_last(
     view: &mut OverlayView<'_>,
     n: Names,
     c: Token<StageIndex>,
@@ -190,7 +190,7 @@ fn staged_bab_last(
 
 /// Unlink the children of the parentless staged `vertex` (what
 /// `GraphEdit` does before a removal).
-fn unlink_children(
+pub(super) fn unlink_children(
     view: &mut OverlayView<'_>,
     vertex: StageIndex,
 ) {
@@ -203,7 +203,7 @@ fn unlink_children(
     }
 }
 
-fn composition(
+pub(super) fn composition(
     view: &OverlayView<'_>,
     vertex: StageIndex,
 ) -> Vec<Occurrence<StageIndex>> {
@@ -216,7 +216,7 @@ fn composition(
         .collect()
 }
 
-fn parents(
+pub(super) fn parents(
     view: &OverlayView<'_>,
     vertex: StageIndex,
 ) -> Vec<(StageIndex, usize)> {
@@ -354,7 +354,8 @@ fn assert_same(
     assert!(difference.is_empty(), "{difference}");
 }
 
-/// One `settle` edit, as the reader runs it after every step.
+/// One `settle` edit, as the reader runs it after every step; its counts
+/// (the gained candidates are checked in `stable.rs`).
 fn settle(
     view: &mut OverlayView<'_>,
     candidates: Candidates,
@@ -363,7 +364,14 @@ fn settle(
     let mut edit = GraphEdit::new(view);
     let settled = edit.settle(candidates, root);
     edit.finish();
-    settled
+    counts(settled)
+}
+
+fn counts(settled: Settled) -> Settled {
+    Settled {
+        gained: Vec::new(),
+        ..settled
+    }
 }
 
 /// The tokens of [`abcabca`] before the last `settle`.
@@ -795,6 +803,7 @@ fn settle_reproduces_the_abcabca_walkthrough() {
             dissolved: 1,
             discarded: 0,
             into_root: 0,
+            gained: Vec::new(),
         }
     );
     assert_eq!(root, before, "the root did not move");
@@ -833,7 +842,7 @@ fn settle_cascades_into_a_committed_host() {
     candidates.push(aba.index);
     candidates.push(bab.index);
     let mut edit = GraphEdit::new(&mut view);
-    let settled = edit.settle(candidates, &mut root);
+    let settled = counts(edit.settle(candidates, &mut root));
     let publication = edit.finish();
     assert_eq!(
         settled,
@@ -842,6 +851,7 @@ fn settle_cascades_into_a_committed_host() {
             dissolved: 3,
             discarded: 0,
             into_root: 0,
+            gained: Vec::new(),
         }
     );
     assert_eq!(root, lift(n.ababab));
@@ -905,6 +915,7 @@ fn settle_renames_a_moved_root() {
             dissolved: 2,
             discarded: 0,
             into_root: 0,
+            gained: Vec::new(),
         }
     );
     assert_eq!(root, Token::new(staged(0), 7));
@@ -976,6 +987,7 @@ fn settle_counts_dissolutions_into_the_root_and_discards() {
             dissolved: 1,
             discarded: 1,
             into_root: 1,
+            gained: Vec::new(),
         }
     );
     // `bb` (s2) is discarded first, then `ba` (s0): the root moves to s0.

@@ -9,16 +9,17 @@
 //! `context-read`.
 //!
 //! The edit itself and its bookkeeping live here, the public operations in
-//! `operations.rs`, dissolution of staged vertices in `dissolve.rs`, the
-//! [`Publication`] record in `publication.rs` and the
-//! store-generic checks shared with `PositionedGraph::validate` in
-//! `check.rs`.
+//! `operations.rs`, dissolution of staged vertices in `dissolve.rs`, early
+//! stabilization by fixed parent occurrences in `stable.rs`, the
+//! [`Publication`] record in `publication.rs` and the store-generic checks
+//! shared with `PositionedGraph::validate` in `check.rs`.
 #![cfg_attr(not(feature = "edit"), allow(dead_code))]
 
 pub(crate) mod check;
 mod dissolve;
 mod operations;
 mod publication;
+mod stable;
 
 pub use self::{
     dissolve::{

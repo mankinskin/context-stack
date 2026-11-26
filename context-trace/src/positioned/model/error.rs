@@ -79,6 +79,10 @@ pub enum PositionedError<I: VertexId = CommittedIndex> {
     /// `vertex` has `count` parent occurrences, which the operation does
     /// not allow (dissolution: exactly one; discard: none; retention: ≥ 2).
     ParentCount { vertex: I, count: usize },
+    /// `vertex` has only `count` (< 2) parent occurrences in fixed
+    /// (committed or stable) parents, so it cannot be stabilized (Rule S,
+    /// cheap stabilization plan §2.2).
+    FixedParentCount { vertex: I, count: usize },
     /// The operation is not allowed on the stage root.
     IsRoot(I),
 }
@@ -163,6 +167,11 @@ impl<I: VertexId> fmt::Display for PositionedError<I> {
             Self::ParentCount { vertex, count } => write!(
                 f,
                 "vertex {} has {count} parent occurrences",
+                Plain(*vertex)
+            ),
+            Self::FixedParentCount { vertex, count } => write!(
+                f,
+                "vertex {} has {count} fixed parent occurrences",
                 Plain(*vertex)
             ),
             Self::IsRoot(vertex) => write!(f, "vertex {} is the root", Plain(*vertex)),

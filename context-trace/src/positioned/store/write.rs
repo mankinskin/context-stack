@@ -19,7 +19,10 @@ pub(crate) mod raw {
         },
         positioned::{
             model::VertexNode,
-            stage::Moved,
+            stage::{
+                Moved,
+                Swap,
+            },
         },
     };
 
@@ -83,6 +86,29 @@ pub(crate) mod raw {
             index: StageIndex,
         ) -> Option<Moved> {
             (**self).remove(seal, index)
+        }
+    }
+
+    /// Stability marks of staged vertices (cheap stabilization plan 20261126).
+    pub trait Stabilize: Remove {
+        /// Mark the unstable staged vertex `index` stable: swap it into the
+        /// first unstable slot (renaming every reference of both swapped
+        /// vertices) and grow the stable prefix by one; `None` if it already
+        /// was in that slot. [`Remove::remove`] panics on a stable slot.
+        fn stabilize(
+            &mut self,
+            seal: Seal,
+            index: StageIndex,
+        ) -> Option<Swap>;
+    }
+
+    impl<T: Stabilize + ?Sized> Stabilize for &mut T {
+        fn stabilize(
+            &mut self,
+            seal: Seal,
+            index: StageIndex,
+        ) -> Option<Swap> {
+            (**self).stabilize(seal, index)
         }
     }
 

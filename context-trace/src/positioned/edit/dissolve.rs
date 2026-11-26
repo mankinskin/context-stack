@@ -21,43 +21,78 @@ use crate::{
         stage::{
             Moved,
             Stage,
+            Swap,
         },
         store::{
+            CompositionRead as _,
             VertexRead,
             raw::SEAL,
         },
     },
 };
 
-/// The vertices whose parent count may have dropped below 2 in one reader
-/// step (§3.3): children of removed occurrences, created tokens and the
-/// previous root.
+/// The candidates of one reader step: the vertices whose parent count may
+/// have dropped below 2 (§3.3: children of removed occurrences, created
+/// tokens and the previous root), and the vertices that may have gained a
+/// fixed parent occurrence (cheap stabilization plan §3: E1 children of
+/// added occurrences and of created tokens, E3 the root's previous last
+/// child, and the previous root).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Candidates(Vec<StageIndex>);
+pub struct Candidates {
+    removal: Vec<StageIndex>,
+    gained: Vec<StageIndex>,
+    /// Created tokens: all their children gained a parent occurrence
+    /// (expanded by `settle`, which reads the compositions).
+    created: Vec<StageIndex>,
+}
 
 impl Candidates {
     /// The children of the `removed` occurrences of `publication` and its
-    /// created tokens.
+    /// created tokens (removal); the children of its `added` occurrences
+    /// and its created tokens with their children (gained, E1).
     pub fn record(
         &mut self,
         publication: &Publication<StageIndex>,
     ) {
-        self.0.extend(publication.edits.iter().flat_map(|edit| {
-            edit.removed.iter().map(|occurrence| occurrence.child.index)
-        }));
-        self.0
+        self.removal
+            .extend(publication.edits.iter().flat_map(|edit| {
+                edit.removed.iter().map(|occurrence| occurrence.child.index)
+            }));
+        self.removal
+            .extend(publication.created.iter().map(|token| token.index));
+        self.gained
+            .extend(publication.edits.iter().flat_map(|edit| {
+                edit.added.iter().map(|occurrence| occurrence.child.index)
+            }));
+        self.created
             .extend(publication.created.iter().map(|token| token.index));
     }
-    /// A vertex that lost its exemption (the previous root).
+    /// A vertex that lost its exemption (the previous root): a candidate
+    /// for removal and for stabilization.
     pub fn push(
         &mut self,
         vertex: StageIndex,
     ) {
-        self.0.push(vertex);
+        self.removal.push(vertex);
+        self.gained.push(vertex);
     }
-    /// The recorded vertices, in recording order (with repeats).
+    /// A vertex that may have gained a fixed parent occurrence without an
+    /// edit record (E3: the root's previous last child after the root grew
+    /// in place).
+    pub fn push_gained(
+        &mut self,
+        vertex: StageIndex,
+    ) {
+        self.gained.push(vertex);
+    }
+    /// The recorded removal candidates, in recording order (with repeats).
     pub fn vertices(&self) -> &[StageIndex] {
-        &self.0
+        &self.removal
+    }
+    /// The recorded gained candidates (E1 without the children of created
+    /// tokens, E3), in recording order (with repeats).
+    pub fn gained(&self) -> &[StageIndex] {
+        &self.gained
     }
 }
 
@@ -76,8 +111,8 @@ pub struct Removal {
     pub moved: Option<Moved>,
 }
 
-/// Counts of one [`GraphEdit::settle`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Counts of one [`GraphEdit::settle`] and the surviving gained candidates.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Settled {
     /// Distinct candidates given.
     pub candidates: usize,
@@ -85,6 +120,12 @@ pub struct Settled {
     pub discarded: usize,
     /// Dissolutions whose host was the root.
     pub into_root: usize,
+    /// The staged gained candidates (E1, E3, previous root) renamed through
+    /// every removal, without the removed vertices, plus the surviving
+    /// created tokens with their children and the children of every
+    /// dissolution (E1); sorted and deduplicated. The input of
+    /// [`GraphEdit::stabilize_candidates`].
+    pub gained: Vec<StageIndex>,
 }
 
 impl<S: Stage + ?Sized> GraphEdit<'_, S> {
@@ -154,7 +195,9 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
     /// Restore invariant (S) (§3.3): dissolve or discard every staged
     /// composite other than `root` with ≤ 1 parent occurrence, starting from
     /// `candidates` and continuing with the children of removed vertices.
-    /// `root` is renamed when it is moved.
+    /// `root` is renamed when it is moved. The gained candidates are
+    /// renamed along and returned in [`Settled::gained`], with the children
+    /// of the surviving created tokens and of every dissolution (E1).
     ///
     /// # Panics
     /// If a removal fails, and (debug and `test-api` builds) if a staged
@@ -165,15 +208,29 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
         candidates: Candidates,
         root: &mut Token<StageIndex>,
     ) -> Settled {
-        let mut work = candidates.0;
+        let Candidates {
+            removal: mut work,
+            mut gained,
+            mut created,
+        } = candidates;
         work.sort();
         work.dedup();
+        gained.sort();
+        gained.dedup();
         let mut settled = Settled {
             candidates: work.len(),
             ..Settled::default()
         };
         while let Some(t) = work.pop() {
             if !t.is_staged() || t == root.index {
+                continue;
+            }
+            if self.graph.is_stable(t) {
+                debug_assert!(
+                    expect_vertex(&*self.graph, t)
+                        .is_ok_and(|vertex| vertex.parent_count() >= 2),
+                    "stable {t} lost its parent occurrences"
+                );
                 continue;
             }
             let count = expect_vertex(&*self.graph, t)
@@ -192,8 +249,10 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
             }
             .unwrap_or_else(|error| panic!("settle: {error}"));
             work.retain(|&i| i != t);
+            gained.retain(|&i| i != t);
+            created.retain(|&i| i != t);
             if let Some(moved) = removal.moved {
-                for index in &mut work {
+                for index in work.iter_mut().chain(&mut gained).chain(&mut created) {
                     *index = moved.apply(*index);
                 }
                 root.index = moved.apply(root.index);
@@ -201,8 +260,25 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
             if removal.host == Some(root.index) {
                 settled.into_root += 1;
             }
+            if removal.host.is_some() {
+                // E1: the children of `t` were added to the host.
+                gained.extend(&removal.children);
+            }
             work.extend(removal.children);
         }
+        for vertex in created {
+            if let Some(composition) = expect_vertex(&*self.graph, vertex)
+                .ok()
+                .and_then(|vertex| vertex.node().composite())
+            {
+                gained.extend(composition.occurrences().map(|c| c.child.index));
+            }
+            gained.push(vertex);
+        }
+        gained.retain(|index| index.is_staged());
+        gained.sort();
+        gained.dedup();
+        settled.gained = gained;
         #[cfg(any(debug_assertions, feature = "test-api"))]
         self.assert_settled(root.index);
         settled
@@ -264,25 +340,77 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
         children: &[Occurrence<StageIndex>],
     ) -> Removal {
         let moved = self.graph.remove(SEAL, t);
+        self.touched.remove(&t);
+        self.created.retain(|token| token.index != t);
+        self.edits.remove(&t);
+        for edit in self.edits.values_mut() {
+            for occurrences in [&mut edit.added, &mut edit.removed] {
+                occurrences.retain(|o| o.child.index != t);
+            }
+        }
         let rename =
             |index: StageIndex| moved.map_or(index, |m| m.apply(index));
-        self.touched.remove(&t);
+        if moved.is_some() {
+            self.rename_records(rename);
+        }
+        Removal {
+            removed: t,
+            host: host.map(rename),
+            children: children.iter().map(|c| rename(c.child.index)).collect(),
+            moved,
+        }
+    }
+
+    /// Apply a stabilization's swap to `touched`, `created` and `edits` in
+    /// place (only the entries of the two swapped vertices move).
+    pub(super) fn swap_records(
+        &mut self,
+        swap: Swap,
+    ) {
+        let (a, b) = (self.touched.remove(&swap.a), self.touched.remove(&swap.b));
+        if a {
+            self.touched.insert(swap.b);
+        }
+        if b {
+            self.touched.insert(swap.a);
+        }
+        for token in &mut self.created {
+            token.index = swap.apply(token.index);
+        }
+        let moved: Vec<_> = [swap.a, swap.b]
+            .into_iter()
+            .filter_map(|vertex| self.edits.remove(&vertex))
+            .collect();
+        for mut edit in moved {
+            edit.vertex = swap.apply(edit.vertex);
+            self.edits.insert(edit.vertex, edit);
+        }
+        for edit in self.edits.values_mut() {
+            for occurrence in edit.added.iter_mut().chain(&mut edit.removed) {
+                occurrence.child.index = swap.apply(occurrence.child.index);
+            }
+        }
+    }
+
+    /// Apply a renaming of staged indices (a removal's [`Moved`]) to
+    /// `touched`, `created` and `edits`.
+    pub(super) fn rename_records(
+        &mut self,
+        rename: impl Fn(StageIndex) -> StageIndex,
+    ) {
         self.touched = std::mem::take(&mut self.touched)
             .into_iter()
-            .map(rename)
+            .map(&rename)
             .collect();
-        self.created.retain(|token| token.index != t);
         for token in &mut self.created {
             token.index = rename(token.index);
         }
-        self.edits.remove(&t);
         self.edits = std::mem::take(&mut self.edits)
             .into_iter()
             .map(|(vertex, mut edit)| {
                 let vertex = rename(vertex);
                 edit.vertex = vertex;
                 for occurrences in [&mut edit.added, &mut edit.removed] {
-                    occurrences.retain(|o| o.child.index != t);
                     for occurrence in occurrences.iter_mut() {
                         occurrence.child.index = rename(occurrence.child.index);
                     }
@@ -290,11 +418,5 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
                 (vertex, edit)
             })
             .collect();
-        Removal {
-            removed: t,
-            host: host.map(rename),
-            children: children.iter().map(|c| rename(c.child.index)).collect(),
-            moved,
-        }
     }
 }

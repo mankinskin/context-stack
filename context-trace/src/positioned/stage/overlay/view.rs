@@ -33,6 +33,7 @@ use crate::{
         stage::{
             Moved,
             Stage,
+            Swap,
         },
         store::{
             Generation,
@@ -219,6 +220,10 @@ impl<G: GraphKind> raw::Remove for OverlayView<'_, G> {
             .unwrap_or_else(|| panic!("committed vertex {index} cannot be removed"))
             .slot();
         let stage = &mut *self.stage;
+        assert!(
+            slot >= stage.stable,
+            "stable vertex {index} cannot be removed"
+        );
         debug_assert!(
             stage.vertices[slot].parents.is_empty(),
             "removed vertex {index} has parents"
@@ -245,33 +250,45 @@ impl<G: GraphKind> raw::Remove for OverlayView<'_, G> {
             from: StagedIndex::new(last).into(),
             to: index,
         };
-        let vertex = &stage.vertices[slot];
-        let children: Vec<StageIndex> = match &vertex.node {
-            VertexNode::Composite(composition) => composition.children().collect(),
-            VertexNode::Atom(_) => Vec::new(),
-        };
-        let parents: Vec<StageIndex> = vertex.parents.keys().copied().collect();
-        for child in children {
-            let links = stage
-                .links_mut(child)
-                .expect("a child links to its staged parent");
-            if let Some(offsets) = links.remove(&moved.from) {
-                links.insert(moved.to, offsets);
-            }
-        }
-        for parent in parents {
-            let composition = stage
-                .composition_mut(parent)
-                .expect("a parent of a staged vertex has a staged composition");
-            *composition = composition.clone().map_index(|child| moved.apply(child));
-        }
+        stage.rename(&[moved.to], |index| moved.apply(index));
         Some(moved)
+    }
+}
+
+impl<G: GraphKind> raw::Stabilize for OverlayView<'_, G> {
+    fn stabilize(
+        &mut self,
+        _: Seal,
+        index: StageIndex,
+    ) -> Option<Swap> {
+        let slot = index
+            .staged()
+            .unwrap_or_else(|| panic!("committed vertex {index} cannot be stabilized"))
+            .slot();
+        let stage = &mut *self.stage;
+        assert!(slot >= stage.stable, "{index} is already stable");
+        let target = stage.stable;
+        stage.stable += 1;
+        stage.generation += 1;
+        if slot == target {
+            return None;
+        }
+        stage.vertices.swap(slot, target);
+        let swap = Swap {
+            a: index,
+            b: StagedIndex::new(target).into(),
+        };
+        stage.rename(&[swap.a, swap.b], |index| swap.apply(index));
+        Some(swap)
     }
 }
 
 impl<G: GraphKind> Stage for OverlayView<'_, G> {
     fn staged(&self) -> impl Iterator<Item = StagedIndex> + '_ {
         (0..self.stage.vertices.len()).map(StagedIndex::new)
+    }
+    fn stable(&self) -> usize {
+        self.stage.stable
     }
 }
 

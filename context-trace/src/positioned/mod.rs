@@ -20,7 +20,8 @@
 //!   and [`PositionedGraphRef`]) implements them (`committed/access.rs`);
 //! - `edit/`: `GraphEdit`, the only mutation layer, with its
 //!   `Publication` record, the dissolution of staged vertices
-//!   ([`Candidates`], [`Removal`], [`Settled`]) and the store-generic
+//!   ([`Candidates`], [`Removal`], [`Settled`]), early stabilization by
+//!   fixed parent occurrences ([`Swap`]) and the store-generic
 //!   checks;
 //! - `stage/`: a read edits a stage ([`Stage`], [`StageHandle`],
 //!   `stage/mod.rs`); the overlay stage ([`OverlayHandle`], [`OverlayView`],
@@ -101,6 +102,7 @@ pub use self::{
         Moved,
         Stage,
         StageHandle,
+        Swap,
         Translation,
         overlay::{
             Lifted,

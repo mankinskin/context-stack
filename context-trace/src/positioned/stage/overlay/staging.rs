@@ -25,6 +25,7 @@ use crate::{
     graph::vertex::{
         CommittedIndex,
         StageIndex,
+        VertexId as _,
         VertexIndex,
     },
     positioned::{
@@ -148,9 +149,13 @@ pub(super) struct BaseDelta {
 /// The staged part of an overlay (staging plan §4.1).
 #[derive(Clone, Debug)]
 pub struct StagingGraph<G: GraphKind = BaseGraphKind> {
-    /// By [`StagedIndex`](crate::graph::vertex::StagedIndex), in slot order: creation order until a removal
-    /// moves the last vertex into the freed slot.
+    /// By [`StagedIndex`](crate::graph::vertex::StagedIndex), in slot order
+    /// (not creation order: removals and stabilizations move vertices); the
+    /// first [`Self::stable`] are stable.
     pub(super) vertices: Vec<StagedVertex<G>>,
+    /// Length of the stable slot prefix (cheap stabilization plan
+    /// 20261126): stable vertices are never removed.
+    pub(super) stable: usize,
     /// Copy-on-write compositions and link deltas of committed vertices.
     pub(super) deltas: StageMap<CommittedIndex, BaseDelta>,
     /// Generation of the base when the stage was opened.
@@ -163,6 +168,7 @@ impl<G: GraphKind> StagingGraph<G> {
     pub(super) fn new(base_generation: u64) -> Self {
         Self {
             vertices: Vec::new(),
+            stable: 0,
             deltas: StageMap::default(),
             base_generation,
             generation: 0,
@@ -199,6 +205,47 @@ impl<G: GraphKind> StagingGraph<G> {
                     VertexNode::Composite(composition) => Some(composition),
                     VertexNode::Atom(_) => None,
                 },
+        }
+    }
+    /// Rename every reference to the staged `vertices` after they changed
+    /// slots: `vertices` are their new indices, `rename` maps every old index
+    /// to its new one (a permutation, identity elsewhere). The references
+    /// are the parent links of their children (staged: own links;
+    /// committed: the delta's `added`) and the compositions of their parents
+    /// (staged: own node; committed: the delta's composition). The sites are
+    /// collected first and each is renamed once, so vertices referencing
+    /// each other are renamed correctly.
+    pub(super) fn rename(
+        &mut self,
+        vertices: &[StageIndex],
+        rename: impl Fn(StageIndex) -> StageIndex,
+    ) {
+        let mut children = BTreeSet::new();
+        let mut parents = BTreeSet::new();
+        for vertex in vertices {
+            let staged = &self.vertices[vertex
+                .staged()
+                .expect("only staged vertices move")
+                .slot()];
+            if let VertexNode::Composite(composition) = &staged.node {
+                children.extend(composition.children());
+            }
+            parents.extend(staged.parents.keys().copied());
+        }
+        for child in children {
+            let links = self
+                .links_mut(rename(child))
+                .expect("a child links to its staged parent");
+            *links = std::mem::take(links)
+                .into_iter()
+                .map(|(parent, offsets)| (rename(parent), offsets))
+                .collect();
+        }
+        for parent in parents {
+            let composition = self
+                .composition_mut(rename(parent))
+                .expect("a parent of a staged vertex has a staged composition");
+            *composition = composition.map_index(&rename);
         }
     }
     /// Push every staged vertex and apply every delta to `base`
