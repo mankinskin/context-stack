@@ -11,10 +11,20 @@ use context_trace::{
 };
 use std::collections::{BTreeSet, HashMap};
 
+use crate::{
+    DirectedKey,
+    DownPosition,
+    SpanCoverage,
+    UpPosition,
+};
 use context_trace::{
+    AtomPosition,
     graph::vertex::VertexIndex,
-    positioned::{fixtures::FixtureGraph, OccurrenceLocation, SpanCoverage},
-    AtomPosition, DirectedKey, DownPosition, Token, UpPosition,
+    positioned::{
+        fixtures::FixtureGraph,
+        OccurrenceLocation,
+    },
+    Token,
 };
 use pretty_assertions::assert_eq;
 
@@ -76,12 +86,12 @@ fn edge(parent: &DirectedKey, child: &DirectedKey, offset: AtomPosition) -> Stri
 /// Every cache edge, with absolute query positions shifted by `-shift`.
 pub(super) fn cache_edges(response: &Response, shift: usize) -> Edges {
     let shifted = |key: &DirectedKey| {
-        let p = pos(**context_trace::HasAtomPosition::pos(&key.pos) - shift);
+        let p = pos(**crate::HasAtomPosition::pos(&key.pos) - shift);
         match key.pos {
-            context_trace::DirectedPosition::BottomUp(_) => {
+            crate::DirectedPosition::BottomUp(_) => {
                 DirectedKey::up(key.index, UpPosition(p))
             }
-            context_trace::DirectedPosition::TopDown(_) => {
+            crate::DirectedPosition::TopDown(_) => {
                 DirectedKey::down(key.index, DownPosition(p))
             }
         }
@@ -310,7 +320,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
             *offset
         );
         match parent.pos {
-            context_trace::DirectedPosition::BottomUp(_) => assert!(
+            crate::DirectedPosition::BottomUp(_) => assert!(
                 graph
                     .vertex_data(child.index.index)
                     .unwrap()
@@ -319,7 +329,7 @@ pub(super) fn validate(oracle: &Oracle, query: &str, query_start: usize, respons
                     .is_some_and(|offsets| offsets.contains(&offset)),
                 "{ctx}: up edge is a parent link"
             ),
-            context_trace::DirectedPosition::TopDown(_) => assert!(
+            crate::DirectedPosition::TopDown(_) => assert!(
                 graph
                     .vertex(parent.index.index)
                     .unwrap()

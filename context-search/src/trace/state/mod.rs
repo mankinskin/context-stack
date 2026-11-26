@@ -2,11 +2,11 @@
 
 pub mod parent;
 
-use crate::{
+use context_trace::{
     AtomPosition,
-    Token,
     graph::vertex::VertexId,
-    positioned::store::GraphRead,
+    positioned::GraphRead,
+    Token,
 };
 use parent::ParentState;
 

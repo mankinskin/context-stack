@@ -2,19 +2,17 @@
 //!
 //! As in legacy, `atom_position` is the query position at the end of the
 //! leaf (the number of query atoms consumed once the leaf is matched). It is
-//! kept equal to [`QueryPath::leaf_end`](context_trace::positioned::RolePath::leaf_end) by every operation here.
+//! kept equal to [`QueryPath::leaf_end`](crate::RolePath::leaf_end) by every operation here.
 
 use std::{
     marker::PhantomData,
     ops::ControlFlow,
 };
 
+use crate::QueryPath;
 use context_trace::{
-    positioned::{
-        GraphRead,
-        QueryPath,
-    },
     CommittedIndex,
+    positioned::GraphRead,
     VertexId,
 };
 
@@ -41,7 +39,7 @@ impl<S: CursorState, I: VertexId> PathCursor<QueryPath<I>, S> {
         self.atom_position
     }
     /// Move to the largest query token starting at the leaf end
-    /// ([`RolePath::advance_leaf`](context_trace::positioned::RolePath::advance_leaf)).
+    /// ([`RolePath::advance_leaf`](crate::RolePath::advance_leaf)).
     /// `Break` (unchanged) at the query end.
     pub fn advance<G: GraphRead<Index = I> + ?Sized>(
         &mut self,

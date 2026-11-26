@@ -2,13 +2,15 @@
 //! to 7 steps per side, checked step by step together with the traced
 //! cache edges. Vertices are addressed through the fixture name map.
 
-use context_trace::{
-    positioned::SpanCoverage,
-    AtomPosition,
+use crate::{
     DirectedKey,
     DownPosition,
-    Token,
+    SpanCoverage,
     UpPosition,
+};
+use context_trace::{
+    AtomPosition,
+    Token,
 };
 use pretty_assertions::assert_eq;
 

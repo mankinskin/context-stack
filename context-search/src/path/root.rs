@@ -6,20 +6,22 @@ use std::{
     hash::Hash,
 };
 
-use crate::{
+use context_trace::{
     AtomPosition,
-    Token,
-    TokenWidth,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
-        wide::Wide,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+            wide::Wide,
+        },
     },
     positioned::{
         check::expect_token,
-        model::OccurrenceLocation,
-        store::GraphRead,
+        GraphRead,
+        OccurrenceLocation,
     },
+    Token,
+    TokenWidth,
 };
 
 /// Root of a [`RolePath`](super::RolePath).

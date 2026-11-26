@@ -3,8 +3,8 @@
 
 use std::marker::PhantomData;
 
+use crate::ChildState;
 use context_trace::{
-    positioned::ChildState,
     CommittedIndex,
     VertexId,
 };

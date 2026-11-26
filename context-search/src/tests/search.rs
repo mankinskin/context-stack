@@ -3,9 +3,18 @@
 //! Expectations come from the fixture strings via the name map.
 
 use context_trace::positioned::GraphRead;
+use crate::{
+    DirectedKey,
+    DirectedPosition,
+    DownPosition,
+    HasAtomPosition,
+    SpanCoverage,
+    UpPosition,
+};
 use context_trace::{
-    positioned::{fixtures::FixtureGraph, SpanCoverage},
-    AtomPosition, DirectedKey, DirectedPosition, DownPosition, HasAtomPosition, Token, UpPosition,
+    AtomPosition,
+    positioned::fixtures::FixtureGraph,
+    Token,
 };
 use pretty_assertions::assert_eq;
 

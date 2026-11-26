@@ -5,14 +5,14 @@ use std::ops::Range;
 
 #[cfg(any(test, feature = "test-api"))]
 use context_trace::positioned::OccurrenceLocation;
+use crate::{
+    QueryAnchor,
+    TraceCache,
+};
 use context_trace::{
-    positioned::{
-        Generation,
-        QueryAnchor,
-        TraceCache,
-    },
     AtomPosition,
     CommittedIndex,
+    positioned::Generation,
     Token,
     VertexId,
 };

@@ -14,29 +14,31 @@
 
 use std::ops::Range;
 
-use context_trace::{
-    positioned::{
-        ChildState,
-        End,
-        EndPath,
-        GraphRead,
-        Navigate,
-        PostfixCommand,
-        PrefixCommand,
-        QueryAnchor,
-        RangeCommand,
-        RangePath,
-        SpanCoverage,
-        StartPath,
-        TraceCtx,
-        Traceable,
-    },
-    AtomPosition,
-    CommittedIndex,
+use crate::{
+    ChildState,
     DownKey,
     DownPosition,
-    Token,
+    End,
+    EndPath,
+    PostfixCommand,
+    PrefixCommand,
+    QueryAnchor,
+    RangeCommand,
+    RangePath,
+    SpanCoverage,
+    StartPath,
+    Traceable,
+    TraceCtx,
     UpPosition,
+};
+use context_trace::{
+    AtomPosition,
+    CommittedIndex,
+    positioned::{
+        GraphRead,
+        Navigate,
+    },
+    Token,
     VertexId,
 };
 

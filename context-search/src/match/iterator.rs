@@ -1,12 +1,12 @@
 //! Search iterator (legacy `match/iterator.rs`): pops queue nodes until a
 //! root matches.
 
+use crate::{
+    TraceCache,
+    TraceCtx,
+};
 use context_trace::{
-    positioned::{
-        GraphRead,
-        TraceCache,
-        TraceCtx,
-    },
+    positioned::GraphRead,
     Token,
     VertexId,
 };

@@ -1,10 +1,8 @@
 //! Comparison inside one root (legacy `compare/iterator.rs`): decompose
 //! until the first match or mismatch.
 
-use context_trace::positioned::{
-    trace::child::ChildQueue,
-    GraphRead,
-};
+use crate::trace::child::ChildQueue;
+use context_trace::positioned::GraphRead;
 
 use crate::{
     compare::state::{

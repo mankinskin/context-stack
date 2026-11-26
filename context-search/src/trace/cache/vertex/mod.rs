@@ -7,12 +7,16 @@ use positions::DirectedPositions;
 use crate::{
     DirectedPosition,
     HasAtomPosition,
-    Token,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
+    trace::cache::position::PositionCache,
+};
+use context_trace::{
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+        },
     },
-    positioned::trace::cache::position::PositionCache,
+    Token,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]

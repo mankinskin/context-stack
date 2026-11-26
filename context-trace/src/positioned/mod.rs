@@ -30,8 +30,9 @@
 //! - `interchange`: content-keyed snapshots, with conversion (feature
 //!   `interchange`), `diff` and `fixtures` in `test-api` builds;
 //! - `committed/serde.rs` (feature `serde`): validated (de)serialization of
-//!   [`PositionedGraph`];
-//! - `path` and `trace`: search paths and trace states (below).
+//!   [`PositionedGraph`], `committed/table.rs`: table construction;
+//! - `check`: store-generic structural checks (hidden; shared with the
+//!   higher crates).
 //!
 //! Read-only navigation (reader plan Phase 2) is split into separate APIs:
 //! - content reading (debug and `test-api` builds):
@@ -40,9 +41,8 @@
 //!   `store/navigate.rs`): `start_at`, `end_at`, `prefix_child`,
 //!   `postfix_child`, `prefixes`, `postfixes`, `parent_occurrences`,
 //!   `advance_end_path`; atoms through [`GraphRead::atom`];
-//! - search paths (role-generic [`RolePath`] with aliases [`StartPath`],
-//!   [`EndPath`], [`QueryPath`]; [`RangePath`], `path/`) and trace states / trace cache ([`ParentState`],
-//!   [`ChildState`], [`TraceCache`], `trace/`), search plan 2.2.
+//! - search paths, trace states, trace cache and cache keys live in
+//!   `context_search::{path, trace}` (search plan 2.2).
 
 #[doc(hidden)]
 pub mod check;
@@ -50,10 +50,8 @@ mod committed;
 mod edit;
 pub mod interchange;
 mod model;
-pub mod path;
 mod stage;
 mod store;
-pub mod trace;
 
 #[cfg(any(test, feature = "test-api"))]
 pub use self::interchange::{
@@ -134,46 +132,6 @@ pub use self::{
         VertexRead,
         VertexState,
         string_repr,
-    },
-    path::{
-        End,
-        EndPath,
-        HasRolePath,
-        PathRole,
-        PathRoot,
-        QueryPath,
-        QueryRoot,
-        RangePath,
-        RolePath,
-        SpanCoverage,
-        Start,
-        StartPath,
-    },
-    trace::{
-        QueryAnchor,
-        TraceCtx,
-        cache::{
-            TraceCache,
-            position::PositionCache,
-            vertex::VertexCache,
-        },
-        child::{
-            ChildState,
-            RootChildState,
-        },
-        state::{
-            IntoParentState,
-            StateAdvance,
-            parent::ParentState,
-        },
-        TraceDirection,
-        traceable::{
-            PostfixCommand,
-            PrefixCommand,
-            RangeCommand,
-            TraceCommand,
-            Traceable,
-        },
     },
 };
 

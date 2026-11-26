@@ -1,11 +1,13 @@
 //! Compare states (legacy `compare/state/core.rs`): a query cursor and a
 //! child cursor inside one root, each with a checkpoint.
 
-use context_trace::{
-    positioned::trace::child::ChildQueue,
-    CommittedIndex,
+use crate::{
     DownKey,
     DownPosition,
+    trace::child::ChildQueue,
+};
+use context_trace::{
+    CommittedIndex,
     VertexId,
 };
 

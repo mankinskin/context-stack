@@ -25,7 +25,7 @@ use crate::{
     DerefMut,
     Default,
 )]
-pub struct AtomPosition(pub(crate) usize);
+pub struct AtomPosition(pub usize);
 
 impl From<TokenWidth> for AtomPosition {
     fn from(width: TokenWidth) -> Self {

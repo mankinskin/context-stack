@@ -9,7 +9,7 @@
 //!   root ([`Navigate::start_at`](super::Navigate::start_at) /
 //!   [`Navigate::end_at`](super::Navigate::end_at)), trace
 //!   direction and trace key positions;
-//! - [`PathRoot`] (`root.rs`): a graph [`Token`](crate::Token) or a
+//! - [`PathRoot`] (`root.rs`): a graph [`Token`](context_trace::Token) or a
 //!   [`QueryRoot`] (token-sequence query; its next root child is the next
 //!   pattern token);
 //! - [`RolePath<R, Root>`] (`role_path.rs`): one path struct with the

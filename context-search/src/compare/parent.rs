@@ -1,15 +1,15 @@
 //! Parent candidates (legacy `compare/parent.rs`): a parent state paired
 //! with the query cursor, entered at the next graph token.
 
-use context_trace::{
-    positioned::{
-        GraphRead,
-        ParentState,
-        StateAdvance,
-    },
-    CommittedIndex,
+use crate::{
     DownKey,
     DownPosition,
+    ParentState,
+    StateAdvance,
+};
+use context_trace::{
+    CommittedIndex,
+    positioned::GraphRead,
     VertexId,
 };
 use derive_more::{

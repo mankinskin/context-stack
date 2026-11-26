@@ -4,26 +4,28 @@
 //! key positions ([`PathRole::trace_pos`]).
 
 use crate::{
+    path::{
+        PathRole,
+        RolePath,
+    },
+    trace::{
+        cache::{
+            EditKind,
+            NewTraceEdge,
+        },
+        QueryAnchor,
+        TraceCtx,
+        TraceDirection,
+    },
+};
+use context_trace::{
     AtomPosition,
-    Token,
     graph::vertex::wide::Wide,
     positioned::{
         check::expect_token,
-        path::{
-            PathRole,
-            RolePath,
-        },
-        store::GraphRead,
-        trace::{
-            QueryAnchor,
-            TraceCtx,
-            TraceDirection,
-            cache::{
-                EditKind,
-                NewTraceEdge,
-            },
-        },
+        GraphRead,
     },
+    Token,
 };
 
 /// Edges along `path` including the root edge, in trace order (bottom-up

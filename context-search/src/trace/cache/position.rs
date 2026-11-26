@@ -1,14 +1,16 @@
 //! Per-position cache entry (legacy `cache::position`).
 
-use crate::{
+use crate::DirectedKey;
+use context_trace::{
     AtomPosition,
-    DirectedKey,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+        },
+    },
     HashMap,
     HashSet,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
-    },
 };
 
 /// Child key → child offset in this vertex.

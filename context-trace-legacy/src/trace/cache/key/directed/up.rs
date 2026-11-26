@@ -6,7 +6,11 @@ use std::ops::{
 use derive_more::derive::From;
 use derive_new::new;
 
-use crate::{
+use super::{
+    HasAtomPosition,
+    down::DownPosition,
+};
+use context_trace::{
     AtomPosition,
     graph::vertex::{
         id::{
@@ -15,10 +19,6 @@ use crate::{
         },
         token::Token,
         wide::Wide,
-    },
-    key::{
-        HasAtomPosition,
-        down::DownPosition,
     },
     logging::compact_format::CompactFormat,
     TokenWidth,

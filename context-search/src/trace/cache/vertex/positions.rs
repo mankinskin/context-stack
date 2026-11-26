@@ -6,14 +6,16 @@ use derive_more::derive::{
     IntoIterator,
 };
 
-use crate::{
+use crate::trace::cache::position::PositionCache;
+use context_trace::{
     AtomPosition,
-    HashMap,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+        },
     },
-    positioned::trace::cache::position::PositionCache,
+    HashMap,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, IntoIterator, Deref, DerefMut)]

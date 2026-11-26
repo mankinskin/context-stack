@@ -19,23 +19,23 @@ use super::{
         QueryRoot,
     },
 };
-use crate::{
+use context_trace::{
     AtomPosition,
-    Token,
-    TokenWidth,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
-        wide::Wide,
-    },
-    positioned::{
-        model::OccurrenceLocation,
-        store::{
-            GraphRead,
-            Located,
-            Navigate,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+            wide::Wide,
         },
     },
+    positioned::{
+        GraphRead,
+        Located,
+        Navigate,
+        OccurrenceLocation,
+    },
+    Token,
+    TokenWidth,
 };
 
 /// Path of role `R` from `root` down to `leaf`.

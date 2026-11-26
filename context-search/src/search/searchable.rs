@@ -5,15 +5,13 @@
 //! [`Response`]) continues right after its checkpoint, without re-reading
 //! earlier query positions.
 
+use crate::QueryPath;
 use context_trace::{
-    positioned::{
-        GraphRead,
-        QueryPath,
-    },
     CommittedIndex,
     GraphKind,
-    ToToken,
+    positioned::GraphRead,
     Token,
+    ToToken,
     VertexId,
 };
 

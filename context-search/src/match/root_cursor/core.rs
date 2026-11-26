@@ -3,12 +3,10 @@
 
 use std::collections::VecDeque;
 
+use crate::trace::state::parent::ParentBatch;
 use context_trace::{
-    positioned::{
-        trace::state::parent::ParentBatch,
-        GraphRead,
-    },
     CommittedIndex,
+    positioned::GraphRead,
     VertexId,
 };
 use derive_more::{

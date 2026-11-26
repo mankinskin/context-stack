@@ -15,31 +15,33 @@ use derive_more::{
 };
 
 use crate::{
-    AtomPosition,
     DirectedKey,
     DownPosition,
-    Token,
-    UpKey,
-    UpPosition,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
-    },
-    positioned::{
-        path::RangePath,
-        store::GraphRead,
-        trace::{
-            QueryAnchor,
-            cache::{
-                RootKey,
-                TargetKey,
-            },
-            state::{
-                StateAdvance,
-                parent::ParentState,
-            },
+    path::RangePath,
+    trace::{
+        cache::{
+            RootKey,
+            TargetKey,
+        },
+        QueryAnchor,
+        state::{
+            parent::ParentState,
+            StateAdvance,
         },
     },
+    UpKey,
+    UpPosition,
+};
+use context_trace::{
+    AtomPosition,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+        },
+    },
+    positioned::GraphRead,
+    Token,
 };
 
 /// A child state together with the parent state it was entered from.

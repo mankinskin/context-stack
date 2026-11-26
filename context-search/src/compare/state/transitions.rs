@@ -4,11 +4,9 @@
 
 use std::ops::ControlFlow;
 
+use crate::StateAdvance;
 use context_trace::{
-    positioned::{
-        GraphRead,
-        StateAdvance,
-    },
+    positioned::GraphRead,
     VertexId,
 };
 

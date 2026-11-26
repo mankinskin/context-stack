@@ -10,7 +10,7 @@ use std::{
     },
 };
 
-use crate::{
+use context_trace::{
     AtomPosition,
     TokenWidth,
     graph::vertex::{

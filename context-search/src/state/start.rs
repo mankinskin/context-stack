@@ -3,11 +3,9 @@
 
 use std::marker::PhantomData;
 
+use crate::ParentState;
 use context_trace::{
-    positioned::{
-        GraphRead,
-        ParentState,
-    },
+    positioned::GraphRead,
     Token,
 };
 

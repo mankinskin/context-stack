@@ -12,18 +12,18 @@ use super::{
     fixture,
     keys,
 };
-use crate::{
-    Token,
+use crate::QueryPath;
+use context_trace::{
     graph::vertex::VertexIndex,
     positioned::{
+        fixtures::{
+            fixture_graphs,
+            FixtureGraph,
+        },
         GraphRead,
         Navigate,
-        QueryPath,
-        fixtures::{
-            FixtureGraph,
-            fixture_graphs,
-        },
     },
+    Token,
 };
 
 /// Walk a query of fixture tokens, decomposing the leaf `depth(i)` times

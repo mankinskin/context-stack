@@ -7,28 +7,30 @@ use std::collections::BTreeMap;
 use pretty_assertions::assert_eq;
 
 use crate::{
-    AtomPosition,
+    ChildState,
     DirectedKey,
-    Token,
+    End,
+    IntoParentState,
+    ParentState,
+    RangeCommand,
+    SpanCoverage,
+    StateAdvance,
+    Traceable,
+    TraceCache,
+    TraceCtx,
+};
+use context_trace::{
+    AtomPosition,
     graph::vertex::VertexIndex,
     positioned::{
-        ChildState,
-        End,
-        IntoParentState,
-        OccurrenceLocation,
-        ParentState,
-        PositionedGraph,
-        RangeCommand,
-        SpanCoverage,
-        StateAdvance,
-        TraceCache,
-        TraceCtx,
-        Traceable,
         fixtures::{
-            FixtureGraph,
             fixture_graphs,
+            FixtureGraph,
         },
+        OccurrenceLocation,
+        PositionedGraph,
     },
+    Token,
 };
 
 mod exhaustive;
@@ -83,7 +85,7 @@ fn step(
 
 /// Match graph tokens up to the root end, as a query equal to the graph
 /// content would (advance, then mark the end leaf matched).
-fn match_to_root_end<G: crate::GraphKind>(
+fn match_to_root_end<G: context_trace::GraphKind>(
     graph: &PositionedGraph<G>,
     mut state: ChildState,
 ) -> ChildState {
@@ -110,7 +112,7 @@ fn edges(cache: &TraceCache) -> Vec<(DirectedKey, DirectedKey, AtomPosition)> {
         .edges()
         .map(|(parent, child, offset)| (parent, child.clone(), offset))
         .collect();
-    edges.sort_by_key(|(p, c, o)| (p.index.index, *crate::HasAtomPosition::pos(p), c.index.index, *o));
+    edges.sort_by_key(|(p, c, o)| (p.index.index, *crate::trace::key::HasAtomPosition::pos(p), c.index.index, *o));
     edges
 }
 
@@ -190,7 +192,7 @@ fn worked_example_repeat_abcabca() {
         ),
     ];
     let mut expected = expected;
-    expected.sort_by_key(|(p, c, o)| (p.index.index, *crate::HasAtomPosition::pos(p), c.index.index, *o));
+    expected.sort_by_key(|(p, c, o)| (p.index.index, *crate::trace::key::HasAtomPosition::pos(p), c.index.index, *o));
     assert_eq!(edges(&cache), expected);
 }
 
@@ -255,7 +257,7 @@ fn raise_repeat_ababa() {
 
 #[test]
 fn span_coverage_classification() {
-    let width = crate::TokenWidth(5);
+    let width = context_trace::TokenWidth(5);
     for (s, e, expected) in [
         (0, 5, SpanCoverage::EntireRoot),
         (0, 3, SpanCoverage::Prefix),

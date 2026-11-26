@@ -11,12 +11,12 @@ use super::{
     role_path::RolePath,
     root::PathRoot,
 };
-use crate::{
+use context_trace::{
     AtomPosition,
+    graph::vertex::VertexId,
+    positioned::GraphRead,
     Token,
     TokenWidth,
-    graph::vertex::VertexId,
-    positioned::store::GraphRead,
 };
 
 /// How a matched span covers its root (legacy `PathCoverage`, classified

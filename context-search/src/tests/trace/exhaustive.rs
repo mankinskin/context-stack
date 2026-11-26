@@ -12,29 +12,31 @@ use super::{
     trace,
 };
 use crate::{
+    ChildState,
     DownKey,
-    ToToken,
-    Token,
+    End,
+    EndPath,
+    IntoParentState,
+    ParentState,
+    SpanCoverage,
+    StateAdvance,
+    Traceable,
+    TraceCache,
+    TraceCtx,
     UpKey,
+};
+use context_trace::{
     graph::vertex::VertexIndex,
     positioned::{
-        ChildState,
-        End,
-        EndPath,
-        GraphRead,
-        IntoParentState,
-        Navigate,
-        ParentState,
-        SpanCoverage,
-        StateAdvance,
-        TraceCache,
-        TraceCtx,
-        Traceable,
         fixtures::{
-            FixtureGraph,
             fixture_graphs,
+            FixtureGraph,
         },
+        GraphRead,
+        Navigate,
     },
+    Token,
+    ToToken,
 };
 
 /// Checks of one exhaustive walk: every seed `(token, parent, offset)` of
@@ -49,7 +51,7 @@ struct Walk<'f> {
 impl Walk<'_> {
     fn key(
         &self,
-        token: impl crate::HasVertexIndex<Index = crate::CommittedIndex>,
+        token: impl context_trace::HasVertexIndex<Index = context_trace::CommittedIndex>,
     ) -> &str {
         &self.keys[&token.vertex_index()]
     }
@@ -115,7 +117,7 @@ impl Walk<'_> {
                 assert_eq!(e, root.width.0, "{context}");
                 // A state at the root end; trace its start path alone.
                 let mut ctx = TraceCtx::new(graph, TraceCache::default());
-                crate::positioned::PostfixCommand {
+                crate::PostfixCommand {
                     path: state.path.clone(),
                     entry_pos: state.root_pos,
                 }

@@ -16,22 +16,25 @@
 
 pub mod cache;
 pub mod child;
+pub mod key;
 pub mod state;
 pub mod traceable;
 
 use std::fmt::Debug;
 
-use crate::positioned::store::GraphRead;
+use context_trace::positioned::GraphRead;
 use crate::{
-    AtomPosition,
     DirectedKey,
     DownKey,
     DownPosition,
     HasAtomPosition,
-    Token,
     UpKey,
     UpPosition,
+};
+use context_trace::{
+    AtomPosition,
     graph::vertex::VertexId,
+    Token,
 };
 use cache::{
     NewTraceEdge,

@@ -26,27 +26,25 @@ use std::{
 };
 
 use crate::{
+    trace::{
+        BottomUp,
+        QueryAnchor,
+        TopDown,
+        TraceDirection,
+    },
+};
+use context_trace::{
     AtomPosition,
-    Token,
-    TokenWidth,
     graph::vertex::VertexId,
     positioned::{
-        model::{
-            Occurrence,
-            OccurrenceLocation,
-        },
-        store::{
-            GraphRead,
-            Located,
-            Navigate,
-        },
-        trace::{
-            BottomUp,
-            QueryAnchor,
-            TopDown,
-            TraceDirection,
-        },
+        GraphRead,
+        Located,
+        Navigate,
+        Occurrence,
+        OccurrenceLocation,
     },
+    Token,
+    TokenWidth,
 };
 
 /// Sum of the step offsets: the offset of the last child in the first
@@ -198,7 +196,7 @@ impl PathRole for Start {
         anchor: &QueryAnchor,
         offset: AtomPosition,
         width: TokenWidth,
-    ) -> crate::UpPosition {
+    ) -> crate::trace::key::UpPosition {
         anchor.up(token_end(offset, width))
     }
 }
@@ -254,7 +252,7 @@ impl PathRole for End {
         anchor: &QueryAnchor,
         offset: AtomPosition,
         _width: TokenWidth,
-    ) -> crate::DownPosition {
+    ) -> crate::trace::key::DownPosition {
         anchor.down(offset)
     }
 }

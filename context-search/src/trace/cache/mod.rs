@@ -5,11 +5,11 @@
 //! [`DirectedKey`] with query positions. Edges are recorded at the parent and
 //! labelled by the child's offset in the parent, so consumers read offsets
 //! without a composition lookup. The root offset of the match is not stored
-//! here but once in [`RangePath::span`](crate::positioned::path::RangePath).
+//! here but once in [`RangePath::span`](crate::path::RangePath).
 //!
 //! Also holds the key accessors of trace states ([`RootKey`],
 //! [`TargetKey`]; legacy `cache::key::props`, the keys themselves are the
-//! model-agnostic [`crate::key`] types) and the new trace edges
+//! model-agnostic [`crate::trace::key`] types) and the new trace edges
 //! ([`EditKind`], [`NewTraceEdge`]; legacy `cache::new`), labelled by the
 //! child's offset in its parent instead of a row location.
 
@@ -23,21 +23,25 @@ use derive_more::{
 use derive_new::new;
 
 use crate::{
-    AtomPosition,
     DirectedKey,
-    HashMap,
-    Token,
-    UpKey,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
-        has_vertex_index::HasVertexIndex,
-    },
-    positioned::trace::{
+    trace::{
         BottomUp,
         TopDown,
         TraceDirection,
     },
+    UpKey,
+};
+use context_trace::{
+    AtomPosition,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            has_vertex_index::HasVertexIndex,
+            VertexId,
+        },
+    },
+    HashMap,
+    Token,
 };
 use position::PositionCache;
 use vertex::VertexCache;
@@ -71,7 +75,7 @@ impl<I: VertexId> TraceCache<I> {
             .entry(key.index.vertex_index())
             .or_insert_with(|| VertexCache::from(key.index))
             .dir_mut(&key.pos)
-            .entry(*crate::HasAtomPosition::pos(&key.pos))
+            .entry(*crate::trace::key::HasAtomPosition::pos(&key.pos))
             .or_default()
     }
     pub fn get_vertex(

@@ -8,11 +8,9 @@
 
 use std::cmp::Ordering;
 
+use crate::trace::child::ChildQueue;
 use context_trace::{
-    positioned::{
-        trace::child::ChildQueue,
-        GraphRead,
-    },
+    positioned::GraphRead,
     VertexId,
 };
 

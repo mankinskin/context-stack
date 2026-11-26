@@ -8,14 +8,16 @@
 
 use std::fmt::Debug;
 
+use crate::{
+    ParentState,
+    trace::state::parent::ParentBatch,
+};
 use context_trace::{
+    AtomPosition,
     positioned::{
-        trace::state::parent::ParentBatch,
         GraphRead,
         Navigate,
-        ParentState,
     },
-    AtomPosition,
     Token,
 };
 

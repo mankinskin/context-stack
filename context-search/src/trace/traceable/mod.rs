@@ -3,29 +3,31 @@
 pub mod role;
 
 use crate::{
-    AtomPosition,
     DownPosition,
+    path::{
+        End,
+        EndPath,
+        HasRolePath,
+        RangePath,
+        Start,
+        StartPath,
+    },
+    trace::{
+        child::ChildState,
+        QueryAnchor,
+        TraceCtx,
+    },
     UpPosition,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
-    },
-    positioned::{
-        path::{
-            End,
-            EndPath,
-            HasRolePath,
-            RangePath,
-            Start,
-            StartPath,
-        },
-        store::GraphRead,
-        trace::{
-            QueryAnchor,
-            TraceCtx,
-            child::ChildState,
+};
+use context_trace::{
+    AtomPosition,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
         },
     },
+    positioned::GraphRead,
 };
 use role::trace_role_path;
 
@@ -68,7 +70,7 @@ pub struct PrefixCommand<I: VertexId = CommittedIndex> {
 /// Up edges along the start path and down edges along the end path.
 #[derive(Debug, Clone)]
 pub struct RangeCommand<I: VertexId = CommittedIndex> {
-    pub path: RangePath<crate::Token<I>>,
+    pub path: RangePath<context_trace::Token<I>>,
     /// Query position at the end of the root entry child.
     pub entry_pos: UpPosition,
 }

@@ -10,15 +10,17 @@ pub mod searchable;
 pub mod stats;
 
 use context::AncestorSearchTraversal;
+use crate::{
+    Traceable,
+    TraceCache,
+    TraceCtx,
+};
 use context_trace::{
+    CommittedIndex,
     positioned::{
         GraphRead,
         HasGraph,
-        TraceCache,
-        TraceCtx,
-        Traceable,
     },
-    CommittedIndex,
 };
 use searchable::Searchable;
 

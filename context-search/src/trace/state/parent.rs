@@ -12,36 +12,38 @@ use derive_more::{
 };
 
 use crate::{
-    AtomPosition,
     DirectedKey,
-    Token,
+    path::{
+        EndPath,
+        RangePath,
+        StartPath,
+    },
+    trace::{
+        cache::{
+            RootKey,
+            TargetKey,
+        },
+        child::{
+            ChildState,
+            RootChildState,
+        },
+        QueryAnchor,
+        state::StateAdvance,
+    },
     UpKey,
     UpPosition,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
-        wide::Wide,
-    },
-    positioned::{
-        path::{
-            EndPath,
-            RangePath,
-            StartPath,
-        },
-        store::GraphRead,
-        trace::{
-            QueryAnchor,
-            cache::{
-                RootKey,
-                TargetKey,
-            },
-            child::{
-                ChildState,
-                RootChildState,
-            },
-            state::StateAdvance,
+};
+use context_trace::{
+    AtomPosition,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+            wide::Wide,
         },
     },
+    positioned::GraphRead,
+    Token,
 };
 
 #[derive(Debug, Clone, Deref, DerefMut)]
@@ -128,7 +130,7 @@ impl<I: VertexId> ParentState<I> {
 impl<I: VertexId> StateAdvance for ParentState<I> {
     type Index = I;
     type Next = RootChildState<I>;
-    /// The next graph token: [`Navigate::start_at`](crate::positioned::Navigate::start_at)`(root,
+    /// The next graph token: [`Navigate::start_at`](context_trace::positioned::Navigate::start_at)`(root,
     /// span.end)`. `Err(self)` at the root end (then the state is raised).
     fn advance_state<G: GraphRead<Index = I> + ?Sized>(
         self,

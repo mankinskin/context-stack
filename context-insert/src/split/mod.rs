@@ -17,17 +17,19 @@ use context_search::Response;
 use context_trace::{
     AtomPosition,
     CommittedIndex,
-    DirectedKey,
+    positioned::{
+        CompositionRead,
+        GraphRead,
+        VertexRead,
+    },
     Token,
     TokenWidth,
     VertexId,
     Wide,
-    positioned::{
-        CompositionRead,
-        GraphRead,
-        TraceCache,
-        VertexRead,
-    },
+};
+use context_search::{
+    DirectedKey,
+    TraceCache,
 };
 
 /// Which span border(s) a split position stands for.
