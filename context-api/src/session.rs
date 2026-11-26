@@ -786,17 +786,18 @@ impl Session {
     }
 }
 
-/// Executes requests in process or on a server.
-pub trait Backend {
+/// Executes requests in process or on a server. Implementations are
+/// shared between threads and run requests concurrently.
+pub trait Backend: Send + Sync {
     fn execute(
-        &mut self,
+        &self,
         request: Request,
     ) -> Response;
 }
 
 impl Backend for Session {
     fn execute(
-        &mut self,
+        &self,
         request: Request,
     ) -> Response {
         Session::execute(self, request)

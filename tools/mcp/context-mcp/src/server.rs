@@ -2,10 +2,7 @@
 
 use std::{
     path::Path,
-    sync::{
-        Arc,
-        Mutex,
-    },
+    sync::Arc,
 };
 
 use context_api::{
@@ -84,7 +81,7 @@ contexts or parents), context_vertex and context_render. Call context_help for a
 /// requests to a running context server implements
 /// [`context_api::Backend`] and is passed to
 /// [`ContextServer::with_backend`]; the tool code stays unchanged.
-type SharedBackend = Arc<Mutex<Box<dyn Backend + Send>>>;
+type SharedBackend = Arc<dyn Backend>;
 
 /// The MCP server handler. Serve it with any rmcp transport
 /// (`server.serve(transport)`); [`crate::run_stdio`] uses stdio.
@@ -100,14 +97,14 @@ impl ContextServer {
     /// configured store.
     pub fn new(config: McpConfig) -> Self {
         let session = config.local_session();
-        Self::with_backend(Box::new(session), config)
+        Self::with_backend(Arc::new(session), config)
     }
 
     /// Serve the tools over any backend (local session or, later, a remote
     /// server). `config` still governs the MCP-side policies (output budget,
     /// delete, file paths, render cap).
     pub fn with_backend(
-        backend: Box<dyn Backend + Send>,
+        backend: Arc<dyn Backend>,
         config: McpConfig,
     ) -> Self {
         let mut tool_router = Self::tool_router();
@@ -115,7 +112,7 @@ impl ContextServer {
             tool_router.remove_route("context_delete_graph");
         }
         Self {
-            backend: Arc::new(Mutex::new(backend)),
+            backend,
             config: Arc::new(config),
             tool_router,
         }
@@ -133,10 +130,7 @@ impl ContextServer {
         let backend = self.backend.clone();
         let id = request.id;
         tokio::task::spawn_blocking(move || {
-            backend
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .execute(request)
+            backend.execute(request)
         })
         .await
         .unwrap_or_else(|err| {
