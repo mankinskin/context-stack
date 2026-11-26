@@ -22,7 +22,14 @@ use std::{
     path::Path,
 };
 
-use context_trace::positioned::PositionedGraph;
+use context_trace::{
+    VertexIndex,
+    Wide,
+    positioned::{
+        GraphRead,
+        PositionedGraph,
+    },
+};
 use serde::{
     Deserialize,
     Serialize,
@@ -127,9 +134,33 @@ pub fn decode(
     if !cursor.bytes.is_empty() {
         return Err(corrupt(path, "trailing bytes"));
     }
-    let graph = bincode::deserialize(graph_bytes)
+    let graph: PositionedGraph = bincode::deserialize(graph_bytes)
         .map_err(|e| corrupt(path, format!("graph: {e}")))?;
+    check_inputs(&meta, &graph).map_err(|reason| corrupt(path, reason))?;
     Ok((meta, graph))
+}
+
+/// Every input record names a vertex of the graph with the recorded width.
+fn check_inputs(
+    meta: &GraphMeta,
+    graph: &PositionedGraph,
+) -> Result<(), String> {
+    for (position, input) in meta.inputs.iter().enumerate() {
+        if input.id as usize != position {
+            return Err(format!("input {position} has id {}", input.id));
+        }
+        let width = graph
+            .vertex(VertexIndex(input.token))
+            .map(|vertex| vertex.width().0)
+            .ok_or_else(|| format!("input {position}: unknown vertex {}", input.token))?;
+        if width != input.width {
+            return Err(format!(
+                "input {position}: width {} but vertex {} has width {width}",
+                input.width, input.token
+            ));
+        }
+    }
+    Ok(())
 }
 
 struct Cursor<'a> {
@@ -336,5 +367,14 @@ pub(crate) mod tests {
         flipped[middle] ^= 0xff;
         assert!(reason(&flipped).contains("checksum"));
         assert!(reason(&bytes[..bytes.len() - 1]).contains("checksum"));
+        let mut bad_input = meta.clone();
+        bad_input.inputs.push(crate::types::InputRecord {
+            id: 0,
+            label: "x".into(),
+            token: 999,
+            width: 1,
+            read_at: now(),
+        });
+        assert!(reason(&encode(&bad_input, &graph).unwrap()).contains("unknown vertex"));
     }
 }

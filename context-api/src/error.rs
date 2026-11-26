@@ -28,6 +28,10 @@ pub enum ApiError {
     #[error("graph '{graph}' is locked by another process{}", holder.as_ref().map(|h| format!(" (server {h})")).unwrap_or_default())]
     Locked { graph: String, holder: Option<String> },
 
+    /// Another command of this session uses the graph.
+    #[error("graph '{graph}' is in use by another command; retry when it finishes")]
+    Busy { graph: String },
+
     /// A row-model workspace directory from before the positioned stack.
     #[error("'{graph}' is a legacy workspace; re-create the graph from its source text with `context-cli create`")]
     LegacyWorkspace { graph: String },
@@ -100,7 +104,7 @@ impl ApiError {
             | ApiError::VertexNotFound { .. }
             | ApiError::NotAVertex { .. } => ErrorKind::NotFound,
             ApiError::GraphExists { .. } => ErrorKind::AlreadyExists,
-            ApiError::Locked { .. } => ErrorKind::Locked,
+            ApiError::Locked { .. } | ApiError::Busy { .. } => ErrorKind::Locked,
             ApiError::LegacyWorkspace { .. } | ApiError::InvalidInput(_) =>
                 ErrorKind::InvalidInput,
             ApiError::FileAccess(_) => ErrorKind::Forbidden,

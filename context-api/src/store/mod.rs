@@ -46,6 +46,11 @@ use crate::{
 /// File extension of graph files.
 pub const EXTENSION: &str = "ctx";
 
+/// Whether a graph reference is a path (ends in `.ctx`) rather than a name.
+pub fn is_path_ref(graph: &str) -> bool {
+    Path::new(graph).extension().is_some_and(|ext| ext == EXTENSION)
+}
+
 /// A resolved graph reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphLocation {
@@ -128,7 +133,7 @@ impl GraphStore {
         graph: &str,
     ) -> Result<GraphLocation, ApiError> {
         let as_path = Path::new(graph);
-        if as_path.extension().is_some_and(|ext| ext == EXTENSION) {
+        if is_path_ref(graph) {
             let name = as_path
                 .file_stem()
                 .map(|stem| stem.to_string_lossy().into_owned())
@@ -403,8 +408,16 @@ impl OpenGraph {
         store: &GraphStore,
     ) -> Result<(), ApiError> {
         if self.mode == OpenMode::Shared {
-            FileExt::try_lock_exclusive(&self.lock)
-                .map_err(|_| store.locked(&self.location))?;
+            if FileExt::try_lock_exclusive(&self.lock).is_err() {
+                // A failed flock conversion drops the shared lock; take it again.
+                FileExt::try_lock_shared(&self.lock).map_err(|_| {
+                    ApiError::Internal(format!(
+                        "lost the shared lock of graph '{}'; reopen it",
+                        self.name()
+                    ))
+                })?;
+                return Err(store.locked(&self.location));
+            }
             self.mode = OpenMode::Exclusive;
         }
         Ok(())
@@ -508,7 +521,9 @@ mod tests {
         let mut b = store.open("g", OpenMode::Shared).unwrap();
         assert!(matches!(store.open("g", OpenMode::Exclusive), Err(ApiError::Locked { .. })));
         assert!(matches!(b.upgrade(&store), Err(ApiError::Locked { .. })));
+        // The failed upgrade kept b's shared lock: no writer can get in.
         drop(a);
+        assert!(matches!(store.open("g", OpenMode::Exclusive), Err(ApiError::Locked { .. })));
         b.upgrade(&store).unwrap();
         assert_eq!(b.mode(), OpenMode::Exclusive);
     }

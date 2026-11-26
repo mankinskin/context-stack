@@ -84,6 +84,9 @@ pub struct SessionConfig {
     pub render_cap: Option<usize>,
     /// Upper bound for `Limits::max_visited`.
     pub max_visited_cap: Option<usize>,
+    /// Accept graph references that are paths (`*.ctx`) anywhere. When false,
+    /// paths are accepted only below `allow_fs`; names always work.
+    pub allow_graph_paths: bool,
 }
 
 impl SessionConfig {
@@ -95,6 +98,7 @@ impl SessionConfig {
             allow_fs: None,
             render_cap: None,
             max_visited_cap: None,
+            allow_graph_paths: false,
         }
     }
 }
@@ -196,6 +200,13 @@ impl Session {
     ) -> Response {
         let Request { id, command } = request;
         let graph = command.graph().map(str::to_string);
+        let checked = match &graph {
+            Some(graph) => self.check_graph_ref(graph),
+            None => Ok(()),
+        };
+        if let Err(err) = checked {
+            return Response::from_result(id, Err(err));
+        }
         let result = panic::catch_unwind(AssertUnwindSafe(|| self.run(id, command)))
             .unwrap_or_else(|payload| {
                 let message = payload
@@ -270,11 +281,16 @@ impl Session {
         mode: OpenMode,
     ) -> Result<Arc<GraphSlot>, ApiError> {
         let location = self.store.resolve(graph)?;
-        let mut graphs = lock(&self.graphs);
-        if let Some(slot) = graphs.get(&location.path) {
+        if let Some(slot) = self.open_slot(&location) {
+            // Not under the `graphs` lock: a running read holds `open`.
             if mode == OpenMode::Exclusive {
                 lock(&slot.open).upgrade(&self.store)?;
             }
+            return Ok(slot);
+        }
+        let mut graphs = lock(&self.graphs);
+        if let Some(slot) = graphs.get(&location.path) {
+            // Opened concurrently; kept-open slots are exclusive.
             return Ok(slot.clone());
         }
         let mode = if self.config.keep_open {
@@ -289,6 +305,53 @@ impl Session {
         Ok(slot)
     }
 
+    /// Close this session's slot of a graph that is about to be replaced or
+    /// deleted; `Busy` (and the slot kept) while another command uses it.
+    fn release_slot(
+        &self,
+        location: &GraphLocation,
+    ) -> Result<(), ApiError> {
+        let mut graphs = lock(&self.graphs);
+        if let Some(slot) = graphs.get(&location.path) {
+            // Clones are only made under `graphs`, so the count cannot grow here.
+            if Arc::strong_count(slot) > 1 {
+                return Err(ApiError::Busy {
+                    graph: location.name.clone(),
+                });
+            }
+            graphs.remove(&location.path);
+        }
+        Ok(())
+    }
+
+    /// Graph references that are paths must be allowed by the config.
+    fn check_graph_ref(
+        &self,
+        graph: &str,
+    ) -> Result<(), ApiError> {
+        let location = self.store.resolve(graph)?;
+        if !crate::store::is_path_ref(graph) || self.config.allow_graph_paths {
+            return Ok(());
+        }
+        let refused = || {
+            ApiError::FileAccess(format!(
+                "graph paths are not allowed here; use a graph name instead of '{graph}'"
+            ))
+        };
+        let root = self.config.allow_fs.as_ref().ok_or_else(refused)?.canonicalize()?;
+        let parent = location
+            .path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or(std::path::Path::new("."));
+        let parent = parent.canonicalize().map_err(|_| refused())?;
+        if parent.starts_with(&root) {
+            Ok(())
+        } else {
+            Err(refused())
+        }
+    }
+
     /// Create a graph (empty, saved) and open it.
     fn create_slot(
         &self,
@@ -296,25 +359,32 @@ impl Session {
         overwrite: bool,
     ) -> Result<Arc<GraphSlot>, ApiError> {
         let location = self.store.resolve(graph)?;
-        let mut graphs = lock(&self.graphs);
-        if let Some(existing) = graphs.remove(&location.path) {
+        if self.open_slot(&location).is_some() {
             if !overwrite {
-                graphs.insert(location.path, existing);
                 return Err(ApiError::GraphExists {
                     graph: location.name,
                 });
             }
-            // Release this session's lock before re-creating the file.
-            Arc::try_unwrap(existing).map_err(|_| ApiError::Locked {
-                graph: location.name.clone(),
-                holder: None,
-            })?;
+            self.release_slot(&location)?;
         }
+        let mut graphs = lock(&self.graphs);
         let slot = Arc::new(GraphSlot::new(self.store.create(graph, overwrite)?));
         if self.config.keep_open {
             graphs.insert(location.path, slot.clone());
         }
         Ok(slot)
+    }
+
+    /// Summary of a slot this command already holds.
+    fn slot_summary(slot: &GraphSlot) -> GraphSummary {
+        let meta = slot.meta();
+        let guard = slot.graph.read();
+        let view = View {
+            name: &slot.location.name,
+            graph: &guard,
+            meta: &meta,
+        };
+        Self::live_summary(&view, slot)
     }
 
     fn with_view<T>(
@@ -392,14 +462,7 @@ impl Session {
         match command {
             Command::New { graph, overwrite } => {
                 let slot = self.create_slot(&graph, overwrite)?;
-                let meta = slot.meta();
-                let guard = slot.graph.read();
-                let view = View {
-                    name: &slot.location.name,
-                    graph: &guard,
-                    meta: &meta,
-                };
-                Ok(CommandResult::Graph(Self::live_summary(&view, &slot)))
+                Ok(CommandResult::Graph(Self::slot_summary(&slot)))
             },
             Command::List => {
                 let mut graphs = self.store.list()?;
@@ -414,7 +477,7 @@ impl Session {
             },
             Command::Info { graph } => Ok(CommandResult::Graph(self.summary(&graph)?)),
             Command::Delete { graph } => {
-                self.forget(&graph);
+                self.release_slot(&self.store.resolve(&graph)?)?;
                 self.store.delete(&graph)?;
                 Ok(CommandResult::Deleted {
                     graph: self.store.resolve(&graph)?.name,
@@ -540,9 +603,7 @@ impl Session {
                 open.save()?;
                 slot.publish(&open);
                 drop(open);
-                Ok(CommandResult::Graph(self.with_view(&graph, |view, slot| {
-                    Ok(Self::live_summary(view, slot))
-                })?))
+                Ok(CommandResult::Graph(Self::slot_summary(&slot)))
             },
             #[cfg(feature = "logs")]
             command => self.run_log_command(command),
@@ -879,6 +940,62 @@ mod tests {
         assert!(events.iter().any(|e| matches!(e, Event::GraphChanged { new_inputs, .. } if new_inputs == &[0])));
         assert!(events.iter().any(|e| matches!(e, Event::ReadProgress { chars: 6, total: 6, .. })));
         assert!(events.iter().any(|e| matches!(e, Event::Saved { .. })));
+    }
+
+    #[test]
+    fn import_in_one_shot_mode() {
+        let (_dir, session) = session(false);
+        run(&session, Command::Create { graph: "a".into(), inputs: vec![text("abcabc")], split: Split::None, overwrite: false }).unwrap();
+        let data = match run(&session, Command::Export { graph: "a".into(), format: crate::types::ExportFormat::Native, gate: Default::default() }).unwrap() {
+            CommandResult::Export(export) => export.data,
+            other => panic!("{other:?}"),
+        };
+        let imported = run(&session, Command::Import { graph: "b".into(), data: crate::types::ImportData::Native { base64: data }, overwrite: false }).unwrap();
+        assert!(matches!(imported, CommandResult::Graph(summary) if summary.input_count == 1));
+        assert_eq!(info(&session, "b").vertex_count, info(&session, "a").vertex_count);
+    }
+
+    #[test]
+    fn busy_graphs_are_kept_open() {
+        let (_dir, session) = session(true);
+        let mut config = session.config().clone();
+        config.save = SaveMode::Manual;
+        let session = Session::new(config);
+        run(&session, Command::New { graph: "g".into(), overwrite: false }).unwrap();
+        run(&session, read("g", vec![text("abab")])).unwrap();
+        let in_use = session.slot("g", OpenMode::Shared).unwrap();
+        for command in [
+            Command::Delete { graph: "g".into() },
+            Command::New { graph: "g".into(), overwrite: true },
+        ] {
+            let err = run(&session, command).unwrap_err();
+            assert_eq!(err.kind, ErrorKind::Locked);
+            assert!(err.message.contains("in use"), "{}", err.message);
+        }
+        drop(in_use);
+        let summary = info(&session, "g");
+        assert!(summary.open && summary.dirty && summary.input_count == 1);
+        run(&session, Command::Delete { graph: "g".into() }).unwrap();
+    }
+
+    #[test]
+    fn graph_paths_need_permission() {
+        let (dir, session) = session(false);
+        let outside = tempfile::tempdir().unwrap();
+        let path = outside.path().join("x.ctx").display().to_string();
+        let err = run(&session, Command::New { graph: path.clone(), overwrite: false }).unwrap_err();
+        assert_eq!(err.kind, ErrorKind::Forbidden);
+        run(&session, Command::New { graph: "notes-ctx".into(), overwrite: false }).unwrap();
+
+        let mut config = SessionConfig::new(dir.path());
+        config.allow_fs = Some(dir.path().to_path_buf());
+        let below = Session::new(config.clone());
+        let inside = dir.path().join("sub.ctx").display().to_string();
+        run(&below, Command::New { graph: inside, overwrite: false }).unwrap();
+        assert_eq!(run(&below, Command::New { graph: path.clone(), overwrite: false }).unwrap_err().kind, ErrorKind::Forbidden);
+
+        config.allow_graph_paths = true;
+        run(&Session::new(config), Command::New { graph: path, overwrite: false }).unwrap();
     }
 
     #[test]
