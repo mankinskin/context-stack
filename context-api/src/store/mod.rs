@@ -244,6 +244,19 @@ impl GraphStore {
         graph: &str,
         overwrite: bool,
     ) -> Result<OpenGraph, ApiError> {
+        let mut open = self.create_unsaved(graph, overwrite)?;
+        open.save()?;
+        Ok(open)
+    }
+
+    /// Create an empty graph open exclusively, without writing the file:
+    /// the first save creates it (or replaces an overwritten graph), so an
+    /// interrupted creation leaves the store unchanged.
+    pub fn create_unsaved(
+        &self,
+        graph: &str,
+        overwrite: bool,
+    ) -> Result<OpenGraph, ApiError> {
         let location = self.resolve(graph)?;
         self.check_legacy(graph)?;
         let lock = self.lock(&location, OpenMode::Exclusive)?;
@@ -252,16 +265,14 @@ impl GraphStore {
                 graph: location.name,
             });
         }
-        let mut open = OpenGraph {
+        Ok(OpenGraph {
             meta: GraphMeta::new(&location.name),
             location,
             graph: PositionedGraphRef::new(PositionedGraph::default()),
             mode: OpenMode::Exclusive,
             lock,
             dirty: true,
-        };
-        open.save()?;
-        Ok(open)
+        })
     }
 
     pub fn open(
@@ -509,6 +520,25 @@ mod tests {
         store.delete("g").unwrap();
         assert!(matches!(store.open("g", OpenMode::Shared), Err(ApiError::GraphNotFound { .. })));
         assert!(store.list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn unsaved_creation_writes_on_first_save() {
+        let (_dir, store) = store();
+        let g = store.create_unsaved("g", false).unwrap();
+        assert!(!store.exists(&g.location));
+        drop(g);
+        assert!(store.list().unwrap().is_empty());
+
+        let mut g = store.create("g", false).unwrap();
+        context_read::read(&g.graph, "abab".chars());
+        g.save().unwrap();
+        drop(g);
+        let before = fs::read(store.resolve("g").unwrap().path).unwrap();
+        let mut replaced = store.create_unsaved("g", true).unwrap();
+        assert_eq!(fs::read(&replaced.location.path).unwrap(), before);
+        replaced.save().unwrap();
+        assert_ne!(fs::read(&replaced.location.path).unwrap(), before);
     }
 
     #[test]

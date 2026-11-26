@@ -59,7 +59,7 @@ fn search_views() {
             "path" => assert!(result.path.is_some()),
             "contexts" => assert!(result.contexts.is_some()),
             "occurrences" =>
-                assert_eq!(result.occurrences.unwrap().total, Some(4)),
+                assert_eq!(result.occurrences.unwrap().total, Some(3)),
             "parents" => assert!(result.parents.is_some()),
             _ => {},
         }
@@ -78,7 +78,7 @@ fn search_views() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("4 occurrences in 3 inputs")
+            predicate::str::contains("3 occurrences in 3 inputs")
                 .and(predicate::str::contains("[brown fox]")),
         );
 
@@ -102,9 +102,14 @@ fn search_views() {
         .success();
     store
         .cmd()
-        .args(["search", "corpus", "xyz"])
+        .args(["search", "corpus", "XYZ"])
         .assert()
         .stdout(predicate::str::starts_with("not found"));
+    store
+        .cmd()
+        .args(["search", "corpus", "xyz"])
+        .assert()
+        .stdout(predicate::str::starts_with("partial"));
 }
 
 /// Overlapping occurrences of `query` in `text`.

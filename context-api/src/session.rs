@@ -358,6 +358,17 @@ impl Session {
         graph: &str,
         overwrite: bool,
     ) -> Result<Arc<GraphSlot>, ApiError> {
+        self.create_slot_with(graph, overwrite, true)
+    }
+
+    /// [`Self::create_slot`]; with `save` false the file is written by the
+    /// command's first save (atomic `create`).
+    fn create_slot_with(
+        &self,
+        graph: &str,
+        overwrite: bool,
+        save: bool,
+    ) -> Result<Arc<GraphSlot>, ApiError> {
         let location = self.store.resolve(graph)?;
         if self.open_slot(&location).is_some() {
             if !overwrite {
@@ -368,7 +379,12 @@ impl Session {
             self.release_slot(&location)?;
         }
         let mut graphs = lock(&self.graphs);
-        let slot = Arc::new(GraphSlot::new(self.store.create(graph, overwrite)?));
+        let open = if save {
+            self.store.create(graph, overwrite)?
+        } else {
+            self.store.create_unsaved(graph, overwrite)?
+        };
+        let slot = Arc::new(GraphSlot::new(open));
         if self.config.keep_open {
             graphs.insert(location.path, slot.clone());
         }
@@ -531,8 +547,10 @@ impl Session {
             } => {
                 let items =
                     ops::read::resolve_inputs(inputs, split, self.config.allow_fs.as_deref())?;
-                self.create_slot(&graph, overwrite)?;
-                self.read(id, &graph, items, false, SavePolicy::Now, false, false)
+                let slot = self.create_slot_with(&graph, overwrite, false)?;
+                // Not kept open: the read must reuse this slot and its lock.
+                let created = (!self.config.keep_open).then_some(slot);
+                self.read_into(id, &graph, created, items, false, SavePolicy::Now, false, false)
                     .map(CommandResult::Read)
             },
             Command::Search {
@@ -621,12 +639,33 @@ impl Session {
         steps: bool,
         dry_run: bool,
     ) -> Result<ReadReport, ApiError> {
+        self.read_into(id, graph, None, items, create, save, steps, dry_run)
+    }
+
+    /// [`Self::read`] into `slot` if given (a slot this command created),
+    /// else into the session's slot of `graph`.
+    #[allow(clippy::too_many_arguments)]
+    fn read_into(
+        &self,
+        id: Option<u64>,
+        graph: &str,
+        slot: Option<Arc<GraphSlot>>,
+        items: Vec<Item>,
+        create: bool,
+        save: SavePolicy,
+        steps: bool,
+        dry_run: bool,
+    ) -> Result<ReadReport, ApiError> {
         let mode = if dry_run {
             OpenMode::Shared
         } else {
             OpenMode::Exclusive
         };
-        let slot = match self.slot(graph, mode) {
+        let found = match slot {
+            Some(slot) => Ok(slot),
+            None => self.slot(graph, mode),
+        };
+        let slot = match found {
             Err(ApiError::GraphNotFound { .. }) if create && !dry_run =>
                 self.create_slot(graph, false)?,
             Err(ApiError::GraphNotFound { graph: name }) if create => {

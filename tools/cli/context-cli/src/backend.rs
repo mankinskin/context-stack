@@ -30,6 +30,8 @@ impl LocalBackend {
         config.save = SaveMode::OnWrite;
         // Files are read by the CLI and sent as text.
         config.allow_fs = None;
+        // The local user may address graph files anywhere.
+        config.allow_graph_paths = true;
         let mut session = Session::new(config);
         if let Some(sink) = events {
             session.set_event_sink(sink);
@@ -40,7 +42,7 @@ impl LocalBackend {
 
 impl Backend for LocalBackend {
     fn execute(
-        &mut self,
+        &self,
         request: Request,
     ) -> Response {
         self.session.execute(request)

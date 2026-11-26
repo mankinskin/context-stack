@@ -125,7 +125,7 @@ fn run(
     let progress = !cli.quiet
         && prepared.input_bytes > progress::PROGRESS_THRESHOLD
         && std::io::stderr().is_terminal();
-    let mut backend =
+    let backend =
         LocalBackend::new(cli.store.clone(), progress.then(progress::sink));
     let response = backend.execute(Request::new(prepared.command));
     if progress {
