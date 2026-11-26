@@ -2,42 +2,38 @@
 //! occurrences and extension of staged vertices.
 
 #[cfg(any(debug_assertions, feature = "test-api"))]
-use crate::positioned::check::check_overlap_closure;
+use context_trace::positioned::check::check_overlap_closure;
 #[cfg(debug_assertions)]
-use crate::positioned::check::composed_label;
+use context_trace::positioned::check::composed_label;
 use super::{
     Error,
     GraphEdit,
 };
-use crate::positioned::check::{
+use context_trace::positioned::check::{
     check_child,
     expect_vertex,
 };
-use crate::{
+use context_trace::{
     AtomOf,
-    Token,
-    TokenWidth,
     graph::vertex::has_vertex_index::ToToken,
     positioned::{
-        model::{
-            Composition,
-            Occurrence,
-            PositionedError,
-            VertexNode,
-            maximal,
+        Composition,
+        GraphRead,
+        GraphWrite,
+        maximal,
+        Occurrence,
+        PositionedError,
+        raw::{
+            SEAL,
+            VertexWrite,
+            Write as _,
         },
-        store::{
-            GraphRead,
-            GraphWrite,
-            VertexRead,
-            VertexState,
-            raw::{
-                SEAL,
-                VertexWrite,
-                Write as _,
-            },
-        },
+        VertexNode,
+        VertexRead,
+        VertexState,
     },
+    Token,
+    TokenWidth,
 };
 
 impl<'g, S: GraphWrite + ?Sized> GraphEdit<'g, S> {

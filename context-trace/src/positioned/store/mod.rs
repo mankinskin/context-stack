@@ -22,7 +22,6 @@ mod composition;
 mod has_graph;
 mod navigate;
 mod read;
-mod stage;
 mod write;
 
 pub use self::{
@@ -46,7 +45,6 @@ pub use self::{
         VertexRead,
         VertexState,
     },
-    stage::Stage,
     write::GraphWrite,
 };
 pub(crate) use self::has_graph::{

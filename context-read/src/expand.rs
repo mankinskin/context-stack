@@ -10,11 +10,11 @@ use context_trace::{
         GraphRead,
         HasGraph,
         Navigate,
-        Publication,
     },
     StageIndex,
     Token,
 };
+use context_insert::edit::Publication;
 
 use crate::{
     forward::find_complete,

@@ -2,7 +2,9 @@
 //! tasks 3.2–3.4). Expectations come from fixture strings through the name
 //! maps; strings are never algorithm input.
 
+mod edit;
 mod insert;
+mod interchange;
 mod split;
 
 use context_trace::positioned::{

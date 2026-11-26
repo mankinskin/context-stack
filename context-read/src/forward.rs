@@ -11,8 +11,8 @@ use context_search::{
 };
 use context_insert::InsertOutcome;
 use crate::stage::StageHandle;
+use context_insert::edit::Publication;
 use context_trace::{
-    positioned::Publication,
     StageIndex,
     Token,
 };

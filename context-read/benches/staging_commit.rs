@@ -12,9 +12,9 @@ use std::time::{
 };
 
 use context_read::read;
+use context_insert::edit::GraphEdit;
 use context_trace::{
     positioned::{
-        GraphEdit,
         GraphRead,
         NodeRef,
         Occurrence,

@@ -1,12 +1,14 @@
 //! [`Publication`]: the record of one edit.
 
-use crate::{
-    Token,
-    graph::vertex::{
-        CommittedIndex,
-        VertexId,
+use context_trace::{
+    graph::{
+        vertex::{
+            CommittedIndex,
+            VertexId,
+        },
     },
-    positioned::model::Occurrence,
+    positioned::Occurrence,
+    Token,
 };
 
 /// Record of one edit: created tokens and changed existing vertices.

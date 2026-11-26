@@ -1,5 +1,6 @@
 //! [`OverlayHandle`]: a read's handle with an overlay stage.
 
+use context_insert::edit::EditExt as _;
 use std::cell::RefCell;
 
 use super::{

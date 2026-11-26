@@ -4,6 +4,7 @@
 //! `settle` with their `Candidates`, the commit check and
 //! `validate_retention`.
 
+use context_insert::edit::EditExt as _;
 use pretty_assertions::assert_eq;
 
 use super::overlay::{
@@ -31,10 +32,8 @@ use context_trace::{
         },
     },
     positioned::{
-        Candidates,
         CompositionRead,
         diff,
-        GraphEdit,
         fixtures::fixture_graphs,
         Generation,
         GraphRead,
@@ -53,16 +52,22 @@ use context_trace::{
             VertexWrite as _,
             Write as _,
         },
-        Removal,
-        Settled,
-        Stage,
         validate_store,
-        VertexEdit,
         VertexRead,
         VertexState,
     },
     Token,
     ToToken,
+};
+use context_insert::{
+    edit::{
+        Candidates,
+        GraphEdit,
+        Removal,
+        Settled,
+        Stage,
+        VertexEdit,
+    },
 };
 
 #[test]

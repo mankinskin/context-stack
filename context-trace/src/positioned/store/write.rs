@@ -10,6 +10,8 @@ use super::GraphRead;
 /// `only_insertion_and_the_reader_enable_the_edit_feature`) it is exported
 /// as `context_trace::positioned::raw`: the seal then proves being inside
 /// context-trace, context-insert or context-read (crate ownership plan E1).
+/// Only those crates write, so without `edit` parts of it are unused here.
+#[cfg_attr(not(feature = "edit"), allow(dead_code))]
 pub mod raw {
     use super::GraphRead;
     use crate::{

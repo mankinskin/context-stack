@@ -15,18 +15,22 @@ use crate::{
         Translation,
     },
 };
+use context_insert::{
+    edit::{
+        Candidates,
+        GraphEdit,
+        Publication,
+        Settled,
+    },
+};
 use context_trace::{
     positioned::{
-        Candidates,
         CompositionRead as _,
-        GraphEdit,
         GraphRead,
         HasGraph,
         maximal,
         Occurrence,
         PositionedGraphRef,
-        Publication,
-        Settled,
         VertexRead,
         VertexState,
     },

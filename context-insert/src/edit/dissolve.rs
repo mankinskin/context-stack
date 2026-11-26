@@ -7,22 +7,18 @@ use super::{
     GraphEdit,
     Publication,
 };
-use crate::positioned::check::expect_vertex;
-use crate::{
+use context_trace::positioned::check::expect_vertex;
+use crate::edit::Stage;
+use context_trace::{
     graph::vertex::StageIndex,
     positioned::{
-        model::{
-            Composition,
-            Occurrence,
-            PositionedError,
-            maximal,
-        },
-        store::{
-            CompositionRead as _,
-            Stage,
-            VertexRead,
-            raw::SEAL,
-        },
+        Composition,
+        CompositionRead as _,
+        maximal,
+        Occurrence,
+        PositionedError,
+        raw::SEAL,
+        VertexRead,
     },
 };
 
@@ -275,7 +271,7 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
         &self,
         root: StageIndex,
     ) {
-        use crate::positioned::store::GraphRead;
+        use context_trace::positioned::GraphRead;
         for staged in self.graph.staged() {
             let index = StageIndex::from(staged);
             let vertex = self.graph.vertex(index).expect("staged vertex");

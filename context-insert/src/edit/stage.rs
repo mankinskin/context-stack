@@ -1,13 +1,15 @@
 //! The [`Stage`] contract of a store with an open stage (staging plan
-//! §3.6), used by `GraphEdit`'s dissolution and stabilization. The overlay
-//! implementation lives in `context_read::stage`.
+//! §3.6), required by `GraphEdit`'s dissolution and stabilization. The
+//! overlay implementation lives in `context_read::stage`.
 
-use crate::{
-    graph::vertex::{
-        StageIndex,
-        StagedIndex,
+use context_trace::{
+    graph::{
+        vertex::{
+            StagedIndex,
+            StageIndex,
+        },
     },
-    positioned::store::{
+    positioned::{
         GraphWrite,
         raw,
     },

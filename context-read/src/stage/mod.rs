@@ -13,16 +13,16 @@ use std::fmt;
 use either::Either;
 
 use context_trace::{
-    graph::vertex::{
-        CommittedIndex,
-        StageIndex,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            StageIndex,
+        },
     },
-    positioned::{
-        HasGraphMut,
-        Stage,
-    },
+    positioned::HasGraphMut,
     Token,
 };
+use context_insert::edit::Stage;
 
 /// Staged → committed; committed indices are unchanged. Removed staged
 /// slots have no committed index.

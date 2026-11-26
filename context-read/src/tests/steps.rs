@@ -12,26 +12,26 @@ use std::collections::{
 };
 
 use context_trace::{
-    StageIndex,
     positioned::{
-        GraphRead,
-        HasGraph,
-        PositionedGraphRef,
-        Stage,
-        VertexRead,
         diff,
         fixtures::{
             fixtures_dir,
             manifest,
         },
+        GraphRead,
+        HasGraph,
         interchange::{
             PositionedGraphData,
             store_interchange,
         },
+        PositionedGraphRef,
         string_repr,
         validate_store,
+        VertexRead,
     },
+    StageIndex,
 };
+use context_insert::edit::Stage;
 use ngrams::{
     Cancellation,
     graph::{

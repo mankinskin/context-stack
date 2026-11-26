@@ -1,19 +1,24 @@
-//! `GraphEdit` operations, generation, `maximal` and `Composition::crossing`.
+//! `GraphEdit` operations: create, add occurrences, extend, generation and
+//! their rejections.
 
 use pretty_assertions::assert_eq;
 
-use crate::{
+use crate::edit::{
+    EditExt as _,
+    Publication,
+    VertexEdit,
+};
+use context_trace::{
+    AtomPosition,
     Token,
     graph::vertex::VertexIndex,
     positioned::{
+        CompositionError,
         GraphRead,
         Occurrence,
         PositionedError,
         PositionedGraph,
-        Publication,
-        VertexEdit,
-        fixtures::fixture_graphs,
-        maximal,
+        interchange::PositionedGraphData,
     },
 };
 
@@ -179,7 +184,7 @@ fn add_occurrences_and_extend_reject_inputs_outside_their_preconditions() {
     );
     assert_eq!(edit.finish(), Publication::default());
     assert!(
-        crate::positioned::diff(
+        context_trace::positioned::diff(
             &before.to_interchange(),
             &graph.to_interchange()
         )
@@ -210,37 +215,6 @@ fn create_rejects_an_overlap_that_is_not_a_vertex() {
         })
     );
     edit.finish();
-}
-
-#[cfg(any(debug_assertions, feature = "test-api"))]
-#[test]
-fn validate_rejects_an_overlap_that_is_not_a_vertex() {
-    let mut graph: PositionedGraph = PositionedGraph::default();
-    let mut edit = graph.edit();
-    let [a, b, c, d] = ['a', 'b', 'c', 'd'].map(|atom| edit.atom(atom));
-    let abc = edit.create(vec![occ(0, a), occ(1, b), occ(2, c)]).unwrap();
-    let bcd = edit.create(vec![occ(0, b), occ(1, c), occ(2, d)]).unwrap();
-    let abcd = edit.create(vec![occ(0, abc), occ(3, d)]).unwrap();
-    edit.finish();
-    graph.validate().unwrap();
-    // Corrupt `abcd` into `[abc@0, bcd@1]`: content agrees, but `bc` is no vertex.
-    let composition =
-        crate::positioned::Composition::new(vec![occ(0, abc), occ(1, bcd)])
-            .unwrap();
-    graph.vertices[abcd.index.0].node =
-        crate::positioned::VertexNode::Composite(composition);
-    graph.vertices[d.index.0].parents.remove(&abcd.index);
-    graph.vertices[bcd.index.0]
-        .parents
-        .insert(abcd.index, [1.into()].into());
-    assert_eq!(
-        graph.validate(),
-        Err(PositionedError::OverlapNotVertex {
-            owner: abcd.index,
-            left: occ(0, abc),
-            right: occ(1, bcd),
-        })
-    );
 }
 
 #[test]
@@ -283,68 +257,108 @@ fn generation_bumps_once_per_mutating_edit() {
     );
 }
 
-#[test]
-fn maximal_drops_duplicates_and_contained_occurrences() {
-    let a = Token::new(VertexIndex(0), 1);
-    let ab = Token::new(VertexIndex(1), 2);
-    let abc = Token::new(VertexIndex(2), 3);
-    let bc = Token::new(VertexIndex(3), 2);
-    assert_eq!(
-        maximal(vec![
-            occ(1, bc),
-            occ(0, a),
-            occ(0, abc),
-            occ(1, bc),
-            occ(0, ab),
-            occ(2, a)
-        ]),
-        [occ(0, abc)]
-    );
-    assert_eq!(
-        maximal(vec![
-            occ(2, bc),
-            occ(1, bc),
-            occ(0, ab),
-            occ(1, a),
-            occ(1, bc)
-        ]),
-        [occ(0, ab), occ(1, bc), occ(2, bc)],
-        "partial overlaps are kept"
-    );
-    assert_eq!(maximal(Vec::<Occurrence>::new()), []);
+/// `ababa = [aba@0, aba@2]`, `aba = [a@0, b@1, a@2]`, built as a table.
+fn ababa() -> (PositionedGraph, Token, Token) {
+    let cover = |children: &[(usize, &str)]| -> Vec<(usize, String)> {
+        children.iter().map(|&(offset, child)| (offset, child.to_string())).collect()
+    };
+    let data = PositionedGraphData {
+        vertices: [
+            ("a", cover(&[])),
+            ("b", cover(&[])),
+            ("aba", cover(&[(0, "a"), (1, "b"), (2, "a")])),
+            ("ababa", cover(&[(0, "aba"), (2, "aba")])),
+        ]
+        .into_iter()
+        .map(|(content, cover)| (content.to_string(), cover))
+        .collect(),
+    };
+    let (graph, names) = PositionedGraph::from_interchange_named(&data).unwrap();
+    (graph, names["aba"], names["ababa"])
 }
 
 #[test]
-fn crossing_equals_the_brute_force_filter_on_every_fixture_composition() {
-    for fixture in fixture_graphs() {
-        for vertex in fixture.graph.vertices.iter() {
-            let Some(composition) = vertex.composition() else {
-                continue;
-            };
-            for p in 0..=vertex.width().0 + 1 {
-                let expected: Vec<Occurrence> = composition
-                    .occurrences()
-                    .iter()
-                    .filter(|o| o.offset.0 < p && p < o.end().0)
-                    .copied()
-                    .collect();
-                assert_eq!(
-                    composition.crossing(p),
-                    expected.as_slice(),
-                    "{}: {vertex} at {p}",
-                    fixture.name
-                );
-            }
-        }
-    }
+fn create_links_parents_and_rejects_incomplete_compositions() {
+    let (mut graph, aba, ababa) = ababa();
+    let mut edit = graph.edit();
+    let a = edit.atom('a');
+    assert_eq!(a.index, VertexIndex(0), "atoms are reused");
+    assert_eq!(ababa.width.0, 5);
+    let offsets: Vec<_> = edit
+        .graph()
+        .vertex_data(aba.index).unwrap().parents()[&ababa.index]
+        .iter()
+        .map(|offset| offset.0)
+        .collect();
+    assert_eq!(offsets, [0, 2]);
+
+    let composition = |error| PositionedError::Composition { owner: None, error };
+    assert_eq!(
+        edit.create(vec![Occurrence::new(0, aba)]),
+        Err(composition(CompositionError::TooFew))
+    );
+    assert_eq!(
+        edit.create(vec![Occurrence::new(0, aba), Occurrence::new(4, a)]),
+        Err(composition(CompositionError::Gap(AtomPosition::from(3))))
+    );
+    assert!(matches!(
+        edit.create(vec![Occurrence::new(0, aba), Occurrence::new(1, a), Occurrence::new(3, a)]),
+        Err(PositionedError::Composition {
+            error: CompositionError::Contained { .. },
+            ..
+        })
+    ));
+    assert_eq!(
+        edit.create(vec![Occurrence::new(0, a), Occurrence::new(1, Token::new(VertexIndex(99), 1))]),
+        Err(PositionedError::UnknownVertex(VertexIndex(99)))
+    );
+    edit.finish();
+    graph.validate().unwrap();
 }
 
+/// A second `ab` is rejected by `create` (the `validate` half is in
+/// context-trace).
+#[cfg(any(debug_assertions, feature = "test-api"))]
 #[test]
-fn validate_passes_on_every_fixture() {
-    for fixture in fixture_graphs() {
-        fixture
-            .graph
-            .validate()
-            .unwrap_or_else(|error| panic!("{}: {error}", fixture.name));
-    }
+fn duplicate_content_is_rejected_by_create() {
+    let (mut graph, _, _) = ababa();
+    let mut edit = graph.edit();
+    let a = edit.atom('a');
+    let b = edit.atom('b');
+    let ab = edit.create(vec![occ(0, a), occ(1, b)]).unwrap();
+    let again = VertexIndex(edit.graph().vertex_count());
+    assert_eq!(
+        edit.create(vec![occ(0, a), occ(1, b)]),
+        Err(PositionedError::DuplicateContent {
+            first: ab.index,
+            second: again,
+        })
+    );
+    edit.finish();
+    graph.validate().unwrap();
+}
+
+/// Overlapping occurrences that disagree are rejected by `create` (the
+/// `validate` half is in context-trace).
+#[cfg(any(debug_assertions, feature = "test-api"))]
+#[test]
+fn overlap_disagreement_is_rejected_by_create() {
+    let (mut graph, _, _) = ababa();
+    let mut edit = graph.edit();
+    let a = edit.atom('a');
+    let b = edit.atom('b');
+    let c = edit.atom('c');
+    let ab = edit.create(vec![occ(0, a), occ(1, b)]).unwrap();
+    let ca = edit.create(vec![occ(0, c), occ(1, a)]).unwrap();
+    edit.create(vec![occ(0, a), occ(1, b), occ(2, c)]).unwrap();
+    // Structurally complete: `ab@0` and `ca@1` overlap at position 1 (`b` ≠ `c`).
+    let left = occ(0, ab);
+    let right = occ(1, ca);
+    let owner = VertexIndex(edit.graph().vertex_count());
+    assert_eq!(
+        edit.create(vec![left, right]),
+        Err(PositionedError::OverlapMismatch { owner, left, right })
+    );
+    edit.finish();
+    graph.validate().unwrap();
 }

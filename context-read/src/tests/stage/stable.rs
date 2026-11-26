@@ -3,6 +3,7 @@
 //! vertices, `GraphEdit::stabilize` with Rule S′ and the worklist
 //! `GraphEdit::stabilize_candidates` (events E1 and E2).
 
+use context_insert::edit::EditExt as _;
 use pretty_assertions::assert_eq;
 
 use super::{
@@ -37,9 +38,7 @@ use context_trace::{
         },
     },
     positioned::{
-        Candidates,
         diff,
-        GraphEdit,
         GraphRead,
         interchange::{
             PositionedGraphData,
@@ -53,12 +52,18 @@ use context_trace::{
             SEAL,
             Stabilize as _,
         },
-        Stage,
         string_repr,
         validate_store,
         VertexRead,
     },
     Token,
+};
+use context_insert::{
+    edit::{
+        Candidates,
+        GraphEdit,
+        Stage,
+    },
 };
 
 fn staged(slot: usize) -> StageIndex {

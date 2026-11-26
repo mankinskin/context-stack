@@ -15,7 +15,7 @@ use super::{
     staging::Links,
     vertex::VertexMut,
 };
-use context_trace::positioned::Stage;
+use context_insert::edit::Stage;
 use context_trace::{
     AtomOf,
     BaseGraphKind,

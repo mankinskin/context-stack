@@ -2,6 +2,7 @@
 //! and committed vertices, commit translation, the base generation check
 //! and equivalence of staged and direct `GraphEdit` sequences.
 
+use context_insert::edit::EditExt as _;
 use pretty_assertions::assert_eq;
 
 use crate::{
@@ -26,20 +27,24 @@ use context_trace::{
         },
     },
     positioned::{
-        GraphEdit,
         GraphRead,
         GraphWrite,
         Occurrence,
         PositionedError,
         PositionedGraph,
         PositionedGraphRef,
-        Stage,
-        VertexEdit,
         VertexRead,
         VertexState,
     },
     Token,
     ToToken,
+};
+use context_insert::{
+    edit::{
+        GraphEdit,
+        Stage,
+        VertexEdit,
+    },
 };
 
 pub(super) fn occ<I: VertexId>(

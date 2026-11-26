@@ -1,7 +1,6 @@
 //! Model-only rules: complete compositions on create and reciprocal links.
 //! Structural cover rules are tested on the interchange validator; the edit
-//! layer in `edit.rs`. Graphs are built as tables (interchange import); the
-//! `create` cases move with `GraphEdit` (crate ownership plan P3).
+//! layer in context-insert. Graphs are built as tables (interchange import).
 
 use std::collections::BTreeMap;
 
@@ -11,7 +10,6 @@ use crate::{
     graph::vertex::VertexIndex,
     positioned::{
         Composition,
-        CompositionError,
         GraphRead,
         Navigate,
         Occurrence,
@@ -23,69 +21,37 @@ use crate::{
     },
 };
 
+/// A graph of the given composites as a table (atoms are added for every
+/// character), and the name → token map.
+pub(super) fn named(
+    composites: &[(&str, &[(usize, &str)])]
+) -> (PositionedGraph, BTreeMap<String, Token>) {
+    let mut vertices: BTreeMap<String, Vec<(usize, String)>> = composites
+        .iter()
+        .map(|(content, cover)| {
+            let cover = cover.iter().map(|&(offset, child)| (offset, child.to_string()));
+            (content.to_string(), cover.collect())
+        })
+        .collect();
+    for atom in composites.iter().flat_map(|(content, _)| content.chars()) {
+        vertices.entry(atom.to_string()).or_default();
+    }
+    PositionedGraph::from_interchange_named(&PositionedGraphData { vertices }).unwrap()
+}
+
 /// `ababa = [aba@0, aba@2]`, `aba = [a@0, b@1, a@2]`, built as a table, and
 /// the name → token map.
 fn ababa_named() -> (PositionedGraph, BTreeMap<String, Token>) {
-    let cover = |children: &[(usize, &str)]| -> Vec<(usize, String)> {
-        children.iter().map(|&(offset, child)| (offset, child.to_string())).collect()
-    };
-    let data = PositionedGraphData {
-        vertices: [
-            ("a", cover(&[])),
-            ("b", cover(&[])),
-            ("aba", cover(&[(0, "a"), (1, "b"), (2, "a")])),
-            ("ababa", cover(&[(0, "aba"), (2, "aba")])),
-        ]
-        .into_iter()
-        .map(|(content, cover)| (content.to_string(), cover))
-        .collect(),
-    };
-    PositionedGraph::from_interchange_named(&data).unwrap()
+    named(&[
+        ("aba", &[(0, "a"), (1, "b"), (2, "a")]),
+        ("ababa", &[(0, "aba"), (2, "aba")]),
+    ])
 }
 
 /// [`ababa_named`] with the tokens of `aba` and `ababa`.
 fn ababa() -> (PositionedGraph, Token, Token) {
     let (graph, names) = ababa_named();
     (graph, names["aba"], names["ababa"])
-}
-
-#[test]
-fn create_links_parents_and_rejects_incomplete_compositions() {
-    let (mut graph, aba, ababa) = ababa();
-    let mut edit = graph.edit();
-    let a = edit.atom('a');
-    assert_eq!(a.index, VertexIndex(0), "atoms are reused");
-    assert_eq!(ababa.width.0, 5);
-    let offsets: Vec<_> = edit
-        .graph()
-        .vertex_data(aba.index).unwrap().parents()[&ababa.index]
-        .iter()
-        .map(|offset| offset.0)
-        .collect();
-    assert_eq!(offsets, [0, 2]);
-
-    let composition = |error| PositionedError::Composition { owner: None, error };
-    assert_eq!(
-        edit.create(vec![Occurrence::new(0, aba)]),
-        Err(composition(CompositionError::TooFew))
-    );
-    assert_eq!(
-        edit.create(vec![Occurrence::new(0, aba), Occurrence::new(4, a)]),
-        Err(composition(CompositionError::Gap(AtomPosition::from(3))))
-    );
-    assert!(matches!(
-        edit.create(vec![Occurrence::new(0, aba), Occurrence::new(1, a), Occurrence::new(3, a)]),
-        Err(PositionedError::Composition {
-            error: CompositionError::Contained { .. },
-            ..
-        })
-    ));
-    assert_eq!(
-        edit.create(vec![Occurrence::new(0, a), Occurrence::new(1, Token::new(VertexIndex(99), 1))]),
-        Err(PositionedError::UnknownVertex(VertexIndex(99)))
-    );
-    edit.finish();
-    graph.validate().unwrap();
 }
 
 #[test]
@@ -138,26 +104,19 @@ fn occurrence_paths_and_intervals_are_checked_against_the_graph() {
     assert!(graph.vertex(ababa.index).and_then(|v| v.interval(range(3, 6))).is_none());
 }
 
-/// A second `ab` is rejected by `create`; added by field access, it is
-/// rejected by `validate`.
+/// A second `ab` added by field access is rejected by `validate` (the
+/// `create` half is in context-insert).
 #[cfg(any(debug_assertions, feature = "test-api"))]
 #[test]
-fn duplicate_content_is_rejected_by_create_and_validate() {
-    let (mut graph, _, _) = ababa();
-    let mut edit = graph.edit();
-    let a = edit.atom('a');
-    let b = edit.atom('b');
-    let ab = edit.create(vec![Occurrence::new(0, a), Occurrence::new(1, b)]).unwrap();
-    let again = VertexIndex(edit.graph().vertex_count());
-    assert_eq!(
-        edit.create(vec![Occurrence::new(0, a), Occurrence::new(1, b)]),
-        Err(PositionedError::DuplicateContent {
-            first: ab.index,
-            second: again,
-        })
-    );
-    edit.finish();
+fn duplicate_content_is_rejected_by_validate() {
+    let (mut graph, names) = named(&[
+        ("aba", &[(0, "a"), (1, "b"), (2, "a")]),
+        ("ababa", &[(0, "aba"), (2, "aba")]),
+        ("ab", &[(0, "a"), (1, "b")]),
+    ]);
+    let [a, b, ab] = ["a", "b", "ab"].map(|name| names[name]);
     graph.validate().unwrap();
+    let again = VertexIndex(graph.vertex_count());
     let mut copy = graph.vertices[ab.index.0].clone();
     copy.index = again;
     graph.vertices.push(copy);
@@ -174,30 +133,23 @@ fn duplicate_content_is_rejected_by_create_and_validate() {
     );
 }
 
+/// Overlapping occurrences that disagree are rejected by `validate` (the
+/// `create` half is in context-insert).
 #[cfg(any(debug_assertions, feature = "test-api"))]
 #[test]
-fn overlap_disagreement_is_rejected_by_create_and_validate() {
-    let (mut graph, _, _) = ababa();
-    let mut edit = graph.edit();
-    let a = edit.atom('a');
-    let b = edit.atom('b');
-    let c = edit.atom('c');
-    let ab = edit.create(vec![Occurrence::new(0, a), Occurrence::new(1, b)]).unwrap();
-    let ca = edit.create(vec![Occurrence::new(0, c), Occurrence::new(1, a)]).unwrap();
-    let abc = edit
-        .create(vec![Occurrence::new(0, a), Occurrence::new(1, b), Occurrence::new(2, c)])
-        .unwrap();
-    // Structurally complete: `ab@0` and `ca@1` overlap at position 1 (`b` ≠ `c`).
-    let left = Occurrence::new(0, ab);
-    let right = Occurrence::new(1, ca);
-    let owner = VertexIndex(edit.graph().vertex_count());
-    assert_eq!(
-        edit.create(vec![left, right]),
-        Err(PositionedError::OverlapMismatch { owner, left, right })
-    );
-    edit.finish();
+fn overlap_disagreement_is_rejected_by_validate() {
+    let (graph, names) = named(&[
+        ("aba", &[(0, "a"), (1, "b"), (2, "a")]),
+        ("ababa", &[(0, "aba"), (2, "aba")]),
+        ("ab", &[(0, "a"), (1, "b")]),
+        ("ca", &[(0, "c"), (1, "a")]),
+        ("abc", &[(0, "a"), (1, "b"), (2, "c")]),
+    ]);
+    let [a, b, c, ab, ca, abc] = ["a", "b", "c", "ab", "ca", "abc"].map(|name| names[name]);
     graph.validate().unwrap();
     // Corrupt `abc = [a@0, b@1, c@2]` into `[ab@0, ca@1]` by field access.
+    let left = Occurrence::new(0, ab);
+    let right = Occurrence::new(1, ca);
     let mut corrupt = graph.clone();
     corrupt.vertices[abc.index.0].node =
         VertexNode::Composite(Composition::new(vec![left, right]).unwrap());

@@ -12,19 +12,19 @@ use std::{
     ops::Range,
 };
 
+use crate::edit::GraphEdit;
 use context_trace::{
     AtomPosition,
-    Token,
-    VertexId,
     positioned::{
         CompositionRead,
-        GraphEdit,
         GraphWrite,
+        maximal,
         Occurrence,
         PositionedError,
         VertexRead,
-        maximal,
     },
+    Token,
+    VertexId,
 };
 
 use crate::split::SplitGraph;

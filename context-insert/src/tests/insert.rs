@@ -2,6 +2,7 @@
 //! §9 tables, unchanged graphs for `EntireRoot` responses and stale
 //! responses.
 
+use crate::edit::EditExt as _;
 use context_trace::positioned::GraphRead;
 use std::{
     collections::BTreeSet,
@@ -12,13 +13,15 @@ use std::{
 };
 
 use context_search::Find;
-use context_trace::positioned::{
-    PositionedGraphRef,
-    Publication,
-    diff,
-    fixtures::{
-        InsertCase,
-        insert_cases,
+use crate::edit::Publication;
+use context_trace::{
+    positioned::{
+        diff,
+        fixtures::{
+            insert_cases,
+            InsertCase,
+        },
+        PositionedGraphRef,
     },
 };
 use pretty_assertions::assert_eq;

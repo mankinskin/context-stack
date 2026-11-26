@@ -7,20 +7,20 @@ use super::{
     Error,
     GraphEdit,
 };
-use crate::positioned::check::expect_vertex;
-use crate::{
-    graph::vertex::{
-        StageIndex,
-        wide::Wide as _,
+use context_trace::positioned::check::expect_vertex;
+use crate::edit::Stage;
+use context_trace::{
+    graph::{
+        vertex::{
+            StageIndex,
+            wide::Wide as _,
+        },
     },
     positioned::{
-        model::PositionedError,
-        store::{
-            CompositionRead as _,
-            Stage,
-            VertexRead,
-            raw::SEAL,
-        },
+        CompositionRead as _,
+        PositionedError,
+        raw::SEAL,
+        VertexRead,
     },
 };
 

@@ -1,6 +1,8 @@
 //! Positioned insertion (insert plan rev 3): split graph, join and
 //! `insert_match`. The row model lives in [`legacy`].
 
+/// `GraphEdit`: every mutation of the positioned graph.
+pub mod edit;
 pub mod insert;
 pub mod join;
 pub mod split;

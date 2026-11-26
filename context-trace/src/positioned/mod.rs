@@ -18,13 +18,10 @@
 //!   (`store/navigate.rs`);
 //! - `committed/`: the committed store ([`PositionedGraph`], its lock guards
 //!   and [`PositionedGraphRef`]) implements them (`committed/access.rs`);
-//! - `edit/`: `GraphEdit`, the only mutation layer, with its
-//!   `Publication` record, the dissolution of staged vertices
-//!   ([`Candidates`], [`Removal`], [`Settled`]), early stabilization by
-//!   fixed parent occurrences (`GraphEdit::stabilize`) and the store-generic
-//!   checks;
-//! - a read edits a stage: the [`Stage`] contract is in `store/stage.rs`;
-//!   the overlay stage and its handle live in `context_read::stage`;
+//! - mutation (`GraphEdit`, the `Stage` contract, dissolution and
+//!   stabilization) lives in `context_insert::edit`, the overlay stage of a
+//!   read in `context_read::stage`; both write through the sealed raw
+//!   primitives (`store/write.rs`, hidden feature `edit`);
 //! - `interchange`: content-keyed snapshots, with conversion (feature
 //!   `interchange`), `diff` and `fixtures` in `test-api` builds;
 //! - `committed/serde.rs` (feature `serde`): validated (de)serialization of
@@ -45,7 +42,6 @@
 #[doc(hidden)]
 pub mod check;
 mod committed;
-mod edit;
 pub mod interchange;
 mod model;
 mod store;
@@ -58,10 +54,7 @@ pub use self::interchange::{
 
 #[cfg(feature = "edit")]
 #[doc(hidden)]
-pub use self::{
-    edit::GraphEdit,
-    store::raw,
-};
+pub use self::store::raw;
 #[cfg(debug_assertions)]
 pub use self::model::PositionedLabels;
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
@@ -78,13 +71,6 @@ pub use self::{
         PositionedGraph,
         PositionedGraphRef,
         PositionedVertexRef,
-    },
-    edit::{
-        Candidates,
-        Publication,
-        Removal,
-        Settled,
-        VertexEdit,
     },
     model::{
         Composition,
@@ -110,7 +96,6 @@ pub use self::{
         Located,
         Navigate,
         NodeRef,
-        Stage,
         VertexRead,
         VertexState,
         string_repr,

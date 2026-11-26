@@ -4,21 +4,23 @@
 //! Every operation changes one vertex plus the parent links of the children
 //! it adds or removes, and checks strict preconditions first: a rejected
 //! operation leaves the graph unchanged. There is no rollback of earlier
-//! operations of the same edit (D10). Outside this crate the layer requires
-//! the hidden feature `edit`, enabled only by `context-insert` and
-//! `context-read`.
+//! operations of the same edit (D10). It writes through the sealed raw
+//! primitives of `context_trace::positioned::raw` (hidden feature `edit` of
+//! context-trace, enabled only by context-insert and context-read). Open an
+//! edit with [`EditExt::edit`] or [`GraphEdit::new`].
 //!
 //! The edit itself and its bookkeeping live here, the public operations in
 //! `operations.rs`, dissolution of staged vertices in `dissolve.rs`, early
 //! stabilization by fixed parent occurrences in `stable.rs`, the
-//! [`Publication`] record in `publication.rs` and the store-generic checks
-//! shared with `PositionedGraph::validate` in `positioned/check.rs`.
-#![cfg_attr(not(feature = "edit"), allow(dead_code))]
+//! [`Publication`] record in `publication.rs` and the [`Stage`] contract of
+//! dissolution and stabilization in `stage.rs`; the store-generic checks are
+//! shared with `PositionedGraph::validate` in `context_trace::positioned::check`.
 
 mod dissolve;
 mod operations;
 mod publication;
 mod stable;
+mod stage;
 
 pub use self::{
     dissolve::{
@@ -30,6 +32,7 @@ pub use self::{
         Publication,
         VertexEdit,
     },
+    stage::Stage,
 };
 
 use std::collections::{
@@ -37,60 +40,50 @@ use std::collections::{
     BTreeSet,
 };
 
-use crate::positioned::check::expect_vertex;
+use context_trace::positioned::check::expect_vertex;
 #[cfg(any(debug_assertions, feature = "test-api"))]
-use crate::positioned::check::{
+use context_trace::positioned::check::{
     check_overlap_closure,
     validate_vertex,
 };
 #[cfg(any(debug_assertions, feature = "test-api"))]
-use crate::{
+use context_trace::{
     AtomOf,
     graph::vertex::has_vertex_index::HasVertexIndex,
-    positioned::store::{
+    positioned::{
         Navigate,
         NodeRef,
     },
 };
-use crate::{
-    GraphKind,
-    Token,
-    TokenWidth,
+use context_trace::{
     graph::vertex::wide::Wide,
     positioned::{
-        committed::PositionedGraph,
-        model::{
-            Composition,
-            Occurrence,
-            PositionedError,
-            VertexNode,
+        Composition,
+        CompositionRead,
+        GraphRead,
+        GraphWrite,
+        Occurrence,
+        PositionedError,
+        raw::{
+            SEAL,
+            VertexWrite,
         },
-        store::{
-            CompositionRead,
-            GraphRead,
-            GraphWrite,
-            VertexRead,
-            raw::{
-                SEAL,
-                VertexWrite,
-            },
-        },
+        VertexNode,
+        VertexRead,
     },
+    Token,
+    TokenWidth,
 };
 
-impl<G: GraphKind> PositionedGraph<G> {
+/// Opens a [`GraphEdit`] on any store it can write.
+pub trait EditExt: GraphWrite {
     /// Open an edit (see [`GraphEdit`]).
-    #[cfg(feature = "edit")]
-    #[doc(hidden)]
-    pub fn edit(&mut self) -> GraphEdit<'_, Self> {
-        GraphEdit::new(self)
-    }
-    /// Open an edit (see [`GraphEdit`]).
-    #[cfg(not(feature = "edit"))]
-    pub(crate) fn edit(&mut self) -> GraphEdit<'_, Self> {
+    fn edit(&mut self) -> GraphEdit<'_, Self> {
         GraphEdit::new(self)
     }
 }
+
+impl<S: GraphWrite + ?Sized> EditExt for S {}
 
 /// Vertex-local, checked mutations of a store, written once for every
 /// [`GraphWrite`] store.
@@ -106,17 +99,7 @@ type Error<S> = PositionedError<<S as GraphRead>::Index>;
 
 impl<'g, S: GraphWrite + ?Sized> GraphEdit<'g, S> {
     /// Open an edit on `graph`.
-    #[cfg(feature = "edit")]
-    #[doc(hidden)]
     pub fn new(graph: &'g mut S) -> Self {
-        Self::open(graph)
-    }
-    /// Open an edit on `graph`.
-    #[cfg(not(feature = "edit"))]
-    pub(crate) fn new(graph: &'g mut S) -> Self {
-        Self::open(graph)
-    }
-    fn open(graph: &'g mut S) -> Self {
         Self {
             graph,
             created: Vec::new(),

@@ -2,12 +2,14 @@
 //! `expansion/block.rs`).
 
 use crate::stage::overlay::OverlayHandle;
-use context_trace::{
-    positioned::{
+use context_insert::{
+    edit::{
         Candidates,
-        PositionedGraphRef,
         Publication,
     },
+};
+use context_trace::{
+    positioned::PositionedGraphRef,
     StageIndex,
     Token,
 };

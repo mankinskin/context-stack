@@ -12,18 +12,22 @@ use context_search::{
     SearchError,
     Searchable,
 };
+use crate::{
+    edit::{
+        GraphEdit,
+        Publication,
+    },
+};
 use context_trace::{
     CommittedIndex,
-    Token,
-    VertexId,
     positioned::{
-        GraphEdit,
         GraphRead,
         HasGraphMut,
         KindOf,
         PositionedError,
-        Publication,
     },
+    Token,
+    VertexId,
 };
 
 use crate::{
