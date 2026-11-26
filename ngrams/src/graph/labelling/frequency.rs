@@ -40,7 +40,7 @@ impl FrequencyCtx<'_> {
     /// Same-width vertices never contain each other, so the tie order does not
     /// influence the result; it only makes the schedule explicit.
     pub(crate) fn run(&mut self) -> RunResult<()> {
-        eprintln!("Frequency Pass");
+        tracing::debug!("Frequency Pass");
         self.check_cancelled()?;
         let seeds = self
             .vocab()
@@ -91,7 +91,7 @@ impl FrequencyCtx<'_> {
                 .any(|p| {
                     self.vocab().get_vertex(p).unwrap().count() < entry.count()
                 })
-                .then(|| eprintln!("{}", entry.ngram))
+                .then(|| tracing::trace!(ngram = %entry.ngram, "frequency token"))
                 .is_some()
         })
     }

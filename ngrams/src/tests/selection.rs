@@ -304,3 +304,18 @@ fn frequency_cover_ties_follow_content_order() {
         );
     }
 }
+
+/// A signalled cancellation stops substring enumeration itself, the
+/// quadratic pass that dominates long inputs.
+#[test]
+fn containment_enumeration_observes_cancellation() {
+    let cancelled = Cancellation::from(std::sync::Arc::new(
+        std::sync::atomic::AtomicBool::new(true),
+    ));
+    let result = Vocabulary::from_corpus_cancellable(
+        &Corpus::new("cancelled", ["abcabca"]),
+        &mut StatusHandle::default(),
+        &cancelled,
+    );
+    assert!(matches!(result, Err(CancelReason::Cancelled)));
+}

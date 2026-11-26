@@ -22,6 +22,8 @@ legacy-tests = [
 ]
 test-api = []
 async = ["dep:tokio", "dep:tokio-stream"]
+# `oracle_speedup` bench: no per-run time budget by default.
+long-bench = []
 
 
 
@@ -132,6 +134,11 @@ harness = false
 [[bench]]
 name = "staging_memory"
 harness = false
+
+[[bench]]
+name = "oracle_speedup"
+harness = false
+required-features = ["test-api"]
 
 #[dev-dependencies.graph_app]
 #path = "../"

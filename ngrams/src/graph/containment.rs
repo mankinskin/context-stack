@@ -25,7 +25,9 @@ use serde::{
     Serialize,
 };
 
-use crate::graph::{
+use crate::{
+    cancellation::Cancellation,
+    graph::{
     vocabulary::{
         entry::{
             HasVertexEntries,
@@ -35,6 +37,7 @@ use crate::graph::{
         Vocabulary,
     },
     Corpus,
+    },
 };
 use context_trace::legacy::{
     graph::vertex::{
@@ -86,6 +89,8 @@ pub(crate) struct CorpusCtx<'a> {
     pub(crate) corpus: &'a Corpus,
     /// Shared progress state, advanced once per enumerated occurrence.
     pub(crate) status: &'a mut StatusHandle,
+    /// Checked once per (width, text) pair during enumeration.
+    pub(crate) cancellation: &'a Cancellation,
 }
 /// One input text at one n-gram length in the containment pass.
 #[derive(Debug, Clone, Copy, From, Deref)]

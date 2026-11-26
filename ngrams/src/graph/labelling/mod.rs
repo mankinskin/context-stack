@@ -178,7 +178,7 @@ impl LabellingCtx {
         if cancellation.is_cancelled() {
             return Err(CancelReason::Cancelled);
         }
-        let vocab = Vocabulary::from_corpus(&corpus, &mut status)?;
+        let vocab = Vocabulary::from_corpus_cancellable(&corpus, &mut status, &cancellation)?;
         let mut ctx = Self::new(
             TestCorpus::new(LabellingImage::from(vocab), corpus),
             status,

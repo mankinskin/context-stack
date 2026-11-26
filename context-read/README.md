@@ -272,6 +272,33 @@ cargo test          # Run tests
 cargo doc --open    # Generate documentation
 ```
 
+### Benchmarks
+
+Criterion benches (`grammar`, `staging`, `staging_commit`,
+`staging_memory`) run with
+`cargo bench -p context-read --no-default-features --features test-api`.
+
+[`benches/oracle_speedup.rs`](benches/oracle_speedup.rs) compares the reader
+with the n-gram oracle (`ngrams::graph::parse_corpus`) building the same
+graph: the reader reads the inputs one by one into an empty graph, the oracle
+builds it in one run over all inputs. Workloads are the v3 fixture corpora,
+growing periodic and random inputs, and growing numbers of random inputs.
+Every single run has a time budget (default 30 s): the oracle
+is cancelled when it passes, the row shows `>30.0s (timeout)` with a lower
+bound for the speedup, and larger sizes of that series are skipped. Results
+go to `target/bench-results/oracle_speedup.csv`.
+
+```bash
+cargo bench -p context-read --bench oracle_speedup --no-default-features --features test-api
+# Options after `--`: --budget <secs>, --no-timeout, --filter <substr>
+cargo bench -p context-read --bench oracle_speedup --no-default-features --features test-api -- --filter periodic --no-timeout
+# Unlimited runs by default (exact long-running numbers):
+cargo bench -p context-read --bench oracle_speedup --no-default-features --features test-api,long-bench
+```
+
+`CONTEXT_BENCH_BUDGET=<secs>|none` sets the budget as well; command-line
+options take precedence.
+
 ## Architecture
 Ordered recursive hypergraph system with root-postfix expansion,
 complement operations, and efficient sequence processing

@@ -1,5 +1,9 @@
 //! Exhaustive substring vocabulary, occurrence metadata, and pass status.
 
+use crate::cancellation::{
+    Cancellable,
+    Cancellation,
+};
 use crate::graph::{
     containment::{
         CorpusCtx,
@@ -186,9 +190,24 @@ impl Vocabulary {
         corpus: &Corpus,
         status: &mut StatusHandle,
     ) -> Result<Self, super::traversal::pass::CancelReason> {
+        Self::from_corpus_cancellable(corpus, status, &Cancellation::None)
+    }
+
+    /// [`Self::from_corpus`], aborting enumeration with
+    /// [`CancelReason::Cancelled`](super::traversal::pass::CancelReason::Cancelled)
+    /// once `cancellation` is signalled.
+    pub(crate) fn from_corpus_cancellable(
+        corpus: &Corpus,
+        status: &mut StatusHandle,
+        cancellation: &Cancellation,
+    ) -> Result<Self, super::traversal::pass::CancelReason> {
         let mut vocab: Vocabulary = Default::default();
         vocab.name.clone_from(&corpus.name);
-        vocab.containment_pass(&CorpusCtx { corpus, status })?;
+        vocab.containment_pass(&CorpusCtx {
+            corpus,
+            status,
+            cancellation,
+        })?;
         Ok(vocab)
     }
 
@@ -212,15 +231,19 @@ impl Vocabulary {
         );
         // Width is the outer loop so all proper child strings exist first.
         Itertools::cartesian_product((1..=N), ctx.corpus.iter().enumerate())
-            .for_each(|(n, (i, text))| {
+            .try_for_each(|(n, (i, text))| {
+                if ctx.cancellation.is_cancelled() {
+                    return Err(super::traversal::pass::CancelReason::Cancelled);
+                }
                 TextLevelCtx {
                     corpus_ctx: ctx,
                     texti: i,
                     text,
                     n,
                 }
-                .on_nlevel(self)
-            });
+                .on_nlevel(self);
+                Ok(())
+            })?;
         for text in ctx.corpus.iter() {
             let id = *self
                 .ids
