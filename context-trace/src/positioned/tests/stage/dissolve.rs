@@ -1,6 +1,6 @@
 //! Dissolution plan D3 and D4 (§4.2, §4.3, §5.1): new atoms committed
-//! through `OverlayHandle::atom`, swap-remove of staged vertices with
-//! renaming of the moved vertex, `GraphEdit::dissolve` / `discard` /
+//! through `OverlayHandle::atom`, removal of staged vertices (a hole, no
+//! vertex moves), `GraphEdit::dissolve` / `discard` /
 //! `settle` with their `Candidates`, the commit check and
 //! `validate_retention`.
 
@@ -26,7 +26,6 @@ use crate::{
         CompositionRead,
         Generation,
         GraphRead,
-        Moved,
         Occurrence,
         OverlayHandle,
         OverlayView,
@@ -231,7 +230,7 @@ pub(super) fn parents(
 }
 
 #[test]
-fn swap_remove_renames_the_moved_vertex() {
+fn remove_leaves_a_hole() {
     let (base, n) = base();
     let graph = PositionedGraphRef::new(base);
     let mut handle = OverlayHandle::open(&graph);
@@ -254,27 +253,27 @@ fn swap_remove_renames_the_moved_vertex() {
 
     unlink_children(&mut view, bc.index);
     let generation = view.generation().stage;
-    let moved = view.remove(SEAL, bc.index);
-    assert_eq!(
-        moved,
-        Some(Moved {
-            from: bab.index,
-            to: bc.index,
-        })
-    );
+    view.remove(SEAL, bc.index);
     assert_eq!(view.generation().stage, generation + 1);
-    let bab = Token::new(bc.index, 3);
-    assert!(view.vertex(StageIndex::from(StagedIndex::new(4))).is_none());
+    // Nothing moves: `bc`'s slot is a hole, `bab` keeps its index.
+    assert!(view.vertex(bc.index).is_none());
+    assert_eq!(bab.index, StageIndex::from(StagedIndex::new(4)));
     assert_eq!(view.staged().count(), 4);
+    assert!(
+        view.staged()
+            .all(|staged| StageIndex::from(staged) != bc.index)
+    );
     assert_eq!(composition(&view, bab.index), vec![occ(0, ba), occ(1, ab)]);
     #[cfg(debug_assertions)]
     {
         use crate::graph::vertex::name_resolver::TokenNameResolver;
         assert_eq!(view.vertex(bab).unwrap().label(), "bab");
+        let resolver = view.name_resolver();
+        let slot =
+            |token: Token<StageIndex>| token.index.staged().unwrap().slot();
+        assert_eq!(resolver.staged_token_name(slot(bc)), None);
         assert_eq!(
-            view.name_resolver()
-                .staged_token_name(bc.index.staged().unwrap().slot())
-                .as_deref(),
+            resolver.staged_token_name(slot(bab)).as_deref(),
             Some("bab")
         );
     }
@@ -309,16 +308,16 @@ fn swap_remove_renames_the_moved_vertex() {
     assert_eq!(parents(&view, c.index), vec![]);
     validate_store(&view).unwrap();
 
-    // Removing the last slot moves nothing.
+    // Slots are not reused: a new vertex gets a fresh slot.
     let ca = {
         let mut edit = GraphEdit::new(&mut view);
         let ca = edit.create(vec![occ(0, c), occ(1, lift(n.a))]).unwrap();
         edit.finish();
         ca
     };
-    assert_eq!(ca.index, StageIndex::from(StagedIndex::new(4)));
+    assert_eq!(ca.index, StageIndex::from(StagedIndex::new(5)));
     unlink_children(&mut view, ca.index);
-    assert_eq!(view.remove(SEAL, ca.index), None);
+    view.remove(SEAL, ca.index);
     assert_eq!(view.staged().count(), 4);
     assert_eq!(parents(&view, c.index), vec![]);
     validate_store(&view).unwrap();
@@ -359,10 +358,10 @@ fn assert_same(
 fn settle(
     view: &mut OverlayView<'_>,
     candidates: Candidates,
-    root: &mut Token<StageIndex>,
+    root: Token<StageIndex>,
 ) -> Settled {
     let mut edit = GraphEdit::new(view);
-    let settled = edit.settle(candidates, root);
+    let settled = edit.settle(candidates, root.index);
     edit.finish();
     counts(settled)
 }
@@ -406,7 +405,7 @@ fn abcabca(handle: &mut OverlayHandle<'_>) -> Walk {
     candidates.push(root.index);
     root = ab;
     assert_eq!(
-        settle(&mut view, candidates, &mut root),
+        settle(&mut view, candidates, root),
         Settled {
             candidates: 2,
             ..Settled::default()
@@ -418,7 +417,7 @@ fn abcabca(handle: &mut OverlayHandle<'_>) -> Walk {
     let mut candidates = Candidates::default();
     candidates.record(&edit.finish());
     root = abc;
-    assert_eq!(settle(&mut view, candidates, &mut root), Settled::default());
+    assert_eq!(settle(&mut view, candidates, root), Settled::default());
     // forward `abc` (complete): NewRoot `abcabc`
     let mut edit = GraphEdit::new(&mut view);
     let abcabc = edit.create(vec![occ(0, abc), occ(3, abc)]).unwrap();
@@ -427,7 +426,7 @@ fn abcabca(handle: &mut OverlayHandle<'_>) -> Walk {
     candidates.push(root.index);
     root = abcabc;
     assert_eq!(
-        settle(&mut view, candidates, &mut root),
+        settle(&mut view, candidates, root),
         Settled {
             candidates: 2,
             ..Settled::default()
@@ -553,18 +552,12 @@ fn dissolve_into_a_staged_host() {
         .collect();
     let mut edit = GraphEdit::new(&mut view);
     let removal = edit.dissolve(abc.index, root.index).unwrap();
-    // `abca` (last slot) moved into the slot of `abc`.
-    let abca = Token::new(abc.index, abca.width);
     assert_eq!(
         removal,
         Removal {
             removed: abc.index,
             host: Some(abca.index),
             children: vec![a.index, b.index, c.index],
-            moved: Some(Moved {
-                from: staged(2),
-                to: staged(0),
-            }),
         }
     );
     let publication = edit.finish();
@@ -642,17 +635,12 @@ fn dissolve_into_a_committed_host() {
 
     let mut edit = GraphEdit::new(&mut view);
     let removal = edit.dissolve(aba.index, root).unwrap();
-    let bab = Token::new(aba.index, bab.width);
     assert_eq!(
         removal,
         Removal {
             removed: aba.index,
             host: Some(abab.index),
             children: vec![ab.index, ba.index],
-            moved: Some(Moved {
-                from: staged(2),
-                to: staged(1),
-            }),
         }
     );
     let publication = edit.finish();
@@ -703,7 +691,6 @@ fn discard_removes_a_parentless_vertex() {
             removed: bab.index,
             host: None,
             children: vec![ba.index, lift::<StageIndex>(n.ab).index],
-            moved: None,
         }
     );
     // `bab` was created in this edit: no record of it is left.
@@ -712,7 +699,7 @@ fn discard_removes_a_parentless_vertex() {
     assert_eq!(view.staged().count(), 1);
     validate_store(&view).unwrap();
 
-    // Discarding a middle slot moves the last vertex.
+    // Discarding a middle slot moves nothing.
     let mut edit = GraphEdit::new(&mut view);
     let ab = lift::<StageIndex>(n.ab);
     let bb = edit.create(vec![occ(0, b), occ(1, b)]).unwrap();
@@ -723,13 +710,8 @@ fn discard_removes_a_parentless_vertex() {
             removed: ba.index,
             host: None,
             children: vec![b.index, a.index],
-            moved: Some(Moved {
-                from: bb.index,
-                to: ba.index,
-            }),
         }
     );
-    let bb = Token::new(ba.index, 2);
     assert_eq!(edit.finish().created, vec![bb]);
     assert_eq!(composition(&view, bb.index), vec![occ(0, b), occ(1, b)]);
     assert_eq!(parents(&view, ab.index).len(), 2, "base links only");
@@ -764,7 +746,6 @@ fn candidates_are_lost_links_and_created_tokens() {
     let mut edit = GraphEdit::new(&mut view);
     let [ba, aba, _] = insert_aba_bab(&mut edit, n);
     edit.dissolve(aba.index, root).unwrap();
-    let bab = Token::new(aba.index, 3);
     let publication = edit.finish();
     assert_eq!(publication.created, vec![ba, bab]);
     assert_eq!(
@@ -787,7 +768,7 @@ fn settle_reproduces_the_abcabca_walkthrough() {
     let mut handle = OverlayHandle::open(&graph);
     let Walk {
         abc,
-        mut root,
+        root,
         abca,
         candidates,
         ..
@@ -795,9 +776,8 @@ fn settle_reproduces_the_abcabca_walkthrough() {
     // `K = {abca, abc}`: `abc` lost both links to the root.
     assert_eq!(candidates.vertices(), [abc.index, abca.index, abc.index]);
     let mut view = handle.stage();
-    let before = root;
     assert_eq!(
-        settle(&mut view, candidates, &mut root),
+        settle(&mut view, candidates, root),
         Settled {
             candidates: 2,
             dissolved: 1,
@@ -806,8 +786,7 @@ fn settle_reproduces_the_abcabca_walkthrough() {
             gained: Vec::new(),
         }
     );
-    assert_eq!(root, before, "the root did not move");
-    let abca = Token::new(abc.index, abca.width);
+    assert!(view.vertex(abc.index).is_none());
     assert_eq!(
         composition(&view, root.index),
         vec![occ(0, abca), occ(3, abca)]
@@ -835,14 +814,14 @@ fn settle_cascades_into_a_committed_host() {
     let [ba, aba, bab] = insert_aba_bab(&mut edit, n);
     edit.finish();
     assert_eq!(view.vertex(ba).unwrap().parent_count(), 2);
-    let mut root = lift::<StageIndex>(n.ababab);
+    let root = lift::<StageIndex>(n.ababab);
     // `bab` first (largest index): `ba` drops to one parent occurrence and
-    // is dissolved into `aba`, which moves into its slot; then `aba`.
+    // is dissolved into `aba`; then `aba`.
     let mut candidates = Candidates::default();
     candidates.push(aba.index);
     candidates.push(bab.index);
     let mut edit = GraphEdit::new(&mut view);
-    let settled = counts(edit.settle(candidates, &mut root));
+    let settled = counts(edit.settle(candidates, root.index));
     let publication = edit.finish();
     assert_eq!(
         settled,
@@ -881,7 +860,7 @@ fn settle_cascades_into_a_committed_host() {
 }
 
 #[test]
-fn settle_renames_a_moved_root() {
+fn settle_keeps_the_root_index() {
     let (base, n) = base();
     let graph = PositionedGraphRef::new(base);
     let mut handle = OverlayHandle::open(&graph);
@@ -898,16 +877,16 @@ fn settle_renames_a_moved_root() {
     let [_, aba, _] = insert_aba_bab(&mut edit, n);
     let inserted = edit.finish();
     let mut edit = GraphEdit::new(&mut view);
-    let mut root = edit.create(vec![occ(0, ababab), occ(4, aba)]).unwrap();
+    let root = edit.create(vec![occ(0, ababab), occ(4, aba)]).unwrap();
     let committed = edit.finish();
     assert_eq!(root.index, staged(3));
     let mut candidates = Candidates::default();
     candidates.record(&inserted);
     candidates.record(&committed);
-    // `bab` (s2) is dissolved into `abab`: the root moves to s2; `ba` (s0)
-    // drops to one parent occurrence (`aba@1`) and is dissolved into
-    // `aba`: the root moves to s0. `aba` keeps `abab@0` and `root@4`.
-    let settled = settle(&mut view, candidates, &mut root);
+    // `bab` (s2) is dissolved into `abab`; `ba` (s0) drops to one parent
+    // occurrence (`aba@1`) and is dissolved into `aba`. No vertex moves.
+    // `aba` keeps `abab@0` and `root@4`.
+    let settled = settle(&mut view, candidates, root);
     assert_eq!(
         settled,
         Settled {
@@ -918,8 +897,12 @@ fn settle_renames_a_moved_root() {
             gained: Vec::new(),
         }
     );
-    assert_eq!(root, Token::new(staged(0), 7));
-    assert_eq!(view.staged().count(), 2);
+    assert_eq!(root, Token::new(staged(3), 7));
+    assert_eq!(aba.index, staged(1));
+    assert_eq!(
+        view.staged().map(StageIndex::from).collect::<Vec<_>>(),
+        [aba.index, root.index]
+    );
     assert_eq!(
         composition(&view, root.index),
         vec![occ(0, ababab), occ(4, aba)]
@@ -975,11 +958,11 @@ fn settle_counts_dissolutions_into_the_root_and_discards() {
     // parentless `bb`.
     let mut edit = GraphEdit::new(&mut view);
     let ba = edit.create(vec![occ(0, b), occ(1, a)]).unwrap();
-    let mut root = edit.create(vec![occ(0, ba), occ(1, ab)]).unwrap();
+    let root = edit.create(vec![occ(0, ba), occ(1, ab)]).unwrap();
     edit.create(vec![occ(0, b), occ(1, b)]).unwrap();
     let mut candidates = Candidates::default();
     candidates.record(&edit.finish());
-    let settled = settle(&mut view, candidates, &mut root);
+    let settled = settle(&mut view, candidates, root);
     assert_eq!(
         settled,
         Settled {
@@ -990,8 +973,8 @@ fn settle_counts_dissolutions_into_the_root_and_discards() {
             gained: Vec::new(),
         }
     );
-    // `bb` (s2) is discarded first, then `ba` (s0): the root moves to s0.
-    assert_eq!(root, Token::new(staged(0), 3));
+    // `bb` (s2) is discarded, `ba` (s0) dissolved; the root stays in s1.
+    assert_eq!(root, Token::new(staged(1), 3));
     assert_eq!(composition(&view, root.index), vec![occ(0, b), occ(1, ab)]);
     assert_eq!(view.staged().count(), 1);
     validate_store(&view).unwrap();

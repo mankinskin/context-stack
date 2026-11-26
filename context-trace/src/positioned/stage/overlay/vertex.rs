@@ -76,7 +76,11 @@ impl<'a, G: GraphKind> OverlayVertex<'a, G> {
     ) -> Option<Self> {
         let known = match index.split() {
             Either::Left(committed) => committed.0 < view.base.vertices.len(),
-            Either::Right(staged) => staged.slot() < view.stage.vertices.len(),
+            Either::Right(staged) => view
+                .stage
+                .vertices
+                .get(staged.slot())
+                .is_some_and(Option::is_some),
         };
         known.then_some(Self { view, index })
     }
@@ -86,7 +90,7 @@ impl<'a, G: GraphKind> OverlayVertex<'a, G> {
             Either::Left(committed) =>
                 Entry::Base(&self.view.base.vertices[committed.0]),
             Either::Right(staged) =>
-                Entry::Staged(&self.view.stage.vertices[staged.slot()]),
+                Entry::Staged(self.view.stage.staged(staged.slot())),
         }
     }
     /// The changes of this committed vertex, if any.
@@ -110,7 +114,7 @@ impl<'a, G: GraphKind> OverlayVertex<'a, G> {
             Either::Left(committed) =>
                 self.view.base.vertices[committed.0].width,
             Either::Right(staged) =>
-                self.view.stage.vertices[staged.slot()].width,
+                self.view.stage.staged(staged.slot()).width,
         }
     }
 }

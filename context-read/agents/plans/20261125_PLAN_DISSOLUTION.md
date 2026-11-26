@@ -181,6 +181,9 @@ discard(t):   t staged, composite, ≠ root, no parent occurrence
   composition shape (copy-on-write in its `BaseDelta`), never its content.
 - G1–G5 are preserved (T1); only occurrences from `comp(t) + o` can be
   filtered by `maximal`. `discard` changes no composition.
+- > **Superseded (2026-11-26)** by
+  > [20261126_PLAN_CHEAP_STABILIZATION](20261126_PLAN_CHEAP_STABILIZATION.md)
+  > §4.5: a removal leaves a hole; no vertex moves and nothing is renamed.
 - **Removal is immediate (swap-remove).** The last staged slot `l` moves
   into the slot of `t`; every reference to `l` is renamed in the same
   call: parent links of its children (staged child: `StagedVertex::parents`;
@@ -987,7 +990,7 @@ unchanged chain members across steps.
 | | Decision |
 |---|---|
 | Staging | Overlay only; tagged staging, `StagingStrategy`, `read_with`, the strategy comparison test and the `pre-staging` benchmark baseline are removed (D2). |
-| Removal | Only staged vertices are removed, immediately (swap-remove with renaming); no tombstones (§3.2). |
+| Removal | Only staged vertices are removed, immediately (swap-remove with renaming); no tombstones (§3.2). Superseded 2026-11-26: a removal leaves a hole, no renaming (cheap stabilization plan §4.5). |
 | `settle` | Eager (end of every step, all span kinds) and local; candidates from the step's edit records plus the previous root; exact by (S) (§3.3). |
 | G6 | Staged vertices: `settle`. Commit: panic on an invalid vertex set (only runtime check). Committed graph: `validate_retention` in tests (§3.1). |
 | Inputs | No stored input mark, no `VertexRead::is_input`; the stage root is the only staged input (§3.1). |

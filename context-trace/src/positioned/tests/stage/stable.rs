@@ -1,6 +1,6 @@
 //! Stability marks of staged vertices (cheap stabilization plan 20261126
-//! §5.3): swap into the stable prefix with renaming, no removal of stable
-//! vertices, `GraphEdit::stabilize` with Rule S and the worklist
+//! §5.3): a flag on the vertex (no index moves), no removal of stable
+//! vertices, `GraphEdit::stabilize` with Rule S′ and the worklist
 //! `GraphEdit::stabilize_candidates` (events E1 and E2).
 
 use pretty_assertions::assert_eq;
@@ -36,7 +36,6 @@ use crate::{
         PositionedGraphRef,
         Stage,
         StageHandle,
-        Swap,
         VertexRead,
         diff,
         edit::GraphEdit,
@@ -81,13 +80,11 @@ fn with_slots<R>(f: impl FnOnce(&mut OverlayHandle<'_>, Slots) -> R) -> R {
     f(&mut handle, slots)
 }
 
-/// Stabilizing `bab` (last slot) swaps it with `ba` (slot 0), which is its
-/// child: links of staged and committed children and compositions of
-/// staged and committed parents of both are renamed; the content is
-/// unchanged. A vertex already in the first unstable slot is not moved.
-/// Removals still work on the unstable slots and the stage commits.
+/// Stabilizing sets a flag: no vertex moves, no reference changes and the
+/// content is unchanged. Removing an unstable vertex leaves the stable ones
+/// in place, and the stage commits.
 #[test]
-fn stabilize_swaps_and_renames() {
+fn stabilize_sets_a_flag() {
     let (base, n) = base();
     let graph = PositionedGraphRef::new(base);
     let mut handle = OverlayHandle::open(&graph);
@@ -100,62 +97,31 @@ fn stabilize_swaps_and_renames() {
         bc,
         bab,
     } = staged_bab_last(&mut view, n, c);
-    let (ab, abab) = (lift::<StageIndex>(n.ab), lift::<StageIndex>(n.abab));
+    let ab = lift::<StageIndex>(n.ab);
     let before = store_interchange(&view);
     let generation = view.generation().stage;
 
-    let swap = view.stabilize(SEAL, bab.index);
-    assert_eq!(
-        swap,
-        Some(Swap {
-            a: bab.index,
-            b: ba.index,
-        })
-    );
+    view.stabilize(SEAL, bab.index);
     assert_eq!(view.generation().stage, generation + 1);
-    assert_eq!(view.stable(), 1);
-    let (ba, bab) = (Token::new(staged(4), 2), Token::new(staged(0), 3));
     assert!(view.is_stable(bab.index) && !view.is_stable(ba.index));
-    #[cfg(debug_assertions)]
-    {
-        assert_eq!(view.vertex(bab).unwrap().label(), "bab");
-        assert_eq!(view.vertex(ba).unwrap().label(), "ba");
-    }
-    // `bab` references its child `ba`, which moved too.
+    assert_eq!(bab.index, staged(4));
     assert_eq!(composition(&view, bab.index), vec![occ(0, ba), occ(1, ab)]);
     assert_eq!(
         parents(&view, ba.index),
         sorted(vec![(aba.index, 1), (bab.index, 0)])
     );
-    assert_eq!(
-        parents(&view, ab.index),
-        sorted(vec![(aba.index, 0), (bab.index, 1)])
-    );
-    assert_eq!(
-        parents(&view, bab.index),
-        sorted(vec![(abab.index, 1), (baba.index, 0)])
-    );
-    assert_eq!(composition(&view, aba.index), vec![occ(0, ab), occ(1, ba)]);
-    assert_eq!(
-        composition(&view, baba.index),
-        vec![occ(0, bab), occ(1, aba)]
-    );
-    assert_eq!(
-        composition(&view, abab.index),
-        vec![occ(0, aba), occ(1, bab)]
-    );
     validate_store(&view).unwrap();
     assert_same(&before, &store_interchange(&view));
 
-    // `aba` is in the first unstable slot: no swap.
-    assert_eq!(view.stabilize(SEAL, aba.index), None);
-    assert_eq!(view.stable(), 2);
+    view.stabilize(SEAL, aba.index);
+    assert_eq!(stable_strings(&view), ["aba", "bab"]);
 
-    // Removing the unstable `bc` moves the last vertex (`ba`) into its slot.
+    // Removing the unstable `bc` leaves a hole; the stable vertices stay.
     unlink_children(&mut view, bc.index);
-    let moved = view.remove(SEAL, bc.index).unwrap();
-    assert_eq!((moved.from, moved.to), (ba.index, bc.index));
-    assert_eq!(view.stable(), 2);
+    view.remove(SEAL, bc.index);
+    assert!(view.vertex(bc.index).is_none());
+    assert!(view.is_stable(bab.index) && view.is_stable(aba.index));
+    assert!(!view.is_stable(bc.index));
     validate_store(&view).unwrap();
     drop(view);
     let (_, translation) = handle.commit(baba).unwrap();
@@ -172,9 +138,8 @@ fn remove_of_a_stable_vertex_panics() {
         let mut view = handle.stage();
         // The raw stabilization does not check the parent count.
         view.stabilize(SEAL, bc.index);
-        let bc = staged(0);
-        unlink_children(&mut view, bc);
-        view.remove(SEAL, bc);
+        unlink_children(&mut view, bc.index);
+        view.remove(SEAL, bc.index);
     });
 }
 
@@ -185,7 +150,7 @@ fn remove_of_a_stable_vertex_panics() {
 /// stabilizing twice is a no-op.
 #[test]
 fn graph_edit_stabilize_checks() {
-    with_slots(|handle, Slots { ba, baba, bc, bab, .. }| {
+    with_slots(|handle, Slots { baba, bc, bab, .. }| {
         let mut view = handle.stage();
         let before = store_interchange(&view);
         let generation = view.generation();
@@ -228,22 +193,14 @@ fn graph_edit_stabilize_checks() {
         );
         edit.finish();
         assert_eq!(view.generation(), generation);
-        assert_eq!(view.stable(), 0);
+        assert_eq!(stable_strings(&view), Vec::<String>::new());
         assert_same(&before, &store_interchange(&view));
 
         let mut edit = GraphEdit::new(&mut view);
-        assert_eq!(
-            edit.stabilize(bab.index, baba.index),
-            Ok(Some(Swap {
-                a: bab.index,
-                b: ba.index,
-            }))
-        );
-        let bab = Token::new(ba.index, 3);
-        assert_eq!(edit.stabilize(bab.index, baba.index), Ok(None));
+        assert_eq!(edit.stabilize(bab.index, baba.index), Ok(true));
+        assert_eq!(edit.stabilize(bab.index, baba.index), Ok(false));
         edit.finish();
-        assert_eq!(view.stable(), 1);
-        assert_eq!(string_repr(view.vertex(bab).unwrap()), "bab");
+        assert_eq!(stable_strings(&view), ["bab"]);
         assert_same(&before, &store_interchange(&view));
     });
 }
@@ -264,18 +221,11 @@ fn end_occurrences_count_in_fixed_parents_only() {
                 count: 1,
             })
         );
-        assert_eq!(
-            edit.stabilize(abab.index, root.index),
-            Ok(Some(Swap {
-                a: abab.index,
-                b: ab.index,
-            }))
-        );
-        let (ab, abab) = (Token::new(abab.index, 2), Token::new(ab.index, 4));
-        assert_eq!(edit.stabilize(abab.index, root.index), Ok(None));
-        assert_eq!(edit.stabilize(ab.index, root.index), Ok(None));
+        assert_eq!(edit.stabilize(abab.index, root.index), Ok(true));
+        assert_eq!(edit.stabilize(abab.index, root.index), Ok(false));
+        assert_eq!(edit.stabilize(ab.index, root.index), Ok(true));
         edit.finish();
-        assert_eq!(stable_strings(view), ["abab", "ab"]);
+        assert_eq!(stable_strings(view), ["ab", "abab"]);
         validate_store(&*view).unwrap();
         assert_same(&before, &store_interchange(view));
     });
@@ -346,11 +296,12 @@ fn with_hosts<R>(f: impl FnOnce(&mut OverlayView<'_>, Hosts) -> R) -> R {
     f(&mut view, Hosts { ab, abab, root })
 }
 
-/// The strings of the stable prefix, in slot order.
+/// The strings of the stable staged vertices, in slot order.
 fn stable_strings(view: &OverlayView<'_>) -> Vec<String> {
     view.staged()
-        .take(view.stable())
-        .map(|s| string_repr(view.vertex(StageIndex::from(s)).unwrap()))
+        .map(StageIndex::from)
+        .filter(|&index| view.is_stable(index))
+        .map(|index| string_repr(view.vertex(index).unwrap()))
         .collect()
 }
 
@@ -359,14 +310,14 @@ fn stable_strings(view: &OverlayView<'_>) -> Vec<String> {
 /// through the cascade. The root is not touched.
 #[test]
 fn stabilize_candidates_cascades() {
-    with_hosts(|view, Hosts { abab, ab, mut root }| {
+    with_hosts(|view, Hosts { abab, ab, root }| {
         let before = store_interchange(view);
         let mut edit = GraphEdit::new(view);
         assert_eq!(view_parents(&edit, ab.index), 2);
-        let stabilized = edit.stabilize_candidates([abab.index], &mut root);
+        let stabilized = edit.stabilize_candidates([abab.index], root.index);
         edit.finish();
         assert_eq!(stabilized, 2);
-        assert_eq!(stable_strings(view), ["abab", "ab"]);
+        assert_eq!(stable_strings(view), ["ab", "abab"]);
         assert!(!view.is_stable(root.index));
         assert_eq!(string_repr(view.vertex(root).unwrap()), "xa");
         validate_store(&*view).unwrap();
@@ -387,13 +338,13 @@ fn stabilize_candidates_skips_end_occurrences_in_unstable_parents() {
     let mut edit = GraphEdit::new(&mut view);
     let ab = edit.create(vec![occ(0, a), occ(1, b)]).unwrap();
     let abab = edit.create(vec![occ(0, ab), occ(2, ab)]).unwrap();
-    let mut root = edit
+    let root = edit
         .create(vec![occ(0, abab), occ(4, x), occ(5, abab)])
         .unwrap();
     edit.finish();
     let mut edit = GraphEdit::new(&mut view);
     let stabilized =
-        edit.stabilize_candidates([abab.index, ab.index, root.index], &mut root);
+        edit.stabilize_candidates([abab.index, ab.index, root.index], root.index);
     assert_eq!(
         edit.stabilize(abab.index, root.index),
         Err(PositionedError::FixedParentCount {
@@ -403,7 +354,7 @@ fn stabilize_candidates_skips_end_occurrences_in_unstable_parents() {
     );
     edit.finish();
     assert_eq!(stabilized, 0);
-    assert_eq!(view.stable(), 0);
+    assert_eq!(stable_strings(&view), Vec::<String>::new());
 }
 
 /// Case (i): two occurrences strictly inside the (unstable) root count.
@@ -422,12 +373,12 @@ fn occurrences_inside_the_root_are_fixed() {
     );
     let mut edit = GraphEdit::new(&mut view);
     let ab = edit.create(vec![occ(0, a), occ(1, b)]).unwrap();
-    let mut root = edit
+    let root = edit
         .create(vec![occ(0, ab), occ(2, x), occ(3, ab), occ(5, y)])
         .unwrap();
     edit.finish();
     let mut edit = GraphEdit::new(&mut view);
-    assert_eq!(edit.stabilize_candidates([ab.index], &mut root), 1);
+    assert_eq!(edit.stabilize_candidates([ab.index], root.index), 1);
     edit.finish();
     assert_eq!(stable_strings(&view), ["ab"]);
     assert!(!view.is_stable(root.index));
@@ -435,11 +386,11 @@ fn occurrences_inside_the_root_are_fixed() {
 }
 
 /// `settle` then `stabilize_candidates` in one edit (as the reader runs
-/// them): the discard of the parentless `ba` (slot 2) moves the gained
-/// candidate `abab` (E1: added to both committed hosts) from slot 3 into
-/// slot 2; the renamed candidate is stabilized, then `ab`.
+/// them): the discard of the parentless `ba` (slot 2) leaves a hole; the
+/// gained candidate `abab` (E1: added to both committed hosts) keeps slot 3
+/// and is stabilized, then `ab`.
 #[test]
-fn settle_renames_gained_candidates() {
+fn settle_keeps_gained_candidates() {
     let graph = PositionedGraphRef::new(hosts());
     let mut handle = OverlayHandle::open(&graph);
     let mut view = handle.stage();
@@ -458,17 +409,17 @@ fn settle_renames_gained_candidates() {
     assert!(candidates.gained().contains(&abab.index));
     assert_eq!((ab.index, root.index, ba.index, abab.index), (staged(0), staged(1), staged(2), staged(3)));
 
-    let mut root = root;
     let mut edit = GraphEdit::new(&mut view);
-    let mut settled = edit.settle(candidates, &mut root);
+    let mut settled = edit.settle(candidates, root.index);
     assert_eq!(settled.discarded, 1);
-    // Created `ab`, the root and `abab` (moved into the slot of `ba`).
-    assert_eq!(settled.gained, vec![staged(0), staged(1), staged(2)]);
+    // Created `ab`, the root and `abab`; the discarded `ba` is dropped.
+    assert_eq!(settled.gained, vec![staged(0), staged(1), staged(3)]);
     let stabilized =
-        edit.stabilize_candidates(std::mem::take(&mut settled.gained), &mut root);
+        edit.stabilize_candidates(std::mem::take(&mut settled.gained), root.index);
     edit.finish();
     assert_eq!(stabilized, 2);
-    assert_eq!(stable_strings(&view), ["abab", "ab"]);
+    assert!(view.vertex(ba.index).is_none());
+    assert_eq!(stable_strings(&view), ["ab", "abab"]);
     assert_eq!(string_repr(view.vertex(root).unwrap()), "xa");
     validate_store(&view).unwrap();
 }
@@ -489,7 +440,7 @@ fn settle_dissolution_gains() {
     let ab = edit.create(vec![occ(0, a), occ(1, b)]).unwrap();
     edit.add_occurrences(xabab.index, vec![occ(3, ab)]).unwrap();
     let aab = edit.create(vec![occ(0, a), occ(1, ab)]).unwrap();
-    let mut root = edit.create(vec![occ(0, aab), occ(3, x)]).unwrap();
+    let root = edit.create(vec![occ(0, aab), occ(3, x)]).unwrap();
     edit.finish();
     let mut edit = GraphEdit::new(&mut view);
     assert_eq!(
@@ -504,13 +455,13 @@ fn settle_dissolution_gains() {
     let mut candidates = Candidates::default();
     candidates.push(aab.index);
     let mut edit = GraphEdit::new(&mut view);
-    let mut settled = edit.settle(candidates, &mut root);
+    let mut settled = edit.settle(candidates, root.index);
     assert_eq!(settled.dissolved, 1);
-    // `aab` (slot 1) was removed: the root moved into its slot.
-    assert_eq!(root.index, staged(1));
+    // `aab` (slot 1) was removed; the root keeps slot 2.
+    assert_eq!(root.index, staged(2));
     assert_eq!(settled.gained, vec![ab.index]);
     let stabilized =
-        edit.stabilize_candidates(std::mem::take(&mut settled.gained), &mut root);
+        edit.stabilize_candidates(std::mem::take(&mut settled.gained), root.index);
     edit.finish();
     assert_eq!(stabilized, 1);
     assert_eq!(stable_strings(&view), ["ab"]);

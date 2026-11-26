@@ -17,13 +17,7 @@ pub(crate) mod raw {
             StageIndex,
             VertexId,
         },
-        positioned::{
-            model::VertexNode,
-            stage::{
-                Moved,
-                Swap,
-            },
-        },
+        positioned::model::VertexNode,
     };
 
     /// Proof of being inside `context-trace`.
@@ -67,16 +61,15 @@ pub(crate) mod raw {
 
     /// Removal of staged vertices (stages only).
     pub trait Remove: Write {
-        /// Remove the staged vertex `index`, which has no parent links and
-        /// whose children no longer link to it (checked by `GraphEdit`).
-        /// Swap-remove: the last staged vertex moves into the freed slot and
-        /// every reference to it is renamed before returning; `None` if
-        /// `index` was the last slot.
+        /// Remove the unstable staged vertex `index`, which has no parent
+        /// links and whose children no longer link to it (checked by
+        /// `GraphEdit`). Its slot becomes a hole: no other vertex moves and
+        /// the slot is never reused.
         fn remove(
             &mut self,
             seal: Seal,
             index: StageIndex,
-        ) -> Option<Moved>;
+        );
     }
 
     impl<T: Remove + ?Sized> Remove for &mut T {
@@ -84,22 +77,21 @@ pub(crate) mod raw {
             &mut self,
             seal: Seal,
             index: StageIndex,
-        ) -> Option<Moved> {
+        ) {
             (**self).remove(seal, index)
         }
     }
 
     /// Stability marks of staged vertices (cheap stabilization plan 20261126).
     pub trait Stabilize: Remove {
-        /// Mark the unstable staged vertex `index` stable: swap it into the
-        /// first unstable slot (renaming every reference of both swapped
-        /// vertices) and grow the stable prefix by one; `None` if it already
-        /// was in that slot. [`Remove::remove`] panics on a stable slot.
+        /// Mark the unstable staged vertex `index` stable (a flag on the
+        /// vertex; nothing moves). [`Remove::remove`] panics on a stable
+        /// vertex.
         fn stabilize(
             &mut self,
             seal: Seal,
             index: StageIndex,
-        ) -> Option<Swap>;
+        );
     }
 
     impl<T: Stabilize + ?Sized> Stabilize for &mut T {
@@ -107,7 +99,7 @@ pub(crate) mod raw {
             &mut self,
             seal: Seal,
             index: StageIndex,
-        ) -> Option<Swap> {
+        ) {
             (**self).stabilize(seal, index)
         }
     }

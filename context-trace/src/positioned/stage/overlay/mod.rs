@@ -4,9 +4,9 @@
 //!
 //! - Staged vertices live in the stage, addressed by [`StagedIndex`]; they
 //!   are composites only: atoms new in the read are committed at once
-//!   through [`OverlayHandle::atom`]. Removal is a swap-remove: the last
-//!   staged vertex moves into the freed slot and is renamed
-//!   ([`Moved`](super::Moved)).
+//!   through [`OverlayHandle::atom`]. A removal leaves a hole: staged
+//!   vertices never move, so staged indices are never renamed; holes are
+//!   skipped at commit.
 //! - Changes of committed vertices (insertion into committed hosts) are a
 //!   copy-on-write composition and a parent-link delta per vertex.
 //! - [`OverlayView`] (base read guard and stage guard) is the store the

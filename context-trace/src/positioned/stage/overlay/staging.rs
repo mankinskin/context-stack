@@ -13,6 +13,7 @@ use std::{
     },
 };
 
+#[cfg(debug_assertions)]
 use either::Either;
 
 use crate::{
@@ -25,7 +26,6 @@ use crate::{
     graph::vertex::{
         CommittedIndex,
         StageIndex,
-        VertexId as _,
         VertexIndex,
     },
     positioned::{
@@ -132,6 +132,8 @@ pub struct StagedVertex<G: GraphKind = BaseGraphKind> {
     pub(super) width: TokenWidth,
     pub(super) node: VertexNode<AtomOf<G>, StageIndex>,
     pub(super) parents: Links<StageIndex>,
+    /// Never removed again (cheap stabilization plan 20261126, Rule S′).
+    pub(super) stable: bool,
     #[cfg(debug_assertions)]
     pub(super) label: String,
 }
@@ -149,13 +151,11 @@ pub(super) struct BaseDelta {
 /// The staged part of an overlay (staging plan §4.1).
 #[derive(Clone, Debug)]
 pub struct StagingGraph<G: GraphKind = BaseGraphKind> {
-    /// By [`StagedIndex`](crate::graph::vertex::StagedIndex), in slot order
-    /// (not creation order: removals and stabilizations move vertices); the
-    /// first [`Self::stable`] are stable.
-    pub(super) vertices: Vec<StagedVertex<G>>,
-    /// Length of the stable slot prefix (cheap stabilization plan
-    /// 20261126): stable vertices are never removed.
-    pub(super) stable: usize,
+    /// By [`StagedIndex`](crate::graph::vertex::StagedIndex) in creation
+    /// order. A removal leaves a hole (`None`); slots are never reused or
+    /// moved, so a staged index stays valid until its vertex is removed and
+    /// is never renamed.
+    pub(super) vertices: Vec<Option<StagedVertex<G>>>,
     /// Copy-on-write compositions and link deltas of committed vertices.
     pub(super) deltas: StageMap<CommittedIndex, BaseDelta>,
     /// Generation of the base when the stage was opened.
@@ -168,15 +168,44 @@ impl<G: GraphKind> StagingGraph<G> {
     pub(super) fn new(base_generation: u64) -> Self {
         Self {
             vertices: Vec::new(),
-            stable: 0,
             deltas: StageMap::default(),
             base_generation,
             generation: 0,
         }
     }
+    /// The live staged vertex in `slot`.
+    ///
+    /// # Panics
+    /// If the slot was never used or its vertex was removed.
+    #[inline(always)]
+    pub(super) fn staged(
+        &self,
+        slot: usize,
+    ) -> &StagedVertex<G> {
+        self.vertices[slot]
+            .as_ref()
+            .unwrap_or_else(|| panic!("staged slot {slot} was removed"))
+    }
+    /// As [`Self::staged`].
+    pub(super) fn staged_mut(
+        &mut self,
+        slot: usize,
+    ) -> &mut StagedVertex<G> {
+        self.vertices[slot]
+            .as_mut()
+            .unwrap_or_else(|| panic!("staged slot {slot} was removed"))
+    }
+    /// The live staged vertices with their slots.
+    pub(super) fn live(&self) -> impl Iterator<Item = (usize, &StagedVertex<G>)> {
+        self.vertices
+            .iter()
+            .enumerate()
+            .filter_map(|(slot, vertex)| Some((slot, vertex.as_ref()?)))
+    }
     /// The stage's parent links of `child`: a staged child's own links, a
     /// committed child's added links (links to staged parents live only
     /// there); `None` for a committed child without delta.
+    #[cfg(debug_assertions)]
     pub(super) fn links_mut(
         &mut self,
         child: StageIndex,
@@ -185,80 +214,26 @@ impl<G: GraphKind> StagingGraph<G> {
             Either::Left(committed) =>
                 self.deltas.get_mut(&committed).map(|delta| &mut delta.added),
             Either::Right(staged) =>
-                Some(&mut self.vertices[staged.slot()].parents),
+                Some(&mut self.staged_mut(staged.slot()).parents),
         }
     }
-    /// The stage's composition of `parent`: a staged composite's own, a
-    /// committed vertex's copy-on-write composition (a committed vertex
-    /// references a staged child only through it); `None` otherwise.
-    pub(super) fn composition_mut(
-        &mut self,
-        parent: StageIndex,
-    ) -> Option<&mut Composition<StageIndex>> {
-        match parent.split() {
-            Either::Left(committed) => self
-                .deltas
-                .get_mut(&committed)
-                .and_then(|delta| delta.composition.as_mut()),
-            Either::Right(staged) =>
-                match &mut self.vertices[staged.slot()].node {
-                    VertexNode::Composite(composition) => Some(composition),
-                    VertexNode::Atom(_) => None,
-                },
-        }
-    }
-    /// Rename every reference to the staged `vertices` after they changed
-    /// slots: `vertices` are their new indices, `rename` maps every old index
-    /// to its new one (a permutation, identity elsewhere). The references
-    /// are the parent links of their children (staged: own links;
-    /// committed: the delta's `added`) and the compositions of their parents
-    /// (staged: own node; committed: the delta's composition). The sites are
-    /// collected first and each is renamed once, so vertices referencing
-    /// each other are renamed correctly.
-    pub(super) fn rename(
-        &mut self,
-        vertices: &[StageIndex],
-        rename: impl Fn(StageIndex) -> StageIndex,
-    ) {
-        let mut children = BTreeSet::new();
-        let mut parents = BTreeSet::new();
-        for vertex in vertices {
-            let staged = &self.vertices[vertex
-                .staged()
-                .expect("only staged vertices move")
-                .slot()];
-            if let VertexNode::Composite(composition) = &staged.node {
-                children.extend(composition.children());
-            }
-            parents.extend(staged.parents.keys().copied());
-        }
-        for child in children {
-            let links = self
-                .links_mut(rename(child))
-                .expect("a child links to its staged parent");
-            *links = std::mem::take(links)
-                .into_iter()
-                .map(|(parent, offsets)| (rename(parent), offsets))
-                .collect();
-        }
-        for parent in parents {
-            let composition = self
-                .composition_mut(rename(parent))
-                .expect("a parent of a staged vertex has a staged composition");
-            *composition = composition.map_index(&rename);
-        }
-    }
-    /// Push every staged vertex and apply every delta to `base`
-    /// (staging plan §4.3). The base must be the one the stage was opened
-    /// on, unchanged.
+    /// Push every live staged vertex and apply every delta to `base`
+    /// (staging plan §4.3); holes are skipped, so the committed indices are
+    /// dense. The base must be the one the stage was opened on, unchanged.
     pub(super) fn commit_into(
         self,
         base: &mut PositionedGraph<G>,
     ) -> Translation {
-        let first = base.vertices.len();
+        let mut next = base.vertices.len();
         let translation = Translation::table(
-            (first..first + self.vertices.len())
-                .map(VertexIndex)
+            self.vertices
+                .iter()
+                .map(|vertex| {
+                    vertex.as_ref().map(|_| {
+                        next += 1;
+                        VertexIndex(next - 1)
+                    })
+                })
                 .collect(),
         );
         let links = |links: Links<StageIndex>| -> Links<CommittedIndex> {
@@ -267,8 +242,11 @@ impl<G: GraphKind> StagingGraph<G> {
                 .map(|(parent, offsets)| (translation.index(parent), offsets))
                 .collect()
         };
-        base.vertices.reserve(self.vertices.len());
+        base.vertices.reserve(translation.len());
         for (vertex, &index) in self.vertices.into_iter().zip(translation.slots()) {
+            let (Some(vertex), Some(index)) = (vertex, index) else {
+                continue;
+            };
             let VertexNode::Composite(composition) = vertex.node else {
                 unreachable!("atoms are committed through OverlayHandle::atom")
             };

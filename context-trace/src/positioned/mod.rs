@@ -21,7 +21,7 @@
 //! - `edit/`: `GraphEdit`, the only mutation layer, with its
 //!   `Publication` record, the dissolution of staged vertices
 //!   ([`Candidates`], [`Removal`], [`Settled`]), early stabilization by
-//!   fixed parent occurrences ([`Swap`]) and the store-generic
+//!   fixed parent occurrences (`GraphEdit::stabilize`) and the store-generic
 //!   checks;
 //! - `stage/`: a read edits a stage ([`Stage`], [`StageHandle`],
 //!   `stage/mod.rs`); the overlay stage ([`OverlayHandle`], [`OverlayView`],
@@ -99,10 +99,8 @@ pub use self::{
     },
     stage::{
         CommitError,
-        Moved,
         Stage,
         StageHandle,
-        Swap,
         Translation,
         overlay::{
             Lifted,

@@ -9,17 +9,13 @@ use super::{
     check::expect_vertex,
 };
 use crate::{
-    Token,
     graph::vertex::{
         StageIndex,
         wide::Wide as _,
     },
     positioned::{
         model::PositionedError,
-        stage::{
-            Stage,
-            Swap,
-        },
+        stage::Stage,
         store::{
             CompositionRead as _,
             VertexRead,
@@ -33,18 +29,17 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
     /// again (`settle` skips it). Rule S′ (§2.2): `t` must have ≥ 2 fixed
     /// parent occurrences (ending strictly inside the parent, or in a
     /// committed or stable parent); by Theorem S′ it is then a vertex of
-    /// every later settled stage. The swap into the stable prefix is
-    /// applied to the edit's records.
+    /// every later settled stage. Only a flag changes; no index moves.
     ///
     /// # Errors
     /// Graph unchanged: `UnknownVertex`, `Atom`, `NotStaged` (committed),
-    /// `IsRoot`, `FixedParentCount` (< 2). `Ok(None)` if `t` was already
-    /// stable or no swap was needed.
+    /// `IsRoot`, `FixedParentCount` (< 2). `Ok(false)` if `t` was already
+    /// stable.
     pub fn stabilize(
         &mut self,
         t: StageIndex,
         root: StageIndex,
-    ) -> Result<Option<Swap>, Error<S>> {
+    ) -> Result<bool, Error<S>> {
         if expect_vertex(&*self.graph, t)?.node().composite().is_none() {
             return Err(PositionedError::Atom(t));
         }
@@ -55,17 +50,14 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
             return Err(PositionedError::IsRoot(t));
         }
         if self.graph.is_stable(t) {
-            return Ok(None);
+            return Ok(false);
         }
         let count = fixed_parent_occurrences(&*self.graph, t)?;
         if count < 2 {
             return Err(PositionedError::FixedParentCount { vertex: t, count });
         }
-        let swap = self.graph.stabilize(SEAL, t);
-        if let Some(swap) = swap {
-            self.swap_records(swap);
-        }
-        Ok(swap)
+        self.graph.stabilize(SEAL, t);
+        Ok(true)
     }
 
     /// Stabilize by Rule S′, starting from `candidates` (events E1 and E3 of
@@ -73,33 +65,25 @@ impl<S: Stage + ?Sized> GraphEdit<'_, S> {
     /// and continuing with the children of every stabilized vertex (E2,
     /// top-down cascade).
     /// Afterwards no unstable staged composite `≠ root` among the reached
-    /// vertices has ≥ 2 fixed parent occurrences. The remaining work list
-    /// and `root` are renamed through every swap. Returns the number of
+    /// vertices has ≥ 2 fixed parent occurrences. Returns the number of
     /// vertices stabilized.
     pub fn stabilize_candidates(
         &mut self,
         candidates: impl IntoIterator<Item = StageIndex>,
-        root: &mut Token<StageIndex>,
+        root: StageIndex,
     ) -> usize {
         let mut work: Vec<StageIndex> = candidates.into_iter().collect();
         let mut stabilized = 0;
         while let Some(t) = work.pop() {
-            if !t.is_staged() || t == root.index || self.graph.is_stable(t) {
+            if !t.is_staged() || t == root || self.graph.is_stable(t) {
                 continue;
             }
             if !matches!(fixed_parent_occurrences(&*self.graph, t), Ok(2..)) {
                 continue;
             }
-            let swap = self
-                .stabilize(t, root.index)
+            self.stabilize(t, root)
                 .unwrap_or_else(|error| panic!("stabilize: {error}"));
             stabilized += 1;
-            let rename = |index: StageIndex| swap.map_or(index, |s| s.apply(index));
-            for index in &mut work {
-                *index = rename(*index);
-            }
-            root.index = rename(root.index);
-            let t = rename(t);
             let vertex = expect_vertex(&*self.graph, t).expect("stabilized vertex");
             let composition = vertex.node().composite().expect("composite");
             work.extend(composition.occurrences().map(|c| c.child.index));

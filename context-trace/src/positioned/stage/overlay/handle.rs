@@ -89,9 +89,9 @@ impl<'g, G: GraphKind> OverlayHandle<'g, G> {
         stage.base_generation = base.generation;
         Ok(Token::new(StageIndex::lift(token.index), token.width))
     }
-    /// Number of staged vertices.
+    /// Number of live staged vertices.
     pub fn staged_count(&self) -> usize {
-        self.view().stage.vertices.len()
+        self.view().stage.live().count()
     }
 }
 
@@ -137,7 +137,7 @@ impl<G: GraphKind> StageHandle for OverlayHandle<'_, G> {
                 now: base.generation,
             });
         }
-        for (slot, vertex) in stage.vertices.iter().enumerate() {
+        for (slot, vertex) in stage.live() {
             let index = StageIndex::from(StagedIndex::new(slot));
             let count: usize =
                 vertex.parents.values().map(|offsets| offsets.len()).sum();

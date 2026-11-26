@@ -17,7 +17,6 @@ use crate::{
         CommittedIndex,
         StageIndex,
         StagedIndex,
-        VertexId as _,
     },
     positioned::store::{
         GraphWrite,
@@ -27,90 +26,52 @@ use crate::{
 };
 
 /// A store with an open stage: indices are [`StageIndex`], new vertices are
-/// staged, unstable staged vertices can be removed (swap-remove, [`Moved`])
-/// and marked stable ([`Swap`]).
+/// staged, unstable staged vertices can be removed and staged vertices can
+/// be marked stable. Staged vertices never move: a removal leaves a hole and
+/// no index is ever renamed.
 pub trait Stage: GraphWrite<Index = StageIndex> + raw::Stabilize {
-    /// The staged vertices in slot order (not creation order: removals and
-    /// stabilizations move vertices); the first [`Self::stable`] are stable.
+    /// The live staged vertices in creation order (without removed slots).
     fn staged(&self) -> impl Iterator<Item = StagedIndex> + '_;
-    /// Length of the stable slot prefix. Stable vertices are never removed
-    /// (cheap stabilization plan 20261126).
-    fn stable(&self) -> usize;
-    /// Whether `index` is a stable staged vertex.
+    /// Whether `index` is a live stable staged vertex. Stable vertices are
+    /// never removed (cheap stabilization plan 20261126).
     fn is_stable(
         &self,
         index: StageIndex,
-    ) -> bool {
-        index
-            .staged()
-            .is_some_and(|staged| staged.slot() < self.stable())
-    }
+    ) -> bool;
 }
 
-/// Two staged vertices exchanged slots (a stabilization).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Swap {
-    pub a: StageIndex,
-    pub b: StageIndex,
-}
-
-impl Swap {
-    /// `index` after the swap: `a` and `b` are exchanged, every other index
-    /// is unchanged.
-    pub fn apply(
-        self,
-        index: StageIndex,
-    ) -> StageIndex {
-        if index == self.a {
-            self.b
-        } else if index == self.b {
-            self.a
-        } else {
-            index
-        }
-    }
-}
-
-/// A staged vertex moved from slot `from` to slot `to` by a removal
-/// (swap-remove: `from` was the last slot, `to` the removed vertex's).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Moved {
-    pub from: StageIndex,
-    pub to: StageIndex,
-}
-
-impl Moved {
-    /// `index` after the move: `from` becomes `to`, every other index is
-    /// unchanged.
-    pub fn apply(
-        self,
-        index: StageIndex,
-    ) -> StageIndex {
-        if index == self.from { self.to } else { index }
-    }
-}
-
-/// Staged → committed; committed indices are unchanged.
+/// Staged → committed; committed indices are unchanged. Removed staged
+/// slots have no committed index.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Translation(Vec<CommittedIndex>);
+pub struct Translation {
+    slots: Vec<Option<CommittedIndex>>,
+    len: usize,
+}
 
 impl Translation {
-    pub(crate) fn table(committed: Vec<CommittedIndex>) -> Self {
-        Self(committed)
+    pub(crate) fn table(slots: Vec<Option<CommittedIndex>>) -> Self {
+        let len = slots.iter().flatten().count();
+        Self { slots, len }
     }
-    /// The committed indices by staged slot.
-    pub(crate) fn slots(&self) -> &[CommittedIndex] {
-        &self.0
+    /// The committed indices by staged slot (`None` for removed slots).
+    pub(crate) fn slots(&self) -> &[Option<CommittedIndex>] {
+        &self.slots
     }
     /// # Panics
-    /// If `index` is staged but not part of the committed stage.
+    /// If `index` is staged but not part of the committed stage (unknown
+    /// or removed).
     pub fn index(
         &self,
         index: StageIndex,
     ) -> CommittedIndex {
         match index.split() {
             Either::Left(committed) => committed,
-            Either::Right(staged) => self.0[staged.slot()],
+            Either::Right(staged) => self
+                .slots
+                .get(staged.slot())
+                .copied()
+                .flatten()
+                .unwrap_or_else(|| panic!("staged {index} was not committed")),
         }
     }
     pub fn token(
@@ -119,12 +80,12 @@ impl Translation {
     ) -> Token<CommittedIndex> {
         Token::new(self.index(token.index), token.width)
     }
-    /// Number of translated (formerly staged) vertices.
+    /// Number of translated (formerly staged, not removed) vertices.
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.len
     }
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.len == 0
     }
 }
 

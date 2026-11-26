@@ -1,9 +1,9 @@
 ---
 tags: `#plan` `#context-read` `#context-trace` `#positioned-composition` `#reader` `#staging` `#stabilization`
 summary: Plan for early stabilization of staged tokens (replaces task D7 of 20261125_PLAN_DISSOLUTION). Revision 2 - Rule S′ - a parent occurrence (U, o) of a staged composite t is fixed iff t ends strictly inside U (any U, the root included) or U is committed or stable; t ≠ root is stabilized iff it has ≥ 2 fixed parent occurrences. Theorem S′ - such a token is a maximal repeat of every continuation, a vertex of every later settled stage, never dissolved. Purpose - the stable property itself (settle skips stable tokens; foundation for streaming and later optimizations). Cheap, parent-local check, event-driven candidates (E1 added occurrences and created tokens, E2 cascade, E3 root growth) in the settle edit. Revision 1 (Rule S, only committed or stable parents) was sound but vacuous in the reader (history in §6.R1). Verification - rule, fixpoint and string-level soundness checks per step, exhaustive small inputs, mutations; coverage reported (33 % fixtures, 60 % exhaustive).
-status: ✅ revision 2 (Rule S′) implemented (2026-11-26, §6). Revision 1 (Rule S) superseded: sound but vacuous in the reader (§6.R1).
+status: ✅ revision 2 (Rule S′) implemented (2026-11-26, §6); revision 3 (stable flag, removal holes, no swaps or renaming) implemented (2026-11-26, §4.5, §6.10). Revision 1 (Rule S) superseded: sound but vacuous in the reader (§6.R1).
 date: 2026-11-26
-revision: 2 (2026-11-26, Rule S′ replaces Rule S)
+revision: 3 (2026-11-26, storage - stable flag and removal holes replace the stable slot prefix and swap-remove; rule unchanged)
 parent: 20261125_PLAN_DISSOLUTION.md (§4.6 D7, Appendix C.7 superseded by this plan)
 depends_on: 20261122_PLAN_POSITIONED_INSERT.md (G2 complete maximal composition, G3 reciprocal links), 20261125_PLAN_DISSOLUTION.md (G6, `settle`, M1, M4, M5, stability marks)
 ---
@@ -20,6 +20,7 @@ depends_on: 20261122_PLAN_POSITIONED_INSERT.md (G2 complete maximal composition,
 | S4 | Benchmarks, gate, documentation (old plan, INDEX) | — |
 
 | S′ (rev. 2) | Rule S′ (§2.2), events E1–E3 (§3), tests and results (§4.4, §5.8, §6) | which tokens become stable |
+| R3 (rev. 3) | Storage: stable flag on the staged vertex, removal leaves a hole; no `Swap`, `Moved` or renaming (§4.5, §6.10) | none (indices only) |
 
 Order: S1 → S2 → S3 → S4, then S′. S1 and S2 are one code change in practice;
 they are separated here so the review can check the rule and the
@@ -297,7 +298,7 @@ Module doc: "Early stabilization by fixed parent occurrences (plan
   `fixed_right_contexts`, `uniform_atom`. Keep `Swap`.
 - Update the docs that mention Theorem E.
 
-**Unchanged (kept from D7):**
+**Unchanged (kept from D7; replaced in revision 3, §4.5):**
 
 - the stable slot prefix (`StagingGraph::stable`, `raw::Stabilize`,
   `Swap`, the shared `rename`);
@@ -377,6 +378,43 @@ Module doc: "Early stabilization by fixed parent occurrences (plan
   `(Commit, Option<Publication>, Option<StageIndex>)`. The last element
   is the previous last child of an in-place grown root (E3).
 - `context-read/src/read.rs`: pushes it with `Candidates::push_gained`.
+
+### 4.5 Revision 3 — stable flag and removal holes (code)
+
+Motivation: the stable slot prefix needed a `Swap` per stabilization and
+swap-remove needed a `Moved` per removal. Both renamed every reference
+of the moved vertices in the graph and forced every index held outside
+the graph (edit records, worklists, candidate lists, the root) to be
+translated. A missed translation silently aliased another vertex. Nothing
+used the prefix layout itself.
+
+New storage (context-trace):
+
+- `StagingGraph::vertices: Vec<Option<StagedVertex>>` in creation order.
+  A removal sets the slot to `None` (a hole); slots are never moved or
+  reused, so a staged index is valid until its vertex is removed and is
+  never renamed. A stale index resolves to `None` (`UnknownVertex`)
+  instead of another vertex.
+- `StagedVertex::stable: bool`. `raw::Stabilize::stabilize` sets it
+  (asserts it was unset); `raw::Remove::remove` asserts it is unset.
+- `Stage::is_stable` is a required method (flag lookup);
+  `Stage::stable()` (prefix length) is removed; `Stage::staged()` lists
+  live slots.
+- `commit_into` skips holes: committed indices stay dense.
+  `Translation` maps slots to `Option<CommittedIndex>`; `len()` counts
+  the committed vertices.
+
+Removed: `Swap`, `Moved`, `StagingGraph::rename` and `composition_mut`,
+`GraphEdit::swap_records` and `rename_records`, `Removal::moved`, and the
+renaming in `settle` and `stabilize_candidates`.
+
+API: `GraphEdit::settle(candidates, root: StageIndex)` and
+`stabilize_candidates(candidates, root: StageIndex)` take the root by
+value (it never moves). `GraphEdit::stabilize` returns `Ok(true)` if
+newly stable, `Ok(false)` if already stable.
+
+Memory: holes stay until the commit. Removals are rare (16 of 701 lane
+steps, 1,030 of 380,250 exhaustive steps), so the cost is negligible.
 
 ## 5. Verification
 
@@ -705,6 +743,31 @@ All green (2026-11-26):
 7. Three sub-events are redundant on reader inputs (§6.5). They are kept
    for completeness of the event table.
 
+### 6.10 Revision 3 results (stable flag, removal holes)
+
+- Lanes unchanged: fixture lane 701 steps, 66 stabilized (33.0 %);
+  exhaustive default 14,178 steps, 3,474 (55.4 %); exhaustive full
+  380,250 steps, 116,038 (60.1 %), 1,030 dissolved. All checks green.
+- Stage unit tests rewritten for the new semantics:
+  `remove_leaves_a_hole` (the removed index resolves to nothing, no
+  vertex moves, the hole has no label, slots are not reused),
+  `stabilize_sets_a_flag` (no reference changes; removing an unstable
+  vertex keeps the stable ones), `settle_keeps_the_root_index`,
+  `settle_keeps_gained_candidates`; the other tests assert unchanged
+  indices instead of moves.
+- Gate: context-trace, context-search, context-insert and context-read
+  in default, `test-api` and `legacy-tests` modes green;
+  `--no-default-features` checks and the workspace build pass.
+- Benchmarks (`staging`, interleaved HEAD/new runs, 20 samples, mean of
+  two runs):
+
+| Benchmark | Revision 2 (swaps) | Revision 3 (flag, holes) |
+|---|---|---|
+| `read/corpus/all` | 2.010 ms | 1.993 ms |
+| `abc^64 x` | 1.046 ms | 1.015 ms |
+| `abc^256 x` | 41.76 ms | 39.98 ms |
+| `abc^512 x` | 363.2 ms | 355.6 ms |
+
 ## 6.R1 History: revision 1 results (Rule S, superseded)
 
 > **Superseded (2026-11-26)** by revision 2 (Rule S′, §6.R1.1–§6.R1.8). Kept as
@@ -926,6 +989,6 @@ Results, with all lane checks including (T) green:
 | R2 | Worklist inside `GraphEdit` (`stabilize_candidates`) or in the reader? | Inside `GraphEdit`, next to `settle` (same pattern, same records, one edit per step). |
 | R3 | Run stabilization in the same edit as `settle`? | Yes: avoids carrying renamed candidates across edits and a second `finish`. |
 | R4 | Keep Theorem E anywhere? | No. Remove it from code and tests; mark C.7 superseded in the dissolution plan. Soundness rests on Theorem S only. |
-| R5 | Keep the stable slot prefix mechanism? | Yes, unchanged (needed by the rule; cheap). |
+| R5 | Keep the stable slot prefix mechanism? | Revision 2: yes. Revision 3 (decided 2026-11-26): no; a stable flag on the vertex and removal holes, so no index ever moves (§4.5). |
 | R6 | Exhaustive lane size (§5.2) | `{a,b}`, inputs ≤ 6, corpora ≤ 2 inputs ≤ 4; adjust to the time budget. |
 | R7 (rev. 2) | Rule S (vacuous) or Rule S′? | Rule S′ (approved 2026-11-26): case (i) gives the base case; the stable machinery is kept. |

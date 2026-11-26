@@ -202,23 +202,21 @@ impl<'g> ReadStage<'g> {
     /// or discard the staged composites among `candidates` (and their
     /// cascades) with ≤ 1 parent occurrence; then stabilize by Rule S′
     /// (cheap stabilization plan §2.2, §3) from the gained candidates and
-    /// the cascade of every stabilization. One `GraphEdit` on the stage; the
-    /// root is renamed if it moved.
+    /// the cascade of every stabilization. One `GraphEdit` on the stage.
     pub(crate) fn settle(
         &mut self,
         candidates: Candidates,
     ) -> Settlement {
-        let Some(mut root) = self.root else {
+        let Some(root) = self.root else {
             return Settlement::default();
         };
         let mut view = self.handle.stage();
         let mut edit = GraphEdit::new(&mut view);
-        let mut settled = edit.settle(candidates, &mut root);
-        let stabilized =
-            edit.stabilize_candidates(std::mem::take(&mut settled.gained), &mut root);
+        let mut settled = edit.settle(candidates, root.index);
+        let stabilized = edit
+            .stabilize_candidates(std::mem::take(&mut settled.gained), root.index);
         edit.finish();
         drop(view);
-        self.root = Some(root);
         Settlement {
             settled,
             stabilized,
