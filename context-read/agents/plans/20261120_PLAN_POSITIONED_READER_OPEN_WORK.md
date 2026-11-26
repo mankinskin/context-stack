@@ -193,10 +193,11 @@ input permutations where the oracle is order-independent.
 ## Step 6 — Cutover and retirement of the row model
 
 - [ ] Positioned backend becomes the default for `context_read::read`.
-- [ ] Migrate `context-api` compare, `context-cli` oracle tests, HTTP/MCP
-  serialization and the context editor kernel to the positioned model or an
-  explicitly derived row layout (optional `layout(owner) -> rows`, never
-  creating vertices).
+- [x] Migrate `context-api`, `context-cli` oracle tests, HTTP/MCP
+  serialization to the positioned model (2026-11-26,
+  `context-api/agents/plans/20261126_PLAN_CONTEXT_TOOLS`; the oracle tests
+  moved to `context-api/tests/acceptance`; legacy `compare` dropped). The
+  context editor kernel has no graph protocol and needs no migration.
 - [ ] Remove row closure (`Overlap::close`, complement interning in
   `scope_complement`, row tail replacement) once unused; mark the overlap
   provider plan superseded.

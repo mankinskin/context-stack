@@ -1,6 +1,6 @@
 # Plan: context tools on the positioned stack (CLI, server, client, MCP)
 
-**Date:** 2026-11-26 · **Status:** 📋 ready, decisions D1–D8 accepted (2026-11-26) ·
+**Date:** 2026-11-26 · **Status:** ✅ stages 1–6 implemented (2026-11-26, §10), decisions D1–D8 accepted ·
 **Scope:** `context-api`, `tools/cli/context-cli`, `tools/http/context-http`,
 `tools/mcp/context-mcp`, one serde feature in `context-trace`.
 
@@ -214,3 +214,55 @@ Correctness anchors (independent of the implementation under test):
 | Reader cost (measured 2026-11-26, release): 20 KB of plan text 45 s, 50 KB > 5 min; a run of one char is cubic (1 000 chars 2.5 s, 3 000 chars 64 s) | Algorithm work in context-read, outside this plan; tools run reads off the async runtime and report progress. Indexing large corpora is blocked on reader performance |
 | Recursion over the nesting depth (= input length for runs of one char) overflowed 2 MB worker stacks and aborted the process (not catchable) | Every command runs on a thread with a 256 MiB lazily committed stack (`Session::execute`); iterative algorithms remain a context-read task |
 | Large inputs block the server | `spawn_blocking`, streamed `text/plain` read endpoint, progress events, body size limit |
+
+## 10. Implementation record (2026-11-26)
+
+All stages are implemented on branch `feat/context-tools`. Test counts at
+completion: context-api 118 (incl. 36 acceptance tests: oracle comparison
+on 1 939 corpora, brute-force search over ~30k queries, fixture round
+trips, gate), context-cli 41, context-http 23, context-mcp 9+; algorithm
+crates unchanged (275). Manual end-to-end check: server holding a graph,
+auto-discovered CLI reads and searches from a second process, curl,
+WebSocket, shell, MCP proxy over stdio, graceful shutdown.
+
+Deviations from the stage files (the code is authoritative):
+
+- Contract: `Command::Read` has `dry_run`; `Vertex` and `Render` take
+  `Limits`; `Response` is `{ id, outcome }` (same JSON as specified);
+  `ReadInputReport` has no `new_vertices`; `ApiError::Busy` (kind `locked`)
+  when another command of the same session uses a graph that is to be
+  deleted or replaced; `SessionConfig::allow_graph_paths` (path graph
+  references only for the local CLI or below `allow_fs`);
+  `Session::open_locations`; `Backend::execute(&self)` (`Send + Sync`).
+- `create` writes the graph file once, after reading
+  (`GraphStore::create_unsaved`).
+- Every command runs on a thread with a 256 MiB (lazily committed) stack:
+  the reader recursion overflowed 2 MB worker stacks on runs of one char
+  and aborted the server.
+- Server: browser guard (foreign `Origin` refused on all `/v1` routes incl.
+  WebSocket upgrades; loopback `Host` required without a token); discovery
+  files and interval autosave keyed by graph path; positional graphs are
+  preloaded (no `--preload` flag).
+- MCP: graphs by store name only; delete and overwrite only with
+  `--allow-delete` (also through `context_execute`); no structured
+  content (schema size).
+- Shell: the default graph is inserted when a command lacks its graph
+  argument, so read texts need `-t` in the shell.
+- TypeScript bindings: export path fixed to `../../packages/...`; `u64`
+  fields are `number`.
+- GraphQL and the legacy REST/log routes of context-http were dropped; the
+  legacy `compare` command was not ported (positioned `diff` is test-only).
+
+Open follow-ups (not part of this plan):
+
+- **Reader performance** (context-read): 20 KB of text takes 45 s in
+  release, runs of one char are cubic. Large-corpus indexing is blocked on
+  it. Recursion should become iterative (the stack mitigation stays).
+- Auto-discovery for graphs addressed by path, and for `mcp` without
+  `--server`; TLS for the client; graph-name completion in the shell.
+- TypeScript: `#[serde(default)]` request fields are required in the
+  generated types (`ts(optional)` would make requests easier to build).
+- Viewer telemetry topic (`telemetry`) once positioned search/read emit
+  traversal events.
+- Context editor kernel: no migration needed (it has no graph protocol);
+  the viewer will use the WebSocket protocol.
