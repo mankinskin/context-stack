@@ -79,8 +79,10 @@ impl GraphMeta {
     }
 }
 
+/// RFC 3339 in UTC with milliseconds (fixed width, so file sizes do not
+/// depend on the clock).
 pub(crate) fn now() -> String {
-    chrono::Utc::now().to_rfc3339()
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
 fn corrupt(
