@@ -2,7 +2,7 @@
 name = "context-http"
 version = "0.1.0"
 edition = "2021"
-description = "HTTP + GraphQL adapter for context-engine API"
+description = "HTTP and WebSocket server for the context-engine API"
 
 [lib]
 name = "context_http"
@@ -12,27 +12,21 @@ path = "src/lib.rs"
 name = "context-http"
 path = "src/main.rs"
 
-[features]
-default = []
-graphql = ["dep:async-graphql", "dep:async-graphql-axum"]
-
 [dependencies]
 context-api = { path = "../../../context-api" }
 
-axum = { version = "0.8", features = ["json"] }
+axum = { version = "0.8", features = ["json", "ws", "query"] }
+clap = { version = "4", features = ["derive", "env"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
-tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["cors", "fs"] }
-
-# Optional GraphQL support
-async-graphql = { version = "7", optional = true }
-async-graphql-axum = { version = "7", optional = true }
+tower-http = { version = "0.6", features = ["cors", "fs", "limit"] }
 
 [dev-dependencies]
-axum-test = "19"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 tempfile = "3"
+tokio-tungstenite = "0.29"
