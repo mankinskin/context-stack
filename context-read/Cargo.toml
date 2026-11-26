@@ -1,6 +1,6 @@
 [package]
 authors = ["Linus Behrbohm <linusbehrbohm@web.de>"]
-edition = "2018"
+edition = "2024"
 name = "context-read"
 version = "0.1.0"
 resolver = "2"
