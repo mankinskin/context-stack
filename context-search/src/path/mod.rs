@@ -26,12 +26,14 @@
 //! is confined to `role.rs` (see its module docs) so that more dimensions
 //! only touch the role trait and its helpers.
 
+pub mod navigate;
 pub mod range;
 pub mod role;
 pub mod role_path;
 pub mod root;
 
 pub use self::{
+    navigate::PathNavigate,
     range::{
         HasRolePath,
         RangePath,

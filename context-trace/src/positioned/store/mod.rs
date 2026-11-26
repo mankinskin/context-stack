@@ -47,6 +47,11 @@ pub use self::{
     },
     write::GraphWrite,
 };
+#[doc(hidden)]
+pub use self::navigate::{
+    descend,
+    location,
+};
 pub(crate) use self::has_graph::{
     impl_has_graph,
     impl_has_graph_mut,

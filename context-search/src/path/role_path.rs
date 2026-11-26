@@ -1,6 +1,7 @@
 //! The role-generic positioned path (legacy `RolePath` /
 //! `RootedRolePath`).
 
+use crate::path::PathNavigate as _;
 use std::{
     marker::PhantomData,
     ops::ControlFlow,

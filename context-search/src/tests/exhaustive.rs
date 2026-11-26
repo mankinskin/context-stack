@@ -5,6 +5,7 @@
 //! [`validate`]. Suite-level depth floors ([`Depth`]) make sure the deep
 //! fixtures keep exercising long paths, raises and decompositions.
 
+use crate::path::PathNavigate as _;
 use context_trace::positioned::{
         GraphRead,
         Navigate,

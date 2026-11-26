@@ -33,9 +33,10 @@
 //! - content reading (debug and `test-api` builds):
 //!   [`Navigate::read_interval`];
 //! - local navigation for search, on vertex objects ([`Navigate`],
-//!   `store/navigate.rs`): `start_at`, `end_at`, `prefix_child`,
-//!   `postfix_child`, `prefixes`, `postfixes`, `parent_occurrences`,
-//!   `advance_end_path`; atoms through [`GraphRead::atom`];
+//!   `store/navigate.rs`): `start_at`, `prefix_child`, `postfix_child`,
+//!   `prefixes`, `postfixes`, `parent_occurrences`; atoms through
+//!   [`GraphRead::atom`]; end paths (`end_at`, `advance_end_path`) are
+//!   `context_search::path::PathNavigate`;
 //! - search paths, trace states, trace cache and cache keys live in
 //!   `context_search::{path, trace}` (search plan 2.2).
 
@@ -95,6 +96,8 @@ pub use self::{
         KindOf,
         Located,
         Navigate,
+        descend,
+        location,
         NodeRef,
         VertexRead,
         VertexState,

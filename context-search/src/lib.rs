@@ -36,6 +36,7 @@ pub use self::{
         End,
         EndPath,
         HasRolePath,
+        PathNavigate,
         PathRole,
         PathRoot,
         QueryPath,

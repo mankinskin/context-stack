@@ -19,6 +19,7 @@
 //! extent and span types for multi-dimensional inputs) only has to replace
 //! these.
 
+use crate::path::PathNavigate as _;
 use std::{
     fmt::Debug,
     hash::Hash,
