@@ -65,7 +65,7 @@ pub use self::{
 /// Canonical `export_to` path for ts-rs (`#[ts(export_to = "...")]`),
 /// relative to `<crate>/bindings/`. Must match [`ts_export!`].
 pub const TS_EXPORT_DIR: &str =
-    "../../../packages/context-types/src/generated/";
+    "../../packages/context-types/src/generated/";
 
 /// Derives and exports a TypeScript type via ts-rs (feature `ts-gen`) for
 /// every wrapped item, keeping the export path in one place.
@@ -76,7 +76,7 @@ macro_rules! ts_export {
             #[cfg_attr(feature = "ts-gen", derive(ts_rs::TS))]
             #[cfg_attr(
                 feature = "ts-gen",
-                ts(export, export_to = "../../../packages/context-types/src/generated/")
+                ts(export, export_to = "../../packages/context-types/src/generated/")
             )]
             $item
         )*

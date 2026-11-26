@@ -26,6 +26,7 @@ ts_export! {
             graph: String,
             /// Id of the request that runs the read.
             #[serde(default, skip_serializing_if = "Option::is_none")]
+            #[cfg_attr(feature = "ts-gen", ts(type = "number | null"))]
             request: Option<u64>,
             /// Index of the input within the request.
             input: usize,
@@ -37,13 +38,21 @@ ts_export! {
         /// A mutating command changed the graph.
         GraphChanged {
             graph: String,
+            #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
             generation: u64,
             vertex_count: usize,
             new_inputs: Vec<u32>,
         },
-        Saved { graph: String, generation: u64 },
+        Saved {
+            graph: String,
+            #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
+            generation: u64,
+        },
         /// The subscriber fell behind; `skipped` events were dropped.
-        Lagged { skipped: u64 },
+        Lagged {
+            #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
+            skipped: u64,
+        },
     }
 }
 

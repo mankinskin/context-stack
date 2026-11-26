@@ -235,6 +235,7 @@ ts_export! {
         /// Top-down, root entry first.
         pub start_path: Vec<PathStep>,
         pub end_path: Vec<PathStep>,
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub generation: u64,
     }
 
@@ -309,10 +310,12 @@ ts_export! {
         pub composite_count: usize,
         pub input_count: usize,
         pub total_input_chars: usize,
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub generation: u64,
         pub created_at: String,
         pub modified_at: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts-gen", ts(type = "number | null"))]
         pub file_size: Option<u64>,
         /// Open in this session.
         pub open: bool,
@@ -403,7 +406,9 @@ ts_export! {
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
     pub struct SaveReport {
         pub path: String,
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub bytes: u64,
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub generation: u64,
     }
 
@@ -488,6 +493,7 @@ ts_export! {
         pub format: ExportFormat,
         /// JSON text (`interchange_v3`) or base64 (`native`).
         pub data: String,
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub bytes: u64,
     }
 

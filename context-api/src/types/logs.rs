@@ -17,6 +17,7 @@ ts_export! {
         /// The log filename (not the full path).
         pub filename: String,
         /// File size in bytes.
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub size: u64,
         /// Last modified time as RFC 3339 string.
         pub modified: String,
@@ -110,6 +111,7 @@ ts_export! {
         /// Event counts by category (e.g., "search": 12, "insert": 35).
         pub event_summary: HashMap<String, usize>,
         /// Duration of the captured execution in milliseconds.
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub duration_ms: u64,
     }
 }
@@ -121,6 +123,7 @@ ts_export! {
         /// Number of log files deleted.
         pub deleted_count: usize,
         /// Total bytes freed.
+        #[cfg_attr(feature = "ts-gen", ts(type = "number"))]
         pub freed_bytes: u64,
     }
 }

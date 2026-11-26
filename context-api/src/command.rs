@@ -273,6 +273,7 @@ ts_export! {
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
     pub struct Request {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts-gen", ts(type = "number | null"))]
         pub id: Option<u64>,
         #[serde(flatten)]
         pub command: Command,
@@ -339,6 +340,7 @@ ts_export! {
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
     pub struct Response {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts-gen", ts(type = "number | null"))]
         pub id: Option<u64>,
         #[serde(flatten)]
         pub outcome: Outcome,
