@@ -20,7 +20,9 @@ mod base64;
 pub mod command;
 pub mod error;
 pub mod event;
+mod ops;
 pub mod session;
+pub mod store;
 pub mod types;
 
 #[cfg(feature = "logs")]

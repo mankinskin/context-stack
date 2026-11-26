@@ -2281,6 +2281,7 @@ dependencies = [
  "context-read",
  "context-search",
  "context-trace",
+ "crc32fast",
  "fs2",
  "jaq-core",
  "jaq-interpret",
