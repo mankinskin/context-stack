@@ -153,7 +153,8 @@ impl<I: VertexId> Composition<I> {
     }
     /// The same composition with every child index mapped by `f` (index
     /// spaces of the same graph: order, offsets and widths are kept).
-    pub(crate) fn map_index<J: VertexId>(
+    #[doc(hidden)]
+    pub fn map_index<J: VertexId>(
         &self,
         mut f: impl FnMut(I) -> J,
     ) -> Composition<J> {
@@ -214,7 +215,8 @@ impl<I: VertexId> Composition<I> {
 impl Composition<CommittedIndex> {
     /// The occurrences with their children as [`StageIndex`]es: a stage
     /// reads unchanged committed compositions without copying.
-    pub(crate) fn lifted(&self) -> &[Occurrence<StageIndex>] {
+    #[doc(hidden)]
+    pub fn lifted(&self) -> &[Occurrence<StageIndex>] {
         // SAFETY: `Occurrence` and `Token` are `repr(C)`, `VertexIndex` and
         // `StageIndex` are `repr(transparent)` over `usize`, so both
         // occurrence types have the same layout, and every `usize` is a
@@ -227,17 +229,18 @@ impl Composition<CommittedIndex> {
 
 /// The search primitives of [`Composition`] on its occurrence slice, shared
 /// with stage views of compositions.
-pub(crate) mod slice {
+#[doc(hidden)]
+pub mod slice {
     use super::Occurrence;
     use crate::{
         AtomPosition,
         graph::vertex::VertexId,
     };
 
-    pub(crate) fn width<I: VertexId>(occurrences: &[Occurrence<I>]) -> usize {
+    pub fn width<I: VertexId>(occurrences: &[Occurrence<I>]) -> usize {
         occurrences.last().map_or(0, |o| o.end().0)
     }
-    pub(crate) fn covering<I: VertexId>(
+    pub fn covering<I: VertexId>(
         occurrences: &[Occurrence<I>],
         position: AtomPosition,
     ) -> Option<&Occurrence<I>> {
@@ -247,7 +250,7 @@ pub(crate) mod slice {
         let after = occurrences.partition_point(|o| o.offset <= position);
         Some(&occurrences[after - 1])
     }
-    pub(crate) fn ending_at<I: VertexId>(
+    pub fn ending_at<I: VertexId>(
         occurrences: &[Occurrence<I>],
         end: AtomPosition,
     ) -> Option<&Occurrence<I>> {
@@ -256,7 +259,7 @@ pub(crate) mod slice {
         }
         occurrences.get(occurrences.partition_point(|o| o.end() < end))
     }
-    pub(crate) fn crossing<I: VertexId>(
+    pub fn crossing<I: VertexId>(
         occurrences: &[Occurrence<I>],
         position: AtomPosition,
     ) -> &[Occurrence<I>] {

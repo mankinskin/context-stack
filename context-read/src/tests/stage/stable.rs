@@ -20,37 +20,45 @@ use super::{
     },
 };
 use crate::{
-    Token,
-    graph::vertex::{
-        StageIndex,
-        StagedIndex,
-        has_vertex_index::HasVertexIndex as _,
+    stage::{
+        overlay::{
+            OverlayHandle,
+            OverlayView,
+        },
+        StageHandle,
+    },
+};
+use context_trace::{
+    graph::{
+        vertex::{
+            has_vertex_index::HasVertexIndex as _,
+            StagedIndex,
+            StageIndex,
+        },
     },
     positioned::{
         Candidates,
-        GraphRead,
-        OverlayHandle,
-        OverlayView,
-        PositionedError,
-        PositionedGraph,
-        PositionedGraphRef,
-        Stage,
-        StageHandle,
-        VertexRead,
         diff,
-        edit::GraphEdit,
+        GraphEdit,
+        GraphRead,
         interchange::{
             PositionedGraphData,
             store_interchange,
         },
-        string_repr,
-        store::raw::{
+        PositionedError,
+        PositionedGraph,
+        PositionedGraphRef,
+        raw::{
             Remove as _,
             SEAL,
             Stabilize as _,
         },
+        Stage,
+        string_repr,
         validate_store,
+        VertexRead,
     },
+    Token,
 };
 
 fn staged(slot: usize) -> StageIndex {

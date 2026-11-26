@@ -16,30 +16,30 @@ use std::{
 #[cfg(debug_assertions)]
 use either::Either;
 
-use crate::{
+use crate::stage::Translation;
+use context_trace::{
     AtomOf,
     AtomPosition,
     BaseGraphKind,
-    GraphKind,
-    TokenWidth,
-    graph::vertex::{
-        CommittedIndex,
-        StageIndex,
-        VertexIndex,
-    },
-    positioned::{
-        committed::PositionedGraph,
-        model::{
-            Composition,
-            VertexNode,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            StageIndex,
+            VertexIndex,
         },
-        stage::Translation,
-        store::raw::{
+    },
+    GraphKind,
+    positioned::{
+        PositionedGraph,
+        Composition,
+        raw::{
             SEAL,
             VertexWrite as _,
             Write as _,
         },
+        VertexNode,
     },
+    TokenWidth,
 };
 
 /// Parent vertex → offsets at which a vertex occurs in it.
@@ -154,7 +154,7 @@ pub(super) struct BaseDelta {
 /// The staged part of an overlay (staging plan §4.1).
 #[derive(Clone, Debug)]
 pub struct StagingGraph<G: GraphKind = BaseGraphKind> {
-    /// By [`StagedIndex`](crate::graph::vertex::StagedIndex) in creation
+    /// By [`StagedIndex`](context_trace::graph::vertex::StagedIndex) in creation
     /// order. A removal leaves a hole (`None`); slots are never reused or
     /// moved, so a staged index stays valid until its vertex is removed and
     /// is never renamed.

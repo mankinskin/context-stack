@@ -15,9 +15,9 @@ use crate::{
     },
     positioned::{
         model::PositionedError,
-        stage::Stage,
         store::{
             CompositionRead as _,
+            Stage,
             VertexRead,
             raw::SEAL,
         },

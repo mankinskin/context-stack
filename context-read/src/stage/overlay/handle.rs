@@ -7,28 +7,32 @@ use super::{
     StagingGraph,
 };
 use crate::{
+    stage::{
+        CommitError,
+        StageHandle,
+        Translation,
+    },
+};
+use context_trace::{
     AtomOf,
     BaseGraphKind,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            StagedIndex,
+            StageIndex,
+        },
+    },
     GraphKind,
-    Token,
-    graph::vertex::{
-        CommittedIndex,
-        StageIndex,
-        StagedIndex,
-    },
+    HasVertexIndex,
     positioned::{
-        committed::PositionedGraphRef,
-        model::VertexNode,
-        stage::{
-            CommitError,
-            StageHandle,
-            Translation,
-        },
-        store::{
-            HasGraph,
-            HasGraphMut,
-        },
+        GraphRead,
+        PositionedGraphRef,
+        HasGraph,
+        HasGraphMut,
+        VertexNode,
     },
+    Token,
 };
 
 /// A read's handle with an overlay stage (staging plan §4.1): the
@@ -44,7 +48,7 @@ pub struct OverlayHandle<'g, G: GraphKind = BaseGraphKind> {
 impl<'g, G: GraphKind> OverlayHandle<'g, G> {
     /// Open an empty stage over `base`.
     pub fn open(base: &'g PositionedGraphRef<G>) -> Self {
-        let generation = base.read().generation;
+        let generation = base.read().generation().base;
         Self {
             base,
             stage: RefCell::new(StagingGraph::new(generation)),
@@ -72,21 +76,22 @@ impl<'g, G: GraphKind> OverlayHandle<'g, G> {
         &mut self,
         value: AtomOf<G>,
     ) -> Result<Token<StageIndex>, CommitError> {
-        if let Some(&index) = self.base.read().atoms.get(&value) {
+        let known = self.base.read().atom(&value).map(|vertex| vertex.vertex_index());
+        if let Some(index) = known {
             return Ok(Token::new(StageIndex::lift(index), 1));
         }
         let mut base = self.base.write();
         let stage = self.stage.get_mut();
-        if base.generation != stage.base_generation {
+        if base.generation().base != stage.base_generation {
             return Err(CommitError::BaseChanged {
                 opened: stage.base_generation,
-                now: base.generation,
+                now: base.generation().base,
             });
         }
         let mut edit = base.edit();
         let token = edit.atom(value);
         edit.finish();
-        stage.base_generation = base.generation;
+        stage.base_generation = base.generation().base;
         Ok(Token::new(StageIndex::lift(token.index), token.width))
     }
     /// Number of live staged vertices.
@@ -131,10 +136,10 @@ impl<G: GraphKind> StageHandle for OverlayHandle<'_, G> {
     ) -> Result<(Token<CommittedIndex>, Translation), CommitError> {
         let stage = self.stage.into_inner();
         let mut base = self.base.write();
-        if base.generation != stage.base_generation {
+        if base.generation().base != stage.base_generation {
             return Err(CommitError::BaseChanged {
                 opened: stage.base_generation,
-                now: base.generation,
+                now: base.generation().base,
             });
         }
         for (slot, vertex) in stage.live() {

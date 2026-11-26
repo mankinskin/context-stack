@@ -20,31 +20,29 @@ use super::{
         remove_link,
     },
 };
-use crate::{
+use context_trace::{
     AtomOf,
     AtomPosition,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            has_vertex_index::HasVertexIndex,
+            StageIndex,
+            VertexId,
+            wide::Wide,
+        },
+    },
     GraphKind,
+    positioned::{
+        NodeRef,
+        PositionedVertex,
+        raw,
+        VertexNode,
+        VertexRead,
+        VertexState,
+    },
     Token,
     TokenWidth,
-    graph::vertex::{
-        CommittedIndex,
-        StageIndex,
-        VertexId,
-        has_vertex_index::HasVertexIndex,
-        wide::Wide,
-    },
-    positioned::{
-        model::{
-            PositionedVertex,
-            VertexNode,
-        },
-        store::{
-            NodeRef,
-            VertexRead,
-            VertexState,
-            raw,
-        },
-    },
 };
 
 /// The stored vertex behind an overlay index.
@@ -75,7 +73,7 @@ impl<'a, G: GraphKind> OverlayVertex<'a, G> {
         index: StageIndex,
     ) -> Option<Self> {
         let known = match index.split() {
-            Either::Left(committed) => committed.0 < view.base.vertices.len(),
+            Either::Left(committed) => committed.0 < view.base.vertex_count(),
             Either::Right(staged) => view
                 .stage
                 .vertices
@@ -88,7 +86,7 @@ impl<'a, G: GraphKind> OverlayVertex<'a, G> {
     fn entry(self) -> Entry<'a, G> {
         match self.index.split() {
             Either::Left(committed) =>
-                Entry::Base(&self.view.base.vertices[committed.0]),
+                Entry::Base(self.view.base.vertex_data(committed).expect("committed vertex")),
             Either::Right(staged) =>
                 Entry::Staged(self.view.stage.staged(staged.slot())),
         }
@@ -103,7 +101,7 @@ impl<'a, G: GraphKind> OverlayVertex<'a, G> {
         if deltas.is_empty() {
             None
         } else {
-            deltas.get(&vertex.index)
+            deltas.get(&vertex.index())
         }
     }
     fn width_of(
@@ -112,7 +110,7 @@ impl<'a, G: GraphKind> OverlayVertex<'a, G> {
     ) -> TokenWidth {
         match index.split() {
             Either::Left(committed) =>
-                self.view.base.vertices[committed.0].width,
+                self.view.base.vertex_data(committed).expect("committed vertex").width(),
             Either::Right(staged) =>
                 self.view.stage.staged(staged.slot()).width,
         }
@@ -141,7 +139,7 @@ impl<G: GraphKind> HasVertexIndex for OverlayVertex<'_, G> {
 impl<G: GraphKind> Wide for OverlayVertex<'_, G> {
     fn width(&self) -> TokenWidth {
         match self.entry() {
-            Entry::Base(vertex) => vertex.width,
+            Entry::Base(vertex) => vertex.width(),
             Entry::Staged(vertex) => vertex.width,
         }
     }
@@ -154,7 +152,7 @@ impl<'a, G: GraphKind> VertexRead<'a> for OverlayVertex<'a, G> {
     #[inline(always)]
     fn node(self) -> NodeRef<'a, AtomOf<G>, Lifted<'a>> {
         match self.entry() {
-            Entry::Base(vertex) => match &vertex.node {
+            Entry::Base(vertex) => match vertex.node() {
                 VertexNode::Atom(atom) => NodeRef::Atom(atom),
                 VertexNode::Composite(composition) => NodeRef::Composite(
                     match self
@@ -188,7 +186,7 @@ impl<'a, G: GraphKind> VertexRead<'a> for OverlayVertex<'a, G> {
             Entry::Base(vertex) => {
                 let delta = self.delta(vertex);
                 let removed = delta.map(|delta| &delta.removed);
-                let base = vertex.parents.iter().flat_map(
+                let base = vertex.parents().iter().flat_map(
                     move |(&parent, offsets)| {
                         offsets
                             .iter()
@@ -214,7 +212,7 @@ impl<'a, G: GraphKind> VertexRead<'a> for OverlayVertex<'a, G> {
     fn parent_count(self) -> usize {
         match self.entry() {
             Entry::Base(vertex) if self.delta(vertex).is_none() =>
-                vertex.parents.values().map(BTreeSet::len).sum(),
+                vertex.parents().values().map(BTreeSet::len).sum(),
             Entry::Staged(vertex) =>
                 vertex.parents.values().map(BTreeSet::len).sum(),
             Entry::Base(_) => self.parents().count(),
@@ -229,7 +227,7 @@ impl<'a, G: GraphKind> VertexRead<'a> for OverlayVertex<'a, G> {
             Entry::Base(vertex) => {
                 let delta = self.delta(vertex);
                 let in_base = parent.committed().is_some_and(|committed| {
-                    has_link(&vertex.parents, &committed, offset)
+                    has_link(vertex.parents(), &committed, offset)
                         && !delta.is_some_and(|delta| {
                             has_link(&delta.removed, &committed, offset)
                         })
@@ -258,7 +256,7 @@ impl<'a, G: GraphKind> VertexRead<'a> for OverlayVertex<'a, G> {
     #[cfg(debug_assertions)]
     fn label(self) -> &'a str {
         match self.entry() {
-            Entry::Base(vertex) => &vertex.label,
+            Entry::Base(vertex) => vertex.label(),
             Entry::Staged(vertex) => &vertex.label,
         }
     }
@@ -282,7 +280,7 @@ impl<G: GraphKind> VertexMut<'_, G> {
         deltas: &'d mut StageMap<CommittedIndex, BaseDelta>,
         vertex: &PositionedVertex<G>,
     ) -> &'d mut BaseDelta {
-        deltas.entry(vertex.index).or_default()
+        deltas.entry(vertex.index()).or_default()
     }
 }
 
@@ -298,7 +296,7 @@ impl<G: GraphKind> raw::VertexWrite for OverlayVertexMut<'_, G> {
                 let VertexNode::Composite(composition) = node else {
                     panic!(
                         "committed vertex {} cannot become an atom",
-                        vertex.index
+                        vertex.index()
                     );
                 };
                 VertexMut::delta(deltas, vertex).composition =
@@ -313,9 +311,9 @@ impl<G: GraphKind> raw::VertexWrite for OverlayVertexMut<'_, G> {
     ) {
         match &mut self.0 {
             VertexMut::Base { vertex, .. } => assert_eq!(
-                vertex.width, width,
+                vertex.width(), width,
                 "the width of committed vertex {} is immutable",
-                vertex.index
+                vertex.index()
             ),
             VertexMut::Staged(vertex) => vertex.width = width,
         }
@@ -330,7 +328,7 @@ impl<G: GraphKind> raw::VertexWrite for OverlayVertexMut<'_, G> {
                 let delta = VertexMut::delta(deltas, vertex);
                 let in_base = parent.committed().is_some_and(|committed| {
                     remove_link(&mut delta.removed, &committed, offset)
-                        || has_link(&vertex.parents, &committed, offset)
+                        || has_link(vertex.parents(), &committed, offset)
                 });
                 if !in_base {
                     insert_link(&mut delta.added, parent, offset);
@@ -352,7 +350,7 @@ impl<G: GraphKind> raw::VertexWrite for OverlayVertexMut<'_, G> {
                     return;
                 }
                 if let Some(committed) = parent.committed()
-                    && has_link(&vertex.parents, &committed, offset)
+                    && has_link(vertex.parents(), &committed, offset)
                 {
                     insert_link(&mut delta.removed, committed, offset);
                 }
@@ -370,7 +368,7 @@ impl<G: GraphKind> raw::VertexWrite for OverlayVertexMut<'_, G> {
     ) {
         match &mut self.0 {
             VertexMut::Base { vertex, .. } =>
-                debug_assert_eq!(vertex.label, label),
+                debug_assert_eq!(vertex.label(), label),
             VertexMut::Staged(vertex) => vertex.label = label,
         }
     }

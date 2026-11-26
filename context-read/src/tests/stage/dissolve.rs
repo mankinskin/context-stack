@@ -13,48 +13,56 @@ use super::overlay::{
     occ,
 };
 use crate::{
-    ToToken,
-    Token,
-    graph::vertex::{
-        StageIndex,
-        StagedIndex,
-        VertexId as _,
+    stage::{
+        CommitError,
+        overlay::{
+            OverlayHandle,
+            OverlayView,
+        },
+        StageHandle,
+    },
+};
+use context_trace::{
+    graph::{
+        vertex::{
+            StagedIndex,
+            StageIndex,
+            VertexId as _,
+        },
     },
     positioned::{
         Candidates,
-        CommitError,
         CompositionRead,
+        diff,
+        GraphEdit,
+        fixtures::fixture_graphs,
         Generation,
         GraphRead,
-        Occurrence,
-        OverlayHandle,
-        OverlayView,
-        PositionedError,
-        PositionedGraph,
-        PositionedGraphRef,
-        Removal,
-        Settled,
-        Stage,
-        StageHandle,
-        VertexEdit,
-        VertexRead,
-        VertexState,
-        diff,
-        edit::GraphEdit,
-        fixtures::fixture_graphs,
         interchange::{
             PositionedGraphData,
             store_interchange,
         },
         maximal,
-        store::raw::{
+        Occurrence,
+        PositionedError,
+        PositionedGraph,
+        PositionedGraphRef,
+        raw::{
             Remove as _,
             SEAL,
             VertexWrite as _,
             Write as _,
         },
+        Removal,
+        Settled,
+        Stage,
         validate_store,
+        VertexEdit,
+        VertexRead,
+        VertexState,
     },
+    Token,
+    ToToken,
 };
 
 #[test]
@@ -65,17 +73,17 @@ fn new_atom_is_committed_at_once() {
         .unwrap();
     let count = fixture.graph.vertex_count();
     let graph = PositionedGraphRef::new(fixture.graph);
-    let opened = graph.read().generation;
+    let opened = graph.read().generation().base;
     let mut handle = OverlayHandle::open(&graph);
     let x = handle.atom('x').unwrap();
     assert_eq!(
         x,
-        Token::new(StageIndex::from(crate::VertexIndex(count)), 1)
+        Token::new(StageIndex::from(context_trace::VertexIndex(count)), 1)
     );
-    assert_eq!(graph.read().generation, opened + 1);
+    assert_eq!(graph.read().generation().base, opened + 1);
     assert_eq!(
         graph.read().atom(&'x').map(|v| v.to_token()),
-        Some(Token::new(crate::VertexIndex(count), 1))
+        Some(Token::new(context_trace::VertexIndex(count), 1))
     );
     let view = handle.stage();
     assert_eq!(view.generation().base, opened + 1);
@@ -90,21 +98,21 @@ fn new_atom_is_committed_at_once() {
 #[test]
 fn existing_atom_is_returned() {
     let (graph, n) = base();
-    let generation = graph.generation;
+    let generation = graph.generation().base;
     let graph = PositionedGraphRef::new(graph);
     let mut handle = OverlayHandle::open(&graph);
     assert_eq!(handle.atom('a'), Ok(lift(n.a)));
     assert_eq!(handle.atom('b'), Ok(lift(n.b)));
     let c = handle.atom('c').unwrap();
     assert_eq!(handle.atom('c'), Ok(c));
-    assert_eq!(graph.read().generation, generation + 1);
+    assert_eq!(graph.read().generation().base, generation + 1);
 }
 
 #[test]
 fn atom_rejects_a_changed_base() {
     let (graph, _) = base();
     let graph = PositionedGraphRef::new(graph);
-    let opened = graph.read().generation;
+    let opened = graph.read().generation().base;
     let mut handle = OverlayHandle::open(&graph);
     graph.write().edit().atom('z');
     assert_eq!(
@@ -128,7 +136,7 @@ fn commit_detects_a_foreign_edit_after_an_own_atom() {
     let graph = PositionedGraphRef::new(graph);
     let mut handle = OverlayHandle::open(&graph);
     let c = handle.atom('c').unwrap();
-    let after_atom = graph.read().generation;
+    let after_atom = graph.read().generation().base;
     let root = {
         let mut view = handle.stage();
         let mut edit = GraphEdit::new(&mut view);
@@ -266,7 +274,7 @@ fn remove_leaves_a_hole() {
     assert_eq!(composition(&view, bab.index), vec![occ(0, ba), occ(1, ab)]);
     #[cfg(debug_assertions)]
     {
-        use crate::graph::vertex::name_resolver::TokenNameResolver;
+        use context_trace::graph::vertex::name_resolver::TokenNameResolver;
         assert_eq!(view.vertex(bab).unwrap().label(), "bab");
         let resolver = view.name_resolver();
         let slot =
@@ -495,7 +503,7 @@ fn dissolve_and_discard_check_preconditions() {
     );
     let mut view = handle.stage();
     let before = stage_state(&view);
-    let base_generation = graph.read().generation;
+    let base_generation = graph.read().generation().base;
 
     let mut edit = GraphEdit::new(&mut view);
     for (result, expected) in [
@@ -529,7 +537,7 @@ fn dissolve_and_discard_check_preconditions() {
     assert_eq!(edit.finish(), Default::default(), "nothing recorded");
     assert_eq!(stage_state(&view), before, "the stage is unchanged");
     validate_store(&view).unwrap();
-    assert_eq!(graph.read().generation, base_generation);
+    assert_eq!(graph.read().generation().base, base_generation);
 }
 
 #[test]

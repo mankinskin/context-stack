@@ -8,26 +8,30 @@
 //! parents) is never edited: a new root is created instead. The stage never
 //! searches.
 
+use crate::{
+    stage::{
+        overlay::OverlayHandle,
+        StageHandle,
+        Translation,
+    },
+};
 use context_trace::{
-    StageIndex,
-    Token,
     positioned::{
         Candidates,
         CompositionRead as _,
         GraphEdit,
         GraphRead,
         HasGraph,
+        maximal,
         Occurrence,
-        OverlayHandle,
         PositionedGraphRef,
         Publication,
         Settled,
-        StageHandle,
-        Translation,
         VertexRead,
         VertexState,
-        maximal,
     },
+    StageIndex,
+    Token,
 };
 
 /// One step of the reader, committed before the next search.

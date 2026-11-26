@@ -4,16 +4,16 @@ use context_insert::{
     InsertOutcome,
     insert_next_match,
 };
+use crate::stage::StageHandle;
 use context_trace::{
-    StageIndex,
-    Token,
     positioned::{
         GraphRead,
-        Publication,
         HasGraph,
         Navigate,
-        StageHandle,
+        Publication,
     },
+    StageIndex,
+    Token,
 };
 
 use crate::{
@@ -98,7 +98,7 @@ pub(crate) fn expand<H: StageHandle>(
 
 #[cfg(test)]
 mod tests {
-    use context_trace::positioned::OverlayHandle;
+    use crate::stage::overlay::OverlayHandle;
 
     use super::*;
     use crate::tests::fixture;

@@ -184,7 +184,8 @@ impl StageIndex {
     /// [`From<CommittedIndex>`] without the range check (hot paths of
     /// stores whose committed indices are dense slots).
     #[inline]
-    pub(crate) fn lift(index: CommittedIndex) -> Self {
+    #[doc(hidden)]
+    pub fn lift(index: CommittedIndex) -> Self {
         debug_assert!(index.0 & STAGED_BIT == 0, "committed index {} out of range", index.0);
         Self(index.0)
     }

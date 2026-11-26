@@ -15,33 +15,33 @@ use super::{
     staging::Links,
     vertex::VertexMut,
 };
-use crate::{
+use context_trace::positioned::Stage;
+use context_trace::{
     AtomOf,
     BaseGraphKind,
-    GraphKind,
-    TokenWidth,
-    graph::vertex::{
-        StageIndex,
-        StagedIndex,
-        VertexId,
-        VertexIndex,
-        has_vertex_index::HasVertexIndex,
-    },
-    positioned::{
-        committed::PositionedGraph,
-        model::VertexNode,
-        stage::Stage,
-        store::{
-            Generation,
-            GraphRead,
-            HasGraph,
-            HasGraphMut,
-            raw::{
-                self,
-                Seal,
-            },
+    graph::{
+        vertex::{
+            has_vertex_index::HasVertexIndex,
+            StagedIndex,
+            StageIndex,
+            VertexId,
+            VertexIndex,
         },
     },
+    GraphKind,
+    positioned::{
+        PositionedGraph,
+        Generation,
+        GraphRead,
+        HasGraph,
+        HasGraphMut,
+        raw::{
+            Seal,
+            self,
+        },
+        VertexNode,
+    },
+    TokenWidth,
 };
 
 /// The store of a read with an overlay stage: the base read-locked (also
@@ -55,11 +55,16 @@ impl<G: GraphKind> OverlayView<'_, G> {
     /// Snapshot of the labels of base and stage (staged indices resolve
     /// through [`TokenNameResolver::staged_token_name`]).
     ///
-    /// [`TokenNameResolver::staged_token_name`]: crate::graph::vertex::name_resolver::TokenNameResolver::staged_token_name
+    /// [`TokenNameResolver::staged_token_name`]: context_trace::graph::vertex::name_resolver::TokenNameResolver::staged_token_name
     #[cfg(debug_assertions)]
     pub fn name_resolver(&self) -> OverlayLabels {
         OverlayLabels {
-            base: self.base.vertices.iter().map(|v| v.label.clone()).collect(),
+            base: (0..self.base.vertex_count())
+                .map(|slot| {
+                    let vertex = self.base.vertex_data(VertexIndex(slot));
+                    vertex.expect("committed vertex").label().to_string()
+                })
+                .collect(),
             staged: self
                 .stage
                 .vertices
@@ -72,7 +77,7 @@ impl<G: GraphKind> OverlayView<'_, G> {
     /// labels change at commit: reinstall the base's resolver afterwards.
     #[cfg(all(debug_assertions, any(test, feature = "test-api")))]
     pub fn register_name_resolver(&self) {
-        crate::graph::vertex::name_resolver::set_token_name_resolver(Box::new(
+        context_trace::graph::vertex::name_resolver::set_token_name_resolver(Box::new(
             self.name_resolver(),
         ));
     }
@@ -88,7 +93,7 @@ pub struct OverlayLabels {
 }
 
 #[cfg(debug_assertions)]
-impl crate::graph::vertex::name_resolver::TokenNameResolver for OverlayLabels {
+impl context_trace::graph::vertex::name_resolver::TokenNameResolver for OverlayLabels {
     fn token_name(
         &self,
         index: usize,
@@ -121,10 +126,11 @@ impl<G: GraphKind> GraphRead for OverlayView<'_, G> {
         &self,
         value: &AtomOf<G>,
     ) -> Option<OverlayVertex<'_, G>> {
-        self.vertex(StageIndex::from(*self.base.atoms.get(value)?))
+        let atom = GraphRead::atom(&*self.base, value)?.vertex_index();
+        self.vertex(StageIndex::from(atom))
     }
     fn vertices(&self) -> impl Iterator<Item = OverlayVertex<'_, G>> + '_ {
-        (0..self.base.vertices.len())
+        (0..self.base.vertex_count())
             .map(|slot| StageIndex::lift(VertexIndex(slot)))
             .chain(
                 self.stage
@@ -156,7 +162,7 @@ impl<G: GraphKind> raw::Write for OverlayView<'_, G> {
         match index.split() {
             Either::Left(committed) =>
                 Some(OverlayVertexMut(VertexMut::Base {
-                    vertex: self.base.vertices.get(committed.0)?,
+                    vertex: self.base.vertex_data(committed)?,
                     deltas: &mut stage.deltas,
                 })),
             Either::Right(staged) => stage

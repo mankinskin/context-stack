@@ -5,6 +5,8 @@ mod forward;
 mod read;
 mod root;
 mod segment;
+/// The overlay stage of a read and its commit (staging plan §3.6, §4).
+pub mod stage;
 pub use read::{
     Commit,
     Step,
@@ -18,6 +20,7 @@ pub use read::{
 #[cfg(test)]
 mod tests {
     mod observed;
+    mod stage;
     mod steps;
 
     use std::collections::BTreeMap;

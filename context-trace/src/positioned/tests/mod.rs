@@ -5,6 +5,5 @@ mod guard;
 mod interchange;
 mod model;
 mod navigation;
-mod stage;
 #[cfg(feature = "serde")]
 mod serde;

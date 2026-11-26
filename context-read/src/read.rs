@@ -1,15 +1,15 @@
 //! Positioned reader (reader plan §3.1; legacy `pipeline/mod.rs`,
 //! `expansion/block.rs`).
 
+use crate::stage::overlay::OverlayHandle;
 use context_trace::{
-    StageIndex,
-    Token,
     positioned::{
         Candidates,
-        OverlayHandle,
         PositionedGraphRef,
         Publication,
     },
+    StageIndex,
+    Token,
 };
 
 pub use crate::root::Commit;

@@ -1,6 +1,7 @@
-//! Stages (staging plan §3.6): a store whose own vertices are staged until
-//! its handle commits them, and the [`Translation`] of staged into committed
-//! indices.
+//! Stages (staging plan §3.6): the handle of a read's stage, which commits
+//! the staged vertices, and the [`Translation`] of staged into committed
+//! indices. The [`Stage`] contract itself is defined with the store traits
+//! in `context_trace::positioned`.
 //!
 //! The implementation is the physical [`overlay`] next to the read-only
 //! committed graph.
@@ -11,34 +12,17 @@ use std::fmt;
 
 use either::Either;
 
-use crate::{
-    Token,
+use context_trace::{
     graph::vertex::{
         CommittedIndex,
         StageIndex,
-        StagedIndex,
     },
-    positioned::store::{
-        GraphWrite,
+    positioned::{
         HasGraphMut,
-        raw,
+        Stage,
     },
+    Token,
 };
-
-/// A store with an open stage: indices are [`StageIndex`], new vertices are
-/// staged, unstable staged vertices can be removed and staged vertices can
-/// be marked stable. Staged vertices never move: a removal leaves a hole and
-/// no index is ever renamed.
-pub trait Stage: GraphWrite<Index = StageIndex> + raw::Stabilize {
-    /// The live staged vertices in creation order (without removed slots).
-    fn staged(&self) -> impl Iterator<Item = StagedIndex> + '_;
-    /// Whether `index` is a live stable staged vertex. Stable vertices are
-    /// never removed (cheap stabilization plan 20261126).
-    fn is_stable(
-        &self,
-        index: StageIndex,
-    ) -> bool;
-}
 
 /// Staged → committed; committed indices are unchanged. Removed staged
 /// slots have no committed index.

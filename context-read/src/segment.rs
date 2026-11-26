@@ -5,15 +5,15 @@
 //! It is committed at once through [`OverlayHandle::atom`], so a later repeat
 //! in the same input is *known* (legacy `NewAtomIndex::{New, Known}`).
 
+use crate::stage::overlay::OverlayHandle;
 use context_trace::{
-    StageIndex,
-    ToToken,
-    Token,
     positioned::{
         GraphRead,
         HasGraph,
-        OverlayHandle,
     },
+    StageIndex,
+    Token,
+    ToToken,
 };
 
 /// One run of unknown atoms followed by one run of known atoms (legacy
@@ -62,11 +62,13 @@ pub(crate) fn segments(
 
 #[cfg(test)]
 mod tests {
-    use context_trace::positioned::{
-        PositionedGraphRef,
-        StageHandle,
-        VertexRead,
-        VertexState,
+    use crate::stage::StageHandle;
+    use context_trace::{
+        positioned::{
+            PositionedGraphRef,
+            VertexRead,
+            VertexState,
+        },
     };
 
     use super::*;

@@ -6,7 +6,8 @@ mod error;
 mod location;
 mod vertex;
 
-pub(crate) use self::composition::slice;
+#[doc(hidden)]
+pub use self::composition::slice;
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
 pub use self::location::IntervalView;
 #[cfg(debug_assertions)]

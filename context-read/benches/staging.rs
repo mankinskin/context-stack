@@ -12,17 +12,19 @@ use std::time::Duration;
 
 use context_read::read;
 use context_search::Find;
-use context_trace::positioned::{
-    HasGraph,
-    OverlayHandle,
-    PositionedGraphRef,
-    fixtures::{
-        Scenario,
-        fixture_graphs,
-        fixtures_dir,
-        manifest,
+use context_trace::{
+    positioned::{
+        fixtures::{
+            fixture_graphs,
+            fixtures_dir,
+            manifest,
+            Scenario,
+        },
+        HasGraph,
+        PositionedGraphRef,
     },
 };
+use context_read::stage::overlay::OverlayHandle;
 use criterion::{
     BenchmarkId,
     Criterion,

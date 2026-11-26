@@ -23,10 +23,8 @@
 //!   ([`Candidates`], [`Removal`], [`Settled`]), early stabilization by
 //!   fixed parent occurrences (`GraphEdit::stabilize`) and the store-generic
 //!   checks;
-//! - `stage/`: a read edits a stage ([`Stage`], [`StageHandle`],
-//!   `stage/mod.rs`); the overlay stage ([`OverlayHandle`], [`OverlayView`],
-//!   `stage/overlay/`) keeps its vertices next to the read-only committed
-//!   graph until the commit;
+//! - a read edits a stage: the [`Stage`] contract is in `store/stage.rs`;
+//!   the overlay stage and its handle live in `context_read::stage`;
 //! - `interchange`: content-keyed snapshots, with conversion (feature
 //!   `interchange`), `diff` and `fixtures` in `test-api` builds;
 //! - `committed/serde.rs` (feature `serde`): validated (de)serialization of
@@ -50,7 +48,6 @@ mod committed;
 mod edit;
 pub mod interchange;
 mod model;
-mod stage;
 mod store;
 
 #[cfg(any(test, feature = "test-api"))]
@@ -66,10 +63,7 @@ pub use self::{
     store::raw,
 };
 #[cfg(debug_assertions)]
-pub use self::{
-    model::PositionedLabels,
-    stage::overlay::OverlayLabels,
-};
+pub use self::model::PositionedLabels;
 #[cfg(any(debug_assertions, test, feature = "test-api"))]
 pub use self::model::IntervalView;
 #[cfg(any(test, feature = "test-api"))]
@@ -101,20 +95,7 @@ pub use self::{
         PositionedVertex,
         VertexNode,
         maximal,
-    },
-    stage::{
-        CommitError,
-        Stage,
-        StageHandle,
-        Translation,
-        overlay::{
-            Lifted,
-            OverlayHandle,
-            OverlayVertex,
-            OverlayView,
-            StagedVertex,
-            StagingGraph,
-        },
+        slice,
     },
     store::{
         CompositionRead,
@@ -129,6 +110,7 @@ pub use self::{
         Located,
         Navigate,
         NodeRef,
+        Stage,
         VertexRead,
         VertexState,
         string_repr,

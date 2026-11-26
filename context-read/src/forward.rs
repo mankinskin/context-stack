@@ -10,13 +10,11 @@ use context_search::{
     SearchError,
 };
 use context_insert::InsertOutcome;
+use crate::stage::StageHandle;
 use context_trace::{
+    positioned::Publication,
     StageIndex,
     Token,
-    positioned::{
-        Publication,
-        StageHandle,
-    },
 };
 
 use crate::root::Span;
@@ -63,10 +61,12 @@ pub(crate) fn find_complete<H: StageHandle>(
 
 #[cfg(test)]
 mod tests {
-    use context_trace::positioned::{
-        GraphRead,
-        HasGraph,
-        OverlayHandle,
+    use crate::stage::overlay::OverlayHandle;
+    use context_trace::{
+        positioned::{
+            GraphRead,
+            HasGraph,
+        },
     };
 
     use super::*;

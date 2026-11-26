@@ -5,33 +5,41 @@
 use pretty_assertions::assert_eq;
 
 use crate::{
+    stage::{
+        CommitError,
+        overlay::{
+            OverlayHandle,
+            OverlayView,
+        },
+        StageHandle,
+    },
+};
+use context_trace::{
     BaseGraphKind,
-    ToToken,
-    Token,
-    graph::vertex::{
-        CommittedIndex,
-        StageIndex,
-        StagedIndex,
-        VertexId,
-        VertexIndex,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            StagedIndex,
+            StageIndex,
+            VertexId,
+            VertexIndex,
+        },
     },
     positioned::{
-        CommitError,
+        GraphEdit,
         GraphRead,
         GraphWrite,
         Occurrence,
-        OverlayHandle,
-        OverlayView,
         PositionedError,
         PositionedGraph,
         PositionedGraphRef,
         Stage,
-        StageHandle,
         VertexEdit,
         VertexRead,
         VertexState,
-        edit::GraphEdit,
     },
+    Token,
+    ToToken,
 };
 
 pub(super) fn occ<I: VertexId>(
@@ -84,15 +92,27 @@ pub(super) fn assert_identical(
     right: &PositionedGraph,
 ) {
     let strip = |graph: &PositionedGraph| {
-        graph
-            .vertices
-            .iter()
-            .map(|v| format!("{} {:?} {:?}", v, v.node, v.parents))
+        (0..graph.vertex_count())
+            .map(|slot| graph.vertex_data(VertexIndex(slot)).unwrap())
+            .map(|v| format!("{} {:?} {:?}", v, v.node(), v.parents()))
             .collect::<Vec<_>>()
     };
     assert_eq!(strip(left), strip(right));
-    assert_eq!(left.atoms, right.atoms);
-    assert_eq!(left.generation, right.generation);
+    // The atom lookup of both graphs agrees on every atom.
+    let atoms = |graph: &PositionedGraph| {
+        (0..graph.vertex_count())
+            .filter_map(|slot| match graph.vertex_data(VertexIndex(slot)).unwrap().node() {
+                context_trace::positioned::VertexNode::Atom(atom) => Some((*atom, slot)),
+                context_trace::positioned::VertexNode::Composite(_) => None,
+            })
+            .map(|(atom, slot)| {
+                let found = GraphRead::atom(graph, &atom).map(|v| context_trace::HasVertexIndex::vertex_index(&v));
+                (atom, slot, found)
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(atoms(left), atoms(right));
+    assert_eq!(left.generation().base, right.generation().base);
 }
 
 /// Insertion of `baba` into `ababab` (insert plan §9.3) by hand, in two
@@ -389,7 +409,7 @@ fn commit_rejects_a_changed_base() {
 #[test]
 fn stage_generation_counts_edits_and_commit_adds_them() {
     let (base, n) = base();
-    let opened = base.generation;
+    let opened = base.generation().base;
     let graph = PositionedGraphRef::new(base);
     let mut handle = OverlayHandle::open(&graph);
     let root = {
@@ -406,7 +426,7 @@ fn stage_generation_counts_edits_and_commit_adds_them() {
 #[cfg(debug_assertions)]
 #[test]
 fn staged_labels_resolve_through_the_overlay() {
-    use crate::graph::vertex::name_resolver::TokenNameResolver;
+    use context_trace::graph::vertex::name_resolver::TokenNameResolver;
     let (base, n) = base();
     let graph = PositionedGraphRef::new(base);
     let mut handle = OverlayHandle::open(&graph);

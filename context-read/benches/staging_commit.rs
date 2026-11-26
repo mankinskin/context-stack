@@ -13,18 +13,22 @@ use std::time::{
 
 use context_read::read;
 use context_trace::{
-    StageIndex,
-    Token,
     positioned::{
         GraphEdit,
         GraphRead,
         NodeRef,
         Occurrence,
-        OverlayHandle,
         PositionedGraph,
         PositionedGraphRef,
-        StageHandle,
         VertexRead,
+    },
+    StageIndex,
+    Token,
+};
+use context_read::{
+    stage::{
+        overlay::OverlayHandle,
+        StageHandle,
     },
 };
 use criterion::{

@@ -20,8 +20,8 @@
 //! handle (`handle.rs`).
 //!
 //! [`StageHandle::commit`]: super::StageHandle::commit
-//! [`StagedIndex`]: crate::graph::vertex::StagedIndex
-//! [`StageIndex`]: crate::graph::vertex::StageIndex
+//! [`StagedIndex`]: context_trace::graph::vertex::StagedIndex
+//! [`StageIndex`]: context_trace::graph::vertex::StageIndex
 
 mod handle;
 mod lifted;

@@ -1,21 +1,21 @@
 //! [`Lifted`]: compositions of an overlay in the stage's index space.
 
-use crate::{
+use context_trace::{
     AtomPosition,
-    TokenWidth,
-    graph::vertex::{
-        CommittedIndex,
-        StageIndex,
-        wide::Wide,
+    graph::{
+        vertex::{
+            CommittedIndex,
+            StageIndex,
+            wide::Wide,
+        },
     },
     positioned::{
-        model::{
-            Composition,
-            Occurrence,
-            slice,
-        },
-        store::CompositionRead,
+        Composition,
+        CompositionRead,
+        Occurrence,
+        slice,
     },
+    TokenWidth,
 };
 
 /// [`CompositionRead`] of an overlay vertex in the stage's index space: a
