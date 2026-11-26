@@ -1,7 +1,7 @@
 //! Store-generic structural checks, shared by `PositionedGraph::validate`
 //! and `GraphEdit` (written once for every store, staging plan §3.5).
 
-#[cfg(any(debug_assertions, feature = "test-api"))]
+#[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
 use crate::positioned::store::Navigate;
 use crate::{
     Token,
@@ -140,14 +140,14 @@ pub(crate) fn validate_vertex<'a, V: VertexRead<'a>>(
 /// Structure, widths and reciprocal links of every vertex of `store`, and
 /// G4 for every composite (debug and `test-api` builds): the checks of
 /// `PositionedGraph::validate` that need no content traversal, for any
-/// store (also an open stage).
-#[cfg(any(test, feature = "test-api"))]
+/// store (also an open stage). Also run on every deserialized graph
+/// (feature `serde`), in every build.
+#[cfg(any(test, feature = "test-api", feature = "serde"))]
 pub fn validate_store<S: GraphRead + ?Sized>(
     store: &S
 ) -> Result<(), PositionedError<S::Index>> {
     for vertex in store.vertices() {
         validate_vertex(vertex)?;
-        #[cfg(any(debug_assertions, feature = "test-api"))]
         if let NodeRef::Composite(composition) = vertex.node() {
             check_overlap_closure(
                 store,
@@ -162,7 +162,7 @@ pub fn validate_store<S: GraphRead + ?Sized>(
 /// G4, structurally: for adjacent overlapping `L@l`, `R@r`, the largest
 /// token starting at `r − l` in `L` ends at `|L|`, i.e. the overlap is a
 /// vertex. Non-adjacent pairs are not checked.
-#[cfg(any(debug_assertions, feature = "test-api"))]
+#[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
 pub(crate) fn check_overlap_closure<S: GraphRead + ?Sized>(
     graph: &S,
     owner: S::Index,

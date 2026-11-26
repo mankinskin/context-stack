@@ -59,7 +59,7 @@ pub enum PositionedError<I: VertexId = CommittedIndex> {
     },
     /// Adjacent occurrences in `owner` overlap, but their overlap is not a
     /// vertex (G4).
-    #[cfg(any(debug_assertions, feature = "test-api"))]
+    #[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
     OverlapNotVertex {
         owner: I,
         left: Occurrence<I>,
@@ -142,7 +142,7 @@ impl<I: VertexId> fmt::Display for PositionedError<I> {
                 Plain(right.child.index),
                 right.offset
             ),
-            #[cfg(any(debug_assertions, feature = "test-api"))]
+            #[cfg(any(debug_assertions, test, feature = "test-api", feature = "serde"))]
             Self::OverlapNotVertex { owner, left, right } => write!(
                 f,
                 "vertex {}: the overlap of {}@{} and {}@{} is not a vertex",

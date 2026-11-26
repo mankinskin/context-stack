@@ -27,8 +27,10 @@
 //!   `stage/mod.rs`); the overlay stage ([`OverlayHandle`], [`OverlayView`],
 //!   `stage/overlay/`) keeps its vertices next to the read-only committed
 //!   graph until the commit;
-//! - `interchange`: content-keyed snapshots, with conversion, `diff`
-//!   and `fixtures` in `test-api` builds;
+//! - `interchange`: content-keyed snapshots, with conversion (feature
+//!   `interchange`), `diff` and `fixtures` in `test-api` builds;
+//! - `committed/serde.rs` (feature `serde`): validated (de)serialization of
+//!   [`PositionedGraph`];
 //! - `path` and `trace`: search paths and trace states (below).
 //!
 //! Read-only navigation (reader plan Phase 2) is split into separate APIs:

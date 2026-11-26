@@ -10,6 +10,7 @@ pub use read::{
     Step,
     StepKind,
     read,
+    read_observed,
     read_traced,
 };
 
@@ -19,6 +20,7 @@ pub mod legacy;
 
 #[cfg(test)]
 mod tests {
+    mod observed;
     mod steps;
 
     use std::collections::BTreeMap;

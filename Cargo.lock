@@ -2278,7 +2278,6 @@ dependencies = [
  "ascii-dag",
  "bincode",
  "chrono",
- "context-insert",
  "context-read",
  "context-search",
  "context-trace",
@@ -2394,6 +2393,7 @@ name = "context-read"
 version = "0.1.0"
 dependencies = [
  "auto_impl",
+ "bincode",
  "charify",
  "context-insert",
  "context-search",
@@ -2471,6 +2471,7 @@ name = "context-trace"
 version = "0.1.0"
 dependencies = [
  "auto_impl",
+ "bincode",
  "charify",
  "context-trace-macros",
  "dashmap",
