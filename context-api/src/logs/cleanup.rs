@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     error::LogError,
-    types::LogDeleteResult,
+    types::logs::LogDeleteResult,
 };
 
 /// Delete a specific log file.

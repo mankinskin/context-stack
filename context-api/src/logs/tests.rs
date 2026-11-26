@@ -214,7 +214,7 @@ fn test_delete_logs_preserves_non_log_files() {
     assert!(tmp.path().join("b.txt").exists());
 }
 
-#[cfg(feature = "jq")]
+#[cfg(feature = "logs")]
 #[test]
 fn test_query_log() {
     let tmp = TempDir::new().unwrap();
@@ -227,7 +227,7 @@ fn test_query_log() {
     assert_eq!(entries.len(), 1);
 }
 
-#[cfg(feature = "jq")]
+#[cfg(feature = "logs")]
 #[test]
 fn test_query_log_not_found() {
     let tmp = TempDir::new().unwrap();
@@ -235,7 +235,7 @@ fn test_query_log_not_found() {
     assert!(result.is_err());
 }
 
-#[cfg(feature = "jq")]
+#[cfg(feature = "logs")]
 #[test]
 fn test_search_logs() {
     let tmp = TempDir::new().unwrap();
@@ -251,7 +251,7 @@ fn test_search_logs() {
     }
 }
 
-#[cfg(feature = "jq")]
+#[cfg(feature = "logs")]
 #[test]
 fn test_search_logs_nonexistent_dir() {
     let (results, count) =

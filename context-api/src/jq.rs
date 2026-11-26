@@ -64,7 +64,7 @@ impl fmt::Display for JqError {
 impl std::error::Error for JqError {}
 
 /// A compiled JQ filter ready for execution.
-#[cfg(feature = "jq")]
+#[cfg(feature = "logs")]
 pub struct JqFilter {
     #[allow(dead_code)]
     ctx: jaq_interpret::ParseCtx,
@@ -72,12 +72,12 @@ pub struct JqFilter {
 }
 
 /// Stub when `jq` feature is disabled.
-#[cfg(not(feature = "jq"))]
+#[cfg(not(feature = "logs"))]
 pub struct JqFilter {
     _private: (),
 }
 
-#[cfg(feature = "jq")]
+#[cfg(feature = "logs")]
 impl JqFilter {
     /// Compile a JQ filter string.
     pub fn compile(query: &str) -> Result<Self, JqError> {
@@ -149,7 +149,7 @@ impl JqFilter {
     }
 }
 
-#[cfg(not(feature = "jq"))]
+#[cfg(not(feature = "logs"))]
 impl JqFilter {
     /// Compile a JQ filter string (stub — always returns `NotAvailable`).
     pub fn compile(_query: &str) -> Result<Self, JqError> {
@@ -211,7 +211,7 @@ pub fn transform_values<'a>(
     Ok(results)
 }
 
-#[cfg(all(test, feature = "jq"))]
+#[cfg(all(test, feature = "logs"))]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -319,7 +319,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, not(feature = "jq")))]
+#[cfg(all(test, not(feature = "logs")))]
 mod tests_no_jq {
     use super::*;
 

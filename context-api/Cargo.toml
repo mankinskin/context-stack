@@ -2,20 +2,18 @@
 name = "context-api"
 version = "0.1.0"
 edition = "2024"
-description = "Unified API for hypergraph workspace management and operations"
+description = "Command API of the context stack: graph store, read, search, render"
 
 [features]
-default = ["jq"]
+default = ["logs"]
 ts-gen = ["ts-rs"]
-jq = ["jaq-core", "jaq-std", "jaq-interpret", "jaq-syn"]
-dev = []
+# Trace capture and log queries (`<graph>.ctx.logs/`).
+logs = ["jaq-core", "jaq-std", "jaq-interpret", "jaq-syn", "regex", "once_cell"]
 
 [dependencies]
-context-trace = { path = "../context-trace", features = ["legacy", "test-api"] }
-context-search = { path = "../context-search", features = ["legacy", "test-api"] }
-context-insert = { path = "../context-insert", features = ["legacy", "test-api"] }
-context-read = { path = "../context-read", features = ["legacy", "test-api"] }
-ngrams = { path = "../ngrams" }
+context-trace = { path = "../context-trace", default-features = false }
+context-search = { path = "../context-search", default-features = false }
+context-read = { path = "../context-read", default-features = false }
 ascii-dag = "0.9"
 
 serde = { version = "1", features = ["derive"] }
@@ -29,11 +27,8 @@ tracing = "0.1"
 schemars = "1"
 ts-rs = { version = "10", features = ["serde-json-impl"], optional = true }
 
-# Log parsing
-regex = "1"
-once_cell = "1"
-
-# JQ query engine (feature-gated)
+regex = { version = "1", optional = true }
+once_cell = { version = "1", optional = true }
 jaq-core = { version = "1", optional = true }
 jaq-std = { version = "1", optional = true }
 jaq-interpret = { version = "1", optional = true }
@@ -42,3 +37,5 @@ jaq-syn = { version = "1", optional = true }
 [dev-dependencies]
 tempfile = "3"
 pretty_assertions = "1"
+context-trace = { path = "../context-trace", default-features = false, features = ["test-api"] }
+ngrams = { path = "../ngrams" }

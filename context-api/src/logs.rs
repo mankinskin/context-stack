@@ -20,7 +20,7 @@ use crate::{
         LogEntry,
         LogParser,
     },
-    types::{
+    types::logs::{
         LogAnalysis,
         LogEntryInfo,
         LogFileInfo,

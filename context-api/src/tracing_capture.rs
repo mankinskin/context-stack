@@ -10,9 +10,9 @@ use std::{
     time::Instant,
 };
 
-use context_trace::legacy::logging::build_capture_dispatch;
+use context_trace::logging::build_capture_dispatch;
 
-use crate::types::TraceSummary;
+use crate::types::logs::TraceSummary;
 
 /// Configuration for per-command tracing capture.
 #[derive(Debug, Clone)]

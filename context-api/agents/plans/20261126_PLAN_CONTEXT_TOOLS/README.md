@@ -168,7 +168,7 @@ Per stage the stage file lists exact tests. Gates across all stages:
 
 ```bash
 # no legacy backend in the tools
-cargo tree -p context-cli -e features | grep -c 'legacy'      # expect 0
+cargo tree -p context-cli -e normal,features | grep -c legacy   # expect 0 (dev-only ngrams may use legacy)
 cargo test -p context-api -p context-cli -p context-http -p context-mcp
 # downstream consumers (winit does not build in the Linux codespace)
 cargo build --workspace --all-targets --exclude context-editor-kernel --exclude sandbox-app

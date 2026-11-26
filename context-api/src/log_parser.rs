@@ -125,7 +125,7 @@ ts_export! {
 }
 
 /// Conversion from full `LogEntry` to the simplified `LogEntryInfo` API type.
-impl From<&LogEntry> for crate::types::LogEntryInfo {
+impl From<&LogEntry> for crate::types::logs::LogEntryInfo {
     fn from(entry: &LogEntry) -> Self {
         Self {
             entry_number: entry.line_number,

@@ -344,7 +344,7 @@ All in `context-api` (`src/tests/`), using `tempfile` stores.
    `--root` subgraph below it succeeds; `force` respects the hard cap.
 8. **Serde/ts:** `Command`/`Response` JSON round trip for every variant
    (port `tests/command_serde.rs`, `result_serde.rs`).
-9. **No legacy:** `cargo tree -p context-api -e features -i context-trace`
+9. **No legacy:** `cargo tree -p context-api -e normal,features`
    shows no `legacy` feature.
 
 ```bash
