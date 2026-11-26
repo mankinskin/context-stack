@@ -1,892 +1,641 @@
-//! `context-cli` — Command-line interface for context-engine hypergraph workspaces.
+//! `context-cli`: standalone command-line tool on the context API.
 //!
-//! Provides both a subcommand-based interface and an interactive REPL for
-//! managing workspaces and manipulating hypergraphs through the `context-api`
-//! crate.
+//! Every command builds a [`Request`] and runs it on a [`Backend`]
+//! (in process: [`LocalBackend`]); output is the `Response` JSON
+//! (`--format json`) or a text rendering of the result.
 
+mod args;
+mod backend;
+mod error;
+mod input;
 mod output;
-mod repl;
+mod progress;
 
-use std::collections::HashSet;
+use std::{
+    fs,
+    io::{
+        IsTerminal,
+        Read,
+        Write,
+    },
+    path::Path,
+    process::ExitCode,
+};
 
+use base64::Engine as _;
 use clap::{
+    ArgMatches,
     CommandFactory,
-    Parser,
-    Subcommand,
+    FromArgMatches,
 };
 use context_api::{
-    commands::{
-        Command,
-        execute,
-        execute_traced,
-        export_import::ExportFormat,
-    },
-    tracing_capture::CaptureConfig,
+    Command,
+    CommandResult,
+    ErrorKind,
+    Outcome,
+    Request,
+    Response,
     types::{
-        CompareMode,
-        TokenRef,
+        ExportFormat,
+        Gate,
+        ImportData,
+        Limits,
+        SavePolicy,
+        SearchOutcome,
+        VertexRef,
     },
-    workspace::manager::WorkspaceManager,
 };
 
-/// Context Engine hypergraph workspace CLI.
-#[derive(Parser)]
-#[command(
-    name = "context-cli",
-    about = "CLI for context-engine hypergraph workspaces",
-    version
-)]
-struct Cli {
-    /// Enable per-command tracing capture (writes .log files to workspace)
-    #[arg(long, global = true)]
-    trace: bool,
+use crate::{
+    args::{
+        Cli,
+        CliCommand,
+        ExportFormatArg,
+        InputArgs,
+        OutputFormat,
+    },
+    backend::{
+        Backend,
+        LocalBackend,
+    },
+    error::{
+        CliError,
+        EXIT_COMMAND,
+        EXIT_OK,
+        exit_code,
+    },
+};
 
-    /// Subcommand to execute. If omitted, print the help message.
-    #[command(subcommand)]
-    command: Option<CliCommand>,
+/// Native `.ctx` files start with this magic.
+const NATIVE_MAGIC: &[u8; 4] = b"CTXG";
+
+fn main() -> ExitCode {
+    let matches = Cli::command().get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
+    let sub = matches.subcommand().map(|(_, m)| m);
+    ExitCode::from(run(&cli, sub))
 }
 
-/// Available CLI subcommands.
-#[derive(Subcommand)]
-enum CliCommand {
-    /// Create a new workspace.
-    Create {
-        /// Name of the workspace to create.
-        name: String,
+/// What to do with a successful result besides printing it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Post {
+    None,
+    Search {
+        fail_if_missing: bool,
     },
-
-    /// Create a workspace by parsing text with the slow legacy row-based ngrams
-    /// oracle (provisional; not the positioned v3 oracle).
-    #[command(name = "create-ngrams")]
-    CreateNgrams {
-        /// Name of the workspace to create.
-        name: String,
-        /// Input text used to build the graph.
-        text: String,
-        /// Timeout in seconds (default: 60).
-        #[arg(long = "timeout-secs", default_value_t = 60)]
-        timeout_secs: u64,
-    },
-
-    /// Open an existing workspace.
-    Open {
-        /// Name of the workspace to open.
-        name: String,
-    },
-
-    /// Close an open workspace (does NOT auto-save).
-    Close {
-        /// Name of the workspace to close.
-        name: String,
-    },
-
-    /// Save an open workspace to disk.
-    Save {
-        /// Name of the workspace to save.
-        name: String,
-    },
-
-    /// List all workspaces (both open and on-disk).
-    List,
-
-    /// Delete a workspace from disk.
-    Delete {
-        /// Name of the workspace to delete.
-        name: String,
-    },
-
-    /// Add a single-character atom to a workspace.
-    AddAtom {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Single character to add as an atom.
-        ch: char,
-    },
-
-    /// Add multiple atoms (one per character in the string).
-    AddAtoms {
-        /// Name of the open workspace.
-        workspace: String,
-        /// String of characters — each character becomes an atom (e.g. "abcde").
-        chars: String,
-    },
-
-    /// Add a simple pattern from atom characters.
-    AddPattern {
-        /// Name of the open workspace.
-        workspace: String,
-        /// String of characters — each character must be an existing atom
-        /// (e.g. "abc" creates a pattern from atoms 'a', 'b', 'c').
-        atoms: String,
-    },
-
-    /// Get detailed information about a vertex by index.
-    GetVertex {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Vertex index (numeric).
-        index: usize,
-    },
-
-    /// List all vertices in a workspace.
-    ListVertices {
-        /// Name of the open workspace.
-        workspace: String,
-    },
-
-    /// List all atoms in a workspace.
-    ListAtoms {
-        /// Name of the open workspace.
-        workspace: String,
-    },
-
-    /// Search for a text sequence in the graph.
-    SearchSequence {
-        /// Name of the open workspace.
-        workspace: String,
-        /// The text to search for (must be at least 2 characters).
-        text: String,
-    },
-
-    /// Search for a pattern by token references (indices or labels).
-    SearchPattern {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Token references: numbers are indices, strings are labels.
-        /// Must provide at least 2.
-        query: Vec<String>,
-    },
-
-    /// Insert a text sequence into the graph (auto-creates atoms).
-    InsertSequence {
-        /// Name of the open workspace.
-        workspace: String,
-        /// The text to insert (must be at least 2 characters).
-        text: String,
-    },
-
-    /// Insert a pattern by token references (indices or labels).
-    InsertFirstMatch {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Token references: numbers are indices, strings are labels.
-        /// Must provide at least 2.
-        query: Vec<String>,
-    },
-
-    /// Insert multiple text sequences (bulk insert).
-    InsertSequences {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Text sequences to insert (each must be at least 2 characters).
-        texts: Vec<String>,
-    },
-
-    /// Read a vertex as a decomposition tree.
-    ReadPattern {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Vertex index to read.
-        index: usize,
-    },
-
-    /// Read a vertex as concatenated leaf text.
-    ReadAsText {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Vertex index to read.
-        index: usize,
-    },
-
-    /// Read a text sequence through the graph (auto-creates atoms, builds decomposition).
-    #[command(name = "read-sequence")]
-    ReadSequence {
-        /// Name of the open workspace.
-        workspace: String,
-        /// The text to read through the graph.
-        text: String,
-    },
-
-    /// Read a file's contents through the graph.
-    #[command(name = "read-file")]
-    ReadFile {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Path to the file to read.
-        path: String,
-    },
-
-    /// Validate graph integrity.
-    Validate {
-        /// Name of the open workspace.
-        workspace: String,
-    },
-
-    /// Print the graph snapshot as JSON.
-    Snapshot {
-        /// Name of the open workspace.
-        workspace: String,
-    },
-
-    /// Print graph statistics.
-    Stats {
-        /// Name of the open workspace.
-        workspace: String,
-    },
-
-    /// Show the entire graph visualization for a workspace.
     Show {
-        /// Name of the open workspace.
-        workspace: String,
+        output: Option<std::path::PathBuf>,
+        fenced: bool,
     },
-
-    /// Show a single vertex with its children and parents.
-    ShowVertex {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Vertex index to show.
-        index: usize,
+    Export {
+        output: Option<std::path::PathBuf>,
     },
-
-    /// Render an ASCII layered graph for the workspace (top = longest labels).
-    RenderGraph {
-        /// Name of the open workspace.
-        workspace: String,
-        /// Use ascii-dag renderer instead of the default aligned grammar layout.
-        #[arg(long = "ascii-dag")]
-        ascii_dag: bool,
-    },
-
-    /// Start the interactive REPL.
-    Repl,
-
-    /// List trace log files for a workspace.
-    ListLogs {
-        /// Name of the workspace.
-        workspace: String,
-        /// Optional filename pattern to filter.
-        #[arg(long)]
-        pattern: Option<String>,
-    },
-
-    /// Read a trace log file.
-    GetLog {
-        /// Name of the workspace.
-        workspace: String,
-        /// Log filename.
-        filename: String,
-        /// Optional level/message filter.
-        #[arg(long)]
-        filter: Option<String>,
-        /// Max entries to return.
-        #[arg(long, default_value = "100")]
-        limit: usize,
-    },
-
-    /// Query a trace log with a JQ expression.
-    QueryLog {
-        /// Name of the workspace.
-        workspace: String,
-        /// Log filename.
-        filename: String,
-        /// JQ query expression.
-        query: String,
-    },
-
-    /// Analyze a trace log file.
-    AnalyzeLog {
-        /// Name of the workspace.
-        workspace: String,
-        /// Log filename.
-        filename: String,
-    },
-
-    /// Search across all trace logs.
-    SearchLogs {
-        /// Name of the workspace.
-        workspace: String,
-        /// Search query (JQ expression).
-        query: String,
-    },
-
-    /// Delete a trace log file.
-    DeleteLog {
-        /// Name of the workspace.
-        workspace: String,
-        /// Log filename to delete.
-        filename: String,
-    },
-
-    /// Delete trace log files, optionally only those older than N days.
-    DeleteLogs {
-        /// Name of the workspace.
-        workspace: String,
-        /// Only delete logs older than this many days (omit to delete all).
-        #[arg(long)]
-        older_than_days: Option<u32>,
-    },
-
-    /// Export a workspace to JSON or bincode format.
-    ExportWorkspace {
-        /// Name of the workspace to export.
-        workspace: String,
-        /// Export format: "json" or "bincode".
-        #[arg(long, default_value = "json")]
-        format: String,
-        /// Optional output file path. If omitted, data is written to stdout.
-        #[arg(long)]
-        path: Option<String>,
-    },
-
-    /// Import a workspace from a previously exported file.
-    ImportWorkspace {
-        /// Name to assign to the imported workspace.
-        name: String,
-        /// Path to the exported file.
-        path: String,
-        /// Overwrite if a workspace with the same name already exists.
-        #[arg(long)]
-        overwrite: bool,
-    },
-
-    // -- Compare (Phase 3.2) -----------------------------------------------
-    /// Compare two workspace graphs and print a structured diff.
-    ///
-    /// Example:
-    ///   context-cli compare ngrams-abc read-abc
-    ///   context-cli compare ngrams-abc read-abc --mode subset
-    ///   context-cli compare ngrams-abc read-abc --format json
-    Compare {
-        /// The reference workspace (A).
-        workspace_a: String,
-        /// The candidate workspace (B).
-        workspace_b: String,
-        /// Comparison mode: "full" (default) or "subset".
-        #[arg(long, default_value = "full")]
-        mode: String,
-        /// Output format: "human" (default) or "json".
-        #[arg(long, default_value = "human")]
-        format: String,
-    },
-
-    /// Compare two individual vertices from (potentially different) workspaces.
-    ///
-    /// Example:
-    ///   context-cli compare-vertex ws-a --vertex-a 5 ws-b --vertex-b 3
-    CompareVertex {
-        /// The reference workspace (A).
-        workspace_a: String,
-        /// Index of the vertex in workspace A.
-        #[arg(long = "vertex-a")]
-        index_a: usize,
-        /// The candidate workspace (B).
-        workspace_b: String,
-        /// Index of the vertex in workspace B.
-        #[arg(long = "vertex-b")]
-        index_b: usize,
-    },
+    Validate,
 }
 
-/// Parse a string as a `TokenRef`.
-///
-/// If it parses as a `usize`, it becomes `TokenRef::Index`.
-/// Otherwise, it becomes `TokenRef::Label`.
-fn parse_token_ref(s: &str) -> TokenRef {
-    match s.parse::<usize>() {
-        Ok(n) => TokenRef::Index(n),
-        Err(_) => TokenRef::Label(s.to_string()),
+#[derive(Debug)]
+struct Prepared {
+    command: Command,
+    post: Post,
+    /// Bytes of read input (progress for large reads).
+    input_bytes: usize,
+}
+
+fn run(
+    cli: &Cli,
+    sub: Option<&ArgMatches>,
+) -> u8 {
+    let format = cli.output_format();
+    if cli.server.is_some() && !cli.local {
+        let err = CliError::new(
+            ErrorKind::Unsupported,
+            "client mode is not available yet (stage 4)",
+        )
+        .with_hint(
+            "run without --server (unset CONTEXT_SERVER or pass --local)",
+        );
+        return report_error(&err.response, err.exit, format);
     }
+    let stdin_tty = std::io::stdin().is_terminal();
+    let prepared =
+        match prepare(cli, sub, &mut std::io::stdin().lock(), stdin_tty) {
+            Ok(prepared) => prepared,
+            Err(err) => return report_error(&err.response, err.exit, format),
+        };
+    let progress = !cli.quiet
+        && prepared.input_bytes > progress::PROGRESS_THRESHOLD
+        && std::io::stderr().is_terminal();
+    let mut backend =
+        LocalBackend::new(cli.store.clone(), progress.then(progress::sink));
+    let response = backend.execute(Request::new(prepared.command));
+    if progress {
+        progress::finish();
+    }
+    finish(cli, response, &prepared.post, format)
 }
 
-/// Parse a slice of strings as `TokenRef` values.
-fn parse_token_refs(strings: &[String]) -> Vec<TokenRef> {
-    strings.iter().map(|s| parse_token_ref(s)).collect()
+fn report_error(
+    error: &context_api::ErrorResponse,
+    exit: u8,
+    format: OutputFormat,
+) -> u8 {
+    if format == OutputFormat::Json {
+        output::print_json(&Response {
+            id: None,
+            outcome: Outcome::Error(error.clone()),
+        });
+    }
+    output::print_error(error);
+    exit
 }
 
-/// Extract the workspace name from a CLI command, if the command is
-/// workspace-scoped.
-fn parse_compare_mode(s: &str) -> CompareMode {
-    s.parse::<CompareMode>().unwrap_or_else(|e| {
-        eprintln!("Warning: {e}. Defaulting to 'full'.");
-        CompareMode::Full
+/// Build the API command of the CLI command.
+fn prepare(
+    cli: &Cli,
+    sub: Option<&ArgMatches>,
+    stdin: &mut dyn Read,
+    stdin_tty: bool,
+) -> Result<Prepared, CliError> {
+    let simple = |command| Prepared {
+        command,
+        post: Post::None,
+        input_bytes: 0,
+    };
+    Ok(match &cli.command {
+        CliCommand::New(a) => simple(Command::New {
+            graph: a.graph.clone(),
+            overwrite: a.force,
+        }),
+        CliCommand::Create(a) => {
+            let inputs = read_inputs(&a.input, sub, stdin, stdin_tty, false)?;
+            let input_bytes = input::total_bytes(&inputs);
+            Prepared {
+                command: Command::Create {
+                    graph: a.graph.clone(),
+                    inputs,
+                    split: a.input.split.into(),
+                    overwrite: a.force,
+                },
+                post: Post::None,
+                input_bytes,
+            }
+        },
+        CliCommand::Read(a) => {
+            let inputs = read_inputs(&a.input, sub, stdin, stdin_tty, true)?;
+            let input_bytes = input::total_bytes(&inputs);
+            Prepared {
+                command: Command::Read {
+                    graph: a.graph.clone(),
+                    inputs,
+                    split: a.input.split.into(),
+                    create: a.create,
+                    save: SavePolicy::Auto,
+                    steps: a.steps,
+                    dry_run: a.dry_run,
+                },
+                post: Post::None,
+                input_bytes,
+            }
+        },
+        CliCommand::Search(a) => Prepared {
+            command: Command::Search {
+                graph: a.graph.clone(),
+                query: a.query.clone(),
+                view: a.view.into(),
+                limits: Limits {
+                    limit: a.limit,
+                    context_width: a.width,
+                    label_width: a.label_width,
+                    max_depth: a.max_depth,
+                    max_visited: None,
+                },
+            },
+            post: Post::Search {
+                fail_if_missing: a.fail_if_missing,
+            },
+            input_bytes: 0,
+        },
+        CliCommand::Show(a) => {
+            let (show_format, fenced) = a.resolved_format();
+            Prepared {
+                command: Command::Render {
+                    graph: a.graph.clone(),
+                    format: show_format.into(),
+                    root: a.root.as_deref().map(vertex_ref),
+                    depth: a.depth,
+                    gate: Gate {
+                        max_vertices: a.max_vertices,
+                        max_label_chars: None,
+                        force: a.force,
+                    },
+                    limits: Limits::default(),
+                },
+                post: Post::Show {
+                    output: a.output.clone(),
+                    fenced,
+                },
+                input_bytes: 0,
+            }
+        },
+        CliCommand::Vertex(a) => simple(Command::Vertex {
+            graph: a.graph.clone(),
+            vertex: vertex_ref(&a.vertex),
+            limits: Limits {
+                limit: a.limit,
+                label_width: a.label_width,
+                ..Limits::default()
+            },
+        }),
+        CliCommand::Inputs(a) => simple(Command::Inputs {
+            graph: a.graph.clone(),
+            limits: Limits {
+                limit: a.limit,
+                ..Limits::default()
+            },
+        }),
+        CliCommand::Info(a) => simple(Command::Info {
+            graph: a.graph.clone(),
+        }),
+        CliCommand::Stats(a) => simple(Command::Stats {
+            graph: a.graph.clone(),
+        }),
+        CliCommand::Validate(a) => Prepared {
+            command: Command::Validate {
+                graph: a.graph.clone(),
+            },
+            post: Post::Validate,
+            input_bytes: 0,
+        },
+        CliCommand::Export(a) => {
+            if a.format == ExportFormatArg::Native
+                && a.output.is_none()
+                && cli.output_format() == OutputFormat::Text
+            {
+                return Err(CliError::usage("native export is binary and is not written to stdout")
+                    .with_hint("pass -o FILE, or --format json before the command for the base64 envelope"));
+            }
+            Prepared {
+                command: Command::Export {
+                    graph: a.graph.clone(),
+                    format: match a.format {
+                        ExportFormatArg::V3 => ExportFormat::InterchangeV3,
+                        ExportFormatArg::Native => ExportFormat::Native,
+                    },
+                    gate: Gate {
+                        force: a.force,
+                        ..Gate::default()
+                    },
+                },
+                post: Post::Export {
+                    output: a.output.clone(),
+                },
+                input_bytes: 0,
+            }
+        },
+        CliCommand::Import(a) => simple(Command::Import {
+            graph: a.graph.clone(),
+            data: import_data(&a.file)?,
+            overwrite: a.force,
+        }),
+        CliCommand::List(_) => simple(Command::List),
+        CliCommand::Delete(a) => simple(Command::Delete {
+            graph: a.graph.clone(),
+        }),
     })
 }
 
-fn workspace_name_from_cli_cmd(cmd: &CliCommand) -> Option<&str> {
-    match cmd {
-        CliCommand::Create { name }
-        | CliCommand::CreateNgrams { name, .. }
-        | CliCommand::Open { name }
-        | CliCommand::Close { name }
-        | CliCommand::Save { name }
-        | CliCommand::Delete { name } => Some(name.as_str()),
-        CliCommand::AddAtom { workspace, .. }
-        | CliCommand::AddAtoms { workspace, .. }
-        | CliCommand::AddPattern { workspace, .. }
-        | CliCommand::GetVertex { workspace, .. }
-        | CliCommand::ListVertices { workspace, .. }
-        | CliCommand::ListAtoms { workspace, .. }
-        | CliCommand::SearchSequence { workspace, .. }
-        | CliCommand::SearchPattern { workspace, .. }
-        | CliCommand::InsertSequence { workspace, .. }
-        | CliCommand::InsertFirstMatch { workspace, .. }
-        | CliCommand::InsertSequences { workspace, .. }
-        | CliCommand::ReadPattern { workspace, .. }
-        | CliCommand::ReadAsText { workspace, .. }
-        | CliCommand::ReadSequence { workspace, .. }
-        | CliCommand::ReadFile { workspace, .. }
-        | CliCommand::Validate { workspace, .. }
-        | CliCommand::Snapshot { workspace, .. }
-        | CliCommand::Stats { workspace, .. }
-        | CliCommand::Show { workspace, .. }
-        | CliCommand::ShowVertex { workspace, .. }
-        | CliCommand::RenderGraph { workspace, .. }
-        | CliCommand::ListLogs { workspace, .. }
-        | CliCommand::GetLog { workspace, .. }
-        | CliCommand::QueryLog { workspace, .. }
-        | CliCommand::AnalyzeLog { workspace, .. }
-        | CliCommand::SearchLogs { workspace, .. }
-        | CliCommand::DeleteLog { workspace, .. }
-        | CliCommand::DeleteLogs { workspace, .. }
-        | CliCommand::ExportWorkspace { workspace, .. } =>
-            Some(workspace.as_str()),
-        CliCommand::ImportWorkspace { name, .. } => Some(name.as_str()),
-        CliCommand::List
-        | CliCommand::Repl
-        | CliCommand::Compare { .. }
-        | CliCommand::CompareVertex { .. } => None,
+fn read_inputs(
+    args: &InputArgs,
+    sub: Option<&ArgMatches>,
+    stdin: &mut dyn Read,
+    stdin_tty: bool,
+    required: bool,
+) -> Result<Vec<context_api::types::Input>, CliError> {
+    let sources = input::with_implicit_stdin(args.sources(sub), stdin_tty);
+    if sources.is_empty() && required {
+        return Err(CliError::usage("no INPUT given").with_hint(
+            "pass text arguments, -f FILE, or pipe text into stdin ('-')",
+        ));
     }
+    input::resolve(&sources, &args.options(), stdin)
 }
 
-fn map_workspace_command(cmd: CliCommand) -> Result<Command, CliCommand> {
-    match cmd {
-        CliCommand::Create { name } => Ok(Command::CreateWorkspace { name }),
-        CliCommand::CreateNgrams {
-            name,
-            text,
-            timeout_secs,
-        } => Ok(Command::CreateWorkspaceFromNgrams {
-            name,
-            text,
-            timeout_secs,
-        }),
-        CliCommand::Open { name } => Ok(Command::OpenWorkspace { name }),
-        CliCommand::Close { name } => Ok(Command::CloseWorkspace { name }),
-        CliCommand::Save { name } => Ok(Command::SaveWorkspace { name }),
-        CliCommand::List => Ok(Command::ListWorkspaces),
-        CliCommand::Delete { name } => Ok(Command::DeleteWorkspace { name }),
-        other => map_import_export_command(other),
-    }
+/// `#123` is an index, anything else is text.
+fn vertex_ref(vertex: &str) -> VertexRef {
+    vertex
+        .strip_prefix('#')
+        .and_then(|index| index.parse().ok())
+        .map(VertexRef::Index)
+        .unwrap_or_else(|| VertexRef::Text(vertex.to_string()))
 }
 
-fn map_import_export_command(cmd: CliCommand) -> Result<Command, CliCommand> {
-    match cmd {
-        CliCommand::ExportWorkspace {
-            workspace,
-            format,
-            path,
-        } => {
-            let export_format = match format.to_lowercase().as_str() {
-                "bincode" => ExportFormat::Bincode,
-                _ => ExportFormat::Json,
+/// Native `.ctx` bytes (by magic) or a v3 interchange JSON document.
+fn import_data(path: &Path) -> Result<ImportData, CliError> {
+    let bytes = fs::read(path).map_err(|e| {
+        CliError::io(format!("cannot read '{}': {e}", path.display()))
+    })?;
+    if bytes.starts_with(NATIVE_MAGIC) {
+        return Ok(ImportData::Native {
+            base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
+        });
+    }
+    let document = String::from_utf8(bytes).map_err(|_| {
+        CliError::io(format!(
+            "'{}' is neither a native .ctx file nor UTF-8 JSON",
+            path.display()
+        ))
+    })?;
+    Ok(ImportData::InterchangeV3 { document })
+}
+
+/// Handle the response: file outputs, printing and the exit code.
+fn finish(
+    cli: &Cli,
+    response: Response,
+    post: &Post,
+    format: OutputFormat,
+) -> u8 {
+    let result = match &response.outcome {
+        Outcome::Ok(result) => result,
+        Outcome::Error(error) =>
+            return report_error(error, exit_code(error.kind), format),
+    };
+    if let Err(err) = write_outputs(result, post) {
+        return report_error(&err.response, err.exit, format);
+    }
+    match format {
+        OutputFormat::Json => output::print_json(&response),
+        OutputFormat::Text => {
+            let text = match (post, result) {
+                (
+                    Post::Show {
+                        output: Some(path), ..
+                    },
+                    CommandResult::Render(render),
+                ) => format!(
+                    "wrote {} vertices, {} edges to {}",
+                    render.vertices,
+                    render.edges,
+                    path.display()
+                ),
+                (
+                    Post::Export { output: Some(path) },
+                    CommandResult::Export(export),
+                ) => format!(
+                    "exported {} bytes to {}",
+                    export.bytes,
+                    path.display()
+                ),
+                _ => output::text(command_name(cli), result),
             };
-            Ok(Command::ExportWorkspace {
-                workspace,
-                format: export_format,
-                path,
+            if !text.is_empty() {
+                println!("{text}");
+            }
+        },
+    }
+    match (post, result) {
+        (
+            Post::Search {
+                fail_if_missing: true,
+            },
+            CommandResult::Search(search),
+        ) if matches!(
+            search.outcome,
+            SearchOutcome::NotFound { .. } | SearchOutcome::Partial { .. }
+        ) =>
+            EXIT_COMMAND,
+        (Post::Validate, CommandResult::Validation(report))
+            if !report.valid =>
+            EXIT_COMMAND,
+        _ => EXIT_OK,
+    }
+}
+
+fn command_name(cli: &Cli) -> &'static str {
+    match &cli.command {
+        CliCommand::New(_) => "new",
+        CliCommand::Create(_) => "create",
+        CliCommand::Read(_) => "read",
+        CliCommand::Search(_) => "search",
+        CliCommand::Show(_) => "show",
+        CliCommand::Vertex(_) => "vertex",
+        CliCommand::Inputs(_) => "inputs",
+        CliCommand::Info(_) => "info",
+        CliCommand::Stats(_) => "stats",
+        CliCommand::Validate(_) => "validate",
+        CliCommand::Export(_) => "export",
+        CliCommand::Import(_) => "import",
+        CliCommand::List(_) => "list",
+        CliCommand::Delete(_) => "delete",
+    }
+}
+
+/// Write `show -o` and `export -o` files.
+fn write_outputs(
+    result: &CommandResult,
+    post: &Post,
+) -> Result<(), CliError> {
+    match (post, result) {
+        (
+            Post::Show {
+                output: Some(path),
+                fenced,
+            },
+            CommandResult::Render(render),
+        ) => {
+            let mut content = match (&render.text, &render.graph) {
+                (Some(text), _) => text.clone(),
+                (None, Some(graph)) => serde_json::to_string_pretty(graph)
+                    .expect("render graphs serialize"),
+                (None, None) => String::new(),
+            };
+            if *fenced {
+                content = format!("```mermaid\n{}\n```", content.trim_end());
+            }
+            if !content.ends_with('\n') {
+                content.push('\n');
+            }
+            write_atomic(path, content.as_bytes())
+        },
+        (
+            Post::Export { output: Some(path) },
+            CommandResult::Export(export),
+        ) => {
+            let bytes = match export.format {
+                ExportFormat::Native =>
+                    base64::engine::general_purpose::STANDARD
+                        .decode(&export.data)
+                        .map_err(|e| {
+                            CliError::io(format!(
+                                "invalid base64 in native export: {e}"
+                            ))
+                        })?,
+                ExportFormat::InterchangeV3 => export.data.clone().into_bytes(),
+            };
+            write_atomic(path, &bytes)
+        },
+        _ => Ok(()),
+    }
+}
+
+/// Write via a temporary sibling file and rename.
+fn write_atomic(
+    path: &Path,
+    bytes: &[u8],
+) -> Result<(), CliError> {
+    let io = |e: std::io::Error| {
+        CliError::io(format!("cannot write '{}': {e}", path.display()))
+    };
+    let name = path.file_name().ok_or_else(|| {
+        CliError::invalid(format!("invalid output path '{}'", path.display()))
+    })?;
+    let tmp = path.with_file_name(format!(
+        ".{}.tmp{}",
+        name.to_string_lossy(),
+        std::process::id()
+    ));
+    let result = (|| {
+        let mut file = fs::File::create(&tmp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        fs::rename(&tmp, path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    result.map_err(io)
+}
+
+#[cfg(test)]
+mod tests {
+    use context_api::types::{
+        Input,
+        Split,
+    };
+
+    use super::*;
+
+    fn prepare_args(
+        args: &[&str],
+        stdin: &str,
+    ) -> Result<Prepared, CliError> {
+        let matches = Cli::command().try_get_matches_from(args).unwrap();
+        let cli = Cli::from_arg_matches(&matches).unwrap();
+        let sub = matches.subcommand().map(|(_, m)| m);
+        prepare(&cli, sub, &mut stdin.as_bytes(), false)
+    }
+
+    fn labels_and_texts(command: &Command) -> Vec<(String, Option<String>)> {
+        let (Command::Read { inputs, .. } | Command::Create { inputs, .. }) =
+            command
+        else {
+            panic!("{command:?}")
+        };
+        inputs
+            .iter()
+            .map(|input| match input {
+                Input::Text { text, label } => (text.clone(), label.clone()),
+                Input::File { .. } => panic!("file input"),
             })
-        },
-        CliCommand::ImportWorkspace {
-            name,
-            path,
-            overwrite,
-        } => Ok(Command::ImportWorkspace {
-            name,
-            path,
-            overwrite,
-        }),
-        other => Err(other),
+            .collect()
     }
-}
 
-fn map_edit_command(cmd: CliCommand) -> Result<Command, CliCommand> {
-    match cmd {
-        CliCommand::AddAtom { workspace, ch } =>
-            Ok(Command::AddAtom { workspace, ch }),
-        CliCommand::AddAtoms { workspace, chars } => Ok(Command::AddAtoms {
-            workspace,
-            chars: chars.chars().collect(),
-        }),
-        CliCommand::AddPattern { workspace, atoms } =>
-            Ok(Command::AddSimplePattern {
-                workspace,
-                atoms: atoms.chars().collect(),
-            }),
-        CliCommand::SearchSequence { workspace, text } =>
-            Ok(Command::SearchSequence { workspace, text }),
-        CliCommand::SearchPattern { workspace, query } =>
-            Ok(Command::SearchPattern {
-                workspace,
-                query: parse_token_refs(&query),
-            }),
-        CliCommand::InsertSequence { workspace, text } =>
-            Ok(Command::InsertSequence { workspace, text }),
-        CliCommand::InsertFirstMatch { workspace, query } =>
-            Ok(Command::InsertFirstMatch {
-                workspace,
-                query: parse_token_refs(&query),
-            }),
-        CliCommand::InsertSequences { workspace, texts } =>
-            Ok(Command::InsertSequences {
-                workspace,
-                texts: texts.into_iter().collect::<HashSet<_>>(),
-            }),
-        other => Err(other),
+    #[test]
+    fn inputs_keep_command_line_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("f.txt");
+        fs::write(&file, "file").unwrap();
+        let file = file.to_str().unwrap();
+        let prepared = prepare_args(
+            &[
+                "context-cli",
+                "read",
+                "g",
+                "-f",
+                file,
+                "one",
+                "-",
+                "-t",
+                "-two",
+                "three",
+            ],
+            "stdin",
+        )
+        .unwrap();
+        let texts: Vec<_> = labels_and_texts(&prepared.command)
+            .into_iter()
+            .map(|(text, _)| text)
+            .collect();
+        assert_eq!(texts, ["file", "one", "stdin", "-two", "three"]);
     }
-}
 
-fn map_query_command(cmd: CliCommand) -> Result<Command, CliCommand> {
-    match cmd {
-        CliCommand::GetVertex { workspace, index } =>
-            Ok(Command::GetVertex { workspace, index }),
-        CliCommand::ListVertices { workspace } =>
-            Ok(Command::ListVertices { workspace }),
-        CliCommand::ListAtoms { workspace } =>
-            Ok(Command::ListAtoms { workspace }),
-        other => map_read_display_command(other),
-    }
-}
-
-fn map_read_display_command(cmd: CliCommand) -> Result<Command, CliCommand> {
-    match cmd {
-        CliCommand::ReadPattern { workspace, index } =>
-            Ok(Command::ReadPattern { workspace, index }),
-        CliCommand::ReadAsText { workspace, index } =>
-            Ok(Command::ReadAsText { workspace, index }),
-        CliCommand::ReadSequence { workspace, text } =>
-            Ok(Command::ReadSequence { workspace, text }),
-        CliCommand::ReadFile { workspace, path } =>
-            Ok(Command::ReadFile { workspace, path }),
-        CliCommand::Validate { workspace } =>
-            Ok(Command::ValidateGraph { workspace }),
-        CliCommand::Snapshot { workspace } =>
-            Ok(Command::GetSnapshot { workspace }),
-        CliCommand::Stats { workspace } =>
-            Ok(Command::GetStatistics { workspace }),
-        CliCommand::Show { workspace } => Ok(Command::ShowGraph { workspace }),
-        CliCommand::ShowVertex { workspace, index } =>
-            Ok(Command::ShowVertex { workspace, index }),
-        CliCommand::RenderGraph {
-            workspace,
-            ascii_dag,
-        } => Ok(Command::RenderAsciiGraph {
-            workspace,
-            ascii_dag,
-        }),
-        other => Err(other),
-    }
-}
-
-fn map_log_command(cmd: CliCommand) -> Result<Command, CliCommand> {
-    match cmd {
-        CliCommand::ListLogs { workspace, pattern } => Ok(Command::ListLogs {
-            workspace,
-            pattern,
-            limit: 100,
-        }),
-        CliCommand::GetLog {
-            workspace,
-            filename,
-            filter,
-            limit,
-        } => Ok(Command::GetLog {
-            workspace,
-            filename,
-            filter,
-            limit,
-            offset: 0,
-        }),
-        CliCommand::QueryLog {
-            workspace,
-            filename,
-            query,
-        } => Ok(Command::QueryLog {
-            workspace,
-            filename,
-            query,
-            limit: 100,
-        }),
-        CliCommand::AnalyzeLog {
-            workspace,
-            filename,
-        } => Ok(Command::AnalyzeLog {
-            workspace,
-            filename,
-        }),
-        CliCommand::SearchLogs { workspace, query } =>
-            Ok(Command::SearchLogs {
-                workspace,
-                query,
-                limit_per_file: 10,
-            }),
-        CliCommand::DeleteLog {
-            workspace,
-            filename,
-        } => Ok(Command::DeleteLog {
-            workspace,
-            filename,
-        }),
-        CliCommand::DeleteLogs {
-            workspace,
-            older_than_days,
-        } => Ok(Command::DeleteLogs {
-            workspace,
-            older_than_days,
-        }),
-        other => Err(other),
-    }
-}
-
-fn run_compare_workspaces(
-    manager: &mut WorkspaceManager,
-    workspace_a: String,
-    workspace_b: String,
-    mode: String,
-    format: String,
-) {
-    let compare_mode = parse_compare_mode(&mode);
-    let _ = execute(
-        manager,
-        Command::OpenWorkspace {
-            name: workspace_a.clone(),
-        },
-    );
-    let _ = execute(
-        manager,
-        Command::OpenWorkspace {
-            name: workspace_b.clone(),
-        },
-    );
-    let cmd = Command::CompareWorkspaces {
-        workspace_a,
-        workspace_b,
-        mode: compare_mode,
-    };
-    match execute(manager, cmd) {
-        Ok(result) => {
-            if format.to_lowercase() == "json" {
-                match serde_json::to_string_pretty(&result) {
-                    Ok(json) => println!("{json}"),
-                    Err(e) => eprintln!("Error serializing result: {e}"),
-                }
-            } else {
-                output::print_command_result(&result);
+    #[test]
+    fn split_is_passed_through() {
+        let prepared = prepare_args(
+            &["context-cli", "create", "g", "a\nb", "--split", "lines"],
+            "",
+        )
+        .unwrap();
+        assert!(matches!(
+            prepared.command,
+            Command::Create {
+                split: Split::Lines,
+                ..
             }
-            use context_api::{
-                commands::CommandResult,
-                types::DiffVerdict,
-            };
-            if let CommandResult::GraphDiff(ref diff) = result {
-                if diff.summary.verdict == DiffVerdict::Divergent {
-                    std::process::exit(1);
-                }
+        ));
+        let prepared = prepare_args(
+            &["context-cli", "read", "g", "x", "--split", "paragraphs"],
+            "",
+        )
+        .unwrap();
+        assert!(matches!(
+            prepared.command,
+            Command::Read {
+                split: Split::Paragraphs,
+                ..
             }
-        },
-        Err(e) => {
-            eprintln!("Error: {e}");
-            std::process::exit(2);
-        },
-    }
-}
-
-fn handle_special_command(
-    manager: &mut WorkspaceManager,
-    cmd: CliCommand,
-) -> Result<Option<Command>, ()> {
-    match cmd {
-        CliCommand::Repl => {
-            repl::run(manager);
-            Err(())
-        },
-        CliCommand::Compare {
-            workspace_a,
-            workspace_b,
-            mode,
-            format,
-        } => {
-            run_compare_workspaces(
-                manager,
-                workspace_a,
-                workspace_b,
-                mode,
-                format,
-            );
-            Err(())
-        },
-        CliCommand::CompareVertex {
-            workspace_a,
-            index_a,
-            workspace_b,
-            index_b,
-        } => {
-            open_compare_workspaces(manager, &workspace_a, &workspace_b);
-            Ok(Some(Command::CompareVertices {
-                workspace_a,
-                workspace_b,
-                index_a,
-                index_b,
-            }))
-        },
-        other => Ok(Some(
-            map_workspace_command(other)
-                .or_else(map_edit_command)
-                .or_else(map_query_command)
-                .or_else(map_log_command)
-                .unwrap_or_else(|_| {
-                    unreachable!("unhandled CLI command variant")
-                }),
-        )),
-    }
-}
-
-fn open_compare_workspaces(
-    manager: &mut WorkspaceManager,
-    workspace_a: &str,
-    workspace_b: &str,
-) {
-    let _ = execute(
-        manager,
-        Command::OpenWorkspace {
-            name: workspace_a.to_string(),
-        },
-    );
-    let _ = execute(
-        manager,
-        Command::OpenWorkspace {
-            name: workspace_b.to_string(),
-        },
-    );
-}
-
-fn main() {
-    // Initialize tracing (respects RUST_LOG env var).
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
-    let cli = Cli::parse();
-    let mut manager = match WorkspaceManager::current_dir() {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("Error: failed to initialize workspace manager: {e}");
-            std::process::exit(1);
-        },
-    };
-
-    match cli.command {
-        Some(cmd) => execute_subcommand(&mut manager, cmd, cli.trace),
-        None => {
-            let mut command = Cli::command();
-            print!("{}", command.render_long_help());
-        },
-    }
-}
-
-/// Map a CLI subcommand to a `Command` enum value and execute it.
-fn execute_subcommand(
-    manager: &mut WorkspaceManager,
-    cmd: CliCommand,
-    trace: bool,
-) {
-    // Extract workspace name before we move `cmd` into the match.
-    let ws_name_owned: Option<String> = if trace {
-        workspace_name_from_cli_cmd(&cmd).map(String::from)
-    } else {
-        None
-    };
-
-    let api_cmd = match prepare_command(manager, cmd) {
-        Ok(Some(command)) => command,
-        Err(()) => return,
-        Ok(None) => unreachable!("special command handler returned no command"),
-    };
-
-    if try_execute_traced(
-        manager,
-        api_cmd.clone(),
-        trace,
-        ws_name_owned.clone(),
-    ) {
-        return;
+        ));
     }
 
-    execute_plain(manager, api_cmd);
-}
-
-fn try_execute_traced(
-    manager: &mut WorkspaceManager,
-    api_cmd: Command,
-    trace: bool,
-    ws_name_owned: Option<String>,
-) -> bool {
-    if !trace {
-        return false;
+    #[test]
+    fn implicit_stdin_when_no_input() {
+        let prepared =
+            prepare_args(&["context-cli", "read", "g"], "piped").unwrap();
+        assert_eq!(
+            labels_and_texts(&prepared.command),
+            [("piped".to_string(), Some("<stdin>".to_string()))]
+        );
     }
 
-    if let Some(ws_name) = ws_name_owned {
-        match manager.log_dir(&ws_name) {
-            Ok(log_dir) => {
-                let config = CaptureConfig {
-                    enabled: true,
-                    log_dir,
-                    level: "TRACE".to_string(),
-                };
-                match execute_traced(manager, api_cmd, Some(&config)) {
-                    Ok((result, trace_summary)) => {
-                        output::print_command_result(&result);
-                        if let Some(summary) = trace_summary {
-                            eprintln!(
-                                "\u{1f4dd} Trace: {} ({} events, {}ms)",
-                                summary.log_file,
-                                summary.entry_count,
-                                summary.duration_ms,
-                            );
-                        }
-                    },
-                    Err(e) => {
-                        eprintln!("Error: {e}");
-                        std::process::exit(1);
-                    },
-                }
-                return true;
-            },
-            Err(e) => {
-                eprintln!("Warning: could not enable tracing: {e}");
-            },
-        }
-    } else {
-        eprintln!("Warning: --trace requires a workspace-scoped command");
+    #[test]
+    fn vertex_refs() {
+        assert_eq!(vertex_ref("#12"), VertexRef::Index(12));
+        assert_eq!(vertex_ref("#x"), VertexRef::Text("#x".into()));
+        assert_eq!(vertex_ref("abc"), VertexRef::Text("abc".into()));
     }
 
-    false
-}
-
-fn execute_plain(
-    manager: &mut WorkspaceManager,
-    api_cmd: Command,
-) {
-    match execute(manager, api_cmd) {
-        Ok(result) => output::print_command_result(&result),
-        Err(e) => {
-            eprintln!("Error: {e}");
-            std::process::exit(1);
-        },
+    #[test]
+    fn show_format_from_extension() {
+        let prepared =
+            prepare_args(&["context-cli", "show", "g", "-o", "x.md"], "")
+                .unwrap();
+        assert!(matches!(prepared.post, Post::Show { fenced: true, .. }));
+        assert!(matches!(
+            prepared.command,
+            Command::Render {
+                format: context_api::types::RenderFormat::Mermaid,
+                ..
+            }
+        ));
+        let prepared =
+            prepare_args(&["context-cli", "show", "g", "-o", "x.dot"], "")
+                .unwrap();
+        assert!(matches!(
+            prepared.command,
+            Command::Render {
+                format: context_api::types::RenderFormat::Dot,
+                ..
+            }
+        ));
     }
-}
-
-fn prepare_command(
-    manager: &mut WorkspaceManager,
-    cmd: CliCommand,
-) -> Result<Option<Command>, ()> {
-    handle_special_command(manager, cmd)
 }
