@@ -122,3 +122,61 @@ fn only_insertion_and_the_reader_enable_the_edit_feature() {
         assert!(ALLOWED.contains(user), "{user} must not enable context-trace/edit");
     }
 }
+
+/// The crate layering (crate ownership plan §2.1), for every dependency
+/// kind (normal, dev, build): the stack crates depend only on lower stack
+/// crates (trace < search < insert < read); only legacy crates and the
+/// `ngrams` oracle depend on legacy crates; a legacy crate depends only on
+/// lower legacy crates, never on context-search, -insert or -read.
+#[test]
+fn crates_depend_only_on_lower_layers() {
+    const STACK: [&str; 4] = ["context-trace", "context-search", "context-insert", "context-read"];
+    const LEGACY: [&str; 4] = [
+        "context-trace-legacy",
+        "context-search-legacy",
+        "context-insert-legacy",
+        "context-read-legacy",
+    ];
+    let output = std::process::Command::new(env!("CARGO"))
+        .args(["metadata", "--format-version", "1", "--no-deps"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("cargo metadata");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let metadata: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let packages = metadata["packages"].as_array().unwrap();
+    let layer = |order: &[&str], name: &str| order.iter().position(|crate_name| *crate_name == name);
+    let mut checked = 0;
+    for package in packages {
+        let name = package["name"].as_str().unwrap();
+        let dependencies = package["dependencies"].as_array().unwrap();
+        for dependency in dependencies.iter().map(|d| d["name"].as_str().unwrap()) {
+            if dependency == name {
+                continue;
+            }
+            if let (Some(own), Some(other)) = (layer(&STACK, name), layer(&STACK, dependency)) {
+                assert!(other < own, "{name} must not depend on {dependency} (higher layer)");
+            }
+            if let (Some(own), Some(other)) = (layer(&LEGACY, name), layer(&LEGACY, dependency)) {
+                assert!(other < own, "{name} must not depend on {dependency} (higher layer)");
+            }
+            if layer(&LEGACY, name).is_some() {
+                assert!(
+                    layer(&STACK, dependency).is_none_or(|other| other == 0),
+                    "{name} must not depend on {dependency}: legacy crates use only context-trace"
+                );
+            }
+            if layer(&LEGACY, dependency).is_some() {
+                assert!(
+                    layer(&LEGACY, name).is_some() || name == "ngrams",
+                    "{name} must not depend on the legacy crate {dependency}"
+                );
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0);
+    for name in STACK.iter().chain(&LEGACY) {
+        assert!(packages.iter().any(|p| p["name"] == *name), "{name} missing from the workspace");
+    }
+}
