@@ -9,7 +9,6 @@ use context_trace::{
     AtomPosition,
     VertexIndex,
     positioned::{
-        CompositionRead,
         GraphRead,
         NodeRef,
         PositionedGraph,
