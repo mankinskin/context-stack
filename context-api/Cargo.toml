@@ -9,6 +9,8 @@ default = ["logs"]
 ts-gen = ["ts-rs"]
 # Trace capture and log queries (`<graph>.ctx.logs/`).
 logs = ["jaq-core", "jaq-std", "jaq-interpret", "jaq-syn", "regex", "once_cell"]
+# Blocking HTTP/WebSocket client of a context server (`client::RemoteBackend`).
+client = ["ureq", "tungstenite"]
 
 [dependencies]
 context-trace = { path = "../context-trace", default-features = false, features = ["serde", "interchange"] }
@@ -34,6 +36,9 @@ jaq-core = { version = "1", optional = true }
 jaq-std = { version = "1", optional = true }
 jaq-interpret = { version = "1", optional = true }
 jaq-syn = { version = "1", optional = true }
+
+ureq = { version = "2", default-features = false, optional = true }
+tungstenite = { version = "0.29", default-features = false, features = ["handshake"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"

@@ -2,11 +2,15 @@
 
 Command-line tool for context-engine graphs on the positioned stack. Every
 command builds a `context_api::Request` and runs it on an in-process
-`Session` (`LocalBackend`); `--format json` prints the `Response` envelope
-unchanged, so scripts see the same JSON as the (future) server and MCP
-transports.
+`Session` (`LocalBackend`) or on a server (`context_api::client::RemoteBackend`,
+client mode); `--format json` prints the `Response` envelope unchanged, so
+scripts see the same JSON as the server and MCP transports.
 
-Plan: `context-api/agents/plans/20261126_PLAN_CONTEXT_TOOLS/02_CLI.md`.
+The same binary runs the server (`serve`), an interactive shell (`shell`)
+and the MCP server (`mcp`).
+
+Plans: `context-api/agents/plans/20261126_PLAN_CONTEXT_TOOLS/02_CLI.md`,
+`04_CLIENT_SHELL.md`.
 
 ## Usage
 
@@ -15,8 +19,9 @@ context-cli [GLOBAL] <COMMAND>
 
 GLOBAL
   --store <DIR>          graph store (default ./.context-engine, env CONTEXT_STORE)
-  --server <URL>         client mode (stage 4; currently an error), env CONTEXT_SERVER
-  --local                run in process even if CONTEXT_SERVER is set
+  --server <URL>         run on a server (client mode), env CONTEXT_SERVER
+  --token <TOKEN>        bearer token of the server, env CONTEXT_TOKEN
+  --local                run in process: ignore CONTEXT_SERVER, no auto-discovery
   --format <text|json>   output format (also accepted after the command)
   -q, --quiet            no progress on stderr
 
@@ -35,6 +40,14 @@ GRAPH COMMANDS                                    <GRAPH> = name or path/to/file
   export  <GRAPH> --format v3|native [-o FILE] [--force]
   import  <GRAPH> <FILE> [--force]
   list                   delete <GRAPH>
+
+MODES
+  shell   [GRAPH]                                 interactive shell (see below)
+  serve   [GRAPH...] [--http ADDR] [--save on-read|interval=30s|manual]
+          [--token T] [--allow-fs DIR] [--max-body SIZE] [--render-cap N]
+          [--cors-origin O] [--static DIR]        HTTP/WebSocket server (feature `server`)
+  mcp     [--allow-fs DIR] [--max-output SIZE] [--allow-delete] [--render-cap N]
+                                                  MCP server on stdio (feature `mcp`)
 
 INPUT (repeatable, kept in order, each becomes one reader input unless split)
   TEXT                   positional text argument
@@ -119,8 +132,130 @@ context-cli search commits "fix(" --view occurrences --format json \
   | jq -r '.ok.search.occurrences.items[].snippet.matched'
 ```
 
-Not yet available: `serve` (stage 3), `--server` client mode and `shell`
-(stage 4), `mcp` (stage 5).
+## Server and client mode
+
+`context-cli serve` keeps graphs in memory (the `context-http` server; flags
+as `context-http`, see `tools/http/context-http/README.md`). It prints one
+line `{"listening":"http://127.0.0.1:7878","pid":1234}` on stdout (port 0
+binds an ephemeral port), writes `<graph>.ctx.server.json` next to every
+graph it holds and saves dirty graphs on Ctrl-C / SIGTERM.
+
+Every command then selects where it runs:
+
+1. `--server URL` or `CONTEXT_SERVER` → the server (`--token` /
+   `CONTEXT_TOKEN` for servers started with `--token`);
+2. `--local` → in process, never auto-connect (wins over `CONTEXT_SERVER`);
+3. auto-discovery: the graph's `.server.json` names a running process and
+   its `/v1/health` answers within 200 ms → the server, with a note on stderr
+   `using server http://127.0.0.1:7878 (graph held by pid 1234)` (not with
+   `-q`); stale discovery files are ignored;
+4. otherwise in process.
+
+So a command works the same whether or not a server holds the graph, and
+never fails with `locked` because of a live server. Outputs are identical in
+both modes. Files and stdin are always read by the CLI and sent as text (the
+server needs no `--allow-fs`); a `read` input larger than 1 MiB is sent
+through the streamed `POST /v1/graphs/{g}/read` route, one input per request
+in order, and the reports are merged into one. Progress of remote reads
+comes from the server's WebSocket events. Graph paths (`*.ctx`) are never
+auto-discovered.
+
+```bash
+# keep a large graph in memory
+context-cli serve wiki &                 # opens wiki at start, prints {"listening":"http://127.0.0.1:7878",...}
+context-cli search wiki "black hole" --view occurrences   # note: using server …
+context-cli read wiki -f new_article.txt          # no reload, no lock conflict
+
+# shared team index on a host
+context-cli serve docs --http 0.0.0.0:7878 --token "$CONTEXT_TOKEN" --save interval=60s
+CONTEXT_SERVER=http://indexhost:7878 CONTEXT_TOKEN=... context-cli search docs "deploy key"
+```
+
+An unreachable server is an I/O error (exit 3) naming the URL; a missing or
+wrong token is refused (exit 1) with a hint. Only `http://` URLs are
+supported by the client.
+
+## Shell
+
+```text
+$ context-cli shell corpus            # local, or remote when discovered / --server
+corpus> search "brown fox" --view occurrences
+corpus> read -f notes/today.md
+corpus> use other                     # switch the default graph
+other> show --root "abc" --format mermaid
+other> :format json                   # shell settings start with ':'
+other> :server http://10.0.0.5:7878   # run on a server from now on
+other> :events on                     # print graph_changed / saved events of other clients
+other> exit
+```
+
+- A line is a graph command without the program name, parsed by the same
+  clap definitions as the CLI (`help`, `help search`). Quoting follows the
+  shell (`shell-words`).
+- Default graph: `shell GRAPH` or `use GRAPH`. A command that misses a
+  required argument is retried with the default graph inserted as its first
+  argument: `search bca` = `search GRAPH bca`, `info` = `info GRAPH`. A
+  command with all its positionals still names its own graph
+  (`search other bca`). Give `read`/`create` texts with `-t` (`read -t xyz`),
+  since a lone positional is taken as the graph; stdin is never read as
+  input in the shell.
+- Settings: `:format text|json`, `:server URL`, `:local`, `:events on|off`,
+  `:save on-read|manual` (local), `:status`, `:help`, `:quit` (also `exit`,
+  `quit`, Ctrl-D).
+- Local shell: one session keeps the graphs open (exclusively locked) and
+  saves after every read (`:save on-read`, default) or only on `save` and on
+  exit (`:save manual`); dirty graphs are saved on exit.
+- Remote shell: one WebSocket subscription on the default graph; with
+  `:events on`, `graph_changed` and `saved` events of other clients (e.g. an
+  agent through `context-cli mcp --server`) are printed above the prompt.
+- On a terminal: line editing, completion of commands, settings and
+  `--flags`, history in `$XDG_STATE_HOME/context-cli/history`
+  (`~/.local/state/context-cli/history`).
+- When stdin is not a terminal, commands are read line by line without
+  prompt or history (`#` comments and empty lines are skipped); the exit code
+  is that of the last failed command (0 if all succeeded):
+
+```bash
+printf 'search bca\nread -t xyzxyz\ninfo\n' | context-cli shell demo
+```
+
+## MCP
+
+`context-cli mcp` serves the `context-mcp` tools on stdio
+(`tools/mcp/context-mcp/README.md`). In process by default (the global
+`--store`); with `--server URL` it is a proxy forwarding every tool call to a
+running server, so an agent and a human share one graph (the agent's reads
+appear as events in the shell). The MCP-side policies (`--max-output`,
+`--allow-delete`, `--render-cap`, graph names only) apply in both modes; in
+proxy mode `files` inputs are read by the server and need its `--allow-fs`.
+
+```bash
+context-cli mcp --store .context-engine --allow-fs .        # local
+context-cli serve research &
+context-cli mcp --server http://127.0.0.1:7878             # proxy
+context-cli shell research     # sees the agent's reads as graph_changed events
+```
+
+```json
+{
+  "servers": {
+    "context": {
+      "command": "context-cli",
+      "args": ["mcp", "--store", "${workspaceFolder}/.context-engine", "--allow-fs", "${workspaceFolder}"]
+    }
+  }
+}
+```
+
+## Features
+
+| Feature | Default | Adds |
+|---|---|---|
+| `server` | yes | `serve` (context-http, tokio) |
+| `mcp` | yes | `mcp` (context-mcp, tokio) |
+
+Client mode and the shell are always built (blocking `ureq` / `tungstenite`,
+no async runtime): `cargo build -p context-cli --no-default-features`.
 
 ## Tests
 
@@ -129,4 +264,6 @@ cargo test -p context-cli
 ```
 
 Integration tests (`tests/`) run the binary against a temporary store with
-`assert_cmd`.
+`assert_cmd`; `tests/client.rs` (client equivalence, auto-discovery, shell,
+events, tokens) and `tests/mcp_proxy.rs` start `context-cli serve` child
+processes on ephemeral ports.

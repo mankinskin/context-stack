@@ -99,8 +99,38 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// Serve the tools over stdio (local mode) until the client disconnects.
 pub async fn run_stdio(config: McpConfig) -> Result<(), BoxError> {
     tracing::info!(store = %config.store_dir.display(), "context-mcp serving on stdio");
-    let server = ContextServer::new(config);
+    serve_stdio(ContextServer::new(config)).await
+}
+
+/// Serve a configured server (e.g. [`ContextServer::with_backend`] over a
+/// remote backend: proxy mode) over stdio until the client disconnects.
+pub async fn serve_stdio(server: ContextServer) -> Result<(), BoxError> {
     let service = server.serve(stdio()).await?;
     service.waiting().await?;
     Ok(())
+}
+
+/// A byte size for `--max-output`: `32768`, `64KiB`, `1MiB` (K/KB/KiB and
+/// M/MB/MiB are binary).
+pub fn parse_size(text: &str) -> Result<usize, String> {
+    let text = text.trim();
+    let split = text
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(text.len());
+    let (number, unit) = text.split_at(split);
+    let number: usize = number
+        .parse()
+        .map_err(|_| format!("invalid size '{text}'"))?;
+    let factor = match unit.trim().to_ascii_lowercase().as_str() {
+        "" | "b" => 1,
+        "k" | "kb" | "kib" => 1024,
+        "m" | "mb" | "mib" => 1024 * 1024,
+        _ =>
+            return Err(format!(
+                "invalid size unit in '{text}' (use B, KiB or MiB)"
+            )),
+    };
+    number
+        .checked_mul(factor)
+        .ok_or_else(|| format!("size '{text}' is too large"))
 }

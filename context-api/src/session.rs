@@ -943,6 +943,18 @@ mod tests {
         assert!(!summary.open);
     }
 
+    /// Responses decode from their JSON (clients of a server), including
+    /// the integer-keyed histograms of `stats`.
+    #[test]
+    fn responses_round_trip_through_json() {
+        let (_dir, session) = session(false);
+        run(&session, Command::Create { graph: "g".into(), inputs: vec![text("abcabca")], split: Split::None, overwrite: false }).unwrap();
+        let response = session.execute(Request::new(Command::Stats { graph: "g".into() }));
+        assert!(response.is_ok());
+        let json = serde_json::to_string(&response).unwrap();
+        assert_eq!(serde_json::from_str::<Response>(&json).unwrap(), response);
+    }
+
     #[test]
     fn errors_map_to_kinds() {
         let (_dir, session) = session(false);

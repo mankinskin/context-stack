@@ -17,6 +17,8 @@
 
 pub mod ascii_graph;
 mod base64;
+#[cfg(feature = "client")]
+pub mod client;
 pub mod command;
 pub mod error;
 pub mod event;
