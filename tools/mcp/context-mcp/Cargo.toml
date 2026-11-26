@@ -2,7 +2,10 @@
 name = "context-mcp"
 version = "0.1.0"
 edition = "2024"
-description = "MCP server for context-engine hypergraph workspaces"
+description = "MCP server for context-engine graphs: typed tools over the context-api Session"
+
+[lib]
+path = "src/lib.rs"
 
 [[bin]]
 name = "context-mcp"
@@ -11,12 +14,15 @@ path = "src/main.rs"
 [dependencies]
 context-api = { path = "../../../context-api" }
 
-rmcp = { version = "0.14", features = ["server", "transport-io"] }
+rmcp = { version = "0.14", features = ["server", "transport-io", "macros"] }
+schemars = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive", "env"] }
 
 [dev-dependencies]
+rmcp = { version = "0.14", features = ["client"] }
 tempfile = "3"
