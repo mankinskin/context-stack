@@ -2,10 +2,8 @@
 //! files of open graphs.
 
 use std::{
-    collections::{
-        BTreeMap,
-        BTreeSet,
-    },
+    collections::BTreeMap,
+    path::PathBuf,
     sync::{
         Arc,
         Mutex,
@@ -56,7 +54,7 @@ struct Inner {
     /// `http://ADDR` once bound; discovery files are written only then.
     url: OnceLock<String>,
     /// Open graphs by name, with the reference that opened them.
-    registered: Mutex<BTreeMap<String, Registered>>,
+    registered: Mutex<BTreeMap<PathBuf, Registered>>,
     shutdown: watch::Sender<bool>,
 }
 
@@ -166,35 +164,37 @@ impl AppState {
     }
 
     /// Register newly opened graphs (writing `<graph>.ctx.server.json`) and
-    /// unregister closed or deleted ones. `graph` is the reference of the
-    /// command just executed, so graphs opened by path are located exactly.
+    /// unregister closed or deleted ones, keyed by file path: a store graph
+    /// and a graph opened by path may share a name.
     fn sync_discovery(
         &self,
-        graph: Option<&str>,
+        _graph: Option<&str>,
     ) {
         let store = self.inner.session.store();
         let mut registered = lock(&self.inner.registered);
-        let open: BTreeSet<String> =
-            self.inner.session.open_graphs().into_iter().collect();
-        registered.retain(|name, entry| {
-            let keep = open.contains(name);
+        let open: BTreeMap<PathBuf, GraphLocation> = self
+            .inner
+            .session
+            .open_locations()
+            .into_iter()
+            .map(|location| (location.path.clone(), location))
+            .collect();
+        registered.retain(|path, entry| {
+            let keep = open.contains_key(path);
             if !keep && entry.discovery {
                 store.remove_server_info(&entry.location);
             }
             keep
         });
-        let mut candidates: Vec<String> =
-            graph.into_iter().map(str::to_string).collect();
-        candidates.extend(open.iter().cloned());
-        for graph in candidates {
-            let Ok(location) = store.resolve(&graph) else {
-                continue;
-            };
-            if !open.contains(&location.name)
-                || registered.contains_key(&location.name)
-            {
+        for (path, location) in open {
+            if registered.contains_key(&path) {
                 continue;
             }
+            // Store graphs are addressed by name, others by their path.
+            let graph = match store.resolve(&location.name) {
+                Ok(by_name) if by_name.path == location.path => location.name.clone(),
+                _ => location.path.display().to_string(),
+            };
             let discovery = self.url().is_some_and(|url| {
                 let info = ServerInfo {
                     url: url.to_string(),
@@ -210,7 +210,7 @@ impl AppState {
                 }
             });
             registered.insert(
-                location.name.clone(),
+                path,
                 Registered {
                     graph,
                     location,

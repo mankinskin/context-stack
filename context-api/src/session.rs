@@ -268,6 +268,16 @@ impl Session {
         names
     }
 
+    /// Locations of the graphs open in this session.
+    pub fn open_locations(&self) -> Vec<GraphLocation> {
+        let mut locations: Vec<_> = lock(&self.graphs)
+            .values()
+            .map(|slot| slot.location.clone())
+            .collect();
+        locations.sort_by(|a, b| a.path.cmp(&b.path));
+        locations
+    }
+
     fn forget(
         &self,
         graph: &str,

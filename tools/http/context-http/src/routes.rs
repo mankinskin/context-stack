@@ -105,6 +105,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/graphs/{graph}/save", post(save))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth))
         .route("/v1/health", get(health))
+        .route_layer(middleware::from_fn_with_state(state.clone(), origin_guard))
         .layer(DefaultBodyLimit::max(config.max_body))
         .with_state(state);
     let app = with_static_files(api, config.static_dir);
@@ -208,6 +209,62 @@ fn constant_time_eq(
 ) -> bool {
     a.len() == b.len()
         && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+/// Host without port (`[::1]:7878` → `[::1]`, `localhost:7878` → `localhost`).
+fn host_name(host: &str) -> &str {
+    match host.rfind(':') {
+        Some(colon) if !host[colon..].contains(']') => &host[..colon],
+        _ => host,
+    }
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    let name = host_name(host);
+    name.eq_ignore_ascii_case("localhost")
+        || name == "[::1]"
+        || name
+            .parse::<std::net::Ipv4Addr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
+/// Browser protection for the API: requests carrying an `Origin` (every
+/// cross-origin POST, including `no-cors`, and every WebSocket upgrade) must
+/// come from the server's own origin or a configured CORS origin; without a
+/// token the `Host` must be a loopback name (DNS rebinding). CLI, MCP and
+/// other non-browser clients send no `Origin`.
+async fn origin_guard(
+    State(state): State<AppState>,
+    request: HttpRequest,
+    next: Next,
+) -> HttpResponse {
+    let headers = request.headers();
+    let host = headers.get(header::HOST).and_then(|value| value.to_str().ok());
+    if state.config().token.is_none() && host.is_some_and(|host| !is_loopback_host(host)) {
+        return error_reply(
+            StatusCode::FORBIDDEN,
+            error(
+                ErrorKind::Forbidden,
+                "host not allowed: a server without a token only answers loopback host names",
+            ),
+        );
+    }
+    if let Some(origin) = headers.get(header::ORIGIN).and_then(|value| value.to_str().ok()) {
+        let same_origin = host.is_some_and(|host| {
+            origin == format!("http://{host}") || origin == format!("https://{host}")
+        });
+        let listed = state.config().cors_origins.iter().any(|allowed| allowed == origin);
+        if !same_origin && !listed {
+            return error_reply(
+                StatusCode::FORBIDDEN,
+                error(
+                    ErrorKind::Forbidden,
+                    format!("origin {origin} not allowed; add it with --cors-origin"),
+                ),
+            );
+        }
+    }
+    next.run(request).await
 }
 
 /// Require the configured bearer token (`Authorization: Bearer <token>`,
