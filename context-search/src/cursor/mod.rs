@@ -1,9 +1,10 @@
 //! Cursor typestates shared by the row-model (`legacy`) and positioned
 //! search: state markers, the generic [`PathCursor`] and [`Checkpointed`].
 //!
-//! Promoted from `legacy::cursor` (plan 2.0, Decision 7.3). Only
-//! row-independent parts live here; row-specific impls (paths, `ChildCursor`,
-//! `StateAdvance`) stay in `legacy::cursor`. The positioned cursors
+//! Promoted from the row model's `cursor` (plan 2.0, Decision 7.3); the row
+//! model keeps a frozen copy in `context_search_legacy::cursor::shared` and
+//! its row-specific impls (paths, `ChildCursor`, `StateAdvance`) in
+//! `context_search_legacy::cursor`. The positioned cursors
 //! ([`QueryCursor`], [`ChildCursor`]) live in `query.rs` and `child.rs`.
 
 use context_trace::AtomPosition;

@@ -39,7 +39,7 @@ ASCII filenames containing only letters, digits, `_`, `-`, or `.`, excluding
 cannot be combined.
 
 Write v3 output to its own directory (such as `context-read/tests/fixtures/v3`);
-the checked-in v2 fixtures in `context-read/tests/fixtures/v2/` come from the
+the checked-in v2 fixtures in `context-read-legacy/tests/fixtures/v2/` come from the
 legacy pipeline and must not be overwritten.
 
 ## JSON format (version 3)

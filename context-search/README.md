@@ -1,30 +1,23 @@
 # Context-Search
 
-## Legacy / positioned split (2026-11-19)
+## Legacy / positioned split
 
-All modules (`compare/`, `container/`, `cursor/`, `logging/`, `match/`,
-`policy.rs`, `search/`, `state/`, `tests/`) live in `src/legacy/`, gated by the
-default-on `legacy` feature, and are imported as `context_search::legacy::…`
-(e.g. `Find`, `Searchable`, `Response`). `container/` and `logging/` depend on
-row types and are promoted to the root only when positioned code needs them.
-The module paths below refer to `src/legacy/…`.
+The row-model search (`compare/`, `container/`, `cursor/`, `logging/`,
+`match/`, `policy.rs`, `search/`, `state/`, `tests/` over the row
+`Hypergraph`) lives in the crate
+[`context-search-legacy`](../context-search-legacy/README.md)
+(`context_search_legacy::…`, e.g. `Find`, `Searchable`, `Response`).
 
-**Positioned (root, no legacy dependency):** `src/cursor/` — cursor
-typestates promoted from `legacy::cursor` (`CursorState`, `Matched`, `Candidate`, `Mismatched`,
-`PathCursor<P, S>`, `Checkpointed<C, AtCheckpoint | HasCandidate>`,
-`MarkMatchState`, `CursorStateMachine`), re-exported by `legacy::cursor`,
-which keeps the row-specific impls. `src/error.rs` — `SearchError
-{ EmptyPatterns, SingleIndex(Token), UnknownAtom }` for positioned search.
+**Positioned (this crate, no legacy dependency):** `compare/`, `match/`,
+`policy.rs`, `search/`, `state/` (layout and names mirror the legacy search;
+only navigation differs), `src/cursor/` — cursor typestates (`CursorState`,
+`Matched`, `Candidate`, `Mismatched`, `PathCursor<P, S>`,
+`Checkpointed<C, AtCheckpoint | HasCandidate>`, `MarkMatchState`,
+`CursorStateMachine`; `context-search-legacy` keeps a frozen copy in
+`cursor/shared/`), `src/error.rs` — `SearchError { EmptyPatterns,
+SingleIndex(Token), UnknownAtom }` for positioned search.
 
-**Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
-
-**Legacy tests:** since the Step 2 test-suite cutover every legacy test is
-`#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]`, so a
-plain `cargo test` runs only the positioned and model-agnostic tests. Run the
-legacy suite with `cargo test -p context-search --features legacy-tests` (the feature
-propagates to the lower crates) whenever a change touches `legacy` code or
-promotes something out of it. Do not use `-- --ignored` for this: it also runs
-the pending positioned reader lane and slow sweeps.
+**Rule:** the legacy crates are frozen (no new code). New (positioned-model) code goes into this crate and must not depend on the legacy crates. Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
 Advanced pattern search and traversal operations for hierarchical graph structures. Provides sophisticated algorithms for finding patterns, sequences, and relationships within hypergraph data structures.
 
@@ -120,28 +113,8 @@ pub enum FinishedKind {
 
 ## Usage Examples
 
-### Basic Pattern Search
-```rust
-use context_search::legacy::*;
-use context_trace::legacy::*;
-
-// Create search context
-let graph_ref = HypergraphRef::new(graph);
-let traversal = BreadthFirst::new(graph_ref);
-
-// Search for token sequence
-let query = &[token_a, token_b, token_c];
-let result = query.fold(traversal)?;
-
-match result.kind {
-    FinishedKind::Complete(end) => {
-        println!("Found complete match at: {:?}", end.cursor);
-    },
-    FinishedKind::Incomplete(end) => {
-        println!("Partial match, stopped at: {:?}", end.reason);
-    }
-}
-```
+Row-model examples (`fold`, `PatternCursor`) are in
+[`context-search-legacy`](../context-search-legacy/README.md#usage-examples).
 
 ### Ancestor Pattern Search
 ```rust
@@ -150,18 +123,6 @@ let ancestors = graph.find_ancestor(&query_pattern)?;
 for ancestor in ancestors {
     println!("Found in pattern: {:?}", ancestor.pattern);
 }
-```
-
-### Advanced Search with Cursors
-```rust
-// Create cursor for complex navigation
-let cursor = PatternCursor::new(
-    RootedRolePath::new(pattern, role_path),
-    atom_position
-);
-
-// Search from specific position
-let result = cursor.fold::<DepthFirst>(traversal)?;
 ```
 
 **Detailed Algorithm Example**: See `PATTERN_MATCHING_EXAMPLE.md` for a complete step-by-step walkthrough of finding the pattern "Hello" in a hierarchical hypergraph, including:

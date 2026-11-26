@@ -13,7 +13,7 @@ pub(crate) use checkpointed::{
 };
 pub(crate) use state_machine::CursorStateMachine;
 
-// Row-independent typestates, promoted to `crate::cursor::shared` (plan 2.0).
+// Row-independent typestates (frozen copy, see `shared`).
 pub use crate::cursor::shared::{
     Candidate,
     CursorState,

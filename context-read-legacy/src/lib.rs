@@ -1,9 +1,8 @@
 //! Row-model reader (legacy).
 //!
-//! Frozen: no new code here, only fixes needed to keep the legacy tests
-//! green. New code lives in the crate root modules and must not depend on
-//! this module. The unqualified `context_read::read` name is reserved for the
-//! positioned reader.
+//! Extracted from `context_read::legacy`. Frozen: no new code here, only
+//! fixes needed to keep the legacy tests green. New code lives in
+//! `context-read` and must not depend on this crate.
 
 pub(crate) mod expansion;
 pub(crate) mod input;

@@ -1,7 +1,7 @@
 //! Deliberately malformed data tests the fixture validator, not reader semantics.
-//! Each lane is checked against its own manifest: the frozen v2 lane for
-//! completeness, the positioned lane also for being in sync with the current `ngrams`
-//! oracle, the insert lane (`v3/insert`) also for its manifest being the
+//! Each lane is checked against its own manifest (the frozen v2 lane is
+//! checked in `context-read-legacy`): the positioned lane also for being in
+//! sync with the current `ngrams` oracle, the insert lane (`v3/insert`) also for its manifest being the
 //! enumeration of the current positioned fixtures, the read lane (`v3/read`)
 //! also for its manifest being derived from the positioned manifest.
 #[allow(dead_code)]
@@ -12,58 +12,10 @@ use ngrams::{
     Cancellation,
 };
 use std::collections::BTreeSet;
-#[cfg(feature = "legacy")]
-use support::legacy::{self, load, seed, token, v2_dir, GraphData};
 use support::{
     fixture_names,
     positioned::{self, load_positioned, positioned_dir, PositionedGraphSnapshot},
 };
-
-#[cfg(feature = "legacy")]
-#[test]
-#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
-fn canonicalization_rejects_duplicate_content_instead_of_overwriting() {
-    let graph = seed("repeat_aaa");
-    graph.insert_pattern(vec![token(&graph, "aa"), token(&graph, "a")]);
-    assert!(GraphData::from_graph(&graph)
-        .unwrap_err()
-        .contains("duplicate token content"));
-}
-
-#[cfg(feature = "legacy")]
-#[test]
-#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
-fn fixture_validation_rejects_incorrect_content_and_missing_children() {
-    let valid = load("linear_abc").graph;
-    let mut invalid = valid.clone();
-    invalid
-        .vertices
-        .insert("abc".into(), [vec!["a".into(), "b".into()]].into());
-    assert!(invalid
-        .validate()
-        .unwrap_err()
-        .contains("invalid decomposition"));
-    let mut invalid = valid;
-    invalid.vertices.remove("b");
-    assert!(invalid.validate().unwrap_err().contains("invalid child"));
-}
-
-#[cfg(feature = "legacy")]
-#[test]
-#[cfg_attr(not(feature = "legacy-tests"), ignore = "legacy suite")]
-fn v2_fixtures_match_frozen_manifest_exactly() {
-    let mut expected = BTreeSet::new();
-    for scenario in legacy::scenarios() {
-        assert!(expected.insert(scenario.name.clone()), "duplicate scenario");
-        assert_eq!(
-            load(&scenario.name).corpus,
-            scenario.inputs,
-            "stale v2 fixture: {}",
-            scenario.name
-        );
-    }
-    assert_eq!(fixture_names(&v2_dir()), expected, "missing or orphaned v2 fixtures");
-}
 
 #[test]
 fn positioned_fixtures_match_manifest_exactly() {

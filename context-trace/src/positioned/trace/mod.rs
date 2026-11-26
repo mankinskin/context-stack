@@ -1,6 +1,6 @@
 //! Trace states and trace cache of positioned search (search plan 2.2).
 //!
-//! Mirrors `crate::legacy::trace` (`state/parent.rs`, `child/`, `cache/`,
+//! Mirrors `context_trace_legacy::trace` (`state/parent.rs`, `child/`, `cache/`,
 //! `traceable/`); only navigation and addressing differ: steps are
 //! [`OccurrenceLocation`](super::OccurrenceLocation)s, spans are absolute
 //! atom offsets in the root and cache edges are labelled by the child's

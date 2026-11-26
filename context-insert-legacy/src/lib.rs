@@ -1,15 +1,11 @@
 //! Row-model insertion (legacy).
 //!
-//! Frozen: no new code here, only fixes needed to keep the legacy tests
-//! green. New code lives in the crate root modules and must not depend on
-//! this module.
-
-// Mirror root items (incl. `#[macro_export]` macros) into this namespace.
+//! Extracted from `context_insert::legacy`. Frozen: no new code here, only fixes needed
+//! to keep the legacy tests green. New code lives in `context-insert` and must
+//! not depend on this crate.
 
 pub mod insert;
 pub mod interval;
-// Shadows the positioned root module `join` from the glob above.
-#[allow(hidden_glob_reexports)]
 pub(crate) mod join;
 pub mod overlap;
 pub mod split;

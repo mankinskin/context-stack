@@ -1,14 +1,14 @@
-//! Row-model implementation (legacy).
+//! Row-model implementation (legacy), extracted from `context_trace::legacy`.
 //!
 //! Contains the pattern-row graph model (`Hypergraph` with `ChildPatterns`),
 //! paths, tracing caches and their tests. Frozen: no new code here, only
-//! fixes needed to keep the legacy tests green. New code lives in the crate
-//! root modules and must not depend on this module.
+//! fixes needed to keep the legacy tests green. New code lives in
+//! `context-trace` and must not depend on this crate.
 //!
-//! `pub use crate::*` (and the per-module `pub use crate::<module>::*`) mirror
-//! the model-agnostic root items into this namespace, so legacy code and
-//! legacy consumers can import everything from `context_trace::legacy`.
-//! Local items shadow the mirrored root items.
+//! `pub use context_trace::*` (and the per-module re-exports) mirror the
+//! model-agnostic items of `context-trace` into this crate, so legacy code
+//! and legacy consumers can import everything from `context_trace_legacy`.
+//! Local items shadow the mirrored items.
 #![feature(type_changing_struct_update)]
 #![deny(clippy::disallowed_methods)]
 

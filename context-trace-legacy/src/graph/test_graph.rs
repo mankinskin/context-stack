@@ -132,7 +132,37 @@ pub fn clear_test_graph() {
     clear_token_name_resolver();
 }
 
-mod as_graph_ref {
+/// `AsGraphRef` for the row model, so a `Hypergraph` can be passed to the
+/// tracing helpers of `context_trace` (behind `test-api`).
+///
+/// With [`init_test_tracing!`](context_trace::init_test_tracing):
+/// ```no_run
+/// use context_trace::init_test_tracing;
+/// use context_trace_legacy::Hypergraph;
+///
+/// #[test]
+/// fn my_test() {
+///     let graph = Hypergraph::default();
+///     // ... build graph ...
+///     let _tracing = init_test_tracing!(graph);
+///     // Tokens will now show string representations
+/// }
+/// ```
+///
+/// With `TestTracing::init_with_graph`:
+/// ```no_run
+/// use context_trace::logging::tracing_utils::TestTracing;
+/// use context_trace_legacy::Hypergraph;
+///
+/// #[test]
+/// fn my_test() {
+///     let graph = Hypergraph::default();
+///     let _tracing = TestTracing::init_with_graph("my_test", &graph);
+///     // Test code - tokens will show string representations
+///     // Graph and log file will be cleaned up if test passes
+/// }
+/// ```
+pub mod as_graph_ref {
     use context_trace::logging::tracing_utils::graph_ref::AsGraphRef;
     use crate::{GraphKind, Hypergraph, HypergraphRef};
     impl<G: GraphKind> AsGraphRef<G> for &Hypergraph<G> {

@@ -6,7 +6,7 @@
 //! Deviation from legacy: the guards do not `Deref` to a concrete store;
 //! they *are* [`GraphRead`] / [`GraphWrite`] views, and the write guard only
 //! exposes the sealed write primitives (insert plan D8). The legacy traits
-//! of the same name stay untouched in `context_trace::legacy`.
+//! of the same name stay untouched in `context_trace_legacy`.
 
 use crate::{
     AtomOf,

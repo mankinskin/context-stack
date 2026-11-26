@@ -1,12 +1,9 @@
 //! Frozen copy of the row-independent cursor typestates (formerly promoted
-//! to `context_search::cursor`).
-//! Cursor typestates shared by the row-model (`legacy`) and positioned
-//! search: state markers, the generic [`PathCursor`] and [`Checkpointed`].
-//!
-//! Promoted from `legacy::cursor` (plan 2.0, Decision 7.3). Only
-//! row-independent parts live here; row-specific impls (paths, `ChildCursor`,
-//! `StateAdvance`) stay in `legacy::cursor`. The positioned cursors
-//! ([`QueryCursor`], [`ChildCursor`]) live in `query.rs` and `child.rs`.
+//! to `context_search::cursor`): state markers, the generic [`PathCursor`]
+//! and [`Checkpointed`]. Row-specific impls (paths, `ChildCursor`,
+//! `StateAdvance`) live in the parent module `crate::cursor`. Kept whole,
+//! so parts the row model does not use are allowed to be dead.
+#![allow(dead_code, unused_imports)]
 
 use context_trace::AtomPosition;
 use std::marker::PhantomData;

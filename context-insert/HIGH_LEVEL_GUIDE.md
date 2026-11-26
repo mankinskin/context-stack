@@ -1,7 +1,8 @@
 # Context-Insert: High-Level Overview
 
-> **Legacy only.** This guide describes the row-model insertion in
-> `context_insert::legacy` (`InitInterval`, split cache, join frontier). The
+> **Legacy only.** This guide describes the row-model insertion in the crate
+> [`context-insert-legacy`](../context-insert-legacy/README.md)
+> (`context_insert_legacy`: `InitInterval`, split cache, join frontier). The
 > positioned insertion (`insert_match`, split graph with roles, bottom-up
 > join through `GraphEdit`) is documented in the crate
 > [README](README.md#positioned-insertion) and in
@@ -67,7 +68,7 @@ let init = InitInterval::from(incomplete_response);
 - **cache**: Trace information from the search
 - **end_bound**: Position in root token where we need to extend
 
-`end_bound` comes from `cursor_position()` (`legacy/interval/init.rs`): the
+`end_bound` comes from `cursor_position()` (`context-insert-legacy/src/interval/init.rs`): the
 query position of the candidate if present, else of the checkpoint. For an
 `EntireRoot` match it equals the token width.
 - `checkpoint_position()` - Confirmed match extent
@@ -194,8 +195,8 @@ pub trait InsertResult {
 ### Basic Pattern Insertion
 
 ```rust
-use context_insert::{ToInsertCtx, InitInterval};
-use context_search::Searchable;
+use context_insert_legacy::{ToInsertCtx, InitInterval};
+use context_search_legacy::Searchable;
 
 // First, search to see if pattern exists
 let query = vec![a, b, c, d];
@@ -498,7 +499,7 @@ response.cursor_position() -> AtomPosition
 
 **Current implementation:**
 ```rust
-// legacy/interval/init.rs
+// context-insert-legacy/src/interval/init.rs
 impl From<Response> for InitInterval {
     fn from(state: Response) -> Self {
         // For EntireRoot matches this equals the token width.
@@ -757,10 +758,10 @@ fn test_init_interval_structure() {
 
 ```bash
 # All insertion logging
-RUST_LOG=context_insert=debug cargo test
+RUST_LOG=context_insert_legacy=debug cargo test
 
 # Specific module
-RUST_LOG=context_insert::split=trace cargo test
+RUST_LOG=context_insert_legacy::split=trace cargo test
 
 # With test output
 RUST_TEST_LOG_STDOUT=1 RUST_LOG=debug cargo test my_test -- --nocapture

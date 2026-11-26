@@ -58,20 +58,10 @@ pub use writers::{
 /// }
 /// ```
 ///
-/// With a test graph (automatically registers and clears on drop):
-// Example needs the row model; compiled only with `legacy`.
-#[cfg_attr(feature = "legacy", doc = "```no_run")]
-#[cfg_attr(not(feature = "legacy"), doc = "```ignore")]
-/// use context_trace::{init_test_tracing, legacy::Hypergraph};
-///
-/// #[test]
-/// fn my_test() {
-///     let graph = Hypergraph::default();
-///     // ... build graph ...
-///     let _tracing = init_test_tracing!(graph);
-///     // Tokens will now show string representations
-/// }
-/// ```
+/// With a test graph (automatically registers and clears on drop), any
+/// graph implementing [`AsGraphRef`](graph_ref::AsGraphRef) can be passed as
+/// `init_test_tracing!(graph)`; the row-model example lives in
+/// `context_trace_legacy::graph::test_graph::as_graph_ref`.
 #[macro_export]
 macro_rules! init_test_tracing {
     // No arguments - basic initialization

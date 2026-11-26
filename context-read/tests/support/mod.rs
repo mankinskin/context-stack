@@ -1,12 +1,9 @@
-//! Oracle fixture support with two explicit lanes, each with its own
-//! scenario manifest:
+//! Oracle fixture support for the v3 positioned lane ([`positioned`]:
+//! `tests/fixtures/v3/<name>.json`, authoritative manifest
+//! `v3/scenarios.json`). The frozen v2 row lane lives in
+//! `context-read-legacy/tests/fixtures/v2`.
 //!
-//! - [`legacy`]: frozen v2 row fixtures (`tests/fixtures/v2/<name>.json`,
-//!   manifest `v2/scenarios.json`).
-//! - [`positioned`]: v3 positioned fixtures (`tests/fixtures/v3/<name>.json`,
-//!   authoritative manifest `v3/scenarios.json`).
-//!
-//! This module holds what both lanes share: manifest and file loading.
+//! This module holds manifest and file loading.
 pub mod positioned;
 
 pub use ngrams::output::Scenario;

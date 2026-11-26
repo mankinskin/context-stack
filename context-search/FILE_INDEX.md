@@ -1,288 +1,54 @@
 # context-search File Index
 
-## Legacy / positioned split (2026-11-19)
+## Legacy / positioned split
 
-All modules (`compare/`, `container/`, `cursor/`, `logging/`, `match/`,
-`policy.rs`, `search/`, `state/`, `tests/`) live in `src/legacy/`, gated by the
-default-on `legacy` feature, and are imported as `context_search::legacy::…`
-(e.g. `Find`, `Searchable`, `Response`). `container/` and `logging/` depend on
-row types and are promoted to the root only when positioned code needs them.
-The module paths below refer to `src/legacy/…`.
+The row-model search lives in the crate
+[`context-search-legacy`](../context-search-legacy/README.md)
+(`context_search_legacy::…`); its files are not indexed here. This crate
+holds the positioned search only; its module layout and names mirror the
+legacy search, only navigation (positions instead of rows) differs.
 
-**Rule:** no new code in `legacy`; only fixes needed to keep the legacy tests green. New (positioned-model) code goes into the root modules and must not depend on `legacy` (checked by `cargo check -p context-trace -p context-search -p context-insert -p context-read --no-default-features --features test-api`). Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
+**Rule:** the legacy crates are frozen (no new code). New (positioned-model) code goes into this crate and must not depend on the legacy crates. Plan: `context-read/agents/plans/20261119_PLAN_POSITIONED_MIGRATION_PREPARATION.md`.
 
-**Generated:** 2025-11-23  
-**Updated:** 2025-11-23 (Post-Phase 1 Complete)  
-**Git Commit:** f23260f  
-**Commit Date:** 2025-11-23  
-**Commit Message:** refactor: extract standalone tools and reorganize deps  
-**Status:** ✅ Phase 1 Complete - All Large Files Split!
-
-**Total:** 56 files, 8,273 lines  
-**Largest File:** 497 lines (test file, down from 815!)  
-**Files >500:** 0 (was 3) ✅
-
-## Summary Statistics
-
-| Category | Files | Lines | % of Total |
-|----------|-------|-------|------------|
-| Match | 3 | 1,257 | 15.4% |
-| Compare | 3 | 919 | 11.2% |
-| State | 7 | 1,360 | 16.6% |
-| Search | 6 | 579 | 7.1% |
-| Cursor | 5 | 707 | 8.6% |
-| Tests | 10 | 2,661 | 32.5% |
-| Logging | 2 | 357 | 4.4% |
-| Other | 10 | 341 | 4.2% |
-
-## Files by Size Category
-
-### ✅ All Large Files Split! (Phase 1 Complete)
-
-**Previously >500 lines (now split):**
-- ✅ match/root_cursor.rs (815 → 434 lines largest)
-- ✅ compare/state.rs (725 → 369 lines largest)
-- ✅ tests/state_advance.rs (544 → 346 lines largest)
-- ✅ state/start.rs (424 → 226 lines largest)
-
-### 🟡 Largest Files Now (400-500 lines) - Test Files, Acceptable
-| Lines | File | Purpose | Status |
-|-------|------|---------|--------|
-| 497 | tests/state_advance_integration.rs | Integration tests | Test file ⚠️ Has 6 failing tests |
-| 434 | tests/search/ancestor.rs | Ancestor search tests | Well-organized ✅ |
-| 434 | match/root_cursor/advance.rs | Cursor advancement logic | Post-split ✅ |
-
-### 🟡 Large (300-500 lines) - Review for Splitting
-| Lines | File | Purpose |
-|-------|------|---------|
-| 497 | tests/state_advance_integration.rs | Integration tests |
-| 434 | tests/search/ancestor.rs | Ancestor search tests |
-| 424 | state/start.rs | Start state logic |
-| 369 | tests/examples.rs | Example tests |
-| 368 | tests/traversal.rs | Traversal tests |
-| 350 | state/end/mod.rs | End state logic |
-| 345 | search/mod.rs | Main search module |
-| 319 | logging/mod.rs | Logging utilities |
-
-### 🟢 Medium (200-299 lines) - Monitor
-| Lines | File |
-|-------|------|
-| 293 | cursor/mod.rs |
-| 276 | match/iterator.rs |
-
-### ✅ Small (<200 lines) - Good Size
-31 files under 200 lines (well-structured)
+**Updated:** 2026-11-26 (legacy extraction)
 
 ## Module Organization
 
-### match/ (3 files, 1,257 lines)
-**Purpose:** Match iteration and root cursor logic
-
 ```
-match/
-├── root_cursor.rs (815) - 🔴 SPLIT: Root cursor operations
-├── iterator.rs (276)
-└── mod.rs (166)
-```
-
-**Issues:**
-- `root_cursor.rs` (815) - Largest file, complex root cursor logic
-  - Should split into: initialization, advancement, state transitions
-
-### compare/ (3 files, 919 lines)
-**Purpose:** Token comparison and state management
-
-```
-compare/
-├── state.rs (725) - 🔴 SPLIT: CompareState operations
-├── parent.rs (116)
-├── iterator.rs (78)
-└── mod.rs (3)
-```
-
-**Issues:**
-- `state.rs` (725) - Recently refactored but still large
-  - Contains: state transitions, prefix decomposition, cursor advancement
-  - Could split into: core state, transitions, decomposition
-
-### state/ (7 files, 1,360 lines)
-**Purpose:** Search state machine and state types
-
-```
-state/
-├── start.rs (424) - 🟡 SPLIT: Start state logic
-├── end/ (4 files, 578 lines)
-│   ├── mod.rs (350) - 🟡 SPLIT: End state core
-│   ├── postfix.rs (91)
-│   ├── range.rs (79)
-│   └── prefix.rs (58)
-├── matched/ (1 file, 119 lines)
-│   └── mod.rs (119)
-├── result.rs (97)
-├── inner_kind.rs (48)
-└── mod.rs (91)
-```
-
-**Issues:**
-- `start.rs` (424) - Start state initialization and transitions
-- `end/mod.rs` (350) - End state logic, multiple match types
-
-### search/ (6 files, 579 lines)
-**Purpose:** Search algorithms and entry points
-
-```
-search/
-├── mod.rs (345) - 🟡 REVIEW: Main search logic
-├── context.rs (93)
-├── bft.rs (74)
-├── final_state.rs (50)
-├── searchable.rs (26)
-└── ext.rs (21)
-```
-
-**Issues:**
-- `mod.rs` (345) - Core search implementation
-  - Could extract: algorithm variants, result handling
-
-### cursor/ (5 files, 707 lines)
-**Purpose:** Cursor types for query traversal
-
-```
-cursor/
-├── mod.rs (293) - Monitor growth
-├── checkpointed.rs (194)
-├── path.rs (142)
-├── state_machine.rs (47)
-└── position.rs (31)
-```
-
-**Structure:** Well-organized, manageable sizes
-
-### tests/ (10 files, 2,661 lines)
-**Purpose:** Unit and integration tests
-
-```
-tests/
-├── state_advance.rs (544) - 🔴 SPLIT: State tests
-├── state_advance_integration.rs (497) - 🟡 SPLIT: Integration tests
-├── search/ (4 files, 838 lines)
-│   ├── ancestor.rs (434) - 🟡 SPLIT: Ancestor search tests
-│   ├── mod.rs (183)
-│   ├── consecutive.rs (116)
-│   └── parent.rs (105)
-├── examples.rs (369) - 🟡 SPLIT: Example tests
-├── traversal.rs (368) - 🟡 SPLIT: Traversal tests
-├── macros.rs (17)
-└── mod.rs (5)
-```
-
-**Issues:**
-- Large test files make debugging harder
-- Should group by feature/component
-
-### logging/ (2 files, 357 lines)
-**Purpose:** Debug logging and formatting
-
-```
-logging/
-├── mod.rs (319) - 🟡 REVIEW: Logging utilities
-└── cursor_format.rs (38)
-```
-
-### container/ (4 files, 150 lines)
-**Purpose:** State container and traversal order
-
-```
-container/
-├── bft.rs (72)
-├── dft.rs (45)
-├── order.rs (17)
-└── mod.rs (16)
-```
-
-**Structure:** Good, small focused files
-
-### traversal/ (2 files, 143 lines)
-**Purpose:** Traversal policies
-
-```
-traversal/
-├── mod.rs (80)
-└── policy.rs (63)
-```
-
-## Recommendations
-
-### Immediate Action (>500 lines)
-1. **match/root_cursor.rs** (815) → Split into:
-   - `root_cursor/core.rs` - RootCursor struct and basic operations
-   - `root_cursor/advance.rs` - Advancement logic
-   - `root_cursor/state.rs` - State transitions
-
-2. **compare/state.rs** (725) → Split into:
-   - `state/core.rs` - CompareState struct and basic operations
-   - `state/transitions.rs` - State transition logic
-   - `state/decomposition.rs` - Token decomposition (prefix methods)
-
-3. **tests/state_advance.rs** (544) → Split by test category:
-   - Group related tests together
-   - Consider splitting by state type being tested
-
-### Review Soon (300-500 lines)
-4. **tests/state_advance_integration.rs** (497) → Split by scenario
-5. **tests/search/ancestor.rs** (434) → Split by test type
-6. **state/start.rs** (424) → Extract state transition logic
-7. **tests/examples.rs** (369) → Split by example type
-8. **tests/traversal.rs** (368) → Split by traversal mode
-9. **state/end/mod.rs** (350) → Extract match type handlers
-10. **search/mod.rs** (345) → Extract algorithm variants
-11. **logging/mod.rs** (319) → Split logging utilities
-
-### Module Restructuring Opportunities
-
-#### compare/ module
-Current structure is flat but logical. Could benefit from:
-```
-compare/
+src/
+├── lib.rs (32) - exports `Find`, `Searchable`, `Response`, `SearchError`
+├── error.rs (42) - `SearchError`
+├── policy.rs (58)
+├── cursor/ - cursor typestates and checkpoints
+│   ├── mod.rs (164)
+│   ├── checkpointed.rs (314)
+│   ├── query.rs (71) - `QueryCursor`
+│   ├── child.rs (63) - `ChildCursor`
+│   └── state_machine.rs (47)
+├── compare/
+│   ├── mod.rs (5)
+│   ├── iterator.rs (51)
+│   ├── parent.rs (91)
+│   └── state/ (core.rs 108, decomposition.rs 92, transitions.rs 110, mod.rs 17)
+├── match/
+│   ├── mod.rs (283)
+│   ├── iterator.rs (123)
+│   └── root_cursor/ (core.rs 116, advance.rs 84, mod.rs 13)
+├── search/
+│   ├── mod.rs (185)
+│   ├── context.rs (45)
+│   ├── searchable.rs (167)
+│   └── stats.rs (126)
 ├── state/
-│   ├── core.rs - CompareState struct
-│   ├── transitions.rs - State transitions
-│   ├── decomposition.rs - Prefix decomposition
-│   └── mod.rs
-├── parent.rs
-├── iterator.rs
-└── mod.rs
-```
-
-#### match/ module
-Need better organization:
-```
-match/
-├── root_cursor/
-│   ├── core.rs - RootCursor struct
-│   ├── advance.rs - Advancement logic
-│   ├── state.rs - State management
-│   └── mod.rs
-├── iterator.rs
-└── mod.rs
-```
-
-#### state/ module
-Already hierarchical but some files too large:
-```
-state/
-├── start/
-│   ├── core.rs - Start state struct
-│   ├── transitions.rs - Transition logic
-│   └── mod.rs
-├── end/
-│   ├── core.rs - End state struct
-│   ├── postfix.rs
-│   ├── range.rs
-│   ├── prefix.rs
-│   └── mod.rs
-├── matched/mod.rs
-├── result.rs
-├── inner_kind.rs
-└── mod.rs
+│   ├── mod.rs (5)
+│   ├── start.rs (82)
+│   ├── matched.rs (334)
+│   └── response.rs (124)
+└── tests/
+    ├── mod.rs (5)
+    ├── search.rs (342)
+    ├── deep.rs (250)
+    ├── exhaustive.rs (585)
+    ├── validate.rs (335)
+    └── util.rs (112)
 ```

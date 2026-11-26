@@ -1,26 +1,16 @@
 //! Row-model search (legacy).
 //!
-//! Frozen: no new code here, only fixes needed to keep the legacy tests
-//! green. New code lives in the crate root modules and must not depend on
-//! this module.
+//! Extracted from `context_search::legacy`. Frozen: no new code here, only fixes needed
+//! to keep the legacy tests green. New code lives in `context-search` and must
+//! not depend on this crate.
 #![feature(test)]
 #![feature(type_changing_struct_update)]
 #![deny(clippy::disallowed_methods)]
 extern crate test;
 
-// Mirror root items (incl. `#[macro_export]` macros) into this namespace.
-
-
-// Shadows the positioned root `compare` on purpose.
-#[allow(hidden_glob_reexports)]
 pub(crate) mod compare;
 pub mod container;
-// Shadows the promoted root `cursor` on purpose; re-exports it plus the
-// row-specific cursor parts.
-#[allow(hidden_glob_reexports)]
 pub(crate) mod cursor;
-// Shadows the positioned root `match` on purpose.
-#[allow(hidden_glob_reexports)]
 pub(crate) mod r#match;
 pub mod policy;
 pub mod search;

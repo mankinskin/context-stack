@@ -14,6 +14,10 @@ context-stack is the standalone repository for the extracted graph, search, inse
 | [context-search](context-search/README.md) | Search and traversal layers built on the trace crate. | [context-search/README.md](context-search/README.md) |
 | [context-insert](context-insert/README.md) | Insert and mutation workflows for the graph structures. | [context-insert/README.md](context-insert/README.md) |
 | [context-read](context-read/README.md) | Read and expansion workflows on top of the shared graph stack. | [context-read/README.md](context-read/README.md) |
+| [context-trace-legacy](context-trace-legacy/README.md) | Frozen row model (pattern-row `Hypergraph`, paths, trace cache) extracted from context-trace. | [context-trace-legacy/README.md](context-trace-legacy/README.md) |
+| [context-search-legacy](context-search-legacy/README.md) | Frozen row-model search on context-trace-legacy. | [context-search-legacy/README.md](context-search-legacy/README.md) |
+| [context-insert-legacy](context-insert-legacy/README.md) | Frozen row-model insertion (split-join, overlap closure). | [context-insert-legacy/README.md](context-insert-legacy/README.md) |
+| [context-read-legacy](context-read-legacy/README.md) | Frozen row-model reader and its v2 oracle tests. | [context-read-legacy/README.md](context-read-legacy/README.md) |
 | `deps/petgraph/README.md` | Vendored dependency source used by this repository. | `deps/petgraph/README.md` |
 
 Additional folders without repository-level READMEs yet include `context-trace-macros` and `ngrams`; the submodule wiring for the dependency folders is tracked in `.gitmodules`.
@@ -39,3 +43,4 @@ cargo doc --workspace --open
 - `cargo test --workspace` is documented in [The Cargo Book: cargo test](https://doc.rust-lang.org/cargo/commands/cargo-test.html).
 - `cargo doc --workspace --open` is documented in [The Cargo Book: cargo doc](https://doc.rust-lang.org/cargo/commands/cargo-doc.html).
 - Child crate workflows and crate-specific commands live in [context-api/README.md](context-api/README.md), [context-trace/README.md](context-trace/README.md), [context-search/README.md](context-search/README.md), [context-insert/README.md](context-insert/README.md), and [context-read/README.md](context-read/README.md).
+- The `context-*-legacy` crates hold the frozen row model (no new code). Their test suites are ignored by default; run them with `cargo test -p context-trace-legacy -p context-search-legacy -p context-insert-legacy -p context-read-legacy --features legacy-tests,test-api`.

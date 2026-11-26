@@ -1,12 +1,7 @@
-//! Oracle fixture support with two explicit lanes, each with its own
-//! scenario manifest:
+//! Oracle fixture support for the frozen v2 row lane ([`legacy`]:
+//! `tests/fixtures/v2/<name>.json`, manifest `v2/scenarios.json`).
 //!
-//! - [`legacy`]: frozen v2 row fixtures (`tests/fixtures/v2/<name>.json`,
-//!   manifest `v2/scenarios.json`).
-//! - [`positioned`]: v3 positioned fixtures (`tests/fixtures/v3/<name>.json`,
-//!   authoritative manifest `v3/scenarios.json`).
-//!
-//! This module holds what both lanes share: manifest and file loading.
+//! This module holds manifest and file loading.
 pub mod legacy;
 
 pub use ngrams::output::Scenario;
@@ -16,7 +11,7 @@ use std::path::{Path, PathBuf};
 pub const MANIFEST: &str = "scenarios.json";
 
 pub fn fixtures_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../context-read/tests/fixtures")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
 
 /// Scenario manifest of the lane in `dir`.
