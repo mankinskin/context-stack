@@ -52,6 +52,8 @@ git = "https://github.com/mankinskin/petgraph"
 
 [dev-dependencies]
 bincode = "1"
+# The legacy unit tests need the test-only items of context-trace.
+context-trace = { path = "../context-trace", features = ["test-api"] }
 
 
 
