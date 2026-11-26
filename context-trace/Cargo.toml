@@ -59,14 +59,6 @@ git = "https://github.com/mankinskin/petgraph"
 [dev-dependencies]
 bincode = "1"
 
-[[example]]
-name = "insert_manifest"
-required-features = ["test-api"]
-
-[[example]]
-name = "read_manifest"
-required-features = ["test-api"]
-
 [dependencies.serde]
 features = ["derive"]
 version = "^1"

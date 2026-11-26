@@ -56,7 +56,13 @@ fn positioned_fixtures_are_valid_and_match_the_oracle() {
 
 #[test]
 fn insert_fixtures_match_manifest_and_enumeration() {
-    use context_trace::positioned::fixtures::{insert_dir, insert_manifest, manifest};
+    use context_insert::{
+        fixtures::{
+            insert_dir,
+            insert_manifest,
+        },
+    };
+    use context_trace::positioned::fixtures::manifest;
     let entries = manifest(&insert_dir());
     let mut expected = BTreeSet::new();
     for entry in &entries {
@@ -95,7 +101,14 @@ fn insert_fixtures_match_manifest_and_enumeration() {
 
 #[test]
 fn read_fixtures_match_manifest_and_derivation() {
-    use context_trace::positioned::fixtures::{manifest, read_cases, read_dir, read_manifest};
+    use context_trace::positioned::fixtures::manifest;
+    use support::{
+        read_lane::{
+            read_cases,
+            read_dir,
+            read_manifest,
+        },
+    };
     let entries = manifest(&read_dir());
     let mut expected = BTreeSet::new();
     for entry in &entries {
@@ -135,9 +148,16 @@ fn retention_violations(fixture: &PositionedGraphSnapshot) -> Vec<String> {
 
 /// Every oracle graph of all positioned lanes (v3, insert, read) by name.
 fn oracle_graphs() -> Vec<(String, PositionedGraphSnapshot)> {
-    use context_trace::positioned::fixtures::{
-        fixture_snapshots, insert_dir, manifest, read_cases,
+    use context_trace::{
+        positioned::{
+            fixtures::{
+                fixture_snapshots,
+                manifest,
+            },
+        },
     };
+    use context_insert::fixtures::insert_dir;
+    use support::read_lane::read_cases;
     let mut graphs: Vec<(String, PositionedGraphSnapshot)> = fixture_snapshots();
     graphs.extend(manifest(&insert_dir()).into_iter().map(|entry| {
         let path = insert_dir().join(format!("{}.json", entry.name));

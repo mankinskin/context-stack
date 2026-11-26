@@ -3,10 +3,8 @@
 use context_trace::positioned::GraphRead;
 use std::collections::BTreeSet;
 
-use context_trace::positioned::{
-    diff,
-    fixtures::insert_cases,
-};
+use crate::fixtures::insert_cases;
+use context_trace::positioned::diff;
 use pretty_assertions::assert_eq;
 
 use super::{

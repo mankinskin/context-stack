@@ -14,13 +14,15 @@ use std::{
 
 use context_search::Find;
 use crate::edit::Publication;
+use crate::{
+    fixtures::{
+        insert_cases,
+        InsertCase,
+    },
+};
 use context_trace::{
     positioned::{
         diff,
-        fixtures::{
-            insert_cases,
-            InsertCase,
-        },
         PositionedGraphRef,
     },
 };

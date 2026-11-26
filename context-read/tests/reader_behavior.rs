@@ -13,10 +13,18 @@
 mod support;
 
 use context_read::{Commit, Step, StepKind};
-use context_trace::positioned::{
-    diff,
-    fixtures::{read_cases, ReadCase},
-    PositionedGraph, PositionedGraphRef,
+use context_trace::{
+    positioned::{
+        diff,
+        PositionedGraph,
+        PositionedGraphRef,
+    },
+};
+use support::{
+    read_lane::{
+        read_cases,
+        ReadCase,
+    },
 };
 use support::positioned::load_positioned;
 

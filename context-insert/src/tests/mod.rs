@@ -3,6 +3,7 @@
 //! maps; strings are never algorithm input.
 
 mod edit;
+mod fixtures;
 mod insert;
 mod interchange;
 mod split;
@@ -23,21 +24,23 @@ use context_search::{
     Find,
     Response,
 };
+use crate::{
+    fixtures::{
+        insert_cases,
+        InsertCase,
+    },
+};
 use context_trace::{
     AtomPosition,
     BaseGraphKind,
-    Token,
     graph::vertex::VertexIndex,
     positioned::{
+        fixtures::FixtureGraph,
+        interchange::PositionedGraphData,
         Occurrence,
         PositionedGraph,
-        fixtures::{
-            FixtureGraph,
-            InsertCase,
-            insert_cases,
-        },
-        interchange::PositionedGraphData,
     },
+    Token,
 };
 
 pub(crate) fn pos(p: usize) -> AtomPosition {

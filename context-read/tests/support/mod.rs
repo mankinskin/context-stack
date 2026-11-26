@@ -5,6 +5,7 @@
 //!
 //! This module holds manifest and file loading.
 pub mod positioned;
+pub mod read_lane;
 
 pub use ngrams::output::Scenario;
 use std::path::{Path, PathBuf};

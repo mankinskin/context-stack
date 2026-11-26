@@ -7,7 +7,6 @@ use context_trace::{
     positioned::{
         GraphRead,
         VertexNode,
-        interchange::PositionedGraphSnapshot,
     },
 };
 
@@ -48,27 +47,26 @@ fn build_with_edit(
 /// every graph of the v3, insert and read lanes.
 #[test]
 fn table_import_equals_edit_import() {
+    use crate::fixtures::insert_dir;
     use context_trace::positioned::{
-        PositionedGraph,
         fixtures::{
             fixture_snapshots,
-            insert_dir,
+            fixtures_dir,
             manifest,
-            read_dir,
+            snapshot,
         },
+        PositionedGraph,
     };
     let lane = |dir: std::path::PathBuf| {
         manifest(&dir).into_iter().map(move |scenario| {
-            let path = dir.join(format!("{}.json", scenario.name));
-            let snapshot: PositionedGraphSnapshot =
-                serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-            (scenario.name, snapshot)
+            let fixture = snapshot(&dir, &scenario.name);
+            (scenario.name, fixture)
         })
     };
     let graphs: Vec<_> = fixture_snapshots()
         .into_iter()
         .chain(lane(insert_dir()))
-        .chain(lane(read_dir()))
+        .chain(lane(fixtures_dir().join("read")))
         .collect();
     assert!(graphs.len() > 1000, "{} graphs", graphs.len());
     for (name, snapshot) in graphs {

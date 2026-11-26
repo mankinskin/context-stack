@@ -110,7 +110,7 @@ the lane after any change to the v3 fixtures (from the workspace root):
 
 ```bash
 # Rewrite v3/insert/scenarios.json and delete the old case files:
-cargo run -p context-trace --features test-api --example insert_manifest
+cargo run -p context-insert --features test-api --example insert_manifest
 # One oracle graph per case:
 cargo run --release -p ngrams --bin ngrams -- \
   --file context-read/tests/fixtures/v3/insert/scenarios.json \
@@ -121,7 +121,7 @@ cargo run --release -p ngrams --bin ngrams -- \
 corpus equal to the entry's inputs that extends its base scenario's corpus by
 the query, and a manifest equal to a fresh enumeration of the current v3
 fixtures. Tests load the cases with
-`context_trace::positioned::fixtures::insert_cases()`.
+`context_insert::fixtures::insert_cases()`.
 
 #### Read fixtures (`v3/read`)
 
@@ -134,7 +134,7 @@ after any change to the v3 manifest (from the workspace root):
 
 ```bash
 # Rewrite v3/read/scenarios.json and delete the old case files:
-cargo run -p context-trace --features test-api --example read_manifest
+cargo run -p context-read --example read_manifest
 # One oracle graph per case:
 cargo run --release -p ngrams --bin ngrams -- \
   --file context-read/tests/fixtures/v3/read/scenarios.json \
@@ -143,7 +143,7 @@ cargo run --release -p ngrams --bin ngrams -- \
 
 `fixture_validation` requires exactly one file per read manifest entry and a
 manifest equal to the one derived from the v3 manifest. Tests load the cases
-with `context_trace::positioned::fixtures::read_cases()`.
+with `read_cases()` of the test support (`tests/support/read_lane.rs`).
 
 Run the suites separately:
 

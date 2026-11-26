@@ -1,18 +1,23 @@
-//! Write the insert lane manifest `context-read/tests/fixtures/v3/insert/scenarios.json`
-//! (insert plan rev 3, task 3.1.1) and remove the lane's old case files.
+//! Write the read lane manifest `context-read/tests/fixtures/v3/read/scenarios.json`
+//! (reader plan §9.1) and remove the lane's old case files.
 //! Then generate the cases with the `ngrams` CLI (see context-read/README.md).
 //!
 //! ```sh
-//! cargo run -p context-trace --features test-api --example insert_manifest
+//! cargo run -p context-read --example read_manifest
 //! ```
 
-use context_trace::positioned::fixtures::{
-    insert_dir,
-    insert_manifest,
+// The read lane of the integration tests; the example needs only the manifest.
+#[allow(dead_code)]
+#[path = "../tests/support/read_lane.rs"]
+mod read_lane;
+
+use read_lane::{
+    read_dir,
+    read_manifest,
 };
 
 fn main() -> std::io::Result<()> {
-    let dir = insert_dir();
+    let dir = read_dir();
     std::fs::create_dir_all(&dir)?;
     for entry in std::fs::read_dir(&dir)? {
         let path = entry?.path();
@@ -23,7 +28,7 @@ fn main() -> std::io::Result<()> {
             std::fs::remove_file(path)?;
         }
     }
-    let entries: Vec<String> = insert_manifest()
+    let entries: Vec<String> = read_manifest()
         .iter()
         .map(|entry| {
             format!("  {}", serde_json::to_string(entry).expect("serializable"))
@@ -31,6 +36,6 @@ fn main() -> std::io::Result<()> {
         .collect();
     let manifest = dir.join("scenarios.json");
     std::fs::write(&manifest, format!("[\n{}\n]\n", entries.join(",\n")))?;
-    println!("{}: {} insert cases", manifest.display(), entries.len());
+    println!("{}: {} read cases", manifest.display(), entries.len());
     Ok(())
 }

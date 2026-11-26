@@ -3,6 +3,9 @@
 
 /// `GraphEdit`: every mutation of the positioned graph.
 pub mod edit;
+/// The insert lane of the reader fixtures (`test-api`).
+#[cfg(any(test, feature = "test-api"))]
+pub mod fixtures;
 pub mod insert;
 pub mod join;
 pub mod split;
